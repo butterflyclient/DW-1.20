@@ -6,6 +6,7 @@
 #include <limits>
 #include <algorithm>
 #include <chrono>
+#include <set>
 
 namespace services
 {
@@ -54,6 +55,20 @@ namespace services
                              path.c_str(),
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
                 throw std::runtime_error("Account document publication failed");
+        }
+
+        Json validatedDocument(const std::filesystem::path &path, size_t limit)
+        {
+            try
+            {
+                return document(path, limit);
+            }
+            catch (const std::runtime_error &)
+            {
+                // Persisted bounds/schema errors are storage failures, distinct
+                // from a malformed incoming token or typed client stat request.
+                throw std::runtime_error("Validated stats document invalid");
+            }
         }
 
         Reply userState(const std::filesystem::path &directory,
@@ -116,9 +131,7 @@ namespace services
             return old + value;
         }
 
-        Reply writeStats(const std::filesystem::path &directory,
-                         const platform::LobbyIdentity &id,
-                         wire::Reader &p)
+        std::vector<StatRow> parseStats(wire::Reader &p)
         {
             // Same-Replay bdStatsInfo base, then LeaderBoardRow<10>'s typed Int32
             // columns. The next UInt32 starts a row; NAN (20) preserves a column.
@@ -143,12 +156,74 @@ namespace services
             }
             p.end();
             wire::require(!rows.empty());
+            return rows;
+        }
+
+        bool digestText(const std::string &value)
+        {
+            return value.size() == 64 && std::all_of(value.begin(),
+                                                     value.end(),
+                                                     [](char c)
+                                                     {
+                                                         return (c >= '0' && c <= '9') ||
+                                                                (c >= 'a' && c <= 'f');
+                                                     });
+        }
+
+        std::string digest(std::span<const uint8_t> bytes)
+        {
+            std::string result;
+            for (const auto byte : crypto::sha256(bytes))
+            {
+                result += "0123456789abcdef"[byte >> 4];
+                result += "0123456789abcdef"[byte & 15];
+            }
+            return result;
+        }
+
+        Reply applyStats(const std::filesystem::path &directory,
+                         const platform::LobbyIdentity &id,
+                         const std::vector<StatRow> &rows,
+                         const std::string &tokenHash = {},
+                         const std::string &authorizationHash = {})
+        {
             for (const auto &row : rows)
                 if (row.owner != id.userId)
                     return {101, {}, "stats-owner-denied"};
             const auto path = directory / "leaderboard-stats" / std::to_string(id.titleId) /
                               (std::to_string(id.userId) + ".json");
-            auto data = document(path, 256 * 1024);
+            auto data = tokenHash.empty() ? document(path, 256 * 1024)
+                                          : validatedDocument(path, 256 * 1024);
+            if (data.contains("_validated_tokens"))
+            {
+                const auto &receipts = data["_validated_tokens"];
+                try
+                {
+                    wire::require(receipts.is_object() && receipts.size() <= 1024);
+                    for (const auto &entry : receipts.items())
+                        wire::require(
+                            digestText(entry.key()) && entry.value().is_object() &&
+                            digestText(
+                                entry.value().at("authorization_sha256").get<std::string>()) &&
+                            entry.value().at("accepted").is_number_unsigned());
+                }
+                catch (const std::runtime_error &)
+                {
+                    throw std::runtime_error("Validated stats receipt schema invalid");
+                }
+            }
+            if (!tokenHash.empty())
+            {
+                auto &receipts = data["_validated_tokens"];
+                if (receipts.is_null())
+                    receipts = Json::object();
+                if (receipts.contains(tokenHash))
+                    return receipts[tokenHash]["authorization_sha256"] == authorizationHash
+                               ? Reply{0, {}, "validated-stats-retry"}
+                               : Reply{108, {}, "validated-stats-authorization-conflict"};
+                if (receipts.size() >= 1024)
+                    return {108, {}, "validated-stats-receipt-capacity"};
+            }
             for (const auto &row : rows)
             {
                 const auto key = std::to_string(row.board);
@@ -185,10 +260,90 @@ namespace services
                                               std::chrono::system_clock::now().time_since_epoch())
                                               .count());
             }
+            if (!tokenHash.empty())
+                data["_validated_tokens"][tokenHash] = {
+                    {"authorization_sha256", authorizationHash},
+                    {"accepted",
+                     static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                               std::chrono::system_clock::now().time_since_epoch())
+                                               .count())}};
             // Validate/merge the entire batch before one atomic publication. A denied,
             // malformed or overflowing later row never commits earlier rows.
             publish(path, data, 256 * 1024);
-            return {0, {}, "leaderboard-stats-written"};
+            return {0,
+                    {},
+                    tokenHash.empty() ? "leaderboard-stats-written"
+                                      : "server-validated-stats-written"};
+        }
+
+        Reply validatedStats(const std::filesystem::path &directory,
+                             const platform::LobbyIdentity &id,
+                             wire::Reader &p)
+        {
+            // Exact Replay 0x1421286F0: one typed blob, SDK capacity 10240,
+            // no result binding. Its opaque token is never treated as client stats.
+            const auto token = p.blob(10240);
+            p.end();
+            wire::require(!token.empty());
+            const auto tokenHash = digest(token);
+            const auto path =
+                directory / "validated-stats" / std::to_string(id.titleId) / "catalog.json";
+            if (!std::filesystem::exists(path))
+                return {108, {}, "validated-stats-authorization-unavailable"};
+            const auto catalog = validatedDocument(path, 4 * 1024 * 1024);
+            const auto time =
+                static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                          std::chrono::system_clock::now().time_since_epoch())
+                                          .count());
+            const Json *selected = nullptr;
+            std::vector<StatRow> authorized;
+            try
+            {
+                wire::require(catalog.at("schema") == 1 && catalog.at("title") == id.titleId &&
+                              catalog.at("authorizations").is_array() &&
+                              catalog["authorizations"].size() <= 4096);
+                std::set<std::string> hashes;
+                for (const auto &entry : catalog["authorizations"])
+                {
+                    const auto hash = entry.at("token_sha256").get<std::string>();
+                    wire::require(
+                        digestText(hash) && hashes.insert(hash).second &&
+                        entry.at("owner").is_number_unsigned() &&
+                        entry["owner"].get<uint64_t>() != 0 &&
+                        entry["owner"].get<uint64_t>() != UINT64_MAX &&
+                        entry.at("enabled").is_boolean() &&
+                        entry.at("starts").is_number_unsigned() &&
+                        entry.at("expires").is_number_unsigned() &&
+                        (!entry["expires"].get<uint64_t>() || entry["expires"] > entry["starts"]));
+                    const auto bytes = wire::base64(
+                        entry.at("stat_request_base64").get<std::string>(), 256 * 1024);
+                    wire::Reader request{bytes};
+                    auto rows = parseStats(request);
+                    for (const auto &row : rows)
+                        wire::require(row.owner == entry["owner"].get<uint64_t>());
+                    if (hash == tokenHash)
+                    {
+                        selected = &entry;
+                        authorized = std::move(rows);
+                    }
+                }
+            }
+            catch (const std::runtime_error &)
+            {
+                throw std::runtime_error("Validated stats authorization schema invalid");
+            }
+            if (!selected)
+                return {108, {}, "validated-stats-token-unavailable"};
+            if ((*selected)["owner"] != id.userId)
+                return {101, {}, "validated-stats-token-owner-denied"};
+            if ((*selected)["enabled"] != true || (*selected)["starts"].get<uint64_t>() > time ||
+                ((*selected)["expires"].get<uint64_t>() &&
+                 (*selected)["expires"].get<uint64_t>() <= time))
+                return {108, {}, "validated-stats-token-inactive"};
+            const auto authorization = selected->dump();
+            const auto authorizationHash = digest(std::span(
+                reinterpret_cast<const uint8_t *>(authorization.data()), authorization.size()));
+            return applyStats(directory, id, authorized, tokenHash, authorizationHash);
         }
     } // namespace
 
@@ -201,7 +356,9 @@ namespace services
         if (service == 125 && task == 9)
             return userState(directory, id, p);
         if (service == 4 && task == 1)
-            return writeStats(directory, id, p);
+            return applyStats(directory, id, parseStats(p));
+        if (service == 4 && task == 14)
+            return validatedStats(directory, id, p);
         return std::nullopt;
     }
 } // namespace services

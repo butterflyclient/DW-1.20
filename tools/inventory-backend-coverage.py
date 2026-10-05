@@ -17,7 +17,7 @@ DATA = ROOT / "data"
 # Reviewed public dispatch routes. Variant restrictions remain explicit below.
 ROUTES = [
     (3, "legacy teams", "team_services.cpp", [46]),
-    (4, "leaderboards", "account_services.cpp", [1]),
+    (4, "leaderboards", "account_services.cpp", [1, 14]),
     (4, "leaderboards", "leaderboard_services.cpp", [4, 11, 13, 16, 17]),
     (6, "instant messaging", "channel_services.cpp", [14]),
     (8, "public/private profiles", "services.cpp", list(range(1, 9))),
@@ -76,7 +76,7 @@ ROUTES = [
 ]
 GAPS = {
     "3": "Only published legacy team data; broader clan/team SDK families require target evidence.",
-    "4": "Native task 14 validation-token write; verified game leaderboard asset column publication.",
+    "4": "Task 14 applies explicitly trusted local token-hash/stat-batch authorizations with atomic retry receipts. Retail opaque token payload validation and a positive native callback remain unverified. Verified game leaderboard asset column publication remains open.",
     "6": "Offline delivery is unavailable; no unsolicited invented recipient identity.",
     "8": "Full native positive CRUD roundtrip still needs observation.",
     "10": "Full native positive editing/deletion/backup roundtrip still needs observation.",

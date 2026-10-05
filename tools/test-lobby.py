@@ -2032,6 +2032,13 @@ try:
     checks.append(
         "native leaderboard row persistence, replace/add/max/NAN semantics and atomic batch rejection"
     )
+    import validated_stats_fixtures
+
+    validated_stats_fixture = validated_stats_fixtures.exercise(
+        client, directory, title, user, stat_row, blob, checks
+    )
+    # The shared restart gate must include the newly authorized rows/receipts.
+    before = statpath.read_bytes()
     # Exercise public rankings across independently stored owners; only the
     # authenticated owner can write these records through the task API.
     peerstat = statpath.with_name(str(user + 1) + ".json")
@@ -3795,6 +3802,7 @@ try:
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
+    validated_stats_fixtures.check_restart(client, validated_stats_fixture, checks)
     copy_content_fixtures.check_restart(client, copy_fixture, checks)
     user_content_fixtures.check_restart(client, user_content_fixture, checks)
     marketing_fixtures.check_restart(client, marketing_fixture, checks)
