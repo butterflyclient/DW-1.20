@@ -42,8 +42,28 @@ full-lobby rejection, malformed targets, invalid tokens, closed joins, both
 native join fields, exact event layouts/recipients, shared document reads,
 host-only updates, repeated unique membership, cancellation, map withdrawal
 and disband. It launches no map and modifies only isolated fixture data.
-Wire acceptance is separate from native invitation/join completion and
-two-game playability; those positive gates remain to be observed.
+Wire acceptance remains separate from two-game playability.
+
+`tools/native-social-test.py lobby` provisions no new account and uses only the
+existing `native-social` validation identity. It obtains its own matchmaking
+token/lobby through real tasks, binds an unused loopback UDP endpoint, and
+publishes its own presence. It answers only the running game's `INV:\0\0`
+session-info request through service 6/task 14. Replay's actual consumer
+`0x140F1E480` and join-info deserializer `0x14106E1E0` verify the header and full
+129-byte layout: game mode/matchmaking/platform, lobby/tournament IDs, block flag,
+session-present byte, 84-byte common address, 16-byte security key, 8-byte ID.
+No game or DTLS server is emulated by this peer.
+
+The native friend-menu path was exercised with this peer. Replay sent
+`player_id_to_presence_join`; its live matchmaking instance then held the
+assigned lobby ID and peer host ID in states 7/4, with all 27 startup fences
+passing. `tools/record-native-presence-join.py` verifies the process/hash-bound
+observation against the persisted signed request and lobby membership. The
+sanitized receipt is `validation/20261005-native-presence-join.json`.
+The expected final host-connection timeout is explicitly recorded: this proves
+the native session-info exchange and backend lobby assignment, not two-game
+network connectivity or a playable map. The test peer disbands its lobby at the
+end; remove its temporary relationship with `native-social-test.py remove`.
 
 Host migration, cross-lobby merging, automatic public matchmaking fill and
 tournament match scheduling remain separate work.
