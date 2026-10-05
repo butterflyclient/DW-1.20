@@ -2902,6 +2902,11 @@ try:
         (u32, u64, text, boolean),
         checks,
     )
+    import matchmaking_transaction_fixtures
+
+    matchmaking_transaction_fixture = matchmaking_transaction_fixtures.exercise(
+        client, directory, title, user, match_query, (u32, u64, text, boolean), checks
+    )
     import tournament_fixtures
 
     tournament_fixture = tournament_fixtures.exercise(
@@ -3764,6 +3769,9 @@ try:
     checks.append(
         "modern service diagnostics omit header credentials, query values and request bodies"
     )
+    matchmaking_transaction_fixtures.prepare_restart(
+        client, matchmaking_transaction_fixture, (u32, u64, text, boolean), checks
+    )
     client.close()
     c = Client()
     c.task(38, 7, text(credentials["session_token"]))
@@ -3796,6 +3804,7 @@ try:
     process.terminate()
     process.wait(timeout=5)
     output.flush()
+    matchmaking_transaction_fixtures.before_restart(matchmaking_transaction_fixture)
     # Turn on the actual loopback QoS peer for the restart phase. The earlier
     # empty/configured-fleet checks remain unchanged and production is untouched.
     (directory / "qos" / "local-provider.json").write_text('{"enabled":true}')
@@ -3826,6 +3835,9 @@ try:
     ticket = base64.b64decode(auth["server_ticket"])
     key = base64.b64decode(auth["client_ticket"])[97:121]
     client = Client()
+    matchmaking_transaction_fixtures.check_restart(
+        client, matchmaking_transaction_fixture, (u32, u64, text, boolean), checks
+    )
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)

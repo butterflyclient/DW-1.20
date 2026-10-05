@@ -198,6 +198,13 @@ Multipart uploads (58/20â€“21) and owner purchases (80/106 and 80/125) have
 encrypted-wire, real HTTP where applicable, and restart proof. A native positive
 call for those deeper methods has not yet been observed.
 
+Lobby/search/index persistence uses a recoverable flushed transaction. Creation,
+joining, cancellation, host updates and disbanding recover before matchmaking
+reads and server listeners. Real interrupted-write and restart checks are in
+`tools/matchmaking_transaction_fixtures.py`; see
+[docs/matchmaking-transactions.md](docs/matchmaking-transactions.md) for limits
+and the distinction between durable recovery and callback acknowledgement.
+
 `observe-game.py` records the live server process path/hash as well as the game
 image and ASLR-resolved state. New launcher receipts bind the server process too,
 so later evidence cannot silently attach old game observations to a new server.

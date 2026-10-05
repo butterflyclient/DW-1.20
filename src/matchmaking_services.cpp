@@ -1,9 +1,11 @@
 #include <windows.h>
 #include "matchmaking_services.h"
+#include "matchmaking_store.h"
 #include "playlist_catalog.h"
 #include "lobby.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <fstream>
 #include <set>
@@ -163,22 +165,20 @@ namespace services
                                                 event == 2005 || event == 2001 ? mmId : 0});
         }
 
-        void publishSearch(const std::filesystem::path &root,
-                           const platform::LobbyIdentity &id,
-                           const Json &query,
-                           const Json &lobby,
-                           uint64_t mmId)
+        Json searchState(const platform::LobbyIdentity &id,
+                         const Json &query,
+                         const Json &lobby,
+                         uint64_t mmId)
         {
-            publish(root / "searches" / (std::to_string(mmId) + ".json"),
-                    {{"schema", 1},
-                     {"title", id.titleId},
-                     {"user", id.userId},
-                     {"revision", 0},
-                     {"id", mmId},
-                     {"lobby_id", lobby.at("id")},
-                     {"query", query},
-                     {"expires", lobby.at("expires")},
-                     {"active", true}});
+            return {{"schema", 1},
+                    {"title", id.titleId},
+                    {"user", id.userId},
+                    {"revision", uint64_t{0}},
+                    {"id", mmId},
+                    {"lobby_id", lobby.at("id")},
+                    {"query", query},
+                    {"expires", lobby.at("expires")},
+                    {"active", true}};
         }
 
         Json currentLobbies(const std::filesystem::path &root, const platform::LobbyIdentity &id)
@@ -323,11 +323,12 @@ namespace services
                               backend.dump().size() < 16384);
                 const auto assignments = prepareLobbyAssignments(
                     root, id, lobby.at("members"), lobby.at("id").get<uint64_t>());
-                // Write the search first. A failed lobby replacement leaves no
-                // queued notification and the orphan search cannot grant access.
-                publishSearch(root, id, query, lobby, mmId);
-                publish(path, lobby);
-                publish(root / "current-lobbies.json", assignments);
+                const std::array<matchmaking_store::Write, 3> writes = {
+                    matchmaking_store::Write{"lobbies/" + path.filename().string(), lobby},
+                    matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
+                                             searchState(id, query, lobby, mmId)},
+                    matchmaking_store::Write{"current-lobbies.json", assignments}};
+                matchmaking_store::commit(root, id.titleId, writes);
                 wire::Writer result;
                 result.text(Json{{"mm_id", mmId}}.dump());
                 Reply reply{0, {std::move(result.data)}, "matchmaker-presence-join-assigned"};
@@ -450,7 +451,7 @@ namespace services
                               {"id", lobbyId},
                               {"owner", id.userId},
                               {"members", query["members"]},
-                              {"update_id", 1},
+                              {"update_id", uint64_t{1}},
                               {"expires", std::min(time + 3600, id.expires)},
                               {"host_doc", host},
                               {"backend_doc", backend},
@@ -466,9 +467,12 @@ namespace services
                 wire::require(host.dump().size() < 16384 && backend.dump().size() < 16384);
                 const auto assignments =
                     prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
-                publish(root / "lobbies" / (std::to_string(lobbyId) + ".json"), lobby);
-                publishSearch(root, id, query, lobby, mmId);
-                publish(root / "current-lobbies.json", assignments);
+                const std::array<matchmaking_store::Write, 3> writes = {
+                    matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", lobby},
+                    matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
+                                             searchState(id, query, lobby, mmId)},
+                    matchmaking_store::Write{"current-lobbies.json", assignments}};
+                matchmaking_store::commit(root, id.titleId, writes);
                 wire::Writer result;
                 result.text(Json{{"mm_id", mmId}}.dump());
                 Reply reply{0, {std::move(result.data)}, "matchmaker-search-created"};
@@ -487,7 +491,9 @@ namespace services
                 if (state.value("expires", uint64_t{}) <= now())
                     return Reply{108, {}, "matchmaker-search-expired"};
                 state["active"] = false;
-                publish(path, state);
+                const std::array<matchmaking_store::Write, 1> writes = {
+                    matchmaking_store::Write{"searches/" + path.filename().string(), state}};
+                matchmaking_store::commit(root, id.titleId, writes);
                 wire::Writer result;
                 result.boolean(true);
                 return Reply{0,
@@ -509,16 +515,20 @@ namespace services
                 if (lobby.at("owner") != id.userId)
                     return Reply{101, {}, "matchmaker-disband-owner-denied"};
                 const bool already = lobby.value("disbanded", false);
+                std::vector<matchmaking_store::Write> writes;
                 if (!already)
                 {
                     lobby["disbanded"] = true;
                     lobby["disbanded_at"] = now();
                     lobby["host_doc"]["lobby_open"] = false;
                     lobby["host_doc"]["lobby_open_for_pres_join"] = false;
-                    publish(path, lobby);
+                    writes.push_back({"lobbies/" + path.filename().string(), lobby});
                 }
+                std::set<uint64_t> searches;
                 for (const auto &value : lobby["backend_doc"]["player_id_to_mm_id"])
                 {
+                    if (!searches.insert(value.get<uint64_t>()).second)
+                        continue;
                     const auto searchPath =
                         root / "searches" / (std::to_string(value.get<uint64_t>()) + ".json");
                     if (!std::filesystem::exists(searchPath))
@@ -534,9 +544,33 @@ namespace services
                     stream.close();
                     wire::require(search.at("schema") == 1 && search.at("title") == id.titleId &&
                                   search.at("lobby_id") == lobbyId);
-                    search["active"] = false;
-                    publish(searchPath, search);
+                    if (search.at("active") != false)
+                    {
+                        search["active"] = false;
+                        writes.push_back({"searches/" + searchPath.filename().string(), search});
+                    }
                 }
+                auto assignments = currentLobbies(root, id);
+                bool indexChanged = false;
+                for (const auto &user : lobby.at("members"))
+                {
+                    const auto key = std::to_string(user.get<uint64_t>());
+                    if (assignments["lobbies"].contains(key) &&
+                        assignments["lobbies"][key] == lobbyId)
+                    {
+                        assignments["lobbies"].erase(key);
+                        indexChanged = true;
+                    }
+                }
+                if (indexChanged)
+                {
+                    const auto revision = assignments.at("revision").get<uint64_t>();
+                    wire::require(revision != UINT64_MAX);
+                    assignments["revision"] = revision + 1;
+                    writes.push_back({"current-lobbies.json", assignments});
+                }
+                if (!writes.empty())
+                    matchmaking_store::commit(root, id.titleId, writes);
                 if (already)
                     return Reply{0, {}, "matchmaker-lobby-already-disbanded"};
                 wire::Writer push;
@@ -610,7 +644,9 @@ namespace services
                 lobby["host_doc"] = host;
                 lobby["backend_doc"]["update_id"] = revision + 1;
                 lobby["backend_doc"]["update_time"] = now();
-                publish(path, lobby);
+                const std::array<matchmaking_store::Write, 1> writes = {
+                    matchmaking_store::Write{"lobbies/" + path.filename().string(), lobby}};
+                matchmaking_store::commit(root, id.titleId, writes);
                 reply.operation = "matchmaker-host-document-updated";
                 notify(reply, lobby, 2006);
                 return reply;
@@ -624,8 +660,9 @@ namespace services
                                        uint64_t lobbyId,
                                        std::span<const uint64_t> participants)
     {
-        const auto path = directory / "matchmaking" / std::to_string(id.titleId) / "lobbies" /
-                          (std::to_string(lobbyId) + ".json");
+        const auto root = directory / "matchmaking" / std::to_string(id.titleId);
+        matchmaking_store::recover(root, id.titleId);
+        const auto path = root / "lobbies" / (std::to_string(lobbyId) + ".json");
         if (!std::filesystem::exists(path))
             return 108;
         const auto lobby = loadLobby(path, id);
@@ -646,6 +683,7 @@ namespace services
         if (!delivery.lobbyId)
             return true;
         const auto root = directory / "matchmaking" / std::to_string(title);
+        matchmaking_store::recover(root, title);
         const auto path = root / "lobbies" / (std::to_string(delivery.lobbyId) + ".json");
         if (!std::filesystem::exists(path))
             return false;
@@ -684,6 +722,8 @@ namespace services
     {
         if (service != 145)
             return std::nullopt;
+        matchmaking_store::recover(directory / "matchmaking" / std::to_string(id.titleId),
+                                   id.titleId);
         if (auto reply = lobbyServices(directory, id, task, p))
             return reply;
         if (task != 2 && task != 3)

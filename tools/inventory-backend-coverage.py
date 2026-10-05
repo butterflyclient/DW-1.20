@@ -200,7 +200,19 @@ def main():
         tournament_proof = json.loads(tournament_path.read_bytes())
         for task in (20, 29):
             relay_proofs[task] = (tournament_path.name, tournament_proof)
-    for filename in ("relay_provider.cpp", "crypto.cpp", "platform.cpp"):
+    presence_join_path = DATA / "native-presence-join-verification.json"
+    if presence_join_path.exists():
+        relay_proofs[18] = (
+            presence_join_path.name,
+            json.loads(presence_join_path.read_bytes()),
+        )
+    for filename in (
+        "relay_provider.cpp",
+        "crypto.cpp",
+        "platform.cpp",
+        "matchmaking_store.cpp",
+        "matchmaking_store.h",
+    ):
         sources["src/" + filename] = digest(ROOT / "src" / filename)
     marketing_path = DATA / "native-marketing-verification.json"
     marketing_proof = (
@@ -217,9 +229,20 @@ def main():
         )
         if (service, task) == (104, 6) and marketing_proof:
             proof_filename, relay_proof = marketing_path.name, marketing_proof
+        completion = bool(relay_proof and relay_proof.get("passed"))
+        scope = None
+        if (service, task) == (145, 18) and relay_proof:
+            completion = bool(
+                relay_proof.get("native_friend_menu_invitation_handshake_verified")
+                and relay_proof.get("native_presence_join_request_verified")
+                and relay_proof.get("native_assigned_lobby_and_host_verified")
+                and relay_proof.get("native_matchmaking_state") == 7
+                and relay_proof.get("native_lobby_state") == 4
+            )
+            scope = "Friend-menu presence-by-player session exchange and native assigned lobby/host; no playable two-game connection or map"
         native = bool(
             relay_proof
-            and relay_proof.get("passed")
+            and completion
             and relay_proof["server_sha256"] == current_hash
             and relay_proof["game_sha256"] == deployment["sha256"]
         )
@@ -240,6 +263,7 @@ def main():
                 static_fixture_references=references.get((service, task), []),
                 native_positive_completion_verified_current_binary=native,
                 native_completion_evidence="data/" + proof_filename if native else None,
+                native_completion_scope=scope if native else None,
                 native_fence_completion_is_not_per_method_proof=True,
             )
         )

@@ -11,6 +11,7 @@
 #include "marketplace_services.h"
 #include "achievement_services.h"
 #include "matchmaking_services.h"
+#include "matchmaking_store.h"
 #include "tournament_services.h"
 #include "channel_services.h"
 #include "clan_services.h"
@@ -468,6 +469,7 @@ namespace services
         directory = std::filesystem::absolute(data);
         std::filesystem::create_directories(directory / "profiles");
         std::filesystem::create_directories(directory / "storage");
+        matchmaking_store::initialize(directory);
         initializeStartup(directory);
         initializeChannels(directory);
         relay::initialize(directory);

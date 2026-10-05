@@ -38,9 +38,10 @@ and service-store locking; it does not infer connectivity from a presence file.
 for each member. Presence-by-player uses this index rather than choosing an
 arbitrary historical lobby. The index is bounded to 4096 accounts and validated
 before committing new documents. Pre-upgrade lobbies remain accessible by
-explicit lobby ID; successful joins index their members. Files publish through
-flushed atomic replacement. Lobby, search and index are separate replacements,
-so power-loss atomicity across all three files is not yet guaranteed.
+explicit lobby ID; successful joins index their members. Lobby, search and index
+now publish through a flushed transaction with pre-read and startup recovery;
+see [matchmaking-transactions.md](matchmaking-transactions.md) for the commit,
+storage-error and notification semantics.
 
 `tools/lobby_join_fixtures.py`, included by `tools/test-lobby.py`, uses independent
 encrypted clients and two separately provisioned accounts. It covers valid
