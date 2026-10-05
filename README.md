@@ -85,7 +85,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 | Service | Tasks | Behavior |
 |---|---|---|
 | Platform/auth | Signed provider, native auth/legacy/lobby | Persistent identity/resources, signed tickets, credential-bound encrypted protocol 210, connection lifecycle |
-| 8 | 1–8 | Public/private profiles, ownership and deletion |
+| 8 | 1â€“8 | Public/private profiles, ownership and deletion |
 | 10 | 10, 11, 12, 17, 21 | Contextual files/backup and configured publisher files |
 | 12 | 1, 6, 12, 13 | Local string policy, UTF-8/control sanitizer and seconds/milliseconds time |
 | 3 | 46 | Explicit published legacy team catalog, complete DTO and paging |
@@ -105,11 +105,11 @@ its build-specific addresses and task IDs are not blindly transferred.
 | 195 | 1 | Full native scripted-loot proxy transport, explicitly published deterministic script responses and ordered owner-scoped task journals |
 | 50 / 58 | 2, 3, 5, 6, 9, 10, 15, 16, 18, 19, 20 / 5, 6, 18, 20, 21 | Whole-file metadata/listing, real HTTP upload/download/COPY, persistent user/multipart stages, owner-bound upload/copy commits, tags/summaries and safe retry receipts |
 | 125 | 1, 2, 3, 4, 5, 6, 9 | Published achievement definitions/states/activation, complete owner/batch event ingestion, binary/REST retry normalization, archived receipts and user-state JSON |
-| 145 | 2, 3, 4, 8, 9, 10, 13, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 28, 29 | Player/token, real UDP QoS, relay discovery/authentication, playlist catalog, lobby/host CAS and lifecycle; explicitly published tournament registration/state, owned ready/accept/decline/leave/rejoin |
+| 145 | 2, 3, 4, 8, 9, 10, 13, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29 | Player/token, real UDP QoS, relay discovery/authentication, playlist catalog, lobby/host CAS and lifecycle; published tournament lifecycle, host-authorized results, durable conflicts and winner advancement |
 | 197 | 10, 11 | Ordered provisioned-account aliases and explicit invalid slots |
-| 197 | 20–32, 37 | Clan create/query/invite/consent/roles/removal, cooldowns, atomic membership replacement, native role-zero acceptance, active membership, paging, versioned files and pushes 77–84 |
-| 198 | 1–7, 12 | Channel lifecycle/info/members, encrypted messages/whispers and disconnect cleanup |
-| 150 | 1–4 | Published schedules, complete paired packed-array DTOs and member-bound event journaling |
+| 197 | 20â€“32, 37 | Clan create/query/invite/consent/roles/removal, cooldowns, atomic membership replacement, native role-zero acceptance, active membership, paging, versioned files and pushes 77â€“84 |
+| 198 | 1â€“7, 12 | Channel lifecycle/info/members, encrypted messages/whispers and disconnect cleanup |
+| 150 | 1â€“4 | Published schedules, complete paired packed-array DTOs and member-bound event journaling |
 | 152 | 1 | Owner-bound performance batches with signed Int64/NAN and persistent game-type history |
 | 255 | 10 | Native REST; friend lifecycle/pushes, user-list CRUD/metadata/trim/paging, scoped presence/snapshots/subscriptions/offline pushes, achievement events and configured GET |
 
@@ -180,7 +180,7 @@ packages remain a deferred game-build concern.
 
 **Full emulation is not complete.** Remaining areas include:
 
-- Multiuser lobby joining/host migration, automatic tournament bracket scheduling/match assignment/pushes, legacy tournament task 145/21 and remote relay deployment/migration. The published tournament lifecycle is described in [docs/tournaments.md](docs/tournaments.md); registration and persisted-state native callbacks were verified, while ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
+- Multiuser lobby joining/host migration, automatic tournament bracket scheduling/match assignment/pushes and remote relay deployment/migration. The published tournament lifecycle and task-21 result journal are described in [docs/tournaments.md](docs/tournaments.md); registration and persisted-state native callbacks were verified, while result/ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
 - Remaining streaming tasks 50/6 whole-user post, 50/22 and 58/22 live/multipart download. Copy is implemented, but preparation IDs 50/15 and 50/20 are source-oracle contracts without target writer proofs, and positive native copy callbacks remain unobserved. Multipart download's exact bound result reader remains unresolved.
 - Marketplace cross-account gifting, discount publication, inventory-token validation task 80/58, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Cross-account purchases remain unavailable until a multi-account transaction journal exists; a buyer is never debited before an uncommitted gift acknowledgement.
 - Object-store category/list and large-upload completion families, including 193/3, 9, 10, 12 and 24. Request writers for 9/10 are recovered; their exact response bindings still need resolution.
@@ -194,7 +194,7 @@ Native achievement REST ingestion and startup/menu fences were exercised in the
 game. The binary 125/2 batch path has independent encrypted-wire and restart
 coverage; the current game uses REST and has not produced a positive native
 125/2 call. Keep those acceptance claims separate.
-Multipart uploads (58/20–21) and owner purchases (80/106 and 80/125) have independent
+Multipart uploads (58/20â€“21) and owner purchases (80/106 and 80/125) have independent
 encrypted-wire, real HTTP where applicable, and restart proof. A native positive
 call for those deeper methods has not yet been observed.
 
@@ -206,8 +206,8 @@ so later evidence cannot silently attach old game observations to a new server.
 `tools/inventory-backend-coverage.py` joins that target evidence with reviewed
 handler registrations, static fixture call sites and hash-bound native proofs.
 It writes `data/backend-coverage-inventory.json` and a plain-text counterpart.
-The current ledger has 139 known or explicitly reviewed task routes, 128
-registered handlers and 11 known target tasks without handlers. The two copy
+The current ledger has 140 known or explicitly reviewed task routes, 132
+registered handlers and 8 known target tasks without handlers. The two copy
 preparation routes are explicitly labeled as source-oracle contracts rather
 than recovered target constructors. These counts do not include every indirect
 SDK or REST operation; these gaps remain explicit. Fixture source references

@@ -89,14 +89,37 @@ namespace services
 
         Json loadLobby(const std::filesystem::path &path, const platform::LobbyIdentity &id)
         {
-            wire::require(std::filesystem::file_size(path) <= 128 * 1024);
+            if (std::filesystem::file_size(path) > 128 * 1024)
+                throw std::runtime_error("Lobby state exceeds capacity");
             std::ifstream stream(path);
             if (!stream)
                 throw std::runtime_error("Lobby state read failed");
             Json state;
             stream >> state;
-            wire::require(state.at("schema") == 1 && state.at("title") == id.titleId &&
-                          state.at("members").is_array() && state["members"].size() <= 200);
+            const auto valid =
+                state.is_object() && state.at("schema") == 1 && state.at("title") == id.titleId &&
+                state.at("id").is_number_unsigned() && state["id"].get<uint64_t>() &&
+                path.stem().string() == std::to_string(state["id"].get<uint64_t>()) &&
+                state.at("owner").is_number_unsigned() && state["owner"].get<uint64_t>() &&
+                state.at("expires").is_number_unsigned() &&
+                state.at("update_id").is_number_unsigned() && state["update_id"].get<uint64_t>() &&
+                state.at("members").is_array() && !state["members"].empty() &&
+                state["members"].size() <= 200 && state.at("host_doc").is_object() &&
+                state.at("backend_doc").is_object() && state["host_doc"].dump().size() < 16384 &&
+                state["backend_doc"].dump().size() < 16384 &&
+                state["host_doc"].at("listen_server").at("host_player_id") == state["owner"] &&
+                state["host_doc"]["listen_server"].at("host_address").is_string() &&
+                state["backend_doc"].at("lobby_id") == state["id"] &&
+                (!state.contains("disbanded") || state["disbanded"].is_boolean());
+            if (!valid)
+                throw std::runtime_error("Invalid persisted lobby layout");
+            std::set<uint64_t> members;
+            for (const auto &user : state["members"])
+                if (!user.is_number_unsigned() || !user.get<uint64_t>() ||
+                    !members.insert(user.get<uint64_t>()).second)
+                    throw std::runtime_error("Invalid persisted lobby membership");
+            if (!members.contains(state["owner"].get<uint64_t>()))
+                throw std::runtime_error("Persisted lobby host is not a member");
             return state;
         }
 
@@ -400,6 +423,26 @@ namespace services
             return std::nullopt;
         }
     } // namespace
+
+    uint32_t matchmakingHostAuthorized(const std::filesystem::path &directory,
+                                       const platform::LobbyIdentity &id,
+                                       uint64_t lobbyId,
+                                       std::span<const uint64_t> participants)
+    {
+        const auto path = directory / "matchmaking" / std::to_string(id.titleId) / "lobbies" /
+                          (std::to_string(lobbyId) + ".json");
+        if (!std::filesystem::exists(path))
+            return 108;
+        const auto lobby = loadLobby(path, id);
+        if (lobby.value("disbanded", false) || lobby["expires"].get<uint64_t>() <= now())
+            return 108;
+        if (lobby["owner"] != id.userId || !member(lobby, id.userId))
+            return 101;
+        for (const auto user : participants)
+            if (!member(lobby, user))
+                return 101;
+        return 0;
+    }
 
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,
                                   uint32_t title,

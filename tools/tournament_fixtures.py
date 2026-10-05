@@ -135,9 +135,9 @@ def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
         client.task(145, 20, error=102)
         assert enrollment_path.read_bytes() == before
     publish()
-    client.task(145, 21, text("{}"), error=108)
+    client.task(145, 21, text("{}"), error=106)
     checks.append(
-        "Tournament malformed requests roll back, full bracket fixed-array bounds and 64-bit narrowing rejection, publication errors remain storage failures, legacy task 21 unavailable"
+        "Tournament malformed requests roll back, full bracket fixed-array bounds and 64-bit narrowing rejection, publication errors remain storage failures"
     )
 
     peer.task(145, 20, error=14526)
@@ -169,10 +169,232 @@ def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
     checks.append(
         "Tournament account isolation, unassigned participant rejection, shared readiness, owned leave/decline/rejoin and expired publication rejection"
     )
+    result_fixture = exercise_results(
+        client, peer, directory, title, user, peer_user, helpers, checks, catalog
+    )
     return {
         "path": enrollment_path,
         "bytes": enrollment_path.read_bytes(),
+        "state": result_fixture["state"],
+        "result": result_fixture,
+    }
+
+
+def exercise_results(
+    client, peer, directory, title, user, peer_user, helpers, checks, original_catalog
+):
+    u64, text, boolean = helpers
+    root = directory / "tournaments" / str(title)
+    catalog_path = root / "catalog.json"
+    catalog = copy.deepcopy(original_catalog)
+    row = catalog["tournaments"][0]
+    tournament = row["id"]
+
+    def publish(value=catalog):
+        catalog_path.write_text(json.dumps(value), encoding="utf-8")
+
+    def get_state(connection=client):
+        return json.loads(connection.task(145, 20)[1:-1])
+
+    registration = text(
+        json.dumps({"data_center": row["data_center"], "tournament_name": row["name"]})
+    )
+    assert peer.task(145, 29, registration)
+    assert peer.task(145, 23, u64(tournament) + boolean(True)) == []
+    player_root = directory / "matchmaking" / str(title) / "players"
+    info = json.loads((player_root / f"{user}.json").read_text())["info"]
+    assert peer.task(145, 2, text(json.dumps(info))) == []
+    tokens = [
+        int.from_bytes(connection.task(145, 3)[1:], "little")
+        for connection in (client, peer)
+    ]
+    playlist = json.loads(
+        (directory / "playlists" / str(title) / "catalog.json").read_text()
+    )
+    query = {
+        "members": [user, peer_user],
+        "tokens": tokens,
+        "ruleset_payload": {
+            "filter": {
+                "playlist_id": 1,
+                "netcode_version": 1,
+                "playlist_version": playlist["system"]["version"],
+            }
+        },
+    }
+    assert json.loads(client.task(145, 18, text(json.dumps(query)))[1:-1])["mm_id"]
+    kind, push = client.receive()
+    assert kind == 2
+    # The native push contains typed UInt32 event, UInt64 search, UInt64 lobby.
+    assert push[14] == 10
+    lobby = int.from_bytes(push[15:23], "little")
+    assert peer.receive() == (kind, push)
+    lobby_path = directory / "matchmaking" / str(title) / "lobbies" / f"{lobby}.json"
+    lobby_bytes = lobby_path.read_bytes()
+    row["state"]["tournamentStatus"] = "PLAYING"
+    row["state"]["rounds"][0]["matches"][0]["lobbyID"] = lobby
+    publish()
+    result_path = root / "results" / f"{tournament}.json"
+    submission = {
+        "tournamentID": tournament,
+        "lobbyID": lobby,
+        "winningTeamID": 0,
+        "matchResultPayload": {"scores": [6, 4]},
+    }
+
+    def submit(value=submission, connection=client, error=0):
+        return connection.task(145, 21, text(json.dumps(value)), error=error)
+
+    submit(error=101)  # Client registration alone does not accept participation.
+    assert client.task(145, 23, u64(tournament) + boolean(True)) == []
+    enrollment_bytes = (root / "enrollments.json").read_bytes()
+    for mutate in (
+        lambda value: value.update(tournamentID=0),
+        lambda value: value.update(lobbyID=0),
+        lambda value: value.update(winningTeamID=16),
+        lambda value: value.update(winningTeamID=(1 << 32)),
+        lambda value: value.update(winningTeamID=-1),
+        lambda value: value.update(extra=True),
+        lambda value: value["matchResultPayload"].update(scores=[1]),
+        lambda value: value["matchResultPayload"].update(scores=[1, 2, 3]),
+        lambda value: value["matchResultPayload"].update(scores=[1, -1]),
+        lambda value: value["matchResultPayload"].update(scores=[65536, 1]),
+        lambda value: value["matchResultPayload"].update(scores=[1.0, 2]),
+        lambda value: value["matchResultPayload"].update(extra=0),
+    ):
+        invalid = copy.deepcopy(submission)
+        mutate(invalid)
+        submit(invalid, error=106)
+    for invalid in (
+        text("broken"),
+        text("[]"),
+        text(json.dumps(submission)[:-1] + ',"lobbyID":1}'),
+        text(json.dumps(submission)) + u64(1),
+        text("x" * 256),
+    ):
+        client.task(145, 21, invalid, error=106)
+    submit(dict(submission, tournamentID=tournament + 1), error=14529)
+    submit(dict(submission, lobbyID=lobby + 1), error=108)
+    submit(dict(submission, winningTeamID=2), error=101)
+    submit(connection=peer, error=101)
+    assert not result_path.exists()
+    assert (root / "enrollments.json").read_bytes() == enrollment_bytes
+    checks.append(
+        "Replay 145/21 exact typed 256-byte JSON request, duplicate-key/type/range/terminator rejection, accepted enrollment and signed reporting-host isolation"
+    )
+
+    for mutate, error in (
+        (lambda value: value.update(expires=1), 108),
+        (lambda value: value.update(disbanded=True), 108),
+        (lambda value: value.update(members=[user]), 101),
+        (lambda value: value["backend_doc"].update(lobby_id=lobby + 1), 102),
+        (lambda value: value.update(title=title + 1), 102),
+    ):
+        damaged = json.loads(lobby_bytes)
+        mutate(damaged)
+        lobby_path.write_text(json.dumps(damaged))
+        submit(error=error)
+        assert not result_path.exists()
+    lobby_path.unlink()
+    submit(error=108)
+    lobby_path.write_bytes(lobby_bytes)
+    unavailable = copy.deepcopy(catalog)
+    unavailable["tournaments"][0]["state"]["rounds"][0]["matches"][0]["expired"] = True
+    unavailable["tournaments"][0]["state"]["rounds"][0]["matches"][0][
+        "expireReason"
+    ] = 1
+    publish(unavailable)
+    submit(error=108)
+    publish()
+    assert not result_path.exists()
+    assert submit() == []
+    committed = result_path.read_bytes()
+    assert submit() == [] and result_path.read_bytes() == committed
+    submit(dict(submission, winningTeamID=1), error=14536)
+    submit({**submission, "matchResultPayload": {"scores": [7, 4]}}, error=14536)
+    submit(connection=peer, error=101)
+    assert result_path.read_bytes() == committed
+    journal = json.loads(committed)
+    assert journal["title"] == title and journal["tournament"] == tournament
+    assert len(journal["results"]) == 1
+    entry = journal["results"][0]
+    assert entry["reporter"] == user and entry["lobby"] == lobby
+    assert (
+        entry["winner"] == 0 and entry["teams"] == [0, 1] and entry["scores"] == [6, 4]
+    )
+    assert entry["round"] == 0 and entry["match"] == 0 and entry["recorded"] > 0
+    expected = copy.deepcopy(row["state"])
+    expected["rounds"][0]["matches"][0].update(
+        winningTeamID=0, matchResultPayload={"scores": [6, 4]}
+    )
+    assert get_state() == expected and get_state(peer) == expected
+    checks.append(
+        "Tournament result requires a live authenticated host lobby with both published teams; one atomic durable result, exact retry and native 14536 conflict without publication or enrollment mutation"
+    )
+
+    # A separately published sibling result completes the two-child prerequisite.
+    # No synthetic accounts, native memory writes or game match are needed here.
+    row["state"]["rounds"][0]["matches"][1].update(
+        winningTeamID=2, matchResultPayload={"scores": [7, 3]}
+    )
+    publish()
+    publication_bytes = catalog_path.read_bytes()
+    expected["rounds"][0]["matches"][1].update(
+        winningTeamID=2, matchResultPayload={"scores": [7, 3]}
+    )
+    expected["rounds"][1]["matches"][0]["teamIDs"] = [0, 2]
+    assert get_state() == expected and get_state(peer) == expected
+    assert client.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
+    expected["rounds"][1]["matches"][0]["readyPlayerIDs"] = [user]
+    assert get_state() == expected
+    assert catalog_path.read_bytes() == publication_bytes
+    assert result_path.read_bytes() == committed
+    for mutate in (
+        lambda value: value.update(title=title + 1),
+        lambda value: value["results"].append(copy.deepcopy(value["results"][0])),
+        lambda value: value["results"][0].update(winner=2),
+        lambda value: value["results"][0].update(scores=[65536, 0]),
+        lambda value: value["results"][0].update(round=4),
+        lambda value: value["results"][0].update(match=7),
+        lambda value: value["results"][0].update(teams=[1, 0]),
+    ):
+        damaged = json.loads(committed)
+        mutate(damaged)
+        result_path.write_text(json.dumps(damaged))
+        before = result_path.read_bytes()
+        client.task(145, 20, error=102)
+        submit(error=102)
+        assert result_path.read_bytes() == before
+    result_path.write_bytes(committed)
+    for mutate in (
+        lambda value: value["tournaments"][0]["state"]["rounds"][0]["matches"][
+            0
+        ].update(teamIDs=[1, 0]),
+        lambda value: value["tournaments"][0]["state"]["rounds"][1]["matches"][
+            0
+        ].update(teamIDs=[1, 2]),
+        lambda value: value["tournaments"][0]["state"]["rounds"][0]["matches"][
+            1
+        ].update(lobbyID=lobby),
+    ):
+        damaged = copy.deepcopy(catalog)
+        mutate(damaged)
+        publish(damaged)
+        client.task(145, 20, error=102)
+        assert result_path.read_bytes() == committed
+    publish()
+    assert get_state() == expected
+    assert catalog_path.read_bytes() == publication_bytes
+    checks.append(
+        "Tournament two-child winner advancement in native global-team order, round-scoped readiness, full result-journal/publication consistency and corrupt-state preservation"
+    )
+    return {
+        "path": result_path,
+        "bytes": committed,
+        "submission": text(json.dumps(submission)),
         "state": expected,
+        "publication_path": catalog_path,
+        "publication_bytes": publication_bytes,
     }
 
 
@@ -181,4 +403,11 @@ def check_restart(client, fixture, checks):
     assert fixture["path"].read_bytes() == fixture["bytes"]
     checks.append(
         "Tournament enrollment and owned readiness survive backend process restart without changing published bracket or persistent receipt"
+    )
+    result = fixture["result"]
+    assert client.task(145, 21, result["submission"]) == []
+    assert result["path"].read_bytes() == result["bytes"]
+    assert result["publication_path"].read_bytes() == result["publication_bytes"]
+    checks.append(
+        "Tournament result and advancement survive a real backend restart; original authenticated reporter can retry without duplicate writes or published bracket edits"
     )

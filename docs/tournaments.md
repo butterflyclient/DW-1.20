@@ -1,12 +1,12 @@
 # Replay tournament publication and owned lifecycle
 
-The server implements Replay tasks 145/19, 20, 22, 23, 28 and 29. These are
+The server implements Replay tasks 145/19, 20, 21, 22, 23, 28 and 29. These are
 backend handlers, without game executable changes or fabricated native fences.
 The implementation uses an explicit published bracket. Automatic scheduling,
-forming teams from matchmaking parties, match assignment, tournament push
-notifications and result advancement remain separate work. Legacy task 145/21
-has a recovered string request but no reviewed domain contract, and remains
-unavailable. Task 145/27 from another source build is not silently substituted.
+forming teams from matchmaking parties, match assignment and tournament push
+notifications remain separate work. Host-authorized result submissions persist
+the scores and advance winners in the published bracket. Task 145/27 from another
+source build is not silently substituted.
 
 The following evidence comes from the original Replay executable and its
 SQLite export; display aliases in that export can be misleading:
@@ -15,6 +15,7 @@ SQLite export; display aliases in that export can be misleading:
 | --- | --- | --- |
 | `0x142136110` | 145/19 ready | UInt64 tournament ID, UInt64 `0xFFFFFFFF`; no result binding |
 | existing 145/20 writer, game `0x141075F30` | 145/20 state | No parameters; one `bdStringResult`, native callback `0x141077F20` accepts not-enrolled error 14526 |
+| `0x1421366F0`, game `0x141076A10` | 145/21 result | One typed JSON string in a native 256-byte buffer; no bound result |
 | `0x142135B60` | 145/22 leave all | No parameters or result binding |
 | `0x142135260` | 145/23 acknowledge join | UInt64 tournament ID, typed Boolean accept; no result binding |
 | `0x142136330` | 145/28 rejoin | UInt64 tournament ID; no result binding |
@@ -86,6 +87,9 @@ replacement. Ready-up affects the first unfinished match for that player and
 is visible to both participants. Accept and rejoin preserve readiness. Decline
 and leave remove only the authenticated user's enrollment. Leaving is
 idempotent and can succeed even if a catalog has become invalid or unavailable.
+New ready-up records include the native round and match indices. They cannot
+automatically ready a player for the next round after a result arrives. Legacy
+records without these indices apply only to round zero.
 After a backend restart, authenticated reconnects recover enrollment and
 readiness. Expired or removed publications cannot produce a positive state.
 
@@ -94,8 +98,59 @@ published JSON returns storage failure 102. Unpublished registration returns
 108; unassigned users receive 101; absent enrollment or an expired bracket
 returns Replay's player-not-in-tournament 14526.
 
+## Host-authorized results and advancement
+
+The exact request produced by Replay `0x141076A10` is:
+
+```json
+{
+  "tournamentID": 173,
+  "lobbyID": 174,
+  "winningTeamID": 0,
+  "matchResultPayload": {"scores": [6, 4]}
+}
+```
+
+Both IDs are nonzero UInt64 values. The winning team is a global bracket index,
+not a local score index; both scores are UInt16 values. The request contains
+exactly these four keys, and the payload contains only the two scores. Duplicate
+keys, trailing wire fields, floats, negative values and narrowing overflow are
+rejected before mutation.
+
+The signed player must accept enrollment, belong to the reported match and own
+its actual title-scoped matchmaking lobby. Both assigned teams must have members
+present in that lobby. The lobby must be live and undisbanded, and the match must
+be published as PLAYING, unexpired and have both previous winners available for
+later rounds. No request-supplied user ID can grant authority. The shared lobby
+reader validates the persisted envelope, membership, host document and lobby ID
+before authorization. Missing or inactive lobbies remain unavailable.
+
+`results/<tournamentID>.json` stores a single atomic journal with `schema`,
+`title`, `tournament` and `results`. Each accepted entry records `round`, `match`,
+`lobby`, `reporter`, `teams`, `winner`, two `scores` and `recorded` UTC seconds.
+There are at most fifteen unique matches, the maximum in a sixteen-team bracket.
+The original reporting user can repeat the exact result without a write,
+including after a server restart or lobby expiry. A different result for the
+same completed match returns 14536, which the exact Replay completion
+`0x141078610` recognizes as nonretryable. Invalid tournament IDs return its
+other nonretryable error, 14529. A foreign reporting user receives 101.
+
+Task 145/20 derives its document from the current publication and that journal.
+It fills each destination match only once both preceding winners are known,
+preserving left/right score and global-team order. It never invents a next-round
+lobby. Its complete output is validated against Replay's native fixed arrays
+and 16 KiB capacity before returning it. Replay `0x141071680` checks these same
+two-child prerequisites; `0x141074530` reads the winner, team IDs and scores.
+
+Every journal entry must still match its published lobby and assigned teams.
+Reusing an already completed match slot for different teams or a new lobby
+returns storage failure 102 rather than applying an obsolete result. Publish a
+new tournament ID for a different competition. Corrupt or inconsistent state
+is preserved for diagnosis. Results do not rewrite the catalog or enrollment;
+publication edits are observed on the next request without a server restart.
+
 Independent encrypted-wire tests cover these methods, full bracket bounds,
-ownership, retry and process restart. Their passing receipt is distinct from
+ownership, retry, result conflict, advancement and process restart. Their passing receipt is distinct from
 native positive tournament callback validation. The native menu test completed
 registration, parsed the 600.25 search offset through the real callback, and
 displayed the expected countdown. After restarting both game and server, native
@@ -103,5 +158,6 @@ displayed the expected countdown. After restarting both game and server, native
 ID into the rejoin candidate. `record-native-tournament-proof.py` requires those
 two observations and their exact executable hashes. Ready/accept/decline/leave/
 rejoin native callbacks, bracket push rendering and playable tournaments remain
-unverified. No match was started. Menu/startup validation alone does not
+unverified. The native 145/21 positive result callback remains unobserved; its
+protocol fixtures are not a substitute. No match was started. Menu/startup validation alone does not
 establish that a tournament can be played.
