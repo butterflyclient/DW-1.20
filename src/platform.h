@@ -1,0 +1,46 @@
+#pragma once
+#include <filesystem>
+#include <string>
+#include <array>
+#include <span>
+#include <cstdint>
+#include <optional>
+
+namespace platform
+{
+    struct AuthReply
+    {
+        std::string body, signature;
+    };
+
+    void initialize(const std::filesystem::path &directory);
+    std::string login(const std::string &nonce, const std::string &profile = "");
+    void provisionProfile(const std::filesystem::path &directory,
+                          const std::string &profile,
+                          const std::string &name);
+    std::optional<std::string> accountName(uint64_t user);
+    std::string resource(const std::string &request);
+    unsigned sessions();
+    unsigned logins();
+    AuthReply authenticate(const std::string &request);
+    unsigned authentications();
+
+    struct LobbyIdentity
+    {
+        std::array<uint8_t, 24> key{};
+        uint64_t userId = 0, expires = 0;
+        uint32_t titleId = 0, ivSeed = 0, platformAccountId = 0;
+        std::string name;
+    };
+
+    bool authorize(std::span<const uint8_t> ticket,
+                   uint32_t title,
+                   uint32_t seed,
+                   LobbyIdentity &result);
+    bool valid(const LobbyIdentity &identity);
+    // Relay INIT omits the lobby ticket; bind its signed digest to a live session.
+    bool relaySessionMatches(uint32_t title, uint64_t user, std::span<const uint8_t> digest);
+    bool sessionTokenMatches(const LobbyIdentity &identity, const std::string &token);
+    std::string legacyLogin(const std::string &request);
+    unsigned legacyLogins();
+} // namespace platform

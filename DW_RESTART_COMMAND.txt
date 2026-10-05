@@ -1,0 +1,48 @@
+DW REPLAY BACKEND HOT RESTART
+
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Console command: dw_restart
+Progress command: dw_localPlatformStatus
+Stage log: E:\IW8\Builds\1.20-replay\replay-dw-client.log
+
+Backend iteration:
+1. Stop the DW server, build its changes, then start it again.
+2. In the running DW game console, enter dw_restart.
+3. Watch for DW_RESTART_CLEANUP, DW_RESTART_RECONNECT, and
+   DW_RESTART_CONNECTED in replay-dw-client.log.
+
+The command returns an active match to the frontend, waits without blocking
+for the previous provider worker, fails outstanding credential callbacks, and
+uses Replay's native task/lobby cleanup and online sign-out notifications.
+It drains the native login HSM into offline, resets provider/resource caches,
+fetches a fresh signed provider session, and lets native DW authentication and
+online service initialization run again. It does not manufacture ready fences
+or task successes. CONNECTED means the native DW lobby connected; other domain
+fences still depend on their real backend responses.
+The previously verified platform user, account policy and UI client stay
+signed in during this DW-only refresh. Credential availability is separate:
+old tokens cannot complete the new DW login. The command deliberately does
+not use NET_OfflineTransition, which is for loss of platform networking.
+
+Duplicate commands are coalesced. Preparation has a 30-second timeout; the
+reconnect monitor has a 90-second timeout. A failed provider exchange or a
+timeout leaves the command available for another attempt. Status reports the
+restart phase and the actual native DW logon status. The existing game process
+stays open, and local profiles/save files are retained.
+
+Scope: this reloads the online session, not newly compiled EXE/DLL code or
+arbitrary game assets. Install this executable once with the game closed.
+Later server-only iterations can use dw_restart without relaunching the game.
+
+Implementation: integration\replay\DW_LocalPlatform.cpp and DW_LocalResources.cpp.
+Compiled lifecycle checks: tools\verify-dw-endpoints.py, included in the private
+build verification report and enforced by tools\deploy-game.py.
+
+Suggested owner test:
+- Start the DW game and reach multiplayer. Run dw_restart; confirm fresh auth
+  and lobby traffic with the same game PID, then normal online-domain requests.
+- Restart the server, then run dw_restart again. Confirm reconnection.
+- Run dw_restart twice quickly; expect one restart, no duplicate teardown.
+- With the server down, run it once; expect a clear failure. Start the server
+  and retry. During a Shipment match, the command should return to the menus
+  before the DW session is rebuilt.

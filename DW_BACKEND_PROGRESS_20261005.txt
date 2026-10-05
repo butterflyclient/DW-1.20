@@ -1,0 +1,414 @@
+REPLAY DEMONWARE BACKEND -- VERIFIED CONTINUATION STATE
+Written 2026-10-05. This is a progress record, not a declaration of full backend completion.
+
+CURRENT DEPLOYMENT
+
+Server: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 316c8d92b6475db935ffea0463170e78de13d6612c3bc120d1cd486c67678f48
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b0075e0dbde62758efe84e23318084608be5b3704f23c269d87254ce2aea58a8
+Game executable was not modified or rebuilt during these backend iterations.
+Root game working directory is enforced by launch-game.ps1.
+Read current PIDs from data\current-runtime-launch.json and data\server-process.json;
+always reverify live paths/hashes before stopping. Stop game first, then server.
+
+CURRENT BUILD / RUNTIME EVIDENCE
+
+C++20 MSVC /W4 /WX build passed: data\build-server-readable-purchase125.log.
+127 grouped independent encrypted native wire/service checks passed:
+  data\test-lobby-readable-purchase125.log
+  data\lobby-verification.json (binds exact server hash and fixture directory)
+Production platform crypto, signed resource and auth tests also passed with the game closed.
+data\deployment.json binds the unchanged game image to the current server build.
+
+Fresh native game validation on THIS exact build:
+  data\runtime-relay-transport-menu.json
+  data\runtime-relay-transport-stability-start.json
+  data\native-relay-transport-menu.jpg and its capture receipt
+  data\native-backend-menu-verification.json
+  data\native-relay-client-verification.json
+  data\native-relay-transport-verification.json
+The Multiplayer menu and frontend connection reached native state 9.
+Controller 0: all 27 fences passing, none failed.
+Platform auth and connection state 2, native profile sign-in state 2,
+DW HSM connected state 33, native reconciliation passing.
+Actual native achievement REST login event accepted and persisted after launch.
+Native pending presence unsubscribe queue, batch count and errors all zero.
+Observer schema 6 records a verified live server path/hash and matching launcher receipt.
+No map or match tests performed. The owner said those are already good.
+Native relay-client token state 2, reconstructed 77-byte token hash and expiry
+match the issuer. This proves the native task reader and completion callback;
+it does not alone prove UDP relay transport. Separate transport evidence requires
+native NetRelay state 6 and bound SDK association state 3, with decrypted route,
+relay ID, endpoint and verification hash matching the authenticated UDP event.
+Stability compares the unchanged native association for at least 60 seconds and
+requires real keepalive replies with no rebind or rejected packets.
+
+IMPLEMENTED IN THESE ITERATIONS
+
+1. Native presence unsubscribe response and retry storm.
+   src\social_services.cpp returns HTTP 200 with {"errorUsers":[]} after valid
+   idempotent removals. HTTP 204 with no body fails Replay's response binding.
+   Same-Replay ProcessUnsubscriptions 141058A80, request 14212F370,
+   response reader 142141090, callback 141058C50.
+   Positive request/task-cache proof was recorded on the earlier 53796e48 build:
+     data\native-clan-presence-53796e48-verification.json
+     data\native-presence-unsubscribe-latest-verification.json
+   Its historical server hash is preserved; do not relabel it as current-build proof.
+
+2. Complete binary achievement user-event batch 125/2.
+   src\achievement_services.cpp and src\platform.{h,cpp} bind game and first-party
+   owners to signed identity claims, validate all event/batch fields before commit,
+   and retain attribution in the request digest.
+   Native serializers: 14216A3A0 request, 142169D10 user batch,
+   142103540/142103630 event; constructor 142118270 has no result binding.
+   PC platform 113 is the evidenced Replay realm; no guessed platform mappings.
+   Binary URL-safe retry IDs normalize to the same reversed-byte REST UUID used
+   by native 14216A100. Old padded/unpadded raw-token receipts remain readable.
+   256 hot receipts, 1024 recent events, permanent owner/title/context-bound
+   checked archives under data\achievements\<title>\<context>\<owner>\receipts.
+   Archive publication precedes eviction and journal replacement.
+   Corrupt/conflicting journal or archive state is rejected without overwrite.
+   tools\achievement_batch_fixtures.py includes malformed bounds, ownership,
+   cross-transport retries, archive rollover/integrity, old-token migration,
+   interruption states and process-restart checks.
+   Native REST request/persistence is observed. Positive native BINARY 125/2
+   completion is NOT observed: this game naturally selects REST.
+
+3. Restart-persistent real pooled multipart uploads 58/20 and 58/21.
+   src\content_services.cpp implements reserve (-1,-1), signed page bounds,
+   max-ten packed string-array URLs, real HTTP PUT parts, stable capabilities,
+   byte/hash verification and complete contiguous-part commit.
+   Native request constructors 14213D580 / 14213D030; packed URL result reader
+   142164040, ten 1025-byte slots. 58/21 uses the same file-ID result as 58/6.
+   Part staging: data\content-streaming\<title>\multipart.json.
+   Immutable parts and assembled bytes precede atomic catalog publication;
+   staging removal follows it. Retrying after interrupted cleanup reuses the ID.
+   Limits: 128 active sessions, 1024 parts/file, 16 MiB/file and 64 MiB pending
+   data per title alongside whole-file uploads held in memory.
+   tools\multipart_content_fixtures.py verifies actual HTTP bytes, empty parts,
+   pages, forged/expired capabilities, peer denial, failed/incomplete/extra
+   commits, damaged data, interrupted cleanup and restart/resume.
+   Positive native 58/20-21 completion is NOT observed.
+   Do not reuse bdFileMetaData for multipart downloads: 58/22 and 50/22 bind
+   a different live-streaming result whose exact native reader is unresolved.
+
+4. Atomic owner marketplace purchase task 80/106.
+   src\marketplace_services.cpp parses every optional array, source byte and
+   entitlement boolean, validates explicit offers/rules, debits published prices,
+   grants declared inventory/currencies and writes a checksummed retry receipt
+   in ONE inventory-file replacement.
+   Native request 1421295B0; result 14213EB00; coupon reader 14215CF20.
+   Important correction to earlier research notes: 1420F0680 writes UByte8
+   customSourceType, followed by 1420EFFA0 writing Bool ignoreEntitlements.
+   Do NOT reverse these last two fields.
+   Full bound coupon fields: string ID, owner context account, claimed Bool,
+   product UInt32, buyer context account, SKU/rental/expiry UInt32, type Int32.
+   The native result loop is UByte8: no response may contain more than 255 coupons.
+   Explicit publication:
+     data\marketplace\<title>\catalog.json (full SKU fields and prices)
+     data\marketplace\<title>\purchase-rules.json
+   Rule schema 1: rules array; each rule has sku, enabled, sources,
+   maximum_quantity, allow_ignore_entitlements, items and currencies.
+   No production SKU/price/grant was fabricated or published for this test.
+   Existing ordinary account/player data was preserved; fixtures used isolated data.
+   A nonempty transaction ID gives an exact retry. The native loot-crate caller
+   14103EA60 sends an empty ID; separate empty requests are distinct intents and
+   return a generated 24-character transaction ID usable for later retry.
+   Do not deduplicate identical empty-ID requests by request body: that would
+   silently discard separately intended purchases.
+   Cross-account gifts and nonzero discounts remain unavailable. They do not
+   debit the buyer. Gifts require a multi-account commit journal first.
+   Native API receipt limits: 4096 purchase receipts; coupon-enabled quantities
+   are additionally bounded to 4096 per request. Inventory limits remain intact.
+   tools\purchase_fixtures.py checks exact native result bytes, real wallet/item
+   mutations, metadata, full parser bounds, source/tag order, failed publication,
+   funds/overflow/sale checks, receipt corruption, distinct empty IDs and restart.
+   Positive native 80/106 completion is NOT observed. This current game registers
+   no Lua execution/purchase test command; do not rebuild its EXE solely to claim
+   fixture results as a native callback.
+
+CONTINUATION TARGETS -- FULL BACKEND STILL INCOMPLETE
+
+Observed live gap: task 145/26 relay authentication still returns unavailable.
+Native RELAY fence passing is NOT evidence of a working relay transport.
+Implement the actual bound token and association/UDP forwarding protocol,
+not fabricated relay credentials or a generic success DTO.
+
+Other remaining areas:
+  Cross-account gifts, discount rules and remaining marketplace/token tasks.
+  Multiuser lobby join/host migration and remaining tournaments.
+  Streaming 50/16 copy, 50/22 and 58/22 live/multipart download bindings.
+  Objectstore category/list and large-upload families 193/3,9,10,12,24.
+  Published achievement progression/reward/quest rules and loot generation.
+  Categorized mail and leaderboard validation tokens.
+  Native positive completion for deeper scheduled/performance/content/purchase,
+  challenge-response and binary achievement operations, beyond wire fixtures.
+  Remote deployment and additional-profile selection from inside this game.
+README.md contains the broader implemented-task table and persistent schemas.
+
+RESEARCH ALREADY AVAILABLE; PRESERVE IT
+
+data\native-service-callgraph.json: same-build constructors, proven/dynamic gaps.
+data\native-purchase-complete-bindings.json
+data\native-purchase-option-types.json
+data\native-purchase-coupon-reader.json
+data\native-purchase-game-callers.json
+data\native-pooled-multipart-contract.json
+data\native-content-multipart-summary.json
+data\native-object-*.json: prior request/result investigations; 142148050 is a
+USER-list response reader, not proof for object-category responses.
+
+Use original Replay SQLite addresses only; source oracle names/behaviour do not
+prove numeric IDs/layouts in this build. The SQLite copy is growing and names
+are candidates. Resolve native consumers/vtables as well as request writers.
+
+CONTROLLED RUNNING / TESTING
+
+Use path-verified stop-game and stop-server operations, then start in a separate
+step after a backend change. Native game launch: launch-game.ps1 from this root.
+Use invoke-game-command.ps1 for known native commands; dw_leave is broken.
+dw_restart is usable, but controlled full relaunch was used for these iterations.
+Main menu Warzone highlight -> dw_localTestKey LEFTARROW then BUTTON_A enters MP.
+Never reauthenticate the default account while the game is alive. Use an
+independently provisioned peer for protocol tests and clean temporary relations
+through authenticated service APIs. Temporary clan/friend data was removed.
+Leave unrelated Replay compiler, assets, proxy and ordinary executable untouched.
+
+The server and game are left running in the connected Multiplayer menu.
+Original DW_BACKEND_HANDOFF_20261004.txt is preserved.
+
+LATEST CONTINUATION: CLIENT RELAY AUTH AND COVERAGE LEDGER
+
+src\relay_services.{h,cpp}: native task 145/26 client credential issuer/verifier.
+Native request 1421358F0 has no arguments and one result binding. Result reader
+142149720 at vtable 1426A4098 reads a blob up to 77 bytes. Virtual token reader
+142193110 at vtable 1426AB438 consumes version 1, opaque[56], secret[16], expiry
+delta LE32. Token object's MEMORY layout differs from its wire order:
+  opaque +8, version +64, expiry delta +68, secret +72, object size 88.
+  Do not infer wire layout from object field order or the available source oracle.
+Result size is 120. Native NetRelay instance: result +176, token +192, auth state
++296, clock expiry +300. Callback 1412BF7C0 sets state 2 only after successful
+task completion and bdSocketRouter::setClientAuthToken.
+
+The local realm's 56 opaque bytes contain IV[16], AES-CBC(owner UInt64/title
+UInt32/absolute expiry UInt32)[16], signed-session digest[8], HMAC[16]. Separate
+HKDF domains produce AES/MAC/client-secret keys. HMAC also covers expiry delta.
+The client secret is derived from the authenticated opaque token. Max lifetime
+is one hour and cannot exceed signed login expiry. Issuance requires a live
+authenticated session. Persisted issuer data/key checksum lives at
+data\relay\issuer-key.bin; do not publish this file or credential bytes.
+Per-client JSON contains only hashes/expiry, never raw credentials.
+
+--inspect-relay-client-token <base64> is a local offline verifier, not a network
+service. It reports active_session_checked=false and udp_transport_verified=false.
+The SDK treats the opaque token as opaque. This local format is not a claimed
+retail/server credential. Relay-server credentials, UDP BIND/JOIN/forwarding,
+migration and sequence/MAC handling remain unimplemented; no server relay
+endpoint is advertised. Task 145/24 still reports the actual direct datacenter.
+
+tools\relay_fixtures.py independently checks native blob layout, decrypts claims
+with Python crypto, checks HMAC/secret/expiry/owner/peer separation, malformed
+requests without mutation, corrupt key preservation, altered fields, expiration
+boundaries and issuer stability across backend restart. 119 total grouped checks.
+
+tools\record-native-relay-client.py binds the current server/game hashes to
+native state 2, reconstructed token/expiry matching issuer JSON, exact request
+after launch, 27 passing fences and Multiplayer frontend state 9. No map tests.
+
+refresh-game-connection.ps1 saves a separate dw_restart dispatch receipt with
+server PID/hash and log/counter baselines; launch provenance stays intact.
+observe-game.py schema 5 validates either correlated launch or connection
+receipt and reports token hashes only when native state 2 is present.
+Do not display uninitialized token bytes in reset/error states.
+
+During this iteration, stopping the server while the old game was connected
+caused a native network-disconnect error 65538. dw_restart DID reauthenticate
+and reconnect the DW lobby, but the previous network teardown left the error UI
+and NETWORKING/ONLINE_PERMISSIONS failed. A controlled process restart restored
+all 27 fences and the menu. No engine change was made. For future backend changes,
+prefer stopping the game BEFORE the server, then launch freshly after verification
+when avoiding this already-disconnected state matters. Never force a failed fence.
+The production auth fixtures ran only while the game held invalid credentials
+from the stopped old server, BEFORE its native refresh/new login. Do not run them
+against a currently valid default-account session; use isolated peer fixtures.
+
+tools\inventory-backend-coverage.py writes:
+  data\backend-coverage-inventory.json
+  data\backend-coverage-inventory.txt
+137 known task routes, 119 reviewed registered handlers, 18 known native tasks
+without handlers. It preserves target constructor proofs, handler/source hashes,
+static fixture call sites, per-method native proof, domain gaps and unclassified
+indirect/REST/push scope. A passed fixture suite is not per-method native proof.
+inventory-native-callgraph.py schema 2 now reads a coherent SQLite transaction,
+records function count, excludes ambiguous display aliases and reports changes
+during inventory. Latest database refresh retains 27 families/123 proven calls,
+5 dynamic forwarders and one unresolved duration-mail path.
+
+Research for the next implementation batch:
+  data\native-remaining-domain-requests.json:
+    50/6 whole-user post upload; 50/16 post copy; 80/58 token transaction;
+    80/125 alternate purchase; 195/1 structured request constructor.
+  data\native-stats-validation-write-request.json: 4/14 validation-token write.
+  data\native-loot-open-engine-callers.json: engine forwarding wrapper for195/1.
+The reference SDK identifies195/1 as loot-generation openLootDrop (HTTP proxy
+request, scriptResponse JSON reader);195/2 player-state in that other source
+does NOT establish a task in Replay. Recover target request/result vtables and
+game consumers before implementing. Native function names remain candidates.
+
+Full goal remains ACTIVE and incomplete. Complete the remaining known handlers,
+variant/domain gaps and native validation; do not call the new client credential
+or the connected menu full Demonware backend completion.
+
+NATIVE UDP RELAY TRANSPORT -- 2026-10-05 FOLLOW-UP
+
+src/relay_provider.{h,cpp} implements real loopback UDP transport. Task145/24
+now returns the nested server_info JSON STRING expected by native140F4FA80,
+containing the exact83-byte native server auth token. Task145/26 retains its
+separate77-byte client credential. The persistent own-realm issuer signs and
+checks client/server owner/title/expiry and live signed-session attribution.
+Neither offline credential inspection nor a lobby ACK establishes transport.
+
+Target contracts recovered from original Replay, including vtable verification:
+  server token vtable1426AB0D0, native reader1421833C0, init writer1421835B0;
+  native join-data AES-GCM reader142192750 (58-byte plaintext);
+  init packet/key1421A3100/1421A2FE0; session key derivation14219EF90;
+  native packet receiver14219FE20; keepalive pump1421A04A0;
+  native socket routing-layer bound association from142195760.
+Native platform field is101; do not copy the oracle build's107.
+Native session crypto uses SHA256 HMAC/HKDF, 21-byte labels INCLUDING NUL,
+AES128-GCM, full32-bit counter in MAC input, 16-bit wire counter, 32-packet
+replay window, control MAC16 and DATA MAC5. These differ from own-realm issuer
+key derivation and the encrypted lobby's SHA1/AES-CBC transport.
+
+Provider supports BIND/JOIN, VERIFY/ESTABLISHED, two-way DATA forwarding,
+PING, join-to-bind upgrade, DISCONNECT/ACK, signed session expiry, endpoint
+binding and bounded association/packet/queue state. Pending associations expire
+in10seconds. Old process server tokens and revoked sessions are rejected.
+No secrets appear in transport-events.jsonl, health or observer receipts.
+
+Live testing found an error that protocol-only testing initially missed:
+PING's final byte is ORIGIN, not request/reply. Replay originates1 every10seconds;
+1 must be echoed unchanged. Origin0 is a server probe that the client echoes.
+The incorrect provider answered only0, causing native rebinds after30seconds.
+The corrected build held one native association for305seconds/30ping echoes
+before the subsequent worker-failure hardening. Final deployment requires its
+own fresh stability receipt; historical hashes are never relabeled.
+
+Worker rejects malformed/foreign/replayed packets without terminating other
+routes. Socket wait/send or durable event write failure withdraws advertisement,
+clears active routes and exposes a bounded diagnostic failure label. Typed
+transport failures derive from std::exception so startup rollback handles them.
+
+Final native proof files:
+  data/runtime-relay-transport-stability-start.json
+  data/runtime-relay-transport-menu.json
+  data/native-relay-transport-verification.json
+  data/native-relay-client-verification.json
+  data/native-backend-menu-verification.json
+  data/native-relay-transport-menu.jpg (native engine screenshot, no map test)
+The record tool requires identical native SDK route/relay/endpoint/verification
+hash over>=60seconds, matching live game/server hashes/PIDs, extra ping replies,
+no rejects/rebind, native relay6/SDKassociation3 and all27 menu fences.
+Native game BIND completion is proved. Native two-game JOIN/forwarding remains
+unverified; independent two-account actual UDP forwarding is verified separately.
+
+The123-check independent suite includes1288-byte forwarding, signed client/server
+credentials, AES-GCM decryption, replay-window reordering/rollover, bad tags/MACs,
+foreign owners, previous sessions, platform mismatch, real keepalive echoes,
+upgrade/disconnect and existing backend persistence. The missing issuer with
+existing credential state refuses to rotate/recreate the key. Keep that key.
+
+CONTENT-STREAMING CONTRACT AUDIT (NO SPECULATIVE HANDLERS ADDED)
+
+50/6 post-upload: native1421339F0 sends name,slot,serverType,serverFilename,
+size,category,metadata blob,packed UInt64 tag pairs,empty trailing string.
+Its result binds caller pointer+42080 if present, otherwise+42072. Recover the
+actual callers/result choice and preparation path before registering completion.
+50/16 post-copy: native142133750 also carries second-copy size,pooled-source bool
+and source file ID. Native bdPreCopyResult constructor142163C30 and reader
+142163DD0 establish FULL bdURL + destination URL + UInt32 size. Do not omit fields.
+The complete bdFileMetaData reader is14213DBE0; URL reader142163B40.
+50/22 writer142133E60 carries file,size,signed Int16 offset/capacity, binds+64816.
+58/22 writer14213D250 omits size and binds external metadata argument.
+Their live-streaming DTO reader/constructor has not yet been established from
+this target. bdMultiPartURL142164040 is an UPLOAD result; don't reuse it blindly
+for the live DOWNLOAD result. The source export lacks that live metadata class,
+and bounded target searches did not establish it. This is an explicit gap.
+
+Some current display aliases are incorrect: for example14213D7D0 named
+uploadSummaryMetaData actually takes the normal upload path in its decoded
+arguments and invokes preUpload58/5. Interpret constructors, virtual tables,
+wire primitives and actual consumers, rather than trusting guessed names.
+The adjacent oracle has pre-upload50/5 and pre-copy50/15/20 writers, but they
+have NOT yet been proved as compiled request constructors in this Replay.
+Do not count oracle addresses/types as native request evidence.
+
+Evidence in data:
+  native-user-streaming-functions.json
+  native-content-dispatch-vtables.json
+  native-content-workflows-remaining.json
+  native-pooled-download-contract.json
+  native-precopy-purchase-contracts.json
+  native-streaming-metadata-functions.json
+  native-streaming-update-support.json
+research-native-text.py now supports --all-terms to narrow unnamed candidates.
+
+Current ledger remains137 known routes/119 handlers/18 missing target handlers.
+This includes remaining content variants, validation-token statistics, alternate
+marketplace purchase/token transactions, loot generation, object-store category/
+large uploads and tournaments/migration. Some implemented domains still need
+positive native callback and multi-profile/remote lifecycle evidence.
+The full backend goal remains ACTIVE. Preserve unrelated compiler/game work;
+continue target contract recovery, real domain mutations and native validation.
+
+LATEST IMPLEMENTATION AND PRIVATE SOURCE PUBLICATION
+
+Private repository: https://github.com/IDARETW/IW8-Replay-DW
+Working tree: E:\DW\IW8, origin points to that exact private repository.
+Initial source publication excludes data, binaries, keys, credentials, player
+profiles, the frozen compiler copy and local tooling. Subsequent validated
+implementations should be committed incrementally. Source C++ is formatted with
+.clang-format; Python tools with Black targeting Python 3.12. format-backend.ps1
+provides a repeatable C++ formatter/check. Compiled engine source snapshots were
+preserved where needed for the unchanged game crypto verification gate.
+
+Added marketplace 80/125 owner SKU purchases. Target constructor 142129000 and
+builder 142128AC0 serialize context, transaction, buyer, SKU/expected-price
+orders, CouponOrderV2 count, metadata pairs, UInt32 customSourceType and Bool.
+The UInt32 is NOT a maximum response count. Native result 14214CC90 consumes
+transaction plus PlayerAssetsV3 (142165A10) plus CouponInventoryV4 records.
+Actual PE call resolution verifies nested currency 142178CC0 and InventoryV3
+142179500 readers, inherited owner behavior, entitlement 142179110 and coupon
+14215DE20. Misleading IDA display aliases are never used as layout authority.
+
+The handler shares existing atomic catalog debit/grant logic, verifies expected
+prices, stores metadata/source and result format in checksummed exact-response
+receipts, rejects changed/cross-format retries, and preserves legacy 80/106
+transactions. ResultV4 writes the complete native account/currency/inventory/
+entitlement/held-coupon layout before committing, including signed expiry duration,
+UInt16 collision, source, rental unit, penalty percentage and coupon metadata.
+Nonrepresentable/invalid stored snapshots fail before any durable debit.
+CouponOrderV2 redemption requests remain explicitly unavailable until their
+native writer and actual mutation/result workflow are established. Discounts,
+gifts, loot and native positive purchase callback validation remain open.
+
+Final build server hash: 316c8d92b6475db935ffea0463170e78de13d6612c3bc120d1cd486c67678f48
+Game hash: b0075e0dbde62758efe84e23318084608be5b3704f23c269d87254ce2aea58a8 (unchanged).
+Final game PID 17716; server PID 26908.
+Recorded native stable connection: 102.6 seconds, same
+association, 10 additional ping replies,
+no rejected packets, native NetRelay 6/SDK association 3. All 27 menu fences pass.
+Independent suite: 127 grouped checks, including actual owner
+wallet/item changes, exact full purchase125 result, malformed/foreign requests,
+metadata/price/source conflicts, capacity failure and process-restart retry.
+Native purchase125 completion has NOT been observed. Independent two-client
+UDP JOIN/forwarding is proven; native two-game forwarding remains untested.
+No map tests performed. Backend and root-folder game are left running.
+
+Current ledger: 137 known routes,
+120 registered handlers,
+17 missing known handlers.
+This is constructor coverage, not a claim of complete native SDK/REST coverage.
+Nested local fixture imports are now followed by the coverage inventory.
+The full backend goal remains ACTIVE and incomplete.

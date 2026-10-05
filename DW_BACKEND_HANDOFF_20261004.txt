@@ -1,0 +1,449 @@
+IW8 REPLAY DEMONWARE BACKEND -- CONTINUATION HANDOFF
+Written 2026-10-04, approximately 17:23 America/New_York.
+
+OWNER OBJECTIVE AND AUTHORIZATION
+
+Continue development in a normal/main Codex session. Implement the complete local
+Demonware backend that this Replay build expects, including authentication,
+account/profile initialization, persistent data, connection lifecycle and the
+remaining online game services. Getting through the initial connection screen
+is the first milestone, not the final scope.
+
+Deliver a freshly compiled/linked executable named:
+  E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Launch it with its working directory set to that root game folder.
+Do not patch an already compiled EXE or replace ordinary Replay.
+
+The owner explicitly authorized game tests, game interactions and controlled
+restarts until the emulator meets the game's native expectations. The owner
+then requested this handoff instead of further work in the side conversation.
+No further source correction, recompilation or restart was done while writing
+this handoff. The confirmed publisher-title bug below is STILL UNFIXED.
+
+Work locally in E:\DW\IW8. Preserve the parent's ongoing E:\replay-compiler
+development, ordinary Replay, game assets and proxy configuration. Use the
+private compiler snapshot mechanism already provided. Do not reimport DW
+templates into the shared workstation simply to resume this project.
+
+Reporting preference: frequent short progress updates. Immediately before
+recompiling a test iteration, give a compact report in chat: issue, research,
+why the fix is correct, what changed, and whether recompilation is ready.
+Separate source/build/protocol proof from actual in-game proof.
+
+CURRENT STATUS -- NOT COMPLETE
+
+The latest owner test is still on Connecting to Online Services.
+The currently installed game image has passed the build gates and the server
+has passed 27 grouped independent protocol/service checks. Neither establishes
+that the game's native remote tasks and startup fences completed.
+
+Latest successful private engine job:
+  d9bd668ac8134f6f
+  E:\DW\IW8\data\workstation-builds\build-workstation-d9bd668ac8134f6f
+Private compiler source root:
+  E:\DW\IW8\data\compiler-snapshot-1791147269512650800
+Game SHA256, freshly rechecked when writing this handoff:
+  b013332c1807fcb7d6b18fe62cc83626cb7834fe45eb30be94e08f85d5b44a07
+Server image:
+  E:\DW\IW8\build\Release\iw8-dw-server.exe
+Server SHA256, freshly rechecked:
+  ce7325f4011685a74f87f7e7a4435850b76533d56995545179b898cabedb127d
+
+Build evidence: zero unresolved symbols, successful Windows SEC_IMAGE mapping,
+269 Windows virtual-unwind cases and a passed relocation audit. The linked VM
+executes the original platform-ID getter against the original native auth
+singleton to verify the C++ writer; native external callbacks are still stubbed
+at VM test boundaries. Do not describe that as full native sign-in proof.
+
+At 17:21 local on 2026-10-04, CIM still showed:
+  PID 11200 -- root game_dx12_ship_replay_dw.exe, started 17:16:54 local.
+  PID 27976 -- owned iw8-dw-server.exe, started 17:15:48 local.
+PIDs are time-sensitive. Recheck executable path, start time and hash before
+using them or stopping anything. Leave unrelated owner processes alone.
+
+CURRENT CONFIRMED BLOCKER: PUBLISHER TITLE AND BUILD NAMESPACE
+
+E:\DW\IW8\data\auth-reports\76561199317547464.json records the ACTUAL game:
+  title=5800, game_version=967, game_mode=4.
+The synthetic fixture in tools\test-lobby.py uses title=5311.
+
+src\services.cpp -> publisherDocument currently bootstraps defaults ONLY when
+id.titleId==5311 and context is empty or "iw8", for these six namespaces:
+  general, pc, f2p, general_8_19, pc_8_19, f2p_8_19.
+Actual Replay therefore does not receive these defaults. It also requests its
+Compass build namespace "autobuild", which is not in that whitelist.
+
+The latest real server log proves all five failures at 21:17:31 UTC:
+  service=95 task=1 error=108 context=_default namespace=general
+  service=95 task=1 error=108 context=_default namespace=pc
+  service=95 task=1 error=108 context=_default namespace=general_8_19
+  service=95 task=1 error=108 context=_default namespace=pc_8_19
+  service=95 task=1 error=108 context=_default namespace=autobuild
+
+Fix this first. Explicitly support the evidenced Replay title/build namespaces;
+do not make every arbitrary title/namespace succeed. Run the service fixture
+with actual title 5800 and cover autobuild/empty context, plus deliberate
+unknown-namespace rejection. Existing local version documents contain string
+MajorVersion="1" and MinorVersion="0", with no remote tuning overrides.
+The native serializer must keep wire versions and JSON versions consistent.
+Whether these version defaults alone are sufficient for every startup gate
+must be determined from the game's native consumers and another live run.
+
+Do not claim that this is the ONLY cause of the connection stall. The server
+can authenticate and reply while a native task or another gate remains pending.
+
+LATEST LIVE NATIVE FINDINGS
+
+Saved observation:
+  E:\DW\IW8\data\latest-runtime-observation.json
+Observed at 2026-10-04T21:18:32 UTC, attached manually to PID 11200.
+It verifies the deployed image hash and resolves addresses through linked
+symbols and the live ASLR module base. It has NO launch counter baseline;
+its log tail includes earlier runs. Attribute events using timestamps.
+
+Native state observed:
+  Platform auth=2, failure=0, platform connection=2.
+  Native profile sign-in=2.
+  Platform ID=1357281737; matching text and game-account ID.
+  XUID=76561199317547464; matching text.
+  License count=1; tokens processed=1.
+  Native DW HSM stack [0,33]; connected state 33 is present.
+  ACCOUNT service group=1, state=1; country US, age=21.
+  Account play-policy ready=1; native fastfile policy processed=1.
+  Profile storage owners use platform 6/UNO and the signed XUID.
+
+Another global, gl_14F05ACE8, reads zero (reported as
+native_platform_universal_id). Its relevant consumer has NOT been proven to
+block startup. Follow its native xrefs before changing it. Do not simply
+populate every zero global or mark failed fences successful.
+
+Current run emits DW_LOCAL_IDENTITY_CLAIMS and later
+DW_LOCAL_IDENTITY_CLAIMS_RESTORED. It does NOT emit
+DW_LOCAL_PLATFORM_SIGNED_IN. The identity-applied latch is set before native
+callbacks; a callback could exit or transfer control before the final marker.
+This is a research lead, not a confirmed callback failure. Inspect native
+completion/control flow and lifetime before repeating callbacks.
+
+There is roughly a 29-second gap between verified platform identity and the
+auth HTTP initialization in the current run. The long freeze has NOT been
+explained or fixed. Timed provider/HTTP markers exist to narrow it down.
+
+REAL SERVICES OBSERVED AFTER LOBBY AUTHENTICATION
+
+The 21:17 run accepted signed auth, legacy account login and protocol-210 lobby
+authentication, then served the following without service errors:
+  38/6 extended-auth report; 38/7 session report.
+  67/6 event-filter initialization; 27/2 local DML geography.
+  198/12 channel-category unsubscribe.
+  197/28 proposals, 197/30 memberships, 197/21 group information.
+  255/10 social user lists, friends, pending invitations and presence.
+  50/2 owner content list; 12/6 time; 12/1 string verification.
+  193/6 user-object vector reads; 193/7 user-object upload.
+  125/9 achievement user state; 29/10 mail headers.
+  4/1 leaderboard stats write at 21:17:51 UTC.
+Six persisted profile objects were available. A subsequent missing blueprints
+read returned an indexed missing result as expected for an absent object.
+Presence and session reports continued later. These are server-side evidence;
+native encrypted task completion is not observed by the current state reader.
+
+PREVIOUS BUGS ALREADY CORRECTED IN THE INSTALLED BUILD
+
+1. Native platform/account numeric ID layout:
+   The real original getter func_141666030 reads ACCOUNT numeric ID at native
+   auth+192. The previous implementation only populated GAME ACCOUNT at +224.
+   DW_LocalPlatform.cpp now initializes both from the signed provider claims.
+   The compiled verifier executes that original getter instead of stubbing it.
+   Native signed ID/license claims are reapplied after callbacks and repaired
+   at the provider boundary if rewritten, without repeating sign-in callbacks.
+
+2. ACCOUNT initialization/policy:
+   Signed local platform protocol v2 includes US region, adult age 21 and
+   unrestricted local account policy. The complete 152-byte ACCOUNT layout,
+   native sign-in/initialize/frame wrappers and native age/country policy pump
+   are implemented and linked. No DW fence/HSM success is manufactured.
+
+3. License state:
+   Signed base license code 51636 is passed to the native notification function
+   func_1413E44F0. Native Owned encoding uses the existing address/key XOR helper;
+   retain it. This does not fabricate ownership of every DLC pack. Native pack
+   table entries include other codes. Do not treat 51636 as all-content unlock.
+
+4. Profile owner namespace:
+   Actual Replay queued file owners use platform 6 (UNO), not only bnet.
+   Object-store and contextual-file ownership now accept authenticated same-ID
+   aliases while rejecting another user's writes. Contextual metadata echoes
+   the requested native account-type representation. Do not loosen ownership.
+
+5. Disconnect crash:
+   An earlier dump confirmed null SDK-client dereference in the native
+   Battle.net disconnect path: original 0x1403E50D7, rcx=0, read at +72.
+   Compiled local-provider disconnect handles the complete 192-byte connection
+   ABI, callback/count/lifecycle, preserving native DW reconnect/error handling.
+   Ordinary image selection still delegates to the native SDK behavior.
+
+6. Startup GDI clone warning:
+   The proxy's repair warning at original RVA 0x3061A0 is a stale byte-signature
+   check. This DW image contains a source-compiled startup constructor
+   replacement. That warning is not proof of a DW authentication failure.
+
+IMPLEMENTED BACKEND AND WHERE IT LIVES
+
+C++20 CMake server, /W4 /WX:
+  E:\DW\IW8\src\platform.cpp       signed identity/session and account policy
+  E:\DW\IW8\src\crypto.cpp         Windows CNG cryptography
+  E:\DW\IW8\src\lobby.cpp          encrypted native connection/lifecycle
+  E:\DW\IW8\src\wire.h             typed byte/bit-buffer primitives
+  E:\DW\IW8\src\protobuf.h         structured/protobuf framing
+  E:\DW\IW8\src\services.cpp       dispatch, profiles/files/publisher/stats
+  E:\DW\IW8\src\startup_services.cpp
+  E:\DW\IW8\src\account_services.cpp
+  E:\DW\IW8\src\objectstore_services.cpp
+  E:\DW\IW8\src\rest_services.cpp
+  E:\DW\IW8\src\server.cpp         loopback HTTP/lobby listeners and health
+
+Auth/connection currently implemented:
+  Nonce-bound RSA-signed local platform protocol v2.
+  Native auth tasks 84/85; decimal-string/integer unsigned field handling.
+  Native 128-byte PC client ticket; 24-byte random session key; server ticket.
+  RSA-PSS/SHA256, zero salt, actual compiled client crypto proof.
+  Legacy account login binds ticket/title/IV and issues local access token.
+  Protocol 210 transcript/KDF/HKDF, mutual challenge, AES-CBC, directional HMAC,
+  sequence checking, expiry and superseded-session rejection.
+  Credentials expire after one hour. Restart game after expiry/server restart.
+  Loopback ports 8085/8443/3075. Port 8443 is local HTTP, not TLS; selection is
+  limited to the intended DW auth/local account URLs and _dw.exe variant.
+
+Data services currently implemented:
+  Public/private profile CRUD (service 8, tasks 1-8).
+  Contextual file upload/remove/download/backup (10/10,11,12,17).
+  Configured publisher files (10/21), explicit missing-file result.
+  Publisher namespace single/bulk responses (95/1,3), with the title bug above.
+  Native user-object vector read/upload/update (193/6,7) including metadata,
+  content, checksums/tags and indexed missing/private-access errors.
+  Configured publisher-object metadata vector response (193/16).
+  Native DML, event filtering/push, category unsubscribe, owner content list.
+  Friends/invitations and user lists currently return valid empty local lists;
+  caller-scoped presence writes are persistent.
+  Mail headers 29/10 return an empty local inbox with bounded paging/ownership.
+  Achievement state 125/9 is persistent per title/context/user, new state {}.
+  Clan proposals/memberships/group infos currently valid empty collections.
+  Leaderboard 4/1 stores caller-owned batches atomically: rating Int64, up to
+  ten Int32/NAN columns; native replace/add/max operations, overflow rejection.
+  Malformed/unsupported requests return explicit native errors, not success.
+
+Complete current coverage is in E:\DW\IW8\README.md. Its owner-pending wording
+predates the latest live test. Treat this handoff and timestamped logs as the
+newer runtime status. There is no separate top-level original plan document
+identified in the DW root; README, source receipts and research files are the
+existing implementation record. Do not invent a recovered original plan.
+
+FULL BACKEND WORK STILL REQUIRED
+
+Inventory every reachable native service/task/REST operation and its request,
+response, callback and readiness consumers for this target build. Organize a
+coverage matrix with native provenance, implementation, persistence, fixture
+proof and live acceptance. Build from source and actual Replay assembly; logs
+only show calls reached so far and cannot establish total coverage.
+
+Unfinished areas include:
+  - Any auth/profile/account completion contracts still required by native
+    readiness; optional Uno/crossplay account linking where native flow needs it.
+  - Publisher content transfer/download and required startup content/version
+    policies beyond a namespace version document.
+  - Playlists/filtering, daily login, loot/inventory, gunsmith/blueprints and
+    achievement event/definition/reward flows.
+  - Party/session/matchmaking/server discovery, connection/reconnection and
+    multiplayer lifecycle, including more than one local account/client.
+  - Friends/invitation and user-list mutations, messaging/subscriptions, clan
+    mutations and mail send/read/delete as exposed by actual native APIs.
+  - Leaderboard reads/pagination and validation tokens where required.
+  - Durable settings/stats/object updates across login, restart, disconnect,
+    retry and concurrent request lifecycles.
+
+Use Replay-provided game data wherever appropriate. Empty results are valid
+only for a genuinely empty local domain whose native reader accepts them.
+Do not use empty responses to stand in for required populated content, force
+online fences, fabricate remote-task objects, or hide failed calls. Develop
+complete schemas/layouts for a domain rather than one-field patches.
+Explicitly distinguish unsupported optional services from required startup or
+gameplay services. Full game support remains unfinished until tested.
+
+PRIORITIZED CONTINUATION SEQUENCE
+
+1. Read README, this handoff, deployment/readiness receipts and latest live
+   logs. Recheck the current game/server PIDs and hashes. Use read-only native
+   observation before restarting; owner has now authorized subsequent tests.
+2. Fix actual title 5800/default-context publisher bootstrapping and evidenced
+   autobuild namespace; update protocol fixtures to exercise the real title.
+3. Trace native task result deserialization, callbacks and publisher readiness
+   after the fix. Extend diagnostics to pending task/service states as needed.
+   Confirm DWServicesAccess::isReady and the online startup gates, rather than
+   treating the authenticated HSM alone as overall readiness.
+4. Investigate the unexplained startup pause and missing signed-in marker.
+   Trace relevant zero universal-ID consumers; do not assume that global is a
+   blocker. Preserve native thread affinity, ownership and callback lifetime.
+5. Rebuild/deploy/test a correlated root-folder run. Validate menus and retain
+   fresh logs/state/screenshots. Iterate every still-required startup contract.
+6. Continue the coverage matrix and implement the remaining full backend
+   domains listed above. Test persistent profile/inventory/settings changes,
+   entering/leaving a local multiplayer session, disconnect/reconnect, restart
+   persistence and multiple accounts where supported. Resolve crashes using
+   the newly linked image's symbols/unwind mapping and actual dump evidence.
+7. Hand the owner the final _dw.exe and concise test checklist, with exact
+   hashes, implemented coverage and truthful remaining limits. Do not call a
+   protocol fixture pass or healthy /health response full game completion.
+
+NATIVE TARGET-BUILD RESEARCH POINTERS
+
+Readonly Replay SQLite:
+  E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe.sqlite
+It is continuously updated. Use SQLite URI mode=ro, select bounded records and
+check names against actual argument/result logic. Some names are unreliable.
+Function addresses are stored as decimal TEXT. Preserve the source database.
+
+Layout/behavior reference source:
+  E:\OpenIW8-main\OpenIW8-main\workspace\iw8\code_source
+It is an oracle for behavior/types, not proof that every ID/address/layout
+matches Replay. Verify numeric tasks and actual bytes in the target build.
+
+Useful ORIGINAL addresses (not live addresses in the shifted DW image):
+  0x141666030 -- native platform-ID getter, ACCOUNT numeric auth+192.
+  0x141660280 -- original native auth singleton getter.
+  0x14107B7D0 -- publisher namespace initialization; general required flag.
+  0x140F71980 -- DWLobbyService::getPublisherVariables, empty context passed.
+  0x14107C1D0 -- Replay publisher retrieval callback/variable application.
+  0x140E51A10 -- q_GetCompassBuildName; DS_PopulateBuildVars reads version.txt
+                 compass_build_name; actual run requests autobuild.
+  0x141528490 -- Live_IsUserSignedInToDemonware combines non-guest,
+                 DWServicesAccess::isReady, signed-in-to-Live and logonStatus2.
+  0x1417EC930 -- dwGetLogOnStatus; HSM connected state 33 maps to status2.
+  0x140F6BD60 -- DWServicesAccess::isReady, controller/vtable native gate.
+  0x140F6BDC0 -- DWWrappers::isReady native lobby readiness path.
+  0x1415281F0 -- Live_IsDemonwareReady/native online-party wait gate.
+  0x141597CC0 -- LiveTracker_Process verifies replace0/add1/max2 write modes.
+  0x14150E8A0 -- LeaderBoardRow<10> serialization, Int32/NAN columns.
+Resolve through build-report symbols and ASLR for live reads. Do not hardcode
+these original addresses into newly shifted runtime code.
+
+Evidence under E:\DW\IW8\data:
+  startup-contract-audit-20261004.json
+  publisher-native-family-20261004.json
+  publisher-namespace-native-20261004.json
+  publisher-stat-native-research-20261004.json
+  native-auth-layout-review-20261004.json
+  native-license-policy-review-20261004.json
+  native-license-pack-table-20261004.json
+  native-tracker-write-research-20261004.json
+  native-online-fence-consumers-20261004.json
+  native-demonware-ready-gates-20261004.json
+  objectstore-native-task-research.json
+  startup-service-research.json
+  native-service-inventory.json
+  owner-crash-analysis.json
+  native-token-parser-callers.json -- empty direct-caller search; not proof that
+                                    all indirect token-parser uses are absent.
+
+BUILD AND VERIFICATION WORKFLOW
+
+Scripts are in E:\DW\IW8. PowerShell 7:
+  C:\Program Files\PowerShell\7\pwsh.exe
+Bundled Python:
+  C:\Users\achar\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe
+Use Python -B. Python dependency root is in
+  E:\replay-compiler\replay-project.local.json -> python_dependency_root.
+Set PYTHONPATH per process when running tools requiring cryptography/pefile/
+Capstone/Unicorn. Build/deploy scripts already handle their dependency root.
+
+Read-only live diagnostic:
+  & 'E:\DW\IW8\observe-game.ps1'
+or explicitly -ProcessId after verifying its root image. This writes a local
+observation receipt but does not write game memory or issue login credentials.
+
+When iterating a server build, close the verified owned DW game first, then:
+  & 'E:\DW\IW8\stop-server.ps1'
+  & 'E:\DW\IW8\build-server.ps1'
+  & 'E:\DW\IW8\start-server.ps1'
+Use separate stop/start steps. Never kill by an unverified stale PID.
+
+Run focused offline fixtures on the newly built server:
+  tools\test-lobby.py -- independent encrypted-wire fixture; uses isolated
+  ports/data/child process, 27 grouped checks currently. Extend meaningful
+  cases for new domains and the actual title. It overwrites its owned proof
+  receipt; it does not launch a game or alter production player data.
+  tools\test-server.py, tools\test-platform.py, tools\test-auth.py -- production
+  loopback checks; platform/auth tests issue credentials and MUST run only with
+  the game closed. New tickets can supersede the live session.
+
+For game-side C++ changes:
+  Edit private integration\replay\DW_Local*.cpp / ABI headers.
+  & 'E:\DW\IW8\build-game.ps1'
+  & 'E:\DW\IW8\deploy-game.ps1'
+The default build creates a new frozen compiler snapshot, copies private
+integration sources and performs engine-only compilation/verification.
+Do not modify prior immutable snapshots or weaken their validation to pass.
+The deployment script checks source/object/hash provenance, compiled endpoint
+and native ACCOUNT-layout checks, relocations, signed platform/auth proofs and
+encrypted lobby/service proofs before installing the new complete executable.
+If only server source changes, regenerate its matching proof receipts and run
+deploy-game.ps1 to refresh deployment binding; unchanged C++ need not be
+recompiled just to update a server hash.
+
+Important saved-source exception: DW_LocalBackend_Frame.cpp is an existing
+saved editor revision, not copied from integration by the frozen builder.
+Its source receipt and compiled revision must be preserved. If changing that
+specific unit becomes necessary, extend a DW-private snapshot input override
+with proper source provenance, or obtain explicit coordinated shared-editor
+authorization. Do not assume changing its template changes the next image.
+tools\workstation-client.py without --build reimports shared source revisions;
+do not run it as routine resumption. Avoid -SharedCompiler for this work.
+
+tools\verify-dw-endpoints.py is bound into the private build receipt. Changing
+the verifier after an existing build invalidates deployment provenance. Make
+a new private build for changed linked-image verification rather than editing
+old receipt hashes. Retain strict callback/CRT overlays in integration\compiler.
+
+Root launch after proofs/deployment:
+  & 'E:\DW\IW8\test-basic.ps1' -Launch
+or E:\IW8\Builds\1.20-replay\Run_Replay_DW.cmd.
+test-basic.ps1 runs production auth fixtures, then launch-game.ps1. It has a
+CIM DW-process guard before issuing credentials. launch-game.ps1 still uses
+Get-Process for its duplicate-instance guard; in the last investigation CIM
+found the game when Get-Process did not. Correct that launcher guard using
+verified CIM ownership/path before controlled game launches.
+
+The launcher records current-runtime-launch.json with game PID/hash, client
+and server log offsets, and server counter baseline. Capture observations
+against that run. A manual PID attachment has no baseline and must not inherit
+an old receipt's attribution. Keep synthetic auth traffic distinct from game
+auth traffic and server success distinct from native task acceptance.
+
+PERSISTENT DATA AND EVIDENCE TO PRESERVE
+
+  data\deployment.json -- source/object/server proof bindings and game hash.
+  data\auth-profile-readiness.json -- native_game_verified is currently false.
+  data\workstation-job.json and compiler-snapshot-receipt.json.
+  data\workstation-source-receipt.json and source-before-dw.json.
+  data\platform-verification.json, auth-verification.json, lobby-verification.json.
+  data\server-process.json and current-runtime-launch.json.
+  data\latest-runtime-observation.json.
+  data\connecting-stall-live-observation-20261004-second.json -- older run.
+  data\server.log, server.stdout.log, server.stderr.log.
+  E:\IW8\Builds\1.20-replay\replay-dw-client.log.
+
+Preserve data\platform-private.blob, platform-public.blob, platform-public.der
+and platform-profile.bin together. Replacing keys requires rebuilding client
+trust. Do not print private keys, tokens, credentials or HTTP auth headers.
+
+Player data lives under profiles, storage, objectstore\users, presence,
+achievement-user-state and leaderboard-stats. Native UNO owner metadata and
+per-title/context/caller isolation are essential. Publisher documents/content
+are under publisher-variables, publisher and objectstore\publisher. Do not
+delete owner data to hide initialization or migration bugs.
+
+HANDOFF ACCEPTANCE
+
+The next session should acknowledge that the current executable builds, signs
+in locally and authenticates its lobby, but still stalls. It should implement
+the evidenced publisher correction first, validate actual native completion,
+then continue the full source-derived backend coverage and game tests.
+No backend fix or game restart was performed as part of writing this file.

@@ -1,0 +1,388 @@
+"""Compile a frozen copy of saved workstation inputs while shared recovery runs."""
+
+from pathlib import Path
+import hashlib
+import json
+import os
+import shutil
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+ORIGINAL = Path(r"E:\replay-compiler")
+snapshot = ROOT / "data" / ("compiler-snapshot-" + str(time.time_ns()))
+snapshot.mkdir(parents=True)
+records = []
+revision_fallbacks = []
+
+# Shared source development may alter a DW-authored file outside the editor's
+# revision API. Do not rewrite that work or bless a metadata/hash mismatch.
+# Only owned DW revisions may fall back to their last verified compiled source.
+dw_sources = json.loads(
+    (ROOT / "data" / "workstation-source-receipt.json").read_text()
+)["sources"]
+dw_expected = {item["id"]: item["content_sha256"] for item in dw_sources}
+units = json.loads((ORIGINAL / "source-workstation" / "units.json").read_text())[
+    "units"
+]
+dw_units_by_source = {
+    Path(item["source"]).as_posix(): item
+    for item in units
+    if item.get("kind") == "cpp" and item.get("function_id") in dw_expected
+}
+prior_path = ROOT / "data" / "deployment.json"
+prior = json.loads(prior_path.read_text()) if prior_path.exists() else None
+
+
+def saved_dw_source(source):
+    relative = source.relative_to(ORIGINAL).as_posix()
+    unit = dw_units_by_source.get(relative)
+    if (
+        unit is None
+        or hashlib.sha256(source.read_bytes()).hexdigest() == unit["sha256"]
+    ):
+        return source
+    expected = dw_expected[unit["function_id"]]
+    if (
+        unit.get("sha256") != expected
+        or unit.get("revision") != expected
+        or prior is None
+    ):
+        raise RuntimeError(
+            "DW saved revision changed; review before building: " + relative
+        )
+    candidates = [
+        item
+        for item in prior["sources"]
+        if item["id"] == unit["function_id"] and item["content_sha256"] == expected
+    ]
+    if len(candidates) != 1:
+        raise RuntimeError("No verified prior DW source revision: " + relative)
+    old_root = Path(prior["compiler_source_root"]).resolve()
+    old_source = (old_root / candidates[0]["compiled_source"]).resolve()
+    if (
+        not old_source.is_relative_to(old_root)
+        or hashlib.sha256(old_source.read_bytes()).hexdigest() != expected
+    ):
+        raise RuntimeError("Prior DW source revision no longer verifies: " + relative)
+    old_report = json.loads(
+        (Path(prior["build_directory"]) / "build-report.json").read_text()
+    )
+    if old_report["sha256"] != prior["sha256"] or not any(
+        item["source_sha256"] == expected
+        and item["object_sha256"] == candidates[0]["object_sha256"]
+        for item in old_report["cpp"]
+    ):
+        raise RuntimeError(
+            "Prior DW source/object provenance does not verify: " + relative
+        )
+    revision_fallbacks.append(
+        {
+            "function_id": unit["function_id"],
+            "shared_source": str(source),
+            "shared_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            "verified_source": str(old_source),
+            "saved_revision_sha256": expected,
+            "prior_verified_executable_sha256": prior["sha256"],
+        }
+    )
+    return old_source
+
+
+def copy_file(source, destination):
+    before = source.read_bytes()
+    digest = hashlib.sha256(before).hexdigest()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(before)
+    if hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+        raise RuntimeError("Workstation input changed during snapshot: " + str(source))
+    records.append(
+        {"original": str(source), "snapshot": str(destination), "sha256": digest}
+    )
+
+
+for directory in ("src", "source-workstation", "generated"):
+    for source in (ORIGINAL / directory).rglob("*"):
+        if (
+            source.is_file()
+            and "__pycache__" not in source.parts
+            and "validation" not in source.parts
+        ):
+            copy_file(
+                saved_dw_source(source) if directory == "src" else source,
+                snapshot / source.relative_to(ORIGINAL),
+            )
+for directory in ("tools", "workstation"):
+    for source in (ORIGINAL / directory).glob("*"):
+        if source.is_file() and source.suffix in (".py", ".json", ".cpp", ".h", ".hpp"):
+            copy_file(source, snapshot / source.relative_to(ORIGINAL))
+for source in (ORIGINAL / "tools" / "native").rglob("*"):
+    if source.is_file() and source.suffix in (
+        ".cpp",
+        ".h",
+        ".hpp",
+        ".json",
+        ".py",
+        ".txt",
+    ):
+        copy_file(source, snapshot / source.relative_to(ORIGINAL))
+copy_file(ORIGINAL / "source-units.json", snapshot / "source-units.json")
+# DW-only startup source stays outside the shared compiler/editor revisions.
+# Its native function ownership and placement are derived by the usual linker.
+private_sources = ROOT / "integration" / "replay"
+for source in sorted(private_sources.iterdir()):
+    # This existing unit is supplied by its saved editor revision above.
+    if source.name == "DW_LocalBackend_Frame.cpp" or source.suffix not in (
+        ".cpp",
+        ".h",
+    ):
+        continue
+    destination = snapshot / "src" / source.name
+    if destination.exists():
+        raise RuntimeError(
+            "Private DW source collides with shared source: " + source.name
+        )
+    copy_file(source, destination)
+fixtures = (
+    "evidence/mw131-canonical-selected-scripts/1806.gscbin",
+    "evidence/replay120-global-mp-scriptfiles/1806.gscbin",
+    "evidence/mw131-scriptfile-dump",
+    "evidence/mw131-frontend6-scriptfiles",
+)
+fixture_count = 0
+for relative in fixtures:
+    path = ORIGINAL / relative
+    sources = (
+        [path]
+        if path.is_file()
+        else sorted(path.rglob("*.gscbin")) if path.is_dir() else []
+    )
+    for source in sources:
+        copy_file(source, snapshot / source.relative_to(ORIGINAL))
+        fixture_count += 1
+if not fixture_count:
+    raise RuntimeError("Retained ScriptFile verification fixtures are unavailable")
+configuration = json.loads((ORIGINAL / "replay-project.local.json").read_text())
+for tool in configuration.get("tools", {}).values():
+    if isinstance(tool, dict) and tool.get("path"):
+        path = Path(tool["path"])
+        tool["path"] = str(path if path.is_absolute() else ORIGINAL / path)
+configuration["build_root"] = str(ROOT / "data" / "workstation-builds")
+configuration["publication_root"] = str(ROOT / "data" / "workstation-output")
+# The job remains visible in the owner's workstation queue. Its compiler lock
+# belongs to this snapshot, so shared IDA recovery is never interrupted.
+(snapshot / "replay-project.local.json").write_text(
+    json.dumps(configuration, indent=2) + "\n"
+)
+for item in records:
+    if (
+        hashlib.sha256(Path(item["original"]).read_bytes()).hexdigest()
+        != item["sha256"]
+    ):
+        raise RuntimeError(
+            "Workstation source changed before snapshot completion: " + item["original"]
+        )
+
+# The shared backend relinks independently proven callback thunks, while its
+# current verifier still compares them as opaque, unchanged bytes. Strengthen
+# this private verifier without modifying any parent compiler source.
+overlay = ROOT / "integration" / "compiler" / "protected_callback_validation.py.inc"
+verify_path = snapshot / "tools" / "verify.py"
+verify_text = verify_path.read_text()
+marker = '    lengths = (ROOT / "generated" / "instruction-lengths.bin").read_bytes()'
+if verify_text.count(marker) != 1:
+    raise RuntimeError(
+        "Compiler callback validation insertion point changed; review before building"
+    )
+verify_text = verify_text.replace(marker, overlay.read_text() + "\n" + marker)
+verify_text = verify_text.replace(
+    '    counts["direct_branch_boundaries"] = 0',
+    '    counts["direct_branch_boundaries"] = 0\n    counts["protected_callback_thunks"] = callback_count',
+)
+verify_text = verify_text.replace(
+    "from verify_debug_states import verify as verify_debug_states",
+    "from verify_debug_states import verify as verify_debug_states\nfrom verify_dw_endpoints import verify as verify_dw_endpoints",
+)
+dw_marker = '        checks["debug_states"] = verify_debug_states(rebuilt, report)'
+if verify_text.count(dw_marker) != 1:
+    raise RuntimeError("Compiled endpoint validation insertion point changed")
+verify_text = verify_text.replace(
+    dw_marker,
+    dw_marker
+    + '\n    checks["dw_local_endpoints"] = verify_dw_endpoints(rebuilt, report)',
+)
+verify_path.write_text(verify_text)
+verify_record = next(item for item in records if Path(item["snapshot"]) == verify_path)
+verify_record["original_sha256"] = verify_record["sha256"]
+verify_record["sha256"] = hashlib.sha256(verify_path.read_bytes()).hexdigest()
+
+debug_path = snapshot / "tools" / "verify_debug_states.py"
+debug_text = debug_path.read_text()
+platform_marker = '    query = symbols["__imp_VirtualQuery"]'
+branch_marker = '        if name == "Sys_IsMainThread":'
+if debug_text.count(platform_marker) != 1 or debug_text.count(branch_marker) != 1:
+    raise RuntimeError("Overlay platform test insertion points changed")
+debug_text = debug_text.replace(
+    platform_marker,
+    '    if "DW_LocalBackend_Frame" in symbols:\n'
+    "        filename_thunk = arena + 0x39200\n"
+    '        write(symbols["__imp_GetModuleFileNameA"], filename_thunk, "<Q")\n'
+    '        intercepted[filename_thunk] = "GetModuleFileNameA"\n' + platform_marker,
+)
+debug_text = debug_text.replace(
+    branch_marker,
+    '        if name == "GetModuleFileNameA":\n'
+    '            path = b"game_dx12_ship_replay.exe"\n'
+    "            assert args[0] == 0 and args[2] > len(path)\n"
+    '            machine.mem_write(args[1], path + b"\\0")\n'
+    "            ret(len(path))\n"
+    '        elif name == "Sys_IsMainThread":',
+)
+debug_path.write_text(debug_text)
+debug_record = next(item for item in records if Path(item["snapshot"]) == debug_path)
+debug_record["original_sha256"] = debug_record["sha256"]
+debug_record["sha256"] = hashlib.sha256(debug_path.read_bytes()).hexdigest()
+copy_file(
+    ROOT / "tools" / "verify-dw-endpoints.py",
+    snapshot / "tools" / "verify_dw_endpoints.py",
+)
+
+# Crash-marker initialization now starts the separate title worker. Keep this
+# boundary explicit in the marker VM: verify exactly one dispatch while still
+# executing the complete marker body and its adjacent-storage canaries.
+marker_path = snapshot / "tools" / "verify_marker.py"
+marker_text = marker_path.read_text()
+entry_hook = "        if address == base + mapped(0x21CCF60):"
+entry_run = "    machine.emu_start(base + entry, return_pc, count=100000)"
+existing_title_hook = (
+    "        if report and address == base + report['symbols'].get('Sys_UpdateGameWindowTitle', -1):\n"
+    "            # Marker bounds/ABI are tested here; the title helper starts a real\n"
+    "            # Win32 worker whose platform APIs are outside this isolated VM.\n"
+    "            returned()\n"
+    "        elif address == base + mapped(0x21CCF60):"
+)
+if marker_text.count(entry_run) != 1:
+    raise RuntimeError("Crash marker worker boundary changed; review before building")
+counted_title_hook = (
+    '        if report and address == base + report["symbols"].get("Sys_UpdateGameWindowTitle", -1):\n'
+    "            title_calls.append(address)\n"
+    "            returned()\n"
+    "        elif address == base + mapped(0x21CCF60):"
+)
+if marker_text.count(entry_hook) == 1:
+    marker_text = marker_text.replace(entry_hook, counted_title_hook)
+elif marker_text.count(existing_title_hook) == 1:
+    # Shared verification now already isolates this same Win32 boundary.
+    # Retain the DW-specific assertion that it is dispatched exactly once.
+    marker_text = marker_text.replace(existing_title_hook, counted_title_hook)
+else:
+    raise RuntimeError("Crash marker worker boundary changed; review before building")
+marker_text = marker_text.replace(
+    entry_run,
+    "    title_calls = []\n" + entry_run + "\n"
+    "    if report and len(title_calls) != 1:\n"
+    '        raise ValueError("Crash marker must dispatch its independent title worker once")',
+)
+marker_path.write_text(marker_text)
+marker_record = next(item for item in records if Path(item["snapshot"]) == marker_path)
+marker_record["original_sha256"] = marker_record["sha256"]
+marker_record["sha256"] = hashlib.sha256(marker_path.read_bytes()).hexdigest()
+
+crt_overlay = ROOT / "integration" / "compiler" / "crt_callback_validation.py.inc"
+audit_path = snapshot / "tools" / "audit_relocations.py"
+audit_text = audit_path.read_text()
+audit_marker = "def audit(directory):"
+loop_marker = "        site, target = callback['site'], callback['target']"
+count_marker = "direct_crt_destructor_registrations=len(crt_callbacks),"
+for marker in (audit_marker, loop_marker, count_marker):
+    if audit_text.count(marker) != 1:
+        raise RuntimeError("CRT registration audit insertion point changed")
+audit_text = audit_text.replace(
+    audit_marker, crt_overlay.read_text() + "\n\n" + audit_marker
+)
+audit_text = audit_text.replace(
+    "    for callback in crt_callbacks:",
+    "    retired_crt_callbacks = []\n    for callback in crt_callbacks:",
+)
+audit_text = audit_text.replace(
+    loop_marker,
+    loop_marker + "\n"
+    "        if retired(site):\n"
+    "            retired_crt_callbacks.append(verify_dw_retired_crt_callback(\n"
+    "                site, target, report, original, rebuilt, lengths, text_start))\n"
+    "            continue",
+)
+audit_text = audit_text.replace(
+    count_marker,
+    "direct_crt_destructor_registrations=len(crt_callbacks) - len(retired_crt_callbacks),\n"
+    "                  retired_direct_crt_registrations=retired_crt_callbacks,",
+)
+audit_path.write_text(audit_text)
+audit_record = next(item for item in records if Path(item["snapshot"]) == audit_path)
+audit_record["original_sha256"] = audit_record["sha256"]
+audit_record["sha256"] = hashlib.sha256(audit_path.read_bytes()).hexdigest()
+
+# Recovery keys contain absolute source paths. Rebind paths only after proving
+# identical algorithm/evidence bytes; never change recovered code or layouts.
+manifest_path = snapshot / "generated" / "manifest.json"
+manifest = json.loads(manifest_path.read_text())
+for item in manifest["preparation_inputs"]:
+    original_path = Path(item["path"])
+    relative = original_path.relative_to(ORIGINAL)
+    new_path = snapshot / relative
+    if hashlib.sha256(new_path.read_bytes()).hexdigest() != item["sha256"]:
+        raise RuntimeError("Recovery source snapshot is stale: " + item["path"])
+    item["path"] = str(new_path)
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+(ROOT / "data" / "compiler-snapshot-receipt.json").write_text(
+    json.dumps(
+        {
+            "schema": 1,
+            "snapshot": str(snapshot),
+            "method": "saved workstation source snapshot with strict callback verification",
+            "files": records,
+            "preparation_path_rebinding": "same evidence, new source paths only",
+            "dw_saved_revision_fallbacks": revision_fallbacks,
+            "validation_overlay": {
+                "path": str(overlay),
+                "sha256": hashlib.sha256(overlay.read_bytes()).hexdigest(),
+                "crt_path": str(crt_overlay),
+                "crt_sha256": hashlib.sha256(crt_overlay.read_bytes()).hexdigest(),
+                "changes": "verify whole native callback, both relocated pointer slots, compiled DW/native endpoint selection and the empty startup constructor; prove retirement of DW-owned CRT registration sites; supply platform filename in the existing overlay VM",
+            },
+        },
+        indent=2,
+    )
+    + "\n"
+)
+os.environ["REPLAY_GAME_ROOT"] = configuration["game"]
+os.environ["REPLAY_SQLITE"] = configuration["sqlite"]
+os.environ["REPLAY_WORKSTATION_CACHE"] = configuration["cache"]
+sys.path[:0] = [str(snapshot), str(snapshot / "tools")]
+from workstation.project import Project
+from workstation.config import load_paths
+
+paths = load_paths(snapshot)
+project = Project(
+    snapshot,
+    paths["cache"],
+    paths["game"],
+    paths["sqlite"],
+    paths["acts"],
+    recover_jobs=False,
+)
+job = project.start_build("engine")
+receipt = ROOT / "data" / "workstation-job.json"
+receipt.write_text(json.dumps(job, indent=2) + "\n")
+print("Frozen saved-source workstation job:", job["id"], flush=True)
+phase = None
+while True:
+    current = project.job(job["id"])
+    if current.get("phase") != phase:
+        phase = current.get("phase")
+        print(current["status"], phase, flush=True)
+    if current["status"] not in ("queued", "running"):
+        receipt.write_text(json.dumps(current, indent=2) + "\n")
+        print(current.get("error", ""), flush=True)
+        raise SystemExit(0 if current["status"] == "succeeded" else 1)
+    time.sleep(1)
