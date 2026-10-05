@@ -43,7 +43,7 @@ ROUTES = [
         145,
         "matchmaking, QoS, relay and tournaments",
         "matchmaking_services.cpp",
-        [2, 3, 8, 9, 10, 13, 15, 18, 20],
+        [2, 3, 8, 9, 10, 13, 15, 18],
     ),
     (
         145,
@@ -52,6 +52,12 @@ ROUTES = [
         [4, 16, 24, 25],
     ),
     (145, "matchmaking, QoS, relay and tournaments", "relay_services.cpp", [26]),
+    (
+        145,
+        "matchmaking, QoS, relay and tournaments",
+        "tournament_services.cpp",
+        [19, 20, 22, 23, 28, 29],
+    ),
     (150, "scheduled matches", "scheduled_services.cpp", [1, 2, 3, 4]),
     (151, "esports registration", "startup_services.cpp", [1]),
     (152, "performance samples", "scheduled_services.cpp", [1]),
@@ -76,12 +82,12 @@ GAPS = {
     "50": "Tasks 6 whole-user post, 16 copy and 22 live download; summary variants and exact result readers.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
-    "80": "Task 58; task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
+    "80": "Task 58 inventory-token validation; task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
     "104": "Local marketing is empty; populated publication/result contract still required.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
     "125": "Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.",
-    "145": "Multiuser lobby join/host migration, tournament enrollment/status family, remote relay deployment/migration and native two-game relay forwarding.",
+    "145": "Multiuser lobby join/host migration; legacy tournament task 21, automatic tournament scheduling/match assignment/push notifications and native ready/accept/leave/rejoin callbacks. Native registration/state callbacks are verified; remote relay deployment/migration and native two-game relay forwarding remain open.",
     "150": "Positive native scheduled match operations; local publication required.",
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
@@ -183,6 +189,11 @@ def main():
         path = DATA / filename
         if path.exists():
             relay_proofs[task] = (filename, json.loads(path.read_bytes()))
+    tournament_path = DATA / "native-tournament-verification.json"
+    if tournament_path.exists():
+        tournament_proof = json.loads(tournament_path.read_bytes())
+        for task in (20, 29):
+            relay_proofs[task] = (tournament_path.name, tournament_proof)
     for filename in ("relay_provider.cpp", "crypto.cpp", "platform.cpp"):
         sources["src/" + filename] = digest(ROOT / "src" / filename)
     for service, task in sorted(pairs):

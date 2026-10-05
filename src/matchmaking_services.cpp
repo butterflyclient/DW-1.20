@@ -444,16 +444,8 @@ namespace services
             return std::nullopt;
         if (auto reply = lobbyServices(directory, id, task, p))
             return reply;
-        if (task != 2 && task != 3 && task != 20)
+        if (task != 2 && task != 3)
             return std::nullopt;
-        if (task == 20)
-        {
-            p.end();
-            // Replay 0x141077F20 explicitly accepts BD player-not-in-tournament
-            // (14526), resets the retry state and completes its native task.
-            // No local tournaments have been published or entered.
-            return Reply{14526, {}, "tournament-player-not-enrolled"};
-        }
         const auto path = directory / "matchmaking" / std::to_string(id.titleId) / "players" /
                           (std::to_string(id.userId) + ".json");
         auto state = read(path, id);

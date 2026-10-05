@@ -11,6 +11,7 @@
 #include "marketplace_services.h"
 #include "achievement_services.h"
 #include "matchmaking_services.h"
+#include "tournament_services.h"
 #include "channel_services.h"
 #include "clan_services.h"
 #include "mail_services.h"
@@ -534,6 +535,8 @@ namespace services
             if (auto reply = marketplaceServices(directory, id, service, task, p))
                 return *reply;
             if (auto reply = achievementServices(directory, id, service, task, p))
+                return *reply;
+            if (auto reply = tournamentServices(directory, id, service, task, p))
                 return *reply;
             if (auto reply = matchmakingServices(directory, id, service, task, p))
                 return *reply;

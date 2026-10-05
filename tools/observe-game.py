@@ -175,6 +175,15 @@ try:
             raise ctypes.WinError(ctypes.get_last_error())
         return buffer.raw
 
+    def native_string_buffer(pointer_symbol, capacity_symbol):
+        pointer = struct.unpack("<Q", read(symbols[pointer_symbol], 8))[0]
+        capacity = struct.unpack("<I", read(symbols[capacity_symbol], 4))[0]
+        if not pointer or not 0 < capacity <= 16384:
+            return None
+        return (
+            read(pointer - base, capacity).split(b"\0", 1)[0].decode(errors="replace")
+        )
+
     def global_from_getter(symbol):
         rva = symbols[symbol]
         for _ in range(3):
@@ -946,6 +955,27 @@ try:
                 ],
                 "retry_count": struct.unpack("<I", read(symbols["gl_14C3B0880"], 4))[0],
                 "operation": read(symbols["gl_14C3B0888"], 1)[0],
+                "state": read(symbols["gl_14C3BBB75"], 1)[0],
+                "registration_time": struct.unpack(
+                    "<I", read(symbols["gl_14C3BFC78"], 4)
+                )[0],
+                "schedule_anchor": struct.unpack(
+                    "<I", read(symbols["gl_14C3BBC04"], 4)
+                )[0],
+                "schedule_count": struct.unpack("<I", read(symbols["gl_14C3BBC08"], 4))[
+                    0
+                ],
+                "schedule_interval": dvar_current("gl_14EE562A8", "<i"),
+                "parsed_search_offset": struct.unpack(
+                    "<i", read(symbols["gl_14C3BFC18"], 4)
+                )[0],
+                "rejoin_tournament_id": struct.unpack(
+                    "<Q", read(symbols["gl_14C3BFC10"], 8)
+                )[0],
+                "state_result_buffer": native_string_buffer(
+                    "gl_14C3B36D0", "gl_14C3B36D8"
+                ),
+                "result_buffer": native_string_buffer("gl_14C3BBB50", "gl_14C3BBB58"),
             }
             if all(
                 n in symbols for n in ("gl_14C3BBBB4", "gl_14C3B0880", "gl_14C3B0888")

@@ -2861,6 +2861,18 @@ try:
         )
     )
     peer_client.task(58, 6, content_fixture["post"], error=101)
+    import tournament_fixtures
+
+    tournament_fixture = tournament_fixtures.exercise(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        (u64, text, boolean),
+        checks,
+    )
     checks.append(
         "separately authenticated content commit cannot impersonate the original uploader"
     )
@@ -3725,6 +3737,7 @@ try:
     client = Client()
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
+    tournament_fixtures.check_restart(client, tournament_fixture, checks)
     multipart_content_fixtures.check_restart(client, multipart_fixture, checks)
     with post("/platform/login/peer", os.urandom(32)) as response:
         purchase_peer_platform = response.read()

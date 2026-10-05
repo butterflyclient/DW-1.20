@@ -22,6 +22,7 @@ add_executable(iw8-dw-server
     src/marketplace_services.cpp
     src/achievement_services.cpp
     src/matchmaking_services.cpp
+    src/tournament_services.cpp
     src/playlist_catalog.cpp
     src/channel_services.cpp
     src/clan_services.cpp
