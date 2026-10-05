@@ -745,6 +745,17 @@ try:
         checks,
     )
 
+    import loot_fixtures
+
+    loot_fixture = loot_fixtures.exercise(
+        client,
+        directory,
+        title,
+        user,
+        (structure, pb_integer, pb_text, pb_bytes, pb_fields),
+        checks,
+    )
+
     def enroll_params(owner):
         return structure(
             pb_text(1, "POST")
@@ -3776,6 +3787,7 @@ try:
     copy_content_fixtures.check_restart(client, copy_fixture, checks)
     user_content_fixtures.check_restart(client, user_content_fixture, checks)
     marketing_fixtures.check_restart(client, marketing_fixture, checks)
+    loot_fixtures.check_restart(client, loot_fixture, checks)
     multipart_content_fixtures.check_restart(client, multipart_fixture, checks)
     with post("/platform/login/peer", os.urandom(32)) as response:
         purchase_peer_platform = response.read()

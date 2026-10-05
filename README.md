@@ -37,6 +37,15 @@ The currently broken `dw_leave` command must not be used. Do not reissue the
 default account's platform/auth credentials while the game runs; doing so
 invalidates its session.
 
+`refresh-game-connection.ps1` records dispatch of `dw_restart`; dispatch and
+`DW_RESTART_CONNECTED` alone do not prove that native networking, permissions
+and menu initialization recovered. The live cold-server-restart test reached
+DW connected state but left native networking/permission fences failed. A
+separate reconnect/menu-return experiment exited the game. Use controlled
+game/server restarts for binary updates until the engine lifecycle is resolved.
+Disk-backed publications, including marketing and scripted-loot catalogs, are
+read per request and can already be updated without restarting either process.
+
 The server binds loopback and provides a local realm. External account linking,
 live Activision services and remote multiplayer deployment remain
 unfinished. Ordinary Replay, shared compiler work, assets and proxy configuration
@@ -93,6 +102,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 | 123 | 1, 2 | Published redeemable codes/payloads, atomic inventory/currency grants, owner binding and durable retry receipts |
 | 151 | 1 | Explicit local esports-registration publication and native boolean DTO |
 | 104 / 194 | 6, 7 / 1 | Full published marketing messages with native field/blob layouts and location/language/time selection, owned view receipts and signed empty AB enrollment |
+| 195 | 1 | Full native scripted-loot proxy transport, explicitly published deterministic script responses and ordered owner-scoped task journals |
 | 50 / 58 | 2, 3, 5, 6, 9, 10, 15, 16, 18, 19, 20 / 5, 6, 18, 20, 21 | Whole-file metadata/listing, real HTTP upload/download/COPY, persistent user/multipart stages, owner-bound upload/copy commits, tags/summaries and safe retry receipts |
 | 125 | 1, 2, 3, 4, 5, 6, 9 | Published achievement definitions/states/activation, complete owner/batch event ingestion, binary/REST retry normalization, archived receipts and user-state JSON |
 | 145 | 2, 3, 4, 8, 9, 10, 13, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 28, 29 | Player/token, real UDP QoS, relay discovery/authentication, playlist catalog, lobby/host CAS and lifecycle; explicitly published tournament registration/state, owned ready/accept/decline/leave/rejoin |
@@ -143,6 +153,7 @@ Credentials, request bodies, headers and retry tokens are excluded from logs.
 - `data/content-streaming/<title>/copies.json`: up to 128 source-snapshot copy stages with 600-second capabilities. `files.json` atomically commits the clone, source counter, owned slot replacement and durable `copy_receipts` journal. See [content-copy.md](docs/content-copy.md) for limits, ownership, retry behavior and target-versus-source-oracle provenance.
 - `data/marketing/<title>/<context>/<user>.views.json`: owner-scoped viewed-message receipts.
 - `data/marketing/<title>/<context>/catalog.json`: complete bounded message publications. See [marketing-messages.md](docs/marketing-messages.md) for the schema, native blob limits and consumer requirements.
+- `data/loot-generation/<title>/<context>/catalog.json` and `receipts/<user>.json`: published exact scripted responses and durable owned task snapshots. See [scripted-loot.md](docs/scripted-loot.md) for native capacities, repeated opening semantics and remaining reward-rule/native-consumer gates.
 - `data/esports/<title>/registered.json`: explicit registered-account catalog.
 - `data/achievement-user-state` and `data/achievement-engine`: persistent state and explicitly published local rules.
 - `data/achievements/<title>/<context>/<user>/events.json`: recent event journal and 256 hot retry receipts. Binary event UUIDs normalize to the same reversed-byte REST UUID. Batch first-party IDs are checked against signed identity claims; attribution is included in the retry digest.

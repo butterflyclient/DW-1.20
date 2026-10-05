@@ -6,6 +6,7 @@
 #include <fstream>
 #include <set>
 #include <tuple>
+#include <charconv>
 
 namespace services
 {
@@ -38,6 +39,75 @@ namespace services
             std::string value(reinterpret_cast<const char *>(f.bytes.data()), f.bytes.size());
             wire::require(value.find('\0') == std::string::npos);
             return value;
+        }
+
+        struct ProxyRequest
+        {
+            std::string method, url, body, contentType;
+        };
+
+        ProxyRequest proxyRequest(wire::Reader &p)
+        {
+            proto::Reader reader{p.structure(16384)};
+            proto::Field f;
+            ProxyRequest result;
+            unsigned seen = 0, headers = 0;
+            while (reader.next(f))
+            {
+                if (f.tag >= 1 && f.tag <= 3)
+                {
+                    const auto bit = 1U << f.tag;
+                    wire::require(!(seen & bit));
+                    seen |= bit;
+                    auto value = text(f, f.tag == 1 ? 16 : 1024);
+                    if (f.tag == 1)
+                        result.method = std::move(value);
+                    else if (f.tag == 2)
+                        result.url = std::move(value);
+                    else
+                        result.body = std::move(value);
+                }
+                else if (f.tag == 4)
+                {
+                    wire::require(f.type == 2 && ++headers <= 16);
+                    proto::Reader header{f.bytes};
+                    proto::Field h;
+                    std::string key, value;
+                    unsigned fields = 0;
+                    while (header.next(h))
+                        if (h.tag == 1 || h.tag == 2)
+                        {
+                            const auto bit = 1U << h.tag;
+                            wire::require(!(fields & bit));
+                            fields |= bit;
+                            auto field = text(h, h.tag == 1 ? 100 : 4096);
+                            (h.tag == 1 ? key : value) = std::move(field);
+                        }
+                    wire::require(fields == 6);
+                    if (key == "Content-Type")
+                    {
+                        wire::require(result.contentType.empty() && !value.empty());
+                        result.contentType = std::move(value);
+                    }
+                }
+            }
+            wire::require((seen & 6) == 6 && result.method == "POST" && !result.url.empty());
+            return result;
+        }
+
+        Reply proxyResponse(const Json &body, const char *operation)
+        {
+            const auto bytes = body.dump();
+            // Both Replay HTTP-proxy consumers read into fixed native buffers.
+            wire::require(bytes.size() < 16000);
+            Reply result{0, {}, operation, true, {}};
+            wire::Bytes header;
+            proto::text(header, 1, "Content-Length");
+            proto::text(header, 2, std::to_string(bytes.size()));
+            proto::bytes(result.structure, 1, header);
+            proto::integer(result.structure, 2, 200);
+            proto::text(result.structure, 3, bytes);
+            return result;
         }
 
         void save(const std::filesystem::path &path, const Json &data)
@@ -80,6 +150,192 @@ namespace services
                               (value >= '0' && value <= '9') || value == '_' || value == '-' ||
                               value == '.');
             return context;
+        }
+
+        Reply openLootDrop(const std::filesystem::path &directory,
+                           const platform::LobbyIdentity &id,
+                           wire::Reader &p)
+        {
+            // Exact Replay 142139BB0 starts 195/1. Writer 14213EDC0 sends the
+            // HTTP-proxy envelope and opaque clientData; reader 14213F0A0 reads
+            // an HTTP JSON body's scriptResponse string into 16000 bytes.
+            const auto request = proxyRequest(p);
+            wire::require(request.contentType == "application/json" && !request.body.empty());
+            const auto start = request.url.find("/v1/users/");
+            const auto query = request.url.find('?', start);
+            wire::require(start != std::string::npos && query != std::string::npos &&
+                          request.url.find('#') == std::string::npos);
+            const auto path = request.url.substr(start, query - start);
+            const auto split = path.find("/loot-drop/", 10);
+            wire::require(split != std::string::npos && path.ends_with('/'));
+            const auto user = path.substr(10, split - 10);
+            if (user != "bnet-" + std::to_string(id.userId) &&
+                user != "uno-" + std::to_string(id.userId))
+                return {101, {}, "loot-drop-owner-denied"};
+            const auto number = path.substr(split + 11, path.size() - split - 12);
+            wire::require(!number.empty() && (number.size() == 1 || number.front() != '0'));
+            uint32_t drop = 0;
+            const auto parsed = std::from_chars(number.data(), number.data() + number.size(), drop);
+            wire::require(parsed.ec == std::errc{} && parsed.ptr == number.data() + number.size());
+            std::string context, client;
+            unsigned fields = 0;
+            size_t at = query + 1;
+            while (at < request.url.size())
+            {
+                const auto end = request.url.find('&', at);
+                const auto pair = request.url.substr(at, end == std::string::npos ? end : end - at);
+                const auto equal = pair.find('=');
+                wire::require(equal != std::string::npos);
+                const auto key = pair.substr(0, equal);
+                wire::require(key == "context" || key == "client");
+                const unsigned bit = key == "context" ? 1 : 2;
+                wire::require(!(fields & bit));
+                fields |= bit;
+                std::string value;
+                auto digit = [](char c) -> int
+                {
+                    if (c >= '0' && c <= '9')
+                        return c - '0';
+                    if (c >= 'a' && c <= 'f')
+                        return c - 'a' + 10;
+                    if (c >= 'A' && c <= 'F')
+                        return c - 'A' + 10;
+                    return -1;
+                };
+                for (size_t index = equal + 1; index < pair.size(); ++index)
+                {
+                    char c = pair[index];
+                    if (c == '%')
+                    {
+                        wire::require(index + 2 < pair.size());
+                        const auto high = digit(pair[index + 1]), low = digit(pair[index + 2]);
+                        wire::require(high >= 0 && low >= 0);
+                        c = static_cast<char>(high * 16 + low);
+                        index += 2;
+                    }
+                    value.push_back(c);
+                }
+                wire::require(value.size() < (bit == 1 ? 16u : 64u));
+                (bit == 1 ? context : client) = std::move(value);
+                if (end == std::string::npos)
+                    break;
+                at = end + 1;
+                wire::require(at < request.url.size());
+            }
+            wire::require(fields == 3 && !client.empty());
+            const auto scoped = publicationContext(context);
+            (void)publicationContext(client);
+            unsigned bodyKeys = 0;
+            const auto body = Json::parse(
+                request.body,
+                [&](int, Json::parse_event_t event, Json &)
+                {
+                    if (event == Json::parse_event_t::key)
+                        wire::require(++bodyKeys == 1);
+                    return true;
+                },
+                false);
+            wire::require(body.is_object() && body.size() == 1 && body.contains("clientData") &&
+                          body["clientData"].is_string());
+            const auto clientData = body["clientData"].get<std::string>();
+            wire::require(clientData.size() < 1000 && clientData.find('\0') == std::string::npos);
+            const auto fingerprint = hex(crypto::sha256(std::span(
+                reinterpret_cast<const uint8_t *>(clientData.data()), clientData.size())));
+            const auto root = directory / "loot-generation" / std::to_string(id.titleId) / scoped;
+            const auto pathToState = root / "receipts" / (std::to_string(id.userId) + ".json");
+            const auto validHash = [](const Json &value)
+            {
+                return value.is_string() && value.get_ref<const std::string &>().size() == 64 &&
+                       value.get_ref<const std::string &>().find_first_not_of("0123456789abcdef") ==
+                           std::string::npos;
+            };
+            const auto validResponse = [](const Json &value)
+            {
+                return value.is_string() && value.get_ref<const std::string &>().size() < 16000 &&
+                       value.get_ref<const std::string &>().find('\0') == std::string::npos &&
+                       Json{{"scriptResponse", value}}.dump().size() < 16000;
+            };
+            auto persisted = [](bool valid)
+            {
+                if (!valid)
+                    throw std::runtime_error("Loot publication or receipt schema invalid");
+            };
+            auto read = [&](const std::filesystem::path &path, const Json &initial)
+            {
+                if (std::filesystem::exists(path))
+                    persisted(std::filesystem::file_size(path) <= 4 * 1024 * 1024);
+                return load(path, initial);
+            };
+            auto state = read(pathToState,
+                              Json{{"schema", 1},
+                                   {"title", id.titleId},
+                                   {"context", context},
+                                   {"owner", id.userId},
+                                   {"next_id", uint64_t{1}},
+                                   {"receipts", Json::array()}});
+            persisted(state.is_object() && state.at("schema") == 1 &&
+                      state.at("title") == id.titleId && state.at("context") == context &&
+                      state.at("owner") == id.userId && state.at("receipts").is_array() &&
+                      state["receipts"].size() <= 4096 && state.at("next_id").is_number_unsigned());
+            std::set<std::pair<uint32_t, std::string>> unique;
+            uint64_t next = 1;
+            for (const auto &row : state["receipts"])
+            {
+                persisted(row.at("id").is_number_unsigned() && row["id"] == next++ &&
+                          row.at("drop").is_number_unsigned() &&
+                          row["drop"].get<uint64_t>() <= UINT32_MAX &&
+                          validHash(row.at("client_data_sha256")) &&
+                          validResponse(row.at("script_response")) &&
+                          row.at("recorded").is_number_unsigned());
+            }
+            persisted(state["next_id"] == next);
+            const auto catalogPath = root / "catalog.json";
+            if (!std::filesystem::exists(catalogPath))
+                return {108, {}, "loot-drop-unpublished"};
+            const auto catalog = read(catalogPath, Json::object());
+            persisted(catalog.at("schema") == 1 && catalog.at("title") == id.titleId &&
+                      catalog.at("context") == context && catalog.at("responses").is_array() &&
+                      catalog["responses"].size() <= 512);
+            unique.clear();
+            const Json *selected = nullptr;
+            const auto stamp = now();
+            for (const auto &row : catalog["responses"])
+            {
+                persisted(row.at("drop").is_number_unsigned() &&
+                          row["drop"].get<uint64_t>() <= UINT32_MAX &&
+                          validHash(row.at("client_data_sha256")) &&
+                          validResponse(row.at("script_response")) &&
+                          row.at("enabled").is_boolean() && row.at("starts").is_number_unsigned() &&
+                          row.at("expires").is_number_unsigned() &&
+                          (!row["expires"].get<uint64_t>() || row["expires"] > row["starts"]) &&
+                          unique
+                              .emplace(row["drop"].get<uint32_t>(),
+                                       row["client_data_sha256"].get<std::string>())
+                              .second);
+                if (row["drop"] == drop && row["client_data_sha256"] == fingerprint &&
+                    row["enabled"] == true && row["starts"].get<uint64_t>() <= stamp &&
+                    (!row["expires"].get<uint64_t>() || row["expires"].get<uint64_t>() > stamp))
+                    selected = &row;
+            }
+            if (!selected)
+                return {108, {}, "loot-drop-rule-unpublished"};
+            if (state["receipts"].size() == 4096)
+                return {108, {}, "loot-drop-receipt-capacity"};
+            auto reply = proxyResponse(Json{{"scriptResponse", (*selected)["script_response"]}},
+                                       "loot-drop-opened");
+            state["receipts"].push_back({{"id", next},
+                                         {"drop", drop},
+                                         {"client_data_sha256", fingerprint},
+                                         {"script_response", (*selected)["script_response"]},
+                                         {"recorded", stamp}});
+            state["next_id"] = next + 1;
+            persisted(state.dump().size() <= 4 * 1024 * 1024);
+            // Exact native game caller 14103E3C0 uses constant clientData for
+            // successive crate openings. It is not a transaction/retry identifier.
+            // Journal each accepted task separately; preserve its exact response
+            // without using a previous opening to override today's publication.
+            save(pathToState, state);
+            return reply;
         }
 
         struct MarketingMessage
@@ -349,36 +605,9 @@ namespace services
             // Replay 0x142139AD0 starts 194/1 using the full HTTP-proxy envelope.
             // 0x1420FF850 requires expiresIn, ABToken and enrollments JSON, and updates
             // the native lobby token lifetime itself. This local server offers no tests.
-            proto::Reader request{p.structure(16384)};
-            proto::Field f;
-            std::string method, url;
-            unsigned headers = 0, seen = 0;
-            while (request.next(f))
-            {
-                if (f.tag == 1 || f.tag == 2)
-                {
-                    const auto bit = 1U << f.tag;
-                    wire::require(!(seen & bit));
-                    seen |= bit;
-                    auto value = text(f, f.tag == 1 ? 16 : 1024);
-                    if (f.tag == 1)
-                        method = value;
-                    else
-                        url = value;
-                }
-                else if (f.tag == 3)
-                    wire::require(f.type == 2 && f.bytes.empty());
-                else if (f.tag == 4)
-                {
-                    wire::require(f.type == 2 && ++headers <= 16);
-                    proto::Reader header{f.bytes};
-                    proto::Field h;
-                    while (header.next(h))
-                        if (h.tag == 1 || h.tag == 2)
-                            (void)text(h, h.tag == 1 ? 100 : 4096);
-                }
-            }
-            wire::require(seen == 6 && method == "POST");
+            const auto request = proxyRequest(p);
+            wire::require(request.body.empty());
+            const auto &url = request.url;
             const auto account = "/v2/users/bnet-" + std::to_string(id.userId) + "/enrollments/";
             const auto universal = "/v2/users/uno-" + std::to_string(id.userId) + "/enrollments/";
             auto route = url.find("/v2/users/");
@@ -406,18 +635,10 @@ namespace services
                 save(target, state);
             }
             wire::require(state.at("enrollments").is_array() && state.at("enrollments").empty());
-            const auto body = Json{{"expiresIn", state.at("expires").get<uint64_t>() - now()},
-                                   {"ABToken", state.at("token")},
-                                   {"enrollments", state.at("enrollments")}}
-                                  .dump();
-            Reply reply{0, {}, "ab-enrollment-read", true, {}};
-            wire::Bytes header;
-            proto::text(header, 1, "Content-Length");
-            proto::text(header, 2, std::to_string(body.size()));
-            proto::bytes(reply.structure, 1, header);
-            proto::integer(reply.structure, 2, 200);
-            proto::text(reply.structure, 3, body);
-            return reply;
+            return proxyResponse(Json{{"expiresIn", state.at("expires").get<uint64_t>() - now()},
+                                      {"ABToken", state.at("token")},
+                                      {"enrollments", state.at("enrollments")}},
+                                 "ab-enrollment-read");
         }
 
         Reply events(const std::filesystem::path &directory,
@@ -532,6 +753,8 @@ namespace services
             return viewed(directory, id, p);
         if (service == 194 && task == 1)
             return enroll(directory, id, p);
+        if (service == 195 && task == 1)
+            return openLootDrop(directory, id, p);
         if (service == 67 && task == 5)
             return events(directory, id, p);
         return std::nullopt;
