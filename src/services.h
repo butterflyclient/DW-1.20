@@ -22,6 +22,8 @@ namespace services
         std::string presenceContext;
         uint64_t clanGroup = 0, clanUser = 0;
         uint32_t clanEvent = 0, clanRole = 0;
+        uint64_t tournamentId = 0;
+        std::string tournamentStateHash;
     };
 
     struct Reply

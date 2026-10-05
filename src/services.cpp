@@ -488,6 +488,7 @@ namespace services
         {
             return socialDeliveryValid(title, delivery) &&
                    clanDeliveryValid(directory, title, delivery) &&
+                   tournamentDeliveryValid(directory, title, delivery) &&
                    (!delivery.lobbyId || matchmakingDeliveryValid(directory, title, delivery));
         }
         catch (...)

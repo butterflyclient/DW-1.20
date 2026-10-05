@@ -3,8 +3,8 @@
 The server implements Replay tasks 145/19, 20, 21, 22, 23, 28 and 29. These are
 backend handlers, without game executable changes or fabricated native fences.
 The implementation uses an explicit published bracket. Automatic scheduling,
-forming teams from matchmaking parties, match assignment and tournament push
-notifications remain separate work. Host-authorized result submissions persist
+forming teams from matchmaking parties, match assignment and join/disband push
+events remain separate work. Host-authorized result submissions persist
 the scores and advance winners in the published bracket. Task 145/27 from another
 source build is not silently substituted.
 
@@ -149,6 +149,38 @@ new tournament ID for a different competition. Corrupt or inconsistent state
 is preserved for diagnosis. Results do not rewrite the catalog or enrollment;
 publication edits are observed on the next request without a server restart.
 
+## Native update notifications
+
+Accepted membership, readiness and newly committed results send an encrypted
+async-matchmaker event to the tournament's accepted, assigned participants.
+Replay's exact decoder `0x14213F1C0` reads event 2010 as one typed bracket string,
+with no separate tournament ID or synthetic length. The game callback
+`0x14103F3F0` forwards that string to `OnlineTournament_OnUpdateTournament`.
+The bracket is the same validated document returned by task 145/20.
+
+Notifications use the existing delayed, serialized endpoint writer. Before
+writing each frame, the server rereads the current publication, result journal
+and enrollment, checks that the user is still accepted, and compares the full
+derived bracket SHA256. Leaving revokes queued updates; a newer readiness/result
+snapshot suppresses older queued documents. Exact idempotent task retries do
+not generate duplicate updates. Each current, authenticated connection for an
+eligible account can receive the update; offline accounts recover through task
+145/20. This is an update transport, not an automatic team-formation scheduler.
+
+Independent encrypted clients verify receipt by both reporting and opposing
+accounts, the exact target event layout, stale snapshot suppression and recipient
+revocation. The native receiver check completed actual UI registration, then
+received FORMING and PLAYING event-2010 documents. Read-only observations found
+the delivered tournament ID and the native arrays' 16 participants, team size 2,
+8 teams, 3 rounds and local team 0. FORMING correctly leaves these counts unset;
+the target parser fills them after formation. Recipient acceptance was explicitly
+seeded in backend fixture data, so this verifies the decoder/parser without
+claiming native join-assignment completion. No lobby or map was scheduled. Exact
+pre-test publication and enrollment bytes were restored and both processes were
+restarted. `verify-native-tournament-update.py` sends the bounded fixture;
+`record-native-tournament-update.py` requires observed counts, image hashes and
+restoration before writing its separate proof.
+
 Independent encrypted-wire tests cover these methods, full bracket bounds,
 ownership, retry, result conflict, advancement and process restart. Their passing receipt is distinct from
 native positive tournament callback validation. The native menu test completed
@@ -157,7 +189,8 @@ displayed the expected countdown. After restarting both game and server, native
 145/20 read the persisted bracket and its completion parsed the exact tournament
 ID into the rejoin candidate. `record-native-tournament-proof.py` requires those
 two observations and their exact executable hashes. Ready/accept/decline/leave/
-rejoin native callbacks, bracket push rendering and playable tournaments remain
-unverified. The native 145/21 positive result callback remains unobserved; its
+rejoin native callbacks, bracket UI rendering and playable tournaments remain
+unverified. Positive event decoding and bracket parsing are verified as described
+above. The native 145/21 positive result callback remains unobserved; its
 protocol fixtures are not a substitute. No match was started. Menu/startup validation alone does not
 establish that a tournament can be played.

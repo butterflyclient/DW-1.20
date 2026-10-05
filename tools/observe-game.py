@@ -1057,6 +1057,48 @@ try:
                 "rejoin_tournament_id": struct.unpack(
                     "<Q", read(symbols["gl_14C3BFC10"], 8)
                 )[0],
+                # Same-Replay 0x141074530: the native parser fills these fields
+                # from the delivered document. Resolve them through linked globals.
+                "current_bracket": (
+                    {
+                        "tournament_id": struct.unpack(
+                            "<Q", read(symbols["gl_14C3B3230"], 8)
+                        )[0],
+                        "participant_count": struct.unpack(
+                            "<I", read(symbols["gl_14C3B34B8"], 4)
+                        )[0],
+                        "team_size": struct.unpack(
+                            "<I", read(symbols["gl_14C3B34B8"] + 4, 4)
+                        )[0],
+                        "team_count": struct.unpack(
+                            "<I", read(symbols["gl_14C3B34C0"], 4)
+                        )[0],
+                        "round_count": struct.unpack(
+                            "<I", read(symbols["gl_14C3B34C8"], 4)
+                        )[0],
+                        "local_team": struct.unpack(
+                            "<i", read(symbols["gl_14C3BFC68"], 4)
+                        )[0],
+                        "local_round": struct.unpack(
+                            "<H", read(symbols["gl_14C3BFC6C"], 2)
+                        )[0],
+                        "local_match": struct.unpack(
+                            "<H", read(symbols["gl_14C3BFC6C"] + 4, 2)
+                        )[0],
+                    }
+                    if all(
+                        name in symbols
+                        for name in (
+                            "gl_14C3B3230",
+                            "gl_14C3B34B8",
+                            "gl_14C3B34C0",
+                            "gl_14C3B34C8",
+                            "gl_14C3BFC68",
+                            "gl_14C3BFC6C",
+                        )
+                    )
+                    else None
+                ),
                 "state_result_buffer": native_string_buffer(
                     "gl_14C3B36D0", "gl_14C3B36D8"
                 ),

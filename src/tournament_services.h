@@ -3,6 +3,9 @@
 
 namespace services
 {
+    bool tournamentDeliveryValid(const std::filesystem::path &directory,
+                                 uint32_t title,
+                                 const Delivery &delivery);
     std::optional<Reply> tournamentServices(const std::filesystem::path &directory,
                                             const platform::LobbyIdentity &identity,
                                             uint8_t service,

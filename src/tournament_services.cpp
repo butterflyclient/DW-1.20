@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <charconv>
 
 namespace services
 {
@@ -229,6 +230,12 @@ namespace services
                           value.is_object() && value.at("id").is_number_unsigned() &&
                           value["id"].get<uint64_t>() && value.at("accepted").is_boolean() &&
                           value.at("ready").is_boolean());
+                uint64_t user = 0;
+                const auto parsed =
+                    std::from_chars(row.key().data(), row.key().data() + row.key().size(), user);
+                persisted(parsed.ec == std::errc{} &&
+                          parsed.ptr == row.key().data() + row.key().size() && user &&
+                          std::to_string(user) == row.key());
                 if (value.contains("ready_round") || value.contains("ready_match"))
                     persisted(value.at("ready_round").is_number_unsigned() &&
                               value["ready_round"].get<uint64_t>() < 4 &&
@@ -358,11 +365,14 @@ namespace services
             return state;
         }
 
+        void notifyUpdate(Reply &reply, const Json &row, const Json &journal, const Json &players);
+
         Reply submitResult(const std::filesystem::path &directory,
                            const platform::LobbyIdentity &id,
                            const Json &query,
                            const Json &state,
                            Json journal,
+                           const Json &players,
                            const std::filesystem::path &path)
         {
             const auto lobby = query["lobbyID"].get<uint64_t>();
@@ -426,9 +436,10 @@ namespace services
                         return {108, {}, "tournament-result-capacity"};
                     // Validate the complete derived document before the one atomic write.
                     Json row = {{"id", query["tournamentID"]}, {"state", state}};
-                    stateWithResults(row, journal);
+                    Reply reply{0, {}, "tournament-result-committed"};
+                    notifyUpdate(reply, row, journal, players);
                     write(path, journal);
-                    return {0, {}, "tournament-result-committed"};
+                    return reply;
                 }
             return {108, {}, "tournament-result-lobby-unassigned"};
         }
@@ -466,7 +477,74 @@ namespace services
             validateBracket(state, tournament);
             return state;
         }
+
+        std::string stateHash(const Json &state)
+        {
+            const auto bytes = state.dump();
+            const auto hash =
+                crypto::sha256({reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()});
+            std::string result;
+            for (const auto byte : hash)
+            {
+                result.push_back("0123456789abcdef"[byte >> 4]);
+                result.push_back("0123456789abcdef"[byte & 15]);
+            }
+            return result;
+        }
+
+        void notifyUpdate(Reply &reply, const Json &row, const Json &journal, const Json &players)
+        {
+            const auto tournament = row["id"].get<uint64_t>();
+            const auto state =
+                stateWithReadiness(stateWithResults(row, journal), tournament, players);
+            const auto members = validateBracket(state, tournament);
+            wire::Writer push;
+            // Exact Replay decoder 0x14213F1C0, event 2010: one typed string,
+            // no synthetic length field. Native consumer 0x14103F3F0 forwards it
+            // to OnlineTournament_OnUpdateTournament and the bracket parser.
+            push.u32(2010);
+            push.text(state.dump());
+            const auto hash = stateHash(state);
+            for (const auto &player : players.items())
+                if (player.value()["id"] == tournament && player.value()["accepted"] == true)
+                {
+                    const auto user = std::stoull(player.key());
+                    if (!members.contains(user))
+                        continue;
+                    Delivery delivery{user, push.data, 250};
+                    delivery.tournamentId = tournament;
+                    delivery.tournamentStateHash = hash;
+                    reply.deliveries.push_back(std::move(delivery));
+                }
+        }
     } // namespace
+
+    bool tournamentDeliveryValid(const std::filesystem::path &directory,
+                                 uint32_t title,
+                                 const Delivery &delivery)
+    {
+        if (!delivery.tournamentId)
+            return true;
+        const auto root = directory / "tournaments" / std::to_string(title);
+        const auto state = enrollments(root / "enrollments.json", title);
+        const auto key = std::to_string(delivery.user);
+        if (!state["players"].contains(key))
+            return false;
+        const auto &player = state["players"][key];
+        if (player["id"] != delivery.tournamentId || player["accepted"] != true)
+            return false;
+        const auto rows = catalog(root / "catalog.json", title);
+        const auto *row = published(rows, delivery.tournamentId, delivery.user);
+        if (!row)
+            return false;
+        const auto journal =
+            results(root / "results" / (std::to_string(delivery.tournamentId) + ".json"),
+                    title,
+                    delivery.tournamentId);
+        return stateHash(stateWithReadiness(stateWithResults(*row, journal),
+                                            delivery.tournamentId,
+                                            state["players"])) == delivery.tournamentStateHash;
+    }
 
     std::optional<Reply> tournamentServices(const std::filesystem::path &directory,
                                             const platform::LobbyIdentity &id,
@@ -525,13 +603,38 @@ namespace services
         const auto root = directory / "tournaments" / std::to_string(id.titleId);
         const auto path = root / "enrollments.json";
         auto state = enrollments(path, id.titleId);
+        const auto previous = state;
         auto &players = state["players"];
         const auto key = std::to_string(id.userId);
         if (task == 22)
         {
+            const auto tournamentLeft =
+                players.contains(key) ? players[key]["id"].get<uint64_t>() : 0;
+            Reply reply{0, {}, "tournament-owner-left-all"};
+            // Leave must still succeed when publication is unavailable. A malformed
+            // notification source cannot undo the authenticated enrollment removal.
+            try
+            {
+                const auto rows = catalog(root / "catalog.json", id.titleId);
+                const auto *row = published(rows, tournamentLeft, id.userId);
+                if (row)
+                {
+                    auto remaining = players;
+                    remaining.erase(key);
+                    const auto journal =
+                        results(root / "results" / (std::to_string(tournamentLeft) + ".json"),
+                                id.titleId,
+                                tournamentLeft);
+                    notifyUpdate(reply, *row, journal, remaining);
+                }
+            }
+            catch (const std::exception &)
+            {
+                reply.detail = "tournament leave notification source unavailable";
+            }
             if (players.erase(key))
                 write(path, state);
-            return Reply{0, {}, "tournament-owner-left-all"};
+            return reply;
         }
         const auto rows = catalog(root / "catalog.json", id.titleId);
         if (task == 29)
@@ -581,7 +684,7 @@ namespace services
         {
             if (entry["accepted"] != true)
                 return Reply{101, {}, "tournament-result-join-not-accepted"};
-            return submitResult(directory, id, query, bracket, journal, resultPath);
+            return submitResult(directory, id, query, bracket, journal, players, resultPath);
         }
         if (task == 20)
         {
@@ -617,12 +720,17 @@ namespace services
             entry["ready"] = true;
         }
         stateWithReadiness(bracket, tournament, players);
-        write(path, state);
-        return Reply{0,
-                     {},
-                     task == 19   ? "tournament-owner-ready"
-                     : task == 28 ? "tournament-owner-rejoined"
-                     : accepted   ? "tournament-owner-join-accepted"
-                                  : "tournament-owner-join-declined"};
+        Reply reply{0,
+                    {},
+                    task == 19   ? "tournament-owner-ready"
+                    : task == 28 ? "tournament-owner-rejoined"
+                    : accepted   ? "tournament-owner-join-accepted"
+                                 : "tournament-owner-join-declined"};
+        if (state != previous)
+        {
+            notifyUpdate(reply, *row, journal, players);
+            write(path, state);
+        }
+        return reply;
     }
 } // namespace services

@@ -6,7 +6,35 @@ The native callback and bracket consumer addresses are recorded in the docs.
 
 import copy
 import json
+import socket
 import time
+
+
+def updates(connections, expected=None):
+    snapshot = None
+    for connection in connections:
+        kind, packet = connection.receive()
+        assert (
+            kind == 2 and packet[:6] == b"\x08\xda\x07\0\0\x10" and packet[-1:] == b"\0"
+        )
+        state = json.loads(packet[6:-1])
+        assert expected is None or state == expected
+        assert snapshot is None or state == snapshot
+        snapshot = state
+    return snapshot
+
+
+def no_update(connection):
+    timeout = connection.s.gettimeout()
+    connection.s.settimeout(0.4)
+    try:
+        try:
+            packet = connection.s.recv(1)
+        except socket.timeout:
+            return
+        raise AssertionError(f"Unexpected revoked/stale tournament frame: {packet!r}")
+    finally:
+        connection.s.settimeout(timeout)
 
 
 def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
@@ -84,10 +112,12 @@ def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
     assert client.task(145, 29, registration()) == result
     assert enrollment_path.read_bytes() == before and get_state() == state
     assert client.task(145, 23, u64(tournament) + boolean(True)) == []
+    updates((client,), state)
     assert client.task(145, 28, u64(tournament)) == []
     assert client.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
     expected = copy.deepcopy(state)
     expected["rounds"][0]["matches"][0]["readyPlayerIDs"] = [user]
+    updates((client,), expected)
     assert get_state() == expected
     checks.append(
         "Replay 145/19/20/22/23/28/29 exact wire contracts, published bracket, enrollment, registration string and first-unfinished-match readiness"
@@ -144,10 +174,12 @@ def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
     assert peer.task(145, 29, registration()) == result
     assert peer.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
     expected["rounds"][0]["matches"][0]["readyPlayerIDs"].append(peer_user)
+    updates((client,), expected)
     assert get_state() == expected and get_state(peer) == expected
     assert peer.task(145, 22) == []
     peer.task(145, 20, error=14526)
     expected["rounds"][0]["matches"][0]["readyPlayerIDs"] = [user]
+    updates((client,), expected)
     assert get_state() == expected
     foreign = copy.deepcopy(catalog)
     foreign["tournaments"][0]["state"]["teams"][1]["playerIDs"] = []
@@ -201,6 +233,7 @@ def exercise_results(
     )
     assert peer.task(145, 29, registration)
     assert peer.task(145, 23, u64(tournament) + boolean(True)) == []
+    updates((peer,))
     player_root = directory / "matchmaking" / str(title) / "players"
     info = json.loads((player_root / f"{user}.json").read_text())["info"]
     assert peer.task(145, 2, text(json.dumps(info))) == []
@@ -247,6 +280,7 @@ def exercise_results(
 
     submit(error=101)  # Client registration alone does not accept participation.
     assert client.task(145, 23, u64(tournament) + boolean(True)) == []
+    updates((client, peer))
     enrollment_bytes = (root / "enrollments.json").read_bytes()
     for mutate in (
         lambda value: value.update(tournamentID=0),
@@ -308,6 +342,7 @@ def exercise_results(
     publish()
     assert not result_path.exists()
     assert submit() == []
+    pushed = updates((client, peer))
     committed = result_path.read_bytes()
     assert submit() == [] and result_path.read_bytes() == committed
     submit(dict(submission, winningTeamID=1), error=14536)
@@ -327,6 +362,7 @@ def exercise_results(
     expected["rounds"][0]["matches"][0].update(
         winningTeamID=0, matchResultPayload={"scores": [6, 4]}
     )
+    assert pushed == expected
     assert get_state() == expected and get_state(peer) == expected
     checks.append(
         "Tournament result requires a live authenticated host lobby with both published teams; one atomic durable result, exact retry and native 14536 conflict without publication or enrollment mutation"
@@ -346,6 +382,7 @@ def exercise_results(
     assert get_state() == expected and get_state(peer) == expected
     assert client.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
     expected["rounds"][1]["matches"][0]["readyPlayerIDs"] = [user]
+    updates((client, peer), expected)
     assert get_state() == expected
     assert catalog_path.read_bytes() == publication_bytes
     assert result_path.read_bytes() == committed
@@ -387,6 +424,40 @@ def exercise_results(
     assert catalog_path.read_bytes() == publication_bytes
     checks.append(
         "Tournament two-child winner advancement in native global-team order, round-scoped readiness, full result-journal/publication consistency and corrupt-state preservation"
+    )
+    started = time.monotonic()
+    assert client.task(145, 23, u64(tournament) + boolean(False)) == []
+    assert client.task(145, 29, registration)
+    assert client.task(145, 23, u64(tournament) + boolean(True)) == []
+    assert client.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
+    assert time.monotonic() - started < 0.25
+    updates((client, peer), expected)
+    no_update(client)
+    no_update(peer)
+    checks.append(
+        "Exact Replay tournament event 2010 typed bracket strings reach both accepted owners; queued older readiness snapshots are suppressed under the serialized endpoint writer"
+    )
+
+    started = time.monotonic()
+    assert peer.task(145, 22) == []  # Queues an update to the remaining client.
+    assert client.task(145, 22) == []  # Revokes that recipient before delivery.
+    assert time.monotonic() - started < 0.25
+    no_update(client)
+    no_update(peer)
+    assert client.task(145, 29, registration)
+    assert client.task(145, 23, u64(tournament) + boolean(True)) == []
+    unready = copy.deepcopy(expected)
+    unready["rounds"][1]["matches"][0]["readyPlayerIDs"] = []
+    updates((client,), unready)
+    assert peer.task(145, 29, registration)
+    assert peer.task(145, 23, u64(tournament) + boolean(True)) == []
+    updates((client, peer), unready)
+    assert client.task(145, 19, u64(tournament) + u64(0xFFFFFFFF)) == []
+    updates((client, peer), expected)
+    assert result_path.read_bytes() == committed
+    assert catalog_path.read_bytes() == publication_bytes
+    checks.append(
+        "Queued tournament updates are revoked when recipients leave; owned enrollment can return without rewriting results or publisher bracket and receive a fresh snapshot"
     )
     return {
         "path": result_path,

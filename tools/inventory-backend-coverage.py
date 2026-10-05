@@ -93,7 +93,7 @@ GAPS = {
     "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
     "125": "Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.",
-    "145": "Multiuser lobby join/host migration; automatic tournament scheduling/match assignment/push notifications and native result/ready/accept/leave/rejoin callbacks. Host-authorized task 21 results, durable conflict-safe journals and bracket winner advancement are implemented. Native registration/state callbacks are verified; remote relay deployment/migration and native two-game relay forwarding remain open.",
+    "145": "Multiuser lobby join/host migration; automatic tournament scheduling/match assignment/join-disband push notifications and native result/ready/accept/leave/rejoin callbacks. Host-authorized task 21 results, durable journals, bracket advancement and exact event-2010 updates with recipient/snapshot revalidation are implemented. Native registration/state callbacks and positive FORMING/PLAYING update parsing are verified; the update receiver test explicitly seeded accepted enrollment, so join assignment and playable tournaments remain open. Remote relay deployment/migration and native two-game relay forwarding remain open.",
     "150": "Positive native scheduled match operations; local publication required.",
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
