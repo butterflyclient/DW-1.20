@@ -8,6 +8,7 @@
 #include <iterator>
 #include <set>
 #include <charconv>
+#include <memory>
 
 namespace services
 {
@@ -57,11 +58,37 @@ namespace services
 
         Json read(const std::filesystem::path &path, size_t capacity)
         {
-            persisted(std::filesystem::file_size(path) <= capacity);
-            std::ifstream stream(path, std::ios::binary);
-            if (!stream)
+            // Hold one immutable file snapshot while allowing the publisher to
+            // atomically replace its path. CRT streams deny delete sharing on
+            // Windows and otherwise race the live-publication watcher.
+            const auto handle = CreateFileW(path.c_str(),
+                                            GENERIC_READ,
+                                            FILE_SHARE_READ | FILE_SHARE_DELETE,
+                                            nullptr,
+                                            OPEN_EXISTING,
+                                            FILE_ATTRIBUTE_NORMAL,
+                                            nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
                 throw std::runtime_error("Tournament state read failed");
-            const std::string bytes(std::istreambuf_iterator<char>{stream}, {});
+            const std::unique_ptr<void, decltype(&CloseHandle)> snapshot(handle, &CloseHandle);
+            LARGE_INTEGER size{};
+            if (!GetFileSizeEx(handle, &size))
+                throw std::runtime_error("Tournament state size read failed");
+            persisted(size.QuadPart >= 0 && static_cast<uint64_t>(size.QuadPart) <= capacity);
+            std::string bytes(static_cast<size_t>(size.QuadPart), '\0');
+            size_t offset = 0;
+            while (offset < bytes.size())
+            {
+                DWORD received = 0;
+                if (!ReadFile(handle,
+                              bytes.data() + offset,
+                              static_cast<DWORD>(bytes.size() - offset),
+                              &received,
+                              nullptr) ||
+                    !received)
+                    throw std::runtime_error("Tournament state snapshot read failed");
+                offset += received;
+            }
             auto result = document(bytes);
             persisted(result.is_object());
             return result;

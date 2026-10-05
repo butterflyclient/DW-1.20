@@ -1,0 +1,49 @@
+# Replay presence lobby joins
+
+Replay's `OnlineMatchmakerOmniscient::StartMatchmaking` at original VA
+`0x14104A450` sends the ordinary `members` and `tokens` arrays, with either
+`lobby_id_to_presence_join` or `player_id_to_presence_join` instead of a new
+playlist filter. Service 145/task 18 recognizes this path before new-lobby
+selection. The party must contain the authenticated requester, and each member
+must have a valid issued matchmaking token.
+
+The existing lobby must be unexpired, not disbanded, open for presence joins,
+and have room for every distinct joining member. The request's `lobby_slots.max`
+sets creation capacity, bounded to 200; legacy files without that field retain
+the existing 200-member limit. SDK source oracle
+`Playlist_WritePlaylistLobbySlotsJSON` supplies the slot-field interpretation.
+Match selection is rechecked against the current published playlist and
+installed-map policy. Joining cannot silently replace unavailable maps.
+
+The join preserves the lobby ID, native listen-server address, DTLS credentials,
+and ruleset/map weights. It advances the host/backend revision, adds unique
+members to the least-populated existing team, retains existing members' search
+IDs, and assigns the joining party a new matchmaking search ID. Joining members
+remain owner-restricted for host-document updates and disband.
+
+Replay's async decoder at `0x14213F1C0` consumes event 2001 as typed UInt64
+matchmaking ID, UInt64 lobby ID, host string, then backend string. Only the
+joining party receives this event. Existing nonjoining members receive event
+2006 with lobby ID, update ID and the same documents. Cancelling a joining
+search before delivery suppresses its queued event; an already committed lobby
+document update remains visible to existing members.
+
+`data/matchmaking/<title>/current-lobbies.json` stores the most recent assignment
+for each member. Presence-by-player uses this index rather than choosing an
+arbitrary historical lobby. The index is bounded to 4096 accounts and validated
+before committing new documents. Pre-upgrade lobbies remain accessible by
+explicit lobby ID; successful joins index their members. Files publish through
+flushed atomic replacement. Lobby, search and index are separate replacements,
+so power-loss atomicity across all three files is not yet guaranteed.
+
+`tools/lobby_join_fixtures.py`, included by `tools/test-lobby.py`, uses independent
+encrypted clients and two separately provisioned accounts. It covers valid
+full-lobby rejection, malformed targets, invalid tokens, closed joins, both
+native join fields, exact event layouts/recipients, shared document reads,
+host-only updates, repeated unique membership, cancellation, map withdrawal
+and disband. It launches no map and modifies only isolated fixture data.
+Wire acceptance is separate from native invitation/join completion and
+two-game playability; those positive gates remain to be observed.
+
+Host migration, cross-lobby merging, automatic public matchmaking fill and
+tournament match scheduling remain separate work.

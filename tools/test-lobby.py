@@ -2888,6 +2888,20 @@ try:
         )
     )
     peer_client.task(58, 6, content_fixture["post"], error=101)
+    import lobby_join_fixtures
+
+    lobby_join_fixtures.exercise(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        player_info,
+        match_query,
+        (u32, u64, text, boolean),
+        checks,
+    )
     import tournament_fixtures
 
     tournament_fixture = tournament_fixtures.exercise(
