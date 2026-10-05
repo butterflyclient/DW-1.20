@@ -14,6 +14,9 @@ the existing 200-member limit. SDK source oracle
 `Playlist_WritePlaylistLobbySlotsJSON` supplies the slot-field interpretation.
 Match selection is rechecked against the current published playlist and
 installed-map policy. Joining cannot silently replace unavailable maps.
+The host must have a live authenticated lobby connection. Presence-by-player
+also requires the target member to be online; persisted lobby files cannot
+revive disconnected sessions after a stop or restart.
 
 The join preserves the lobby ID, native listen-server address, DTLS credentials,
 and ruleset/map weights. It advances the host/backend revision, adds unique
@@ -27,6 +30,9 @@ joining party receives this event. Existing nonjoining members receive event
 2006 with lobby ID, update ID and the same documents. Cancelling a joining
 search before delivery suppresses its queued event; an already committed lobby
 document update remains visible to existing members.
+An assignment is also suppressed if the member's current matchmaking ID has
+already been replaced by a newer search. Delivery uses the existing connection
+and service-store locking; it does not infer connectivity from a presence file.
 
 `data/matchmaking/<title>/current-lobbies.json` stores the most recent assignment
 for each member. Presence-by-player uses this index rather than choosing an

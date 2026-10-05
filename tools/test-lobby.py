@@ -3158,6 +3158,9 @@ try:
     )
     # A different context must not notify an iw8 subscriber.
     assert client.task(12, 6)[0] == 8
+    offline_lobby = lobby_join_fixtures.prepare_offline_lobby(
+        peer_client, peer_user, match_query, (u32, u64, text, boolean)
+    )
     peer_client.close()
     kind, push = client.receive()
     prefix = (
@@ -3181,6 +3184,16 @@ try:
     else:
         raise AssertionError("Disconnected peer remained online")
     client.task(6, 14, u64(peer_user) + blob(b"offline"), error=108)
+    lobby_join_fixtures.reject_offline_owner(
+        client,
+        peer_user,
+        offline_lobby,
+        directory,
+        title,
+        user,
+        (u32, u64, text, boolean),
+        checks,
+    )
     checks.append(
         "global instant messages do not report successful delivery to a disconnected recipient"
     )

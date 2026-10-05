@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "matchmaking_services.h"
 #include "playlist_catalog.h"
+#include "lobby.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
@@ -233,6 +234,8 @@ namespace services
             wire::require(target.is_number_unsigned() && target.get<uint64_t>() &&
                           target.get<uint64_t>() != UINT64_MAX &&
                           !(byLobby && query.contains("player_id_to_presence_join")));
+            if (!byLobby && !lobby::online(id.titleId, target.get<uint64_t>()))
+                return {108, {}, "matchmaker-presence-player-offline"};
             const auto root = directory / "matchmaking" / std::to_string(id.titleId);
             const auto lobbies = root / "lobbies";
             std::vector<std::filesystem::path> candidates;
@@ -253,6 +256,7 @@ namespace services
                     continue;
                 auto lobby = loadLobby(path, id);
                 if ((!byLobby && !member(lobby, target.get<uint64_t>())) ||
+                    !lobby::online(id.titleId, lobby.at("owner").get<uint64_t>()) ||
                     lobby.value("disbanded", false) || lobby.at("expires").get<uint64_t>() <= now())
                     continue;
                 const auto &host = lobby.at("host_doc");
@@ -653,6 +657,10 @@ namespace services
             return false;
         if (delivery.searchId)
         {
+            const auto key = std::to_string(delivery.user);
+            const auto &assignments = lobby.at("backend_doc").at("player_id_to_mm_id");
+            if (!assignments.contains(key) || assignments.at(key) != delivery.searchId)
+                return false;
             const auto searchPath =
                 root / "searches" / (std::to_string(delivery.searchId) + ".json");
             if (!std::filesystem::exists(searchPath) ||

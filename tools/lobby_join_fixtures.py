@@ -165,6 +165,17 @@ def exercise(
         "cancelled presence searches suppress their queued join event while preserving the committed lobby update"
     )
 
+    superseded = start(peer, join)
+    latest = start(peer, join)
+    assert superseded != latest
+    assert peer.receive()[1].startswith(u32(2001) + u64(latest) + u64(lobby))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(7))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(8))
+    assert peer.task(12, 6).startswith(b"\x08")
+    checks.append(
+        "a superseded presence assignment cannot deliver an old native join callback after a newer search has replaced that member's matchmaking ID"
+    )
+
     saved = path.read_bytes()
     policy_path = directory / "playlists" / str(title) / "policy.json"
     policy = policy_path.read_bytes()
@@ -181,3 +192,37 @@ def exercise(
     assert host.receive() == peer.receive() == (2, u32(2002) + u64(lobby) + u64(0))
     start(peer, by_player, 108)
     return {"id": lobby, "path": path}
+
+
+def prepare_offline_lobby(peer, peer_user, query, helpers):
+    u32, u64, text, boolean = helpers
+    token = struct.unpack_from("<Q", peer.task(145, 3), 1)[0]
+    peer.task(
+        145, 18, text(json.dumps({**query, "members": [peer_user], "tokens": [token]}))
+    )
+    kind, packet = peer.receive()
+    assert kind == 2 and packet.startswith(u32(2005))
+    return struct.unpack_from("<Q", packet, 15)[0]
+
+
+def reject_offline_owner(
+    client, peer_user, lobby, directory, title, user, helpers, checks
+):
+    u32, u64, text, boolean = helpers
+    token = struct.unpack_from("<Q", client.task(145, 3), 1)[0]
+    path = directory / "matchmaking" / str(title) / "lobbies" / f"{lobby}.json"
+    before = path.read_bytes()
+    for field, target in (
+        ("lobby_id_to_presence_join", lobby),
+        ("player_id_to_presence_join", peer_user),
+    ):
+        client.task(
+            145,
+            18,
+            text(json.dumps({"members": [user], "tokens": [token], field: target})),
+            error=108,
+        )
+        assert path.read_bytes() == before
+    checks.append(
+        "unexpired persisted lobbies and current-player assignments do not revive disconnected hosts; both presence targets reject without a document mutation"
+    )
