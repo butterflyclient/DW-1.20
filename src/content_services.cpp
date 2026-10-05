@@ -23,7 +23,13 @@ namespace services
         constexpr size_t maxUserUploads = 128, maxUserUploadReceipts = 4096;
         constexpr uint32_t copyLifetimeSeconds = 600;
         std::filesystem::path dataRoot;
-        std::string origin;
+        unsigned short contentPort = 0;
+
+        std::string origin()
+        {
+            return network::httpOrigin(contentPort);
+        }
+
         std::mutex contentMutex;
 
         struct Upload
@@ -590,10 +596,11 @@ namespace services
             wire::Bytes strings;
             for (size_t i = start; i < start + count; ++i)
             {
-                const auto value =
-                    origin + "/content-streaming/upload/multipart/" + std::to_string(title) + "/" +
-                    std::to_string(session.at("id").get<uint64_t>()) + "/" + std::to_string(i) +
-                    "/" + session.at("parts").at(i).at("token").get<std::string>();
+                const auto value = origin() + "/content-streaming/upload/multipart/" +
+                                   std::to_string(title) + "/" +
+                                   std::to_string(session.at("id").get<uint64_t>()) + "/" +
+                                   std::to_string(i) + "/" +
+                                   session.at("parts").at(i).at("token").get<std::string>();
                 wire::require(value.size() < 1025);
                 strings.insert(strings.end(), value.begin(), value.end());
                 strings.push_back(0);
@@ -885,7 +892,7 @@ namespace services
 
         std::string url(uint32_t title, const std::string &hash)
         {
-            return origin + "/content-streaming/download/" + std::to_string(title) + "/" + hash;
+            return origin() + "/content-streaming/download/" + std::to_string(title) + "/" + hash;
         }
 
         wire::Bytes metadata(uint32_t title, const Json &row)
@@ -913,7 +920,7 @@ namespace services
 
         std::string copyURL(uint32_t title, const std::string &token, size_t part, bool source)
         {
-            return origin + "/content-streaming/copy/" + std::to_string(title) + "/" + token +
+            return origin() + "/content-streaming/copy/" + std::to_string(title) + "/" + token +
                    (source ? "/source/" : "/destination/") + std::to_string(part);
         }
 
@@ -1182,8 +1189,8 @@ namespace services
             saveUserUploads(id.titleId, pending);
             // Complete Replay bdURL reader 142163B40, maximum ten URL results.
             wire::Writer out;
-            out.text(origin + "/content-streaming/upload/user/" + std::to_string(id.titleId) + "/" +
-                     token);
+            out.text(origin() + "/content-streaming/upload/user/" + std::to_string(id.titleId) +
+                     "/" + token);
             out.u16(0);
             out.text(token);
             out.u64(file);
@@ -1356,7 +1363,7 @@ namespace services
             upload.expires = now() + 600;
             // Complete native bdURL reader 142163B40: URL/location/server filename/ID.
             wire::Writer out;
-            out.text(origin + "/content-streaming/upload/" + token);
+            out.text(origin() + "/content-streaming/upload/" + token);
             out.u16(0);
             out.text(upload.serverName);
             out.u64(upload.file);
@@ -1437,7 +1444,7 @@ namespace services
     {
         std::lock_guard lock(contentMutex);
         dataRoot = std::filesystem::absolute(directory);
-        origin = network::httpOrigin(port);
+        contentPort = port;
         uploads.clear();
     }
 

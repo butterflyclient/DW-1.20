@@ -65,7 +65,26 @@ advertised = (
     if network_file.exists()
     else "127.0.0.1"
 )
-assert url.startswith(f"http://{advertised}:8085/platform/resources/")
+assert url.startswith("http://127.0.0.1:8085/platform/resources/")
+if network_file.exists():
+    # A LAN-facing request must retain public publication even when a loopback
+    # request is handled concurrently by another server connection thread.
+    lan = json.loads((root / "data/host-network-receipt.json").read_text())[
+        "lan_address"
+    ]
+    with urllib.request.urlopen(
+        urllib.request.Request(f"http://{lan}:8085/platform/resource", request),
+        timeout=5,
+    ) as response:
+        remote_data = response.read()
+    assert verify(remote_data, request, now)
+    remote_length = struct.unpack_from("<I", remote_data, 72)[0]
+    remote_handle = remote_data[80 : 80 + remote_length]
+    assert (
+        remote_handle[46:]
+        .decode()
+        .startswith(f"http://{advertised}:8085/platform/resources/")
+    )
 # Verify the immutable response locally independently of router hairpin support.
 local_url = urllib.parse.urlunsplit(
     urllib.parse.urlsplit(url)._replace(netloc="127.0.0.1:8085")

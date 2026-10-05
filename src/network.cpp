@@ -15,6 +15,7 @@ namespace network
         std::string publicHost = "127.0.0.1";
         uint16_t qos = 0, relay = 0, bandwidth = 0;
         std::map<std::string, std::string> clients;
+        thread_local bool loopbackPeer = false;
 
         uint32_t ipv4(const std::string &value)
         {
@@ -70,21 +71,38 @@ namespace network
         return bindIp;
     }
 
+    PeerScope::PeerScope(uint32_t address) : previous(loopbackPeer)
+    {
+        loopbackPeer = address == htonl(INADDR_LOOPBACK);
+    }
+
+    PeerScope::~PeerScope()
+    {
+        loopbackPeer = previous;
+    }
+
+    bool isLoopbackPeer()
+    {
+        return loopbackPeer;
+    }
+
     uint32_t advertisedAddress()
     {
-        return publicIp;
+        return loopbackPeer ? htonl(INADDR_LOOPBACK) : publicIp;
     }
 
     std::array<uint8_t, 4> advertisedBytes()
     {
         std::array<uint8_t, 4> bytes{};
-        std::memcpy(bytes.data(), &publicIp, bytes.size());
+        const auto address = advertisedAddress();
+        std::memcpy(bytes.data(), &address, bytes.size());
         return bytes;
     }
 
     std::string httpOrigin(uint16_t port)
     {
-        return "http://" + publicHost + ":" + std::to_string(port);
+        return "http://" + (loopbackPeer ? std::string("127.0.0.1") : publicHost) + ":" +
+               std::to_string(port);
     }
 
     uint16_t qosPort()

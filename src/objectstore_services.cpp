@@ -15,7 +15,7 @@ namespace services
     {
         using Json = nlohmann::json;
         std::filesystem::path contentDirectory;
-        std::string contentOrigin;
+        unsigned short contentPort = 0;
         std::mutex contentMutex;
 
         // bdObjectStore's struct-buffer transport carries an HTTP-shaped request.
@@ -477,7 +477,8 @@ namespace services
                         throw std::runtime_error("Publisher content cache publication failed");
                 }
             }
-            metadata["contentURL"] = contentOrigin + "/objectstore/content/" + hash;
+            metadata["contentURL"] =
+                network::httpOrigin(contentPort) + "/objectstore/content/" + hash;
             return metadata;
         }
 
@@ -704,7 +705,7 @@ namespace services
     void initializePublisherContent(const std::filesystem::path &directory, unsigned short port)
     {
         contentDirectory = std::filesystem::absolute(directory) / "objectstore" / "content";
-        contentOrigin = network::httpOrigin(port);
+        contentPort = port;
     }
 
     std::optional<wire::Bytes> publisherContent(const std::string &route)

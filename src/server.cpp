@@ -642,6 +642,12 @@ namespace
                         Socket connection(client);
                         try
                         {
+                            sockaddr_in peer{};
+                            int size = sizeof(peer);
+                            if (getpeername(client, reinterpret_cast<sockaddr *>(&peer), &size) ||
+                                peer.sin_family != AF_INET)
+                                throw std::runtime_error("Cannot determine connection peer");
+                            const network::PeerScope publication(peer.sin_addr.s_addr);
                             handler(client);
                         }
                         catch (const std::exception &e)

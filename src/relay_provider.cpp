@@ -595,6 +595,7 @@ namespace relay_provider
                         }
                         try
                         {
+                            const network::PeerScope publication(peer.sin_addr.s_addr);
                             receive(std::span(buffer.data(), static_cast<size_t>(bytes)), peer);
                         }
                         catch (const ProviderFailure &)

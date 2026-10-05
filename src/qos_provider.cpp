@@ -136,6 +136,7 @@ namespace qos_provider
                         continue;
                     try
                     {
+                        const network::PeerScope publication(peer.sin_addr.s_addr);
                         const auto incoming = std::span(packet.data(), static_cast<size_t>(bytes));
                         wire::Bytes reply;
                         if (bytes == 29 && packet[0] == 13 && wire::at<uint16_t>(incoming, 1) == 2)

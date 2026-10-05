@@ -10,7 +10,7 @@ namespace platform_resources
 {
     namespace
     {
-        std::vector<uint8_t> resourceHandle, resourceContent;
+        std::vector<uint8_t> resourceHandle, loopbackHandle, resourceContent;
         std::string contentPath;
 
         void varint(std::vector<uint8_t> &out, size_t value)
@@ -140,14 +140,17 @@ namespace platform_resources
         resourceHandle.push_back(0x15);
         little(resourceHandle, 0x61706674);
         blob(resourceHandle, 3, digest);
+        loopbackHandle = resourceHandle;
         text(resourceHandle, 4, network::httpOrigin(port) + contentPath);
-        if (resourceContent.size() > 4096 || resourceHandle.size() > 256)
+        text(loopbackHandle, 4, "http://127.0.0.1:" + std::to_string(port) + contentPath);
+        if (resourceContent.size() > 4096 || resourceHandle.size() > 256 ||
+            loopbackHandle.size() > 256)
             throw std::runtime_error("Resource publication exceeds ABI bounds");
     }
 
     const std::vector<uint8_t> &handle()
     {
-        return resourceHandle;
+        return network::isLoopbackPeer() ? loopbackHandle : resourceHandle;
     }
 
     const std::vector<uint8_t> &content()

@@ -6,6 +6,20 @@
 
 namespace network
 {
+    // Request-local endpoint publication avoids depending on router NAT loopback.
+    // Scope the real socket peer; never trust a Host header or request body.
+    class PeerScope
+    {
+        bool previous;
+
+      public:
+        explicit PeerScope(uint32_t address);
+        ~PeerScope();
+        PeerScope(const PeerScope &) = delete;
+        PeerScope &operator=(const PeerScope &) = delete;
+    };
+
+    bool isLoopbackPeer();
     void initialize(const std::filesystem::path &directory);
     uint32_t bindAddress();
     uint32_t advertisedAddress();
