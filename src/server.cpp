@@ -101,6 +101,7 @@ namespace
                const std::string &extraHeaders = "")
     {
         const char *reason = status == 200   ? "OK"
+                             : status == 201 ? "Created"
                              : status == 206 ? "Partial Content"
                              : status == 400 ? "Bad Request"
                              : status == 404 ? "Not Found"
@@ -227,6 +228,7 @@ namespace
         unsigned length = 0;
         bool hasLength = false;
         std::optional<std::string> rangeHeader;
+        std::optional<std::string> destinationHeader;
         size_t at = firstLineEnd + 2;
         while (at < headerEnd)
         {
@@ -266,6 +268,15 @@ namespace
                 }
                 rangeHeader = value;
             }
+            if (key == "destination")
+            {
+                if (destinationHeader)
+                {
+                    reply(socket, 400, "{\"error\":\"duplicate_destination\"}");
+                    return;
+                }
+                destinationHeader = value;
+            }
             at = end + 2;
         }
         const size_t bodyAt = headerEnd + 4;
@@ -290,6 +301,23 @@ namespace
         {
             ++probes;
             reply(socket, 200, status());
+        }
+        else if (method == "COPY" && path.starts_with("/content-streaming/copy/"))
+        {
+            if (!destinationHeader || length || rangeHeader)
+            {
+                reply(socket, 400, "{\"error\":\"invalid_copy_request\"}");
+                return;
+            }
+            try
+            {
+                const auto status = services::streamingCopy(path, *destinationHeader);
+                reply(socket, status, status < 300 ? "" : "{\"error\":\"copy_rejected\"}");
+            }
+            catch (const std::exception &)
+            {
+                reply(socket, 500, "{\"error\":\"copy_storage_failed\"}");
+            }
         }
         else if (method == "PUT" && path.starts_with("/content-streaming/upload/"))
         {

@@ -18,6 +18,8 @@ namespace services
         using Json = nlohmann::json;
         constexpr size_t maxStore = 16 * 1024 * 1024, maxFiles = 4096;
         constexpr size_t maxMultipartParts = 1024, maxMultipartSessions = 128;
+        constexpr size_t maxCopySessions = 128, maxCopyReceipts = 32768;
+        constexpr uint32_t copyLifetimeSeconds = 600;
         std::filesystem::path dataRoot;
         std::string origin;
         std::mutex contentMutex;
@@ -132,6 +134,50 @@ namespace services
             }
         }
 
+        void validateFile(const Json &row)
+        {
+            wire::require(number(row.at("id"), UINT64_MAX - 1) != 0);
+            wire::require(row.at("kind") == "user" || row.at("kind") == "publisher" ||
+                          row.at("kind") == "pooled");
+            const auto owner = number(row.at("owner"), UINT64_MAX - 1);
+            wire::require(owner || row.at("kind") == "publisher");
+            wire::require(!text(row.at("name"), 128).empty());
+            (void)text(row.at("owner_name"), 64);
+            for (const auto *key : {"created", "modified", "copies"})
+                (void)number(row.at(key), UINT32_MAX);
+            for (const auto *key : {"slot", "category"})
+                (void)number(row.at(key), UINT16_MAX);
+            (void)number(row.at("origin"), UINT64_MAX - 1);
+            (void)number(row.at("size"), maximumStreamingBody);
+            (void)number(row.at("summary_size"), maximumStreamingBody);
+            wire::require(hashText(text(row.at("content"), 65)));
+            const auto summary = text(row.at("summary"), 65);
+            wire::require(summary.empty() ? row.at("summary_size") == 0 : hashText(summary));
+            (void)wire::base64(row.at("metadata").get<std::string>(), 2048);
+            validateTags(row.at("tags"));
+            if (row.contains("copy_receipt"))
+            {
+                const auto &receipt = row.at("copy_receipt");
+                wire::require(row.at("kind") == "user" &&
+                              hashText(text(receipt.at("token"), 33), 32) &&
+                              hashText(text(receipt.at("request_sha256"), 65)));
+            }
+            if (row.contains("parts"))
+            {
+                const auto &parts = row.at("parts");
+                wire::require(row.at("kind") == "pooled" && parts.is_array() &&
+                              parts.size() <= maxMultipartParts);
+                uint64_t total = 0;
+                for (const auto &part : parts)
+                {
+                    wire::require(hashText(text(part.at("content"), 65)));
+                    total += number(part.at("size"), maximumStreamingBody);
+                    wire::require(total <= maximumStreamingBody);
+                }
+                wire::require(total == row.at("size"));
+            }
+        }
+
         Json load(uint32_t title)
         {
             const auto path = storePath(title);
@@ -152,40 +198,31 @@ namespace services
                 {
                     const auto file = number(row.at("id"), UINT64_MAX - 1);
                     wire::require(file && ids.insert(file).second);
-                    wire::require(row.at("kind") == "user" || row.at("kind") == "publisher" ||
-                                  row.at("kind") == "pooled");
-                    const auto owner = number(row.at("owner"), UINT64_MAX - 1);
-                    wire::require(owner || row.at("kind") == "publisher");
-                    wire::require(!text(row.at("name"), 128).empty());
-                    (void)text(row.at("owner_name"), 64);
-                    for (const auto *key : {"created", "modified", "copies"})
-                        (void)number(row.at(key), UINT32_MAX);
-                    for (const auto *key : {"slot", "category"})
-                        (void)number(row.at(key), UINT16_MAX);
-                    (void)number(row.at("origin"), UINT64_MAX - 1);
-                    (void)number(row.at("size"), maximumStreamingBody);
-                    (void)number(row.at("summary_size"), maximumStreamingBody);
-                    wire::require(hashText(text(row.at("content"), 65)));
-                    const auto summary = text(row.at("summary"), 65);
-                    wire::require(summary.empty() ? row.at("summary_size") == 0
-                                                  : hashText(summary));
-                    (void)wire::base64(row.at("metadata").get<std::string>(), 2048);
-                    validateTags(row.at("tags"));
-                    if (row.contains("parts"))
+                    validateFile(row);
+                }
+                if (data.contains("copy_receipts"))
+                {
+                    const auto &receipts = data.at("copy_receipts");
+                    wire::require(receipts.is_object() && receipts.size() <= maxCopyReceipts);
+                    for (const auto &entry : receipts.items())
                     {
-                        const auto &parts = row.at("parts");
-                        wire::require(row.at("kind") == "pooled" && parts.is_array() &&
-                                      parts.size() <= maxMultipartParts);
-                        uint64_t total = 0;
-                        for (const auto &part : parts)
-                        {
-                            wire::require(hashText(text(part.at("content"), 65)));
-                            total += number(part.at("size"), maximumStreamingBody);
-                            wire::require(total <= maximumStreamingBody);
-                        }
-                        wire::require(total == row.at("size"));
+                        const auto &receipt = entry.value();
+                        wire::require(hashText(entry.key(), 32) && receipt.is_object() &&
+                                      number(receipt.at("owner"), UINT64_MAX - 1) &&
+                                      number(receipt.at("file"), UINT64_MAX - 1) &&
+                                      hashText(text(receipt.at("request_sha256"), 65)));
                     }
                 }
+                for (const auto &row : data.at("files"))
+                    if (row.contains("copy_receipt"))
+                    {
+                        const auto &marker = row.at("copy_receipt");
+                        const auto &receipt =
+                            data.at("copy_receipts").at(marker.at("token").get<std::string>());
+                        wire::require(receipt.at("owner") == row.at("owner") &&
+                                      receipt.at("file") == row.at("id") &&
+                                      receipt.at("request_sha256") == marker.at("request_sha256"));
+                    }
             }
             catch (const std::runtime_error &)
             {
@@ -270,6 +307,75 @@ namespace services
                            sessions.end());
         }
 
+        std::filesystem::path copyPath(uint32_t title)
+        {
+            return dataRoot / "content-streaming" / std::to_string(title) / "copies.json";
+        }
+
+        Json loadCopies(uint32_t title)
+        {
+            const auto path = copyPath(title);
+            if (!std::filesystem::exists(path))
+                return Json{{"schema", 1}, {"sessions", Json::array()}};
+            if (std::filesystem::file_size(path) > maxStore)
+                throw std::runtime_error("Streaming copy store size invalid");
+            std::ifstream stream(path);
+            if (!stream)
+                throw std::runtime_error("Streaming copy store read failed");
+            auto result = Json::parse(stream);
+            try
+            {
+                wire::require(result.at("schema") == 1 && result.at("sessions").is_array() &&
+                              result["sessions"].size() <= maxCopySessions);
+                std::set<std::string> tokens;
+                std::set<uint64_t> files;
+                for (const auto &session : result["sessions"])
+                {
+                    const auto token = text(session.at("token"), 33);
+                    wire::require(hashText(token, 32) && tokens.insert(token).second &&
+                                  number(session.at("owner"), UINT64_MAX - 1) &&
+                                  number(session.at("file"), UINT64_MAX - 1) &&
+                                  files.insert(session["file"].get<uint64_t>()).second &&
+                                  session.at("pooled").is_boolean());
+                    (void)text(session.at("owner_name"), 64);
+                    (void)number(session.at("slot"), UINT16_MAX);
+                    (void)number(session.at("expires"), UINT32_MAX);
+                    validateFile(session.at("source"));
+                    wire::require(session["pooled"] == (session["source"]["kind"] == "pooled") &&
+                                  (session["source"]["kind"] == "pooled" ||
+                                   session["source"]["kind"] == "user"));
+                    const auto &copied = session.at("copied");
+                    wire::require(copied.is_array() &&
+                                  copied.size() == (session["source"]["summary"] == "" ? 1 : 2));
+                    for (const auto &part : copied)
+                        wire::require(part.is_boolean());
+                }
+            }
+            catch (const std::runtime_error &)
+            {
+                throw std::runtime_error("Streaming copy store schema invalid");
+            }
+            auto &sessions = result["sessions"];
+            sessions.erase(std::remove_if(sessions.begin(),
+                                          sessions.end(),
+                                          [](const auto &session)
+                                          {
+                                              return session["expires"].template get<uint32_t>() <=
+                                                     now();
+                                          }),
+                           sessions.end());
+            return result;
+        }
+
+        void saveCopies(uint32_t title, const Json &value)
+        {
+            const auto bytes = value.dump();
+            if (bytes.size() > maxStore)
+                throw std::runtime_error("Streaming copy store capacity exceeded");
+            atomic(copyPath(title),
+                   std::span(reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()));
+        }
+
         wire::Bytes readBlob(uint32_t title, const std::string &hash, uint64_t expected)
         {
             const auto path = blobPath(title, hash);
@@ -288,11 +394,25 @@ namespace services
 
         uint64_t allocateFile(uint32_t title, const Json &files, const Json &sessions)
         {
+            const auto copies = loadCopies(title);
+            const auto receipts = load(title).value("copy_receipts", Json::object());
             uint64_t file = 0;
             do
             {
                 file = wire::at<uint64_t>(crypto::random(8), 0);
             } while (!file || file == UINT64_MAX ||
+                     std::any_of(receipts.begin(),
+                                 receipts.end(),
+                                 [file](const auto &receipt)
+                                 {
+                                     return receipt.at("file") == file;
+                                 }) ||
+                     std::any_of(copies["sessions"].begin(),
+                                 copies["sessions"].end(),
+                                 [file](const auto &row)
+                                 {
+                                     return row.at("file") == file;
+                                 }) ||
                      std::any_of(files.begin(),
                                  files.end(),
                                  [file](const auto &row)
@@ -678,6 +798,212 @@ namespace services
             return std::move(out.data);
         }
 
+        std::string copyURL(uint32_t title, const std::string &token, size_t part, bool source)
+        {
+            return origin + "/content-streaming/copy/" + std::to_string(title) + "/" + token +
+                   (source ? "/source/" : "/destination/") + std::to_string(part);
+        }
+
+        Reply preCopy(const platform::LobbyIdentity &id, bool pooled, wire::Reader &params)
+        {
+            // The preparation IDs 50/15 (pooled) and 50/20 (user) are supported
+            // source-oracle contracts; their writers are not exported in Replay.
+            // Replay's actual result reader 142163DD0 consumes bdURL, destination
+            // string and UInt32 size. Do not label these IDs as target CFG proofs.
+            const auto source = params.u64();
+            const auto slot = params.u16();
+            params.end();
+            wire::require(source && source != UINT64_MAX);
+            const auto catalog = load(id.titleId);
+            const auto &files = catalog["files"];
+            const auto found = std::find_if(files.begin(),
+                                            files.end(),
+                                            [source](const auto &row)
+                                            {
+                                                return row["id"] == source;
+                                            });
+            if (found == files.end() || (*found)["kind"] != (pooled ? "pooled" : "user"))
+                return {108, {}, "streaming-copy-source-not-found"};
+            auto pending = loadCopies(id.titleId);
+            if (pending["sessions"].size() >= maxCopySessions)
+                return {108, {}, "streaming-copy-capacity"};
+            auto multipart = loadMultipart(id.titleId);
+            expireMultipart(multipart);
+            const auto file = allocateFile(id.titleId, files, multipart["sessions"]);
+            auto token = hex(crypto::random(16));
+            const auto receipts = catalog.value("copy_receipts", Json::object());
+            if (receipts.size() >= maxCopyReceipts)
+                return {108, {}, "streaming-copy-receipt-capacity"};
+            while (receipts.contains(token) || std::any_of(pending["sessions"].begin(),
+                                                           pending["sessions"].end(),
+                                                           [&](const auto &session)
+                                                           {
+                                                               return session["token"] == token;
+                                                           }))
+                token = hex(crypto::random(16));
+            const auto parts = (*found)["summary"] == "" ? 1u : 2u;
+            Json session = {{"token", token},
+                            {"owner", id.userId},
+                            {"owner_name", id.name},
+                            {"file", file},
+                            {"slot", slot},
+                            {"pooled", pooled},
+                            {"expires", now() + copyLifetimeSeconds},
+                            {"source", *found},
+                            {"copied", Json::array()}};
+            Reply result{0, {}, "streaming-copy-prepared"};
+            for (unsigned part = 0; part < parts; ++part)
+            {
+                const auto hash = (*found)[part ? "summary" : "content"].get<std::string>();
+                const auto size = (*found)[part ? "summary_size" : "size"].get<uint32_t>();
+                (void)readBlob(id.titleId, hash, size);
+                session["copied"].push_back(false);
+                wire::Writer writer;
+                writer.text(copyURL(id.titleId, token, part, true));
+                writer.u16(0);
+                writer.text(token);
+                writer.u64(file);
+                writer.text(copyURL(id.titleId, token, part, false));
+                writer.u32(size);
+                result.results.push_back(std::move(writer.data));
+            }
+            pending["sessions"].push_back(std::move(session));
+            saveCopies(id.titleId, pending);
+            return result;
+        }
+
+        Reply postCopy(const platform::LobbyIdentity &id, wire::Reader &params)
+        {
+            // Full original Replay writer 142133750. In particular, summary size
+            // precedes the metadata blob, and the pooled flag is a typed Boolean.
+            const auto name = params.text(129);
+            const auto slot = params.u16(), location = params.u16();
+            const auto token = params.text(128);
+            const auto size = params.u32();
+            const auto category = params.u16();
+            const auto summarySize = params.u32();
+            const auto metadataBytes = params.blob(2048);
+            const auto suppliedTags = tags(params);
+            const auto pooled = params.boolean();
+            const auto source = params.u64();
+            params.end();
+            wire::require(!name.empty() && name.size() < 128 && !location && hashText(token, 32) &&
+                          size <= maximumStreamingBody && summarySize <= maximumStreamingBody &&
+                          source && source != UINT64_MAX);
+            const Json request = {{"owner", id.userId},
+                                  {"name", name},
+                                  {"slot", slot},
+                                  {"size", size},
+                                  {"category", category},
+                                  {"summary_size", summarySize},
+                                  {"metadata", wire::base64Encode(metadataBytes)},
+                                  {"tags", suppliedTags},
+                                  {"pooled", pooled},
+                                  {"source", source}};
+            const auto encoded = request.dump();
+            const auto requestHash = hex(crypto::sha256(
+                std::span(reinterpret_cast<const uint8_t *>(encoded.data()), encoded.size())));
+            auto catalog = load(id.titleId);
+            auto &files = catalog["files"];
+            auto &receipts = catalog["copy_receipts"];
+            if (receipts.is_null())
+                receipts = Json::object();
+            if (receipts.contains(token))
+            {
+                const auto &receipt = receipts[token];
+                if (receipt["owner"] != id.userId)
+                    return {101, {}, "streaming-copy-owner-denied"};
+                if (receipt["request_sha256"] != requestHash)
+                    return {106, {}, "streaming-copy-retry-conflict"};
+                // A later slot replacement must not allow this retry to roll
+                // back the new file or increment the old source counter again.
+                wire::Writer result;
+                result.u64(receipt["file"].get<uint64_t>());
+                return {0, {std::move(result.data)}, "streaming-copy-already-committed"};
+            }
+            if (receipts.size() >= maxCopyReceipts)
+                return {108, {}, "streaming-copy-receipt-capacity"};
+            const auto pending = loadCopies(id.titleId);
+            const auto &sessions = pending["sessions"];
+            const auto found = std::find_if(sessions.begin(),
+                                            sessions.end(),
+                                            [&](const auto &session)
+                                            {
+                                                return session["token"] == token;
+                                            });
+            if (found == sessions.end())
+                return {108, {}, "streaming-copy-session-unavailable"};
+            if ((*found)["owner"] != id.userId)
+                return {101, {}, "streaming-copy-owner-denied"};
+            const auto &snapshot = (*found)["source"];
+            if ((*found)["slot"] != slot || (*found)["pooled"] != pooled ||
+                snapshot["id"] != source || snapshot["size"] != size ||
+                snapshot["summary_size"] != summarySize)
+                return {106, {}, "streaming-copy-description-mismatch"};
+            if (std::any_of((*found)["copied"].begin(),
+                            (*found)["copied"].end(),
+                            [](const auto &part)
+                            {
+                                return part == false;
+                            }))
+                return {108, {}, "streaming-copy-http-incomplete"};
+            (void)readBlob(id.titleId, snapshot["content"].get<std::string>(), size);
+            if (snapshot["summary"] != "")
+                (void)readBlob(id.titleId, snapshot["summary"].get<std::string>(), summarySize);
+            const auto file = (*found)["file"].get<uint64_t>();
+            if (std::any_of(files.begin(),
+                            files.end(),
+                            [file](const auto &row)
+                            {
+                                return row["id"] == file;
+                            }))
+                throw std::runtime_error("Streaming copy reserved ID collision");
+            for (auto &row : files)
+                if (row["id"] == source)
+                {
+                    const auto copies = row["copies"].get<uint32_t>();
+                    if (copies == UINT32_MAX)
+                        throw std::runtime_error("Streaming copy counter exhausted");
+                    row["copies"] = copies + 1;
+                }
+            Json destination = snapshot;
+            destination.erase("parts");
+            destination["id"] = file;
+            destination["kind"] = "user";
+            destination["owner"] = id.userId;
+            destination["owner_name"] = (*found)["owner_name"];
+            destination["name"] = name;
+            destination["slot"] = slot;
+            destination["category"] = category;
+            destination["metadata"] = request["metadata"];
+            destination["tags"] = suppliedTags;
+            destination["created"] = now();
+            destination["modified"] = now();
+            destination["copies"] = 0u;
+            destination["origin"] = source;
+            destination["copy_receipt"] = {{"token", token}, {"request_sha256", requestHash}};
+            validateFile(destination);
+            files.erase(std::remove_if(files.begin(),
+                                       files.end(),
+                                       [&](const auto &row)
+                                       {
+                                           return row["kind"] == "user" &&
+                                                  row["owner"] == id.userId && row["slot"] == slot;
+                                       }),
+                        files.end());
+            if (files.size() >= maxFiles)
+                return {102, {}, "streaming-file-capacity-exceeded"};
+            files.push_back(std::move(destination));
+            receipts[token] = {
+                {"owner", id.userId}, {"file", file}, {"request_sha256", requestHash}};
+            // Source counter, slot replacement, clone and retry receipt have
+            // one commit point. Pending HTTP sessions are only durable staging.
+            save(id.titleId, catalog);
+            wire::Writer result;
+            result.u64(file);
+            return {0, {std::move(result.data)}, "streaming-copy-committed"};
+        }
+
         void prune()
         {
             const auto stamp = now();
@@ -817,6 +1143,10 @@ namespace services
             return preUploadMultipart(id, p);
         if (service == 58 && task == 21)
             return postUploadMultipart(id, p);
+        if (service == 50 && (task == 15 || task == 20))
+            return preCopy(id, task == 15, p);
+        if (service == 50 && task == 16)
+            return postCopy(id, p);
         if (service == 50 && (task == 2 || task == 3))
         {
             const auto owner = task == 2 ? p.u64() : 0;
@@ -878,6 +1208,53 @@ namespace services
             return Reply{0, {metadata(id.titleId, *found)}, "streaming-download-prepared"};
         }
         return std::nullopt;
+    }
+
+    unsigned streamingCopy(const std::string &source, const std::string &destination)
+    {
+        std::lock_guard lock(contentMutex);
+        constexpr std::string_view prefix = "/content-streaming/copy/";
+        if (!source.starts_with(prefix))
+            return 400;
+        const auto rest = source.substr(prefix.size());
+        const auto slash = rest.find('/');
+        if (slash == std::string::npos || !slash || slash > 10 || (slash > 1 && rest[0] == '0'))
+            return 400;
+        uint32_t title = 0;
+        const auto parsed = std::from_chars(rest.data(), rest.data() + slash, title);
+        if (parsed.ec != std::errc{} || parsed.ptr != rest.data() + slash)
+            return 400;
+        const auto suffix = rest.substr(slash + 1);
+        if (suffix.size() != 41 || !hashText(suffix.substr(0, 32), 32) ||
+            suffix.substr(32, 8) != "/source/" || (suffix[40] != '0' && suffix[40] != '1'))
+            return 400;
+        const auto token = suffix.substr(0, 32);
+        const size_t part = static_cast<size_t>(suffix[40] - '0');
+        if (destination != copyURL(title, token, part, false))
+            return 400;
+        auto pending = loadCopies(title);
+        auto &sessions = pending["sessions"];
+        const auto found = std::find_if(sessions.begin(),
+                                        sessions.end(),
+                                        [&](const auto &session)
+                                        {
+                                            return session["token"] == token;
+                                        });
+        if (found == sessions.end())
+            return 404;
+        if (part >= (*found)["copied"].size())
+            return 400;
+        const auto &snapshot = (*found)["source"];
+        (void)readBlob(title,
+                       snapshot[part ? "summary" : "content"].get<std::string>(),
+                       snapshot[part ? "summary_size" : "size"].get<uint32_t>());
+        if ((*found)["copied"][part] == true)
+            return 200;
+        // The immutable verified blob is shared physically, while the final
+        // destination is a distinct owned file. No untrusted URL is fetched.
+        (*found)["copied"][part] = true;
+        saveCopies(title, pending);
+        return 201;
     }
 
     std::optional<wire::Bytes> streamingContent(const std::string &request)

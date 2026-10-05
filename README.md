@@ -93,7 +93,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 | 123 | 1, 2 | Published redeemable codes/payloads, atomic inventory/currency grants, owner binding and durable retry receipts |
 | 151 | 1 | Explicit local esports-registration publication and native boolean DTO |
 | 104 / 194 | 6, 7 / 1 | Empty local marketing, durable viewed-message reports and signed empty AB enrollment |
-| 50 / 58 | 2, 3, 9, 10, 18, 19 / 5, 6, 18, 20, 21 | Whole-file content publication/listing, real HTTP upload/download, restart-persistent multipart upload pages, metadata/tags, signed uploader and commit integrity |
+| 50 / 58 | 2, 3, 9, 10, 15, 16, 18, 19, 20 / 5, 6, 18, 20, 21 | Whole-file metadata/listing, real HTTP upload/download/COPY, persistent multipart stages, owner-bound copy commits, tags/summaries and safe retry receipts |
 | 125 | 1, 2, 3, 4, 5, 6, 9 | Published achievement definitions/states/activation, complete owner/batch event ingestion, binary/REST retry normalization, archived receipts and user-state JSON |
 | 145 | 2, 3, 4, 8, 9, 10, 13, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 28, 29 | Player/token, real UDP QoS, relay discovery/authentication, playlist catalog, lobby/host CAS and lifecycle; explicitly published tournament registration/state, owned ready/accept/decline/leave/rejoin |
 | 197 | 10, 11 | Ordered provisioned-account aliases and explicit invalid slots |
@@ -139,6 +139,7 @@ Credentials, request bodies, headers and retry tokens are excluded from logs.
 - `data/teams/<title>/<context>/teams.json`: explicitly published legacy teams and member statuses.
 - `data/content-streaming/<title>`: complete whole-file metadata and immutable payloads/capabilities. Upload completion verifies actual transferred bytes before publication.
 - `data/content-streaming/<title>/multipart.json`: signed-owner multipart staging and stable ten-URL pages. Parts are immutable, capabilities expire after ten inactive minutes, and a commit verifies every contiguous part and the byte total before publishing one file. Limits are 128 active sessions, 1024 parts per file and 16 MiB per file. A 64 MiB pending-data limit applies per title alongside whole-file uploads held in memory.
+- `data/content-streaming/<title>/copies.json`: up to 128 source-snapshot copy stages with 600-second capabilities. `files.json` atomically commits the clone, source counter, owned slot replacement and durable `copy_receipts` journal. See [content-copy.md](docs/content-copy.md) for limits, ownership, retry behavior and target-versus-source-oracle provenance.
 - `data/marketing/<title>/<context>/<user>.views.json`: owner-scoped viewed-message receipts.
 - `data/esports/<title>/registered.json`: explicit registered-account catalog.
 - `data/achievement-user-state` and `data/achievement-engine`: persistent state and explicitly published local rules.
@@ -167,7 +168,7 @@ packages remain a deferred game-build concern.
 **Full emulation is not complete.** Remaining areas include:
 
 - Multiuser lobby joining/host migration, automatic tournament bracket scheduling/match assignment/pushes, legacy tournament task 145/21 and remote relay deployment/migration. The published tournament lifecycle is described in [docs/tournaments.md](docs/tournaments.md); registration and persisted-state native callbacks were verified, while ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
-- Remaining streaming copy/live download tasks, including 50/16, 22 and 58/22. Whole-file transfer and 58/20–21 multipart upload/commit are implemented; multipart download's exact bound result reader remains unresolved.
+- Remaining streaming tasks 50/6 whole-user post, 50/22 and 58/22 live/multipart download. Copy is implemented, but preparation IDs 50/15 and 50/20 are source-oracle contracts without target writer proofs, and positive native copy callbacks remain unobserved. Multipart download's exact bound result reader remains unresolved.
 - Marketplace cross-account gifting, discount publication, inventory-token validation task 80/58, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Cross-account purchases remain unavailable until a multi-account transaction journal exists; a buyer is never debited before an uncommitted gift acknowledgement.
 - Object-store category/list and large-upload completion families, including 193/3, 9, 10, 12 and 24. Request writers for 9/10 are recovered; their exact response bindings still need resolution.
 - Published achievement progression/reward rules. Replay requests achievement 1500 with no local publication, so it correctly returns unavailable. Changed-payload retry conflicts are rejected; event ingestion itself does not fabricate XP targets, quest definitions or rewards.
@@ -192,8 +193,10 @@ so later evidence cannot silently attach old game observations to a new server.
 `tools/inventory-backend-coverage.py` joins that target evidence with reviewed
 handler registrations, static fixture call sites and hash-bound native proofs.
 It writes `data/backend-coverage-inventory.json` and a plain-text counterpart.
-The current ledger has 137 known task routes, 119 registered handlers and 18
-known target tasks without handlers. Those counts do not include every indirect
+The current ledger has 139 known or explicitly reviewed task routes, 128
+registered handlers and 11 known target tasks without handlers. The two copy
+preparation routes are explicitly labeled as source-oracle contracts rather
+than recovered target constructors. These counts do not include every indirect
 SDK or REST operation; these gaps remain explicit. Fixture source references
 are not presented as native completion.
 Indirect/dynamic calls remain explicit audit gaps. Unsupported tasks return

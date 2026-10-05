@@ -29,7 +29,12 @@ ROUTES = [
     (29, "mail", "mail_services.cpp", [4, 5, 7, 9, 10]),
     (38, "anti-cheat and auth reports", "anticheat_services.cpp", [2]),
     (38, "anti-cheat and auth reports", "services.cpp", [6, 7, 8]),
-    (50, "content streaming", "content_services.cpp", [2, 3, 9, 10, 18, 19]),
+    (
+        50,
+        "content streaming",
+        "content_services.cpp",
+        [2, 3, 9, 10, 15, 16, 18, 19, 20],
+    ),
     (58, "content streaming", "content_services.cpp", [5, 6, 18, 20, 21]),
     (67, "telemetry", "engagement_services.cpp", [5]),
     (67, "telemetry", "startup_services.cpp", [6]),
@@ -79,7 +84,7 @@ GAPS = {
     "27": "Configured geography is local metadata, not real IP geolocation.",
     "29": "Native tasks 2 and categorized/status variants; dynamic send-duration branch remains unresolved in CFG inventory.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
-    "50": "Tasks 6 whole-user post, 16 copy and 22 live download; summary variants and exact result readers.",
+    "50": "Tasks 6 whole-user post and 22 live download; copy preparation IDs 15/20 are source-oracle contracts without target constructor proofs. Full positive native copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
     "80": "Task 58 inventory-token validation; task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
@@ -220,6 +225,11 @@ def main():
                 handler_source=routes.get((service, task)),
                 exact_target_constructor_proofs=constructors,
                 target_constructor_audit_covered=bool(constructors),
+                preparation_contract_provenance=(
+                    "SDK source oracle only; not recovered as a Replay request writer"
+                    if (service, task) in ((50, 15), (50, 20))
+                    else None
+                ),
                 static_fixture_references=references.get((service, task), []),
                 native_positive_completion_verified_current_binary=native,
                 native_completion_evidence="data/" + proof_filename if native else None,

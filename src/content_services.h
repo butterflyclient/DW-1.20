@@ -11,5 +11,6 @@ namespace services
                                          wire::Reader &);
     std::optional<wire::Bytes> streamingContent(const std::string &);
     unsigned streamingUpload(const std::string &, std::span<const uint8_t>);
+    unsigned streamingCopy(const std::string &source, const std::string &destination);
     constexpr unsigned maximumStreamingBody = 16 * 1024 * 1024;
 } // namespace services
