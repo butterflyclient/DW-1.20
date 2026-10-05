@@ -1,6 +1,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "relay_provider.h"
+#include "network.h"
 #include "relay_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
@@ -221,7 +222,8 @@ namespace relay_provider
                            sizeof(exclusive));
                 sockaddr_in local{};
                 local.sin_family = AF_INET;
-                local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                local.sin_addr.s_addr = network::bindAddress();
+                local.sin_port = htons(network::relayPort());
                 int size = sizeof(local);
                 if (bind(socket, reinterpret_cast<sockaddr *>(&local), sizeof(local)) ||
                     getsockname(socket, reinterpret_cast<sockaddr *>(&local), &size))
@@ -267,7 +269,8 @@ namespace relay_provider
 
             wire::Bytes address() const
             {
-                wire::Bytes out{127, 0, 0, 1};
+                const auto ip = network::advertisedBytes();
+                wire::Bytes out(ip.begin(), ip.end());
                 wire::raw(out, port);
                 return out;
             }
@@ -578,7 +581,7 @@ namespace relay_provider
                                                     reinterpret_cast<sockaddr *>(&peer),
                                                     &size);
                         if (bytes <= 0 || peer.sin_family != AF_INET ||
-                            peer.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+                            !network::permittedPeer(peer.sin_addr.s_addr))
                             continue;
                         if (clock - window >= std::chrono::seconds(1))
                         {

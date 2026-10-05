@@ -26,6 +26,7 @@
 #include "content_services.h"
 #include "relay_services.h"
 #include "relay_provider.h"
+#include "network.h"
 
 namespace
 {
@@ -229,6 +230,7 @@ namespace
         bool hasLength = false;
         std::optional<std::string> rangeHeader;
         std::optional<std::string> destinationHeader;
+        std::optional<std::string> accessHeader;
         size_t at = firstLineEnd + 2;
         while (at < headerEnd)
         {
@@ -276,6 +278,15 @@ namespace
                     return;
                 }
                 destinationHeader = value;
+            }
+            if (key == "x-replay-access")
+            {
+                if (accessHeader || value.size() > 64)
+                {
+                    reply(socket, 400, "{\"error\":\"invalid_access_header\"}");
+                    return;
+                }
+                accessHeader = value;
             }
             at = end + 2;
         }
@@ -440,8 +451,18 @@ namespace
             }
             try
             {
-                auto response = platform::login(request.substr(bodyAt, length),
-                                                path == "/platform/login" ? "" : path.substr(16));
+                sockaddr_in peer{};
+                int peerSize = sizeof(peer);
+                const bool loopback =
+                    getpeername(socket, reinterpret_cast<sockaddr *>(&peer), &peerSize) == 0 &&
+                    peer.sin_family == AF_INET && peer.sin_addr.s_addr == htonl(INADDR_LOOPBACK);
+                const auto profile = path == "/platform/login" ? "" : path.substr(16);
+                if (!network::loginPermitted(loopback, profile, accessHeader.value_or("")))
+                {
+                    reply(socket, 403, "{\"error\":\"platform_access_rejected\"}");
+                    return;
+                }
+                auto response = platform::login(request.substr(bodyAt, length), profile);
                 reply(socket, 200, response, "application/octet-stream");
                 log("PLATFORM issued signed local identity/session; native DW authentication still "
                     "required");
@@ -576,13 +597,13 @@ namespace
                    sizeof(exclusive));
         sockaddr_in address{};
         address.sin_family = AF_INET;
-        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        address.sin_addr.s_addr = network::bindAddress();
         address.sin_port = htons(port);
         if (bind(listener.value, reinterpret_cast<sockaddr *>(&address), sizeof(address)) ||
             listen(listener.value, SOMAXCONN))
-            throw std::runtime_error("cannot bind loopback port " + std::to_string(port) + ": " +
+            throw std::runtime_error("cannot bind port " + std::to_string(port) + ": " +
                                      std::to_string(WSAGetLastError()));
-        log("LISTEN 127.0.0.1:" + std::to_string(port));
+        log("LISTEN port=" + std::to_string(port));
         while (!stopping.load())
         {
             fd_set readable{};
@@ -691,6 +712,7 @@ int main(int argc, char **argv)
     }
     try
     {
+        network::initialize(directory);
         platform::initialize(directory);
         if (argc == 5 && std::string(argv[2]) == "--provision-profile")
         {

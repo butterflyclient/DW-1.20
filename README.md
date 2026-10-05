@@ -46,10 +46,23 @@ game/server restarts for binary updates until the engine lifecycle is resolved.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
 read per request and can already be updated without restarting either process.
 
-The server binds loopback and provides a local realm. External account linking,
-live Activision services and remote multiplayer deployment remain
-unfinished. Ordinary Replay, shared compiler work, assets and proxy configuration
-are preserved. Backend-only work does not rebuild or patch the game EXE.
+The server defaults to loopback. Optional `data/network.json` configures the
+listener/public IPv4 addresses and fixed QoS, relay and bandwidth ports for an
+owner-hosted remote test. External platform login requires a provisioned profile
+and its `X-Replay-Access` key; the default host account is local-only. Native
+authentication and encrypted lobby traffic retain their signed session checks.
+External account linking and live Activision services remain outside this realm.
+Ordinary Replay, shared compiler work and game assets are preserved.
+Backend-only work does not rebuild or patch the game EXE.
+
+Remote setup uses `tools/prepare-host-network.py`,
+`configure-host-firewall.ps1`, `tools/prepare-remote-friends.py`, and
+`tools/package-remote-guest.py`. Configuration is read at process startup; use
+separate controlled game/server stops and starts after endpoint changes.
+Guest packages contain the DW executable, INI and launcher, with no proxy or
+backend signing keys. Each guest still needs the compatible Replay game data.
+Router/firewall configuration, native startup, authenticated lobby assignment,
+and actual two-network gameplay are distinct validation gates.
 
 ## Native game evidence
 

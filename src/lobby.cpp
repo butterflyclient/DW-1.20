@@ -32,6 +32,7 @@ namespace lobby
         {
             std::mutex mutex;
             platform::LobbyIdentity identity;
+            std::string sessionFingerprint;
             std::function<bool(std::span<const uint8_t>)> writer;
             uint64_t lastTournament = 0;
             std::string lastTournamentHash;
@@ -42,7 +43,14 @@ namespace lobby
         // Brief presence reads do not reverse endpointMutex -> service-store lock
         // ordering. Release this separate lock before calling any service handler.
         std::mutex onlineMutex;
-        std::map<std::pair<uint32_t, uint64_t>, unsigned> onlineUsers;
+
+        struct OnlineSession
+        {
+            unsigned count = 0;
+            platform::LobbyIdentity identity;
+        };
+
+        std::map<std::pair<uint32_t, uint64_t>, std::map<std::string, OnlineSession>> onlineUsers;
         void route(uint32_t title, const services::Delivery &delivery);
         void startTournamentUpdates();
 
@@ -58,6 +66,7 @@ namespace lobby
                 : connection(key), endpoint(std::make_shared<PushEndpoint>())
             {
                 endpoint->identity = identity;
+                endpoint->sessionFingerprint = wire::base64Encode(crypto::sha256(identity.key));
                 endpoint->writer = std::move(writer);
                 startTournamentUpdates();
                 std::lock_guard lock(endpointMutex);
@@ -71,7 +80,10 @@ namespace lobby
                 endpoints.emplace(connection, endpoint);
                 {
                     std::lock_guard presenceLock(onlineMutex);
-                    ++onlineUsers[{identity.titleId, identity.userId}];
+                    auto &session = onlineUsers[{identity.titleId, identity.userId}]
+                                               [endpoint->sessionFingerprint];
+                    session.identity = identity;
+                    ++session.count;
                 }
             }
 
@@ -86,8 +98,14 @@ namespace lobby
                         const auto key =
                             std::make_pair(endpoint->identity.titleId, endpoint->identity.userId);
                         auto found = onlineUsers.find(key);
-                        if (found != onlineUsers.end() && !--found->second)
-                            onlineUsers.erase(found);
+                        if (found != onlineUsers.end())
+                        {
+                            auto session = found->second.find(endpoint->sessionFingerprint);
+                            if (session != found->second.end() && !--session->second.count)
+                                found->second.erase(session);
+                            if (found->second.empty())
+                                onlineUsers.erase(found);
+                        }
                     }
                     bool online = false;
                     for (const auto &entry : endpoints)
@@ -440,6 +458,24 @@ namespace lobby
     {
         std::lock_guard lock(onlineMutex);
         return onlineUsers.contains({title, user});
+    }
+
+    bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint)
+    {
+        std::optional<platform::LobbyIdentity> identity;
+        {
+            std::lock_guard lock(onlineMutex);
+            const auto userEntry = onlineUsers.find({title, user});
+            if (userEntry != onlineUsers.end())
+            {
+                const auto session = userEntry->second.find(fingerprint);
+                if (session != userEntry->second.end())
+                    identity = session->second.identity;
+            }
+        }
+        // Authentication can replace a ticket/key while the old socket is idle.
+        // Check its issuer lease too, without holding the connection registry lock.
+        return identity && platform::valid(*identity);
     }
 
     void serve(const IO &transport)

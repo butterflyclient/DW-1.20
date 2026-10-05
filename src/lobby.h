@@ -15,5 +15,6 @@ namespace lobby
 
     void serve(const IO &io);
     bool online(uint32_t title, uint64_t user);
+    bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint);
     extern std::atomic<unsigned> connections, authenticated, frames, tasks, failures;
 } // namespace lobby

@@ -156,6 +156,19 @@ namespace matchmaking_store
                 require(member.is_number_unsigned() && member.get<uint64_t>() &&
                         members.insert(member.get<uint64_t>()).second);
             require(members.contains(state["owner"].get<uint64_t>()));
+            if (state.contains("owner_session"))
+            {
+                require(state["owner_session"].is_string());
+                const auto &fingerprint = state["owner_session"].get_ref<const std::string &>();
+                require(fingerprint.size() == 44 && fingerprint.back() == '=' &&
+                        std::all_of(fingerprint.begin(),
+                                    fingerprint.end() - 1,
+                                    [](char c)
+                                    {
+                                        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                                               (c >= '0' && c <= '9') || c == '+' || c == '/';
+                                    }));
+            }
             if (state.contains("maximum_members"))
                 require(state["maximum_members"].is_number_unsigned() &&
                         state["maximum_members"].get<uint64_t>() <= 200 &&

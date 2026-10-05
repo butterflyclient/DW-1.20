@@ -210,6 +210,8 @@ def main():
         "relay_provider.cpp",
         "crypto.cpp",
         "platform.cpp",
+        "lobby.cpp",
+        "lobby.h",
         "matchmaking_store.cpp",
         "matchmaking_store.h",
     ):

@@ -137,6 +137,20 @@ namespace services
                    lobby.at("members").end();
         }
 
+        bool hostSessionActive(const Json &state, uint32_t title)
+        {
+            // Unbound historical documents remain readable/disbandable, but a
+            // new login cannot implicitly adopt their old native address/DTLS keys.
+            if (!state.contains("owner_session"))
+                return false;
+            if (!state["owner_session"].is_string() ||
+                state["owner_session"].get_ref<const std::string &>().size() != 44)
+                throw std::runtime_error("Invalid persisted lobby host session");
+            return lobby::sessionOnline(title,
+                                        state.at("owner").get<uint64_t>(),
+                                        state["owner_session"].get<std::string>());
+        }
+
         void notify(Reply &reply,
                     const Json &lobby,
                     uint32_t event,
@@ -256,8 +270,8 @@ namespace services
                     continue;
                 auto lobby = loadLobby(path, id);
                 if ((!byLobby && !member(lobby, target.get<uint64_t>())) ||
-                    !lobby::online(id.titleId, lobby.at("owner").get<uint64_t>()) ||
-                    lobby.value("disbanded", false) || lobby.at("expires").get<uint64_t>() <= now())
+                    !hostSessionActive(lobby, id.titleId) || lobby.value("disbanded", false) ||
+                    lobby.at("expires").get<uint64_t>() <= now())
                     continue;
                 const auto &host = lobby.at("host_doc");
                 if (!host.value("lobby_open_for_pres_join", false))
@@ -450,6 +464,7 @@ namespace services
                               {"title", id.titleId},
                               {"id", lobbyId},
                               {"owner", id.userId},
+                              {"owner_session", wire::base64Encode(crypto::sha256(id.key))},
                               {"members", query["members"]},
                               {"update_id", uint64_t{1}},
                               {"expires", std::min(time + 3600, id.expires)},
@@ -614,6 +629,9 @@ namespace services
                 }
                 if (lobby.at("owner") != id.userId)
                     return Reply{101, {}, "matchmaker-host-update-owner-denied"};
+                if (!hostSessionActive(lobby, id.titleId) ||
+                    lobby.at("owner_session") != wire::base64Encode(crypto::sha256(id.key)))
+                    return Reply{108, {}, "matchmaker-host-update-session-expired"};
                 wire::require(
                     host.contains("listen_server") && host["listen_server"].is_object() &&
                     host["listen_server"].value("host_player_id", uint64_t{}) == id.userId &&
@@ -670,6 +688,9 @@ namespace services
             return 108;
         if (lobby["owner"] != id.userId || !member(lobby, id.userId))
             return 101;
+        if (!hostSessionActive(lobby, id.titleId) ||
+            lobby.at("owner_session") != wire::base64Encode(crypto::sha256(id.key)))
+            return 108;
         for (const auto user : participants)
             if (!member(lobby, user))
                 return 101;
@@ -690,8 +711,8 @@ namespace services
         platform::LobbyIdentity id;
         id.titleId = title;
         const auto lobby = loadLobby(path, id);
-        if (lobby.value("disbanded", false) || lobby.at("expires").get<uint64_t>() <= now() ||
-            !member(lobby, delivery.user))
+        if (!hostSessionActive(lobby, title) || lobby.value("disbanded", false) ||
+            lobby.at("expires").get<uint64_t>() <= now() || !member(lobby, delivery.user))
             return false;
         if (delivery.searchId)
         {

@@ -14,9 +14,15 @@ the existing 200-member limit. SDK source oracle
 `Playlist_WritePlaylistLobbySlotsJSON` supplies the slot-field interpretation.
 Match selection is rechecked against the current published playlist and
 installed-map policy. Joining cannot silently replace unavailable maps.
-The host must have a live authenticated lobby connection. Presence-by-player
+The host must have a live authenticated lobby connection matching the session
+fingerprint stored when the lobby was created. Issuer validation also rejects
+a superseded ticket on an otherwise idle socket. Presence-by-player
 also requires the target member to be online; persisted lobby files cannot
 revive disconnected sessions after a stop or restart.
+Reauthenticating the same account does not reactivate old native addresses or
+DTLS credentials. Host updates require the creator's matching session too.
+Unbound historical lobbies remain available for member inspection and owner
+disband, but cannot be joined or adopted implicitly by a new login.
 
 The join preserves the lobby ID, native listen-server address, DTLS credentials,
 and ruleset/map weights. It advances the host/backend revision, adds unique

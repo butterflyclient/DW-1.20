@@ -3217,6 +3217,51 @@ try:
     )
     assert unsubscribe_peer() == (200, {"errorUsers": []})
     assert unsubscribe_peer() == (200, {"errorUsers": []})
+    # Reauth rotates the existing signed peer key. A new live connection for
+    # that account must not revive the lobby created with the old endpoint/key.
+    with post(
+        "/auth/", dict(request, extra_data=json.dumps(peer_credentials))
+    ) as response:
+        renewed_peer_auth = json.load(response)
+    renewed_peer = Client(
+        auth_identity=(
+            base64.b64decode(renewed_peer_auth["server_ticket"]),
+            base64.b64decode(renewed_peer_auth["client_ticket"])[97:121],
+        )
+    )
+    assert renewed_peer.task(12, 6).startswith(b"\x08")
+    lobby_join_fixtures.reject_offline_owner(
+        client,
+        peer_user,
+        offline_lobby,
+        directory,
+        title,
+        user,
+        (u32, u64, text, boolean),
+        [],
+    )
+    old_lobby_path = (
+        directory / "matchmaking" / str(title) / "lobbies" / f"{offline_lobby}.json"
+    )
+    old_lobby = json.loads(old_lobby_path.read_bytes())
+    before_old_lobby = old_lobby_path.read_bytes()
+    renewed_peer.task(
+        145,
+        15,
+        u64(offline_lobby)
+        + u64(old_lobby["update_id"])
+        + text(json.dumps(old_lobby["host_doc"])),
+        error=108,
+    )
+    assert old_lobby_path.read_bytes() == before_old_lobby
+    # Read-only inspection and owner cleanup remain available for old records.
+    assert renewed_peer.task(145, 13, u64(offline_lobby))[0] == 16
+    assert renewed_peer.task(145, 10, u64(offline_lobby)) == []
+    assert renewed_peer.receive() == (2, u32(2002) + u64(offline_lobby) + u64(0))
+    renewed_peer.close()
+    checks.append(
+        "a reauthenticated online host cannot revive an old lobby's endpoint/DTLS session through either presence target or a host update; read-only inspection and owner disband remain available"
+    )
     checks.append(
         "two separately signed identities, independent sessions, real encrypted friend lifecycle notifications and disconnect-aware peer presence"
     )

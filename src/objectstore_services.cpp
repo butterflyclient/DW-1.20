@@ -2,6 +2,7 @@
 #include "objectstore_services.h"
 #include "protobuf.h"
 #include "crypto.h"
+#include "network.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <chrono>
 #include <fstream>
@@ -703,7 +704,7 @@ namespace services
     void initializePublisherContent(const std::filesystem::path &directory, unsigned short port)
     {
         contentDirectory = std::filesystem::absolute(directory) / "objectstore" / "content";
-        contentOrigin = "http://127.0.0.1:" + std::to_string(port);
+        contentOrigin = network::httpOrigin(port);
     }
 
     std::optional<wire::Bytes> publisherContent(const std::string &route)

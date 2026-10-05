@@ -9,6 +9,7 @@ import struct
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import zlib
 
 root = Path(__file__).resolve().parents[1]
@@ -58,14 +59,24 @@ assert (
 )
 assert handle[44] == 0x22 and handle[45] < 128 and len(handle) == 46 + handle[45]
 url = handle[46:].decode("ascii")
-assert url.startswith("http://127.0.0.1:8085/platform/resources/")
+network_file = root / "data/network.json"
+advertised = (
+    json.loads(network_file.read_text())["advertised_address"]
+    if network_file.exists()
+    else "127.0.0.1"
+)
+assert url.startswith(f"http://{advertised}:8085/platform/resources/")
+# Verify the immutable response locally independently of router hairpin support.
+local_url = urllib.parse.urlunsplit(
+    urllib.parse.urlsplit(url)._replace(netloc="127.0.0.1:8085")
+)
 assert content[:8] == b"ZpmC\0\0\0\0"
 decoded = zlib.decompress(content[16:])
 assert len(decoded) == struct.unpack_from("<Q", content, 8)[0]
-with urllib.request.urlopen(url, timeout=5) as response:
+with urllib.request.urlopen(local_url, timeout=5) as response:
     assert response.read() == content
 try:
-    urllib.request.urlopen(url + "?wrong", timeout=5)
+    urllib.request.urlopen(local_url + "?wrong", timeout=5)
     raise AssertionError("Unknown immutable resource accepted")
 except urllib.error.HTTPError as error:
     assert error.code == 404
@@ -90,6 +101,8 @@ receipt = {
     ],
     "native_filter_compilation_verified": False,
     "resource_sha256": hashlib.sha256(content).hexdigest(),
+    "advertised_origin": f"http://{advertised}:8085",
+    "external_transport_verified": False,
     "decoded_bytes": len(decoded),
 }
 (root / "data/platform-resource-verification.json").write_text(

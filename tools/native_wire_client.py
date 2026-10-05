@@ -102,16 +102,23 @@ def expand(key, info, size):
 
 
 class NativeClient:
-    def __init__(self, root: Path, title=5800, profile=""):
+    def __init__(
+        self, root: Path, title=5800, profile="", host="127.0.0.1", access_key=""
+    ):
         self.socket = None
         self.title = title
         self.pushes = []
-        base = "http://127.0.0.1:8085"
+        base = f"http://{host}:8085"
 
         def post(path, value):
             data = value if isinstance(value, bytes) else json.dumps(value).encode()
             return urllib.request.urlopen(
-                urllib.request.Request(base + path, data), timeout=5
+                urllib.request.Request(
+                    base + path,
+                    data,
+                    headers={"X-Replay-Access": access_key} if access_key else {},
+                ),
+                timeout=5,
             )
 
         if profile and (
@@ -161,6 +168,9 @@ class NativeClient:
         auth = json.loads(raw)
         ticket = base64.b64decode(auth["server_ticket"], validate=True)
         key = base64.b64decode(auth["client_ticket"], validate=True)[97:121]
+        self.session_fingerprint = base64.b64encode(
+            hashlib.sha256(key).digest()
+        ).decode()
         with post(
             "/v1.0/tokens/lsg/?client=replaylocal",
             {
@@ -171,7 +181,7 @@ class NativeClient:
         ) as reply:
             if json.load(reply)["umbrellaID"] != self.user:
                 raise ValueError("Legacy identity binding")
-        self.socket = socket.create_connection(("127.0.0.1", 3075), timeout=5)
+        self.socket = socket.create_connection((host, 3075), timeout=5)
         self.incoming = self.outgoing = 1
         try:
             hello = struct.pack("<5I", 200, 200, 210, 220, 1024 * 1024) + os.urandom(8)

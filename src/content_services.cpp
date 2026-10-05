@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "content_services.h"
 #include "crypto.h"
+#include "network.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
@@ -1436,7 +1437,7 @@ namespace services
     {
         std::lock_guard lock(contentMutex);
         dataRoot = std::filesystem::absolute(directory);
-        origin = "http://127.0.0.1:" + std::to_string(port);
+        origin = network::httpOrigin(port);
         uploads.clear();
     }
 

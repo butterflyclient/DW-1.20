@@ -1,6 +1,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "qos_provider.h"
+#include "network.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <array>
 #include <algorithm>
@@ -46,7 +47,8 @@ namespace qos_provider
                            sizeof(exclusive));
                 sockaddr_in address{};
                 address.sin_family = AF_INET;
-                address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+                address.sin_addr.s_addr = network::bindAddress();
+                address.sin_port = htons(network::qosPort());
                 int size = sizeof(address);
                 if (bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) ||
                     getsockname(socket, reinterpret_cast<sockaddr *>(&address), &size))
@@ -122,7 +124,7 @@ namespace qos_provider
                                                reinterpret_cast<sockaddr *>(&peer),
                                                &size);
                     if (bytes <= 0 || peer.sin_family != AF_INET ||
-                        peer.sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+                        !network::permittedPeer(peer.sin_addr.s_addr))
                         continue;
                     const auto received = Clock::now();
                     if (received - window >= std::chrono::seconds(1))
@@ -144,7 +146,7 @@ namespace qos_provider
                             // challenge exactly, as the native receiving peer does.
                             // Only introductions addressed to this local endpoint
                             // are answered; never forward to a caller-supplied address.
-                            const std::array<uint8_t, 4> loopback{127, 0, 0, 1};
+                            const auto loopback = network::advertisedBytes();
                             if (!std::equal(
                                     loopback.begin(), loopback.end(), incoming.begin() + 23) ||
                                 wire::at<uint16_t>(incoming, 27) != port)
@@ -254,7 +256,8 @@ namespace qos_provider
             wire::require(provider->leases.size() < 256);
             provider->leases.push_back({id, now + std::chrono::minutes(5)});
         }
-        wire::Bytes endpoint{127, 0, 0, 1};
+        const auto ip = network::advertisedBytes();
+        wire::Bytes endpoint(ip.begin(), ip.end());
         wire::raw(endpoint, provider->port);
         // Full bdCommonAddr 0x1420EC6B0: five local addresses, public address,
         // NAT kind, platform, then 43-byte bdRelayJoinData 0x142192930. A direct

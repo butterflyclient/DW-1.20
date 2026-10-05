@@ -2,6 +2,7 @@
 #include <ws2tcpip.h>
 #include "bandwidth.h"
 #include "wire.h"
+#include "network.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -63,7 +64,8 @@ namespace bandwidth
                 throw std::runtime_error("Bandwidth UDP socket creation failed");
             sockaddr_in address{};
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            address.sin_addr.s_addr = network::bindAddress();
+            address.sin_port = htons(network::bandwidthPort());
             int addressSize = sizeof(address);
             if (bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) ||
                 getsockname(socket, reinterpret_cast<sockaddr *>(&address), &addressSize))
@@ -147,7 +149,7 @@ namespace bandwidth
                         return;
                     }
                     if (size == static_cast<int>(packetBytes) && sender.sin_family == AF_INET &&
-                        sender.sin_addr.s_addr == htonl(INADDR_LOOPBACK) &&
+                        network::permittedPeer(sender.sin_addr.s_addr) &&
                         std::equal(token.begin(), token.end(), packet.begin() + 4))
                     {
                         uint32_t sequence = 0;
@@ -260,7 +262,7 @@ namespace bandwidth
                                      downloadIdleMs})
                 wire::raw(data, value);
             wire::raw(data, state_->port);
-            wire::raw(data, uint32_t(htonl(INADDR_LOOPBACK)));
+            wire::raw(data, network::advertisedAddress());
             data.insert(data.end(), state_->token.begin(), state_->token.end());
             return {std::move(data),
                     "bandwidth-begin",

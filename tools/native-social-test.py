@@ -173,6 +173,7 @@ with NativeClient(root, profile="native-social") as client:
                 "game_host": False,
                 "map_launched": False,
                 "join_info_responses": 0,
+                "session_fingerprint": client.session_fingerprint,
             }
             (root / "data/native-presence-join-peer.json").write_text(
                 json.dumps(test_lobby, indent=2) + "\n"

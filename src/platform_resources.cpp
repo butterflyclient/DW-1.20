@@ -1,5 +1,6 @@
 #include "platform_resources.h"
 #include "crypto.h"
+#include "network.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <stdexcept>
@@ -139,7 +140,7 @@ namespace platform_resources
         resourceHandle.push_back(0x15);
         little(resourceHandle, 0x61706674);
         blob(resourceHandle, 3, digest);
-        text(resourceHandle, 4, "http://127.0.0.1:" + std::to_string(port) + contentPath);
+        text(resourceHandle, 4, network::httpOrigin(port) + contentPath);
         if (resourceContent.size() > 4096 || resourceHandle.size() > 256)
             throw std::runtime_error("Resource publication exceeds ABI bounds");
     }

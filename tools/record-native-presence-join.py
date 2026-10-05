@@ -49,6 +49,10 @@ state = json.loads(
     (data / "matchmaking/5800/lobbies" / f"{peer['id']}.json").read_bytes()
 )
 assert state["owner"] == peer["peer"] and set(state["members"]) == {user, peer["peer"]}
+assert state["owner_session"] == peer["session_fingerprint"]
+transaction = json.loads((data / "matchmaking/5800/transaction.json").read_bytes())
+assert transaction["title"] == 5800 and transaction["phase"] == "applied"
+assert transaction["writes"] == [] and transaction["revision"] > 0
 search_id = state["backend_doc"]["player_id_to_mm_id"][str(user)]
 search = json.loads(
     (data / "matchmaking/5800/searches" / f"{search_id}.json").read_bytes()
@@ -79,6 +83,8 @@ proof = dict(
     native_presence_join_request_verified=True,
     native_presence_join_field=fields[0],
     native_assigned_lobby_and_host_verified=True,
+    native_host_session_fingerprint_verified=True,
+    native_transaction_applied_verified=True,
     native_matchmaking_state=native["state"],
     native_lobby_state=native["lobby_state"],
     native_startup_fences_passing=27,
