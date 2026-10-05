@@ -196,6 +196,91 @@ try:
             return rva + 7 + struct.unpack_from("<i", code, 3)[0]
         raise RuntimeError("Native getter has an unexpected gateway chain")
 
+    def native_marketing():
+        getter = "q_MarketingCommsManager::GetInstance"
+        if getter not in symbols:
+            return None
+        # Target getter 140F69230 and completion 140F69AB0 establish these
+        # fields. All addresses follow the current linked getter/ASLR mapping.
+        manager = global_from_getter(getter)
+        record = read(manager, 432)
+        request, response = struct.unpack_from("<QQ", record, 208)
+        result = {
+            "fetch_in_flight": bool(record[65]),
+            "remote_task_present": bool(struct.unpack_from("<Q", record, 264)[0]),
+            "controller": struct.unpack_from("<i", record, 296)[0],
+            "request": None,
+            "response_count": 0,
+            "messages": [],
+            "parsed_locations": [],
+        }
+        if request:
+            header = read(request - base, 72)
+            capacity, count = struct.unpack_from("<II", header, 64)
+            if count > capacity or count > 64:
+                raise RuntimeError("Native marketing request bounds changed")
+            result["request"] = {
+                "context": header[16:32].split(b"\0")[0].decode(errors="replace"),
+                "language": header[32:52].split(b"\0")[0].decode(errors="replace"),
+                "location_count": count,
+            }
+        if response:
+            header = read(response - base, 32)
+            data, capacity, count = struct.unpack_from("<QII", header, 16)
+            if count > capacity or count > 512 or (count and data < 65536):
+                raise RuntimeError("Native marketing response bounds changed")
+            result["response_count"] = count
+            for index in range(count):
+                # Actual 142114EC0 array stride and 142114CF0 member offsets.
+                item = read(data - base + index * 7328, 7312)
+                message = {
+                    "id": struct.unpack_from("<Q", item, 16)[0],
+                    "language": item[24:44].split(b"\0")[0].decode(errors="replace"),
+                    "assignment": struct.unpack_from("<Q", item, 7296)[0],
+                    "location": struct.unpack_from("<I", item, 7304)[0],
+                }
+                for name, at, maximum, length_at in (
+                    ("content", 44, 4096, 4140),
+                    ("metadata", 4144, 2048, 6192),
+                    ("payload", 6196, 1024, 7220),
+                    ("signature", 7224, 65, 7292),
+                ):
+                    size = struct.unpack_from("<I", item, length_at)[0]
+                    if size > maximum:
+                        raise RuntimeError("Native marketing blob bounds changed")
+                    message[name + "_size"] = size
+                    message[name + "_sha256"] = hashlib.sha256(
+                        item[at : at + size]
+                    ).hexdigest()
+                result["messages"].append(message)
+        for location in range(15):
+            pointer = struct.unpack_from("<Q", record, 88 + 8 * location)[0]
+            maximum = struct.unpack_from("<I", record, 312 + 4 * location)[0]
+            parsed_count = struct.unpack_from("<I", record, 372 + 4 * location)[0]
+            if not pointer or not maximum:
+                continue
+            if maximum > 100 or parsed_count > maximum:
+                raise RuntimeError("Native marketing parsed-cache bounds changed")
+            cached = read(pointer - base, 6152)
+            value = cached[:6144].split(b"\0")[0]
+            parsed = None
+            if cached[6144] and value:
+                try:
+                    parsed = json.loads(value)
+                except (UnicodeDecodeError, ValueError):
+                    pass
+            result["parsed_locations"].append(
+                {
+                    "location": location,
+                    "maximum": maximum,
+                    "parsed_count": parsed_count,
+                    "first_parsed": bool(cached[6144]),
+                    "first_json": parsed,
+                    "first_sha256": hashlib.sha256(value).hexdigest(),
+                }
+            )
+        return result
+
     def pointer_from_getter(symbol):
         rva = symbols[symbol]
         for _ in range(3):
@@ -982,6 +1067,7 @@ try:
             )
             else None
         ),
+        "native_marketing_messages": native_marketing(),
         "native_registered_test_commands": commands,
         "native_frontend_active": bool(read(symbols["gl_14C4EBE6C"], 1)[0]),
         "native_selected_dvars": selected_dvars,

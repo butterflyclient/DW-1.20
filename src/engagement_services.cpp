@@ -5,6 +5,7 @@
 #include <chrono>
 #include <fstream>
 #include <set>
+#include <tuple>
 
 namespace services
 {
@@ -69,7 +70,99 @@ namespace services
             return Json::parse(in);
         }
 
-        Reply messages(wire::Reader &p)
+        std::string publicationContext(const std::string &context)
+        {
+            if (context.empty())
+                return "_default";
+            wire::require(context != "." && context != "..");
+            for (const auto value : context)
+                wire::require((value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
+                              (value >= '0' && value <= '9') || value == '_' || value == '-' ||
+                              value == '.');
+            return context;
+        }
+
+        struct MarketingMessage
+        {
+            uint64_t id = 0, assignment = 0, starts = 0, expires = 0;
+            uint32_t location = 0;
+            bool enabled = false;
+            std::string language;
+            wire::Bytes content, metadata, payload, signature;
+
+            wire::Bytes serialize() const
+            {
+                // Full same-Replay bdCommsMessage reader 142114CF0. All eight
+                // fields are present even when a published blob is empty.
+                wire::Bytes result;
+                proto::integer(result, 1, id);
+                proto::text(result, 2, language);
+                proto::bytes(result, 3, content);
+                proto::bytes(result, 4, metadata);
+                proto::bytes(result, 5, payload);
+                proto::bytes(result, 6, signature);
+                proto::integer(result, 7, assignment);
+                proto::integer(result, 8, location);
+                return result;
+            }
+        };
+
+        std::vector<MarketingMessage> publications(const std::filesystem::path &directory,
+                                                   uint32_t title,
+                                                   const std::string &context)
+        {
+            const auto path = directory / "marketing" / std::to_string(title) /
+                              publicationContext(context) / "catalog.json";
+            if (!std::filesystem::exists(path))
+                return {};
+            try
+            {
+                const auto document = load(path, Json::object());
+                wire::require(
+                    document.at("schema") == 1 && document.at("title").is_number_unsigned() &&
+                    document.at("title") == title && document.at("context") == context &&
+                    document.at("messages").is_array() && document.at("messages").size() <= 512);
+                std::vector<MarketingMessage> result;
+                std::set<std::tuple<uint64_t, std::string, uint32_t>> unique;
+                for (const auto &row : document.at("messages"))
+                {
+                    MarketingMessage message;
+                    for (const auto *key : {"id", "assignment", "location", "starts", "expires"})
+                        wire::require(row.at(key).is_number_unsigned());
+                    message.id = row.at("id").get<uint64_t>();
+                    message.assignment = row.at("assignment").get<uint64_t>();
+                    wire::require(message.id && message.id != UINT64_MAX &&
+                                  row.at("location").get<uint64_t>() <= UINT32_MAX &&
+                                  row.at("enabled").is_boolean());
+                    message.location = row.at("location").get<uint32_t>();
+                    message.starts = row.at("starts").get<uint64_t>();
+                    message.expires = row.at("expires").get<uint64_t>();
+                    wire::require(!message.expires || message.expires > message.starts);
+                    message.enabled = row.at("enabled").get<bool>();
+                    message.language = row.at("language").get<std::string>();
+                    wire::require(
+                        !message.language.empty() && message.language.size() < 20 &&
+                        message.language.find('\0') == std::string::npos &&
+                        unique.emplace(message.id, message.language, message.location).second);
+                    message.content = wire::base64(row.at("content").get<std::string>(), 4096);
+                    message.metadata = wire::base64(row.at("metadata").get<std::string>(), 2048);
+                    message.payload = wire::base64(row.at("payload").get<std::string>(), 1024);
+                    message.signature = wire::base64(row.at("signature").get<std::string>(), 65);
+                    result.push_back(std::move(message));
+                }
+                return result;
+            }
+            catch (const std::runtime_error &)
+            {
+                // Publication corruption is a storage error, not malformed
+                // caller parameters. Validate disabled/expired rows as well.
+                throw std::runtime_error("Marketing publication schema invalid");
+            }
+        }
+
+        Reply messages(const std::filesystem::path &directory,
+                       const platform::LobbyIdentity &id,
+                       wire::Reader &p)
         {
             // Replay 0x142129BC0 -> startStructTask(104,6), request vtable
             // bdCommsGetMessagesRequest: context/language and location/count objects.
@@ -77,7 +170,10 @@ namespace services
             // absent collection is a valid empty publication, not invented ads.
             proto::Reader request{p.structure(16384)};
             proto::Field f;
-            unsigned seen = 0, locations = 0;
+            unsigned seen = 0;
+            std::string context, language;
+            std::vector<std::pair<uint32_t, uint32_t>> locations;
+            std::set<uint32_t> unique;
             while (request.next(f))
             {
                 if (f.tag == 1 || f.tag == 2)
@@ -85,14 +181,16 @@ namespace services
                     const auto bit = 1U << f.tag;
                     wire::require(!(seen & bit));
                     seen |= bit;
-                    (void)text(f, f.tag == 1 ? 16 : 20);
+                    auto value = text(f, f.tag == 1 ? 16 : 20);
+                    (f.tag == 1 ? context : language) = std::move(value);
                 }
                 else if (f.tag == 3)
                 {
-                    wire::require(f.type == 2 && ++locations <= 64);
+                    wire::require(f.type == 2 && locations.size() < 64);
                     proto::Reader location{f.bytes};
                     proto::Field l;
                     unsigned fields = 0;
+                    uint32_t locationId = 0, count = 0;
                     while (location.next(l))
                         if (l.tag == 1 || l.tag == 2)
                         {
@@ -100,13 +198,47 @@ namespace services
                             wire::require(!(fields & bit) && l.type == 0 && l.value <= UINT32_MAX);
                             fields |= bit;
                             if (l.tag == 2)
+                            {
                                 wire::require(l.value <= 100);
+                                count = static_cast<uint32_t>(l.value);
+                            }
+                            else
+                                locationId = static_cast<uint32_t>(l.value);
                         }
                     wire::require(fields == 6);
+                    wire::require(unique.insert(locationId).second);
+                    locations.emplace_back(locationId, count);
                 }
             }
             wire::require(seen == 6);
-            return {0, {}, "marketing-messages-empty", true, {}};
+            const auto published = publications(directory, id.titleId, context);
+            Reply result{0, {}, "marketing-messages-empty", true, {}};
+            const auto stamp = now();
+            unsigned selected = 0;
+            for (const auto &[location, maximum] : locations)
+            {
+                unsigned count = 0;
+                for (const auto &message : published)
+                {
+                    if (count == maximum)
+                        break;
+                    if (!message.enabled || message.language != language ||
+                        message.location != location || message.starts > stamp ||
+                        (message.expires && message.expires <= stamp))
+                        continue;
+                    proto::bytes(result.structure, 1, message.serialize());
+                    if (result.structure.size() > 256 * 1024)
+                        return {102, {}, "marketing-response-capacity-exceeded"};
+                    ++count;
+                    ++selected;
+                }
+            }
+            if (selected)
+            {
+                result.operation = "marketing-messages-published";
+                result.detail = " messages=" + std::to_string(selected);
+            }
+            return result;
         }
 
         Reply viewed(const std::filesystem::path &directory,
@@ -156,11 +288,12 @@ namespace services
                     incoming.push_back(std::move(row));
                 }
             }
-            wire::require(seen && !context.empty() && context != "." && context != "..");
-            for (char c : context)
-                wire::require((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                              (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.');
-            const auto path = directory / "marketing" / std::to_string(id.titleId) / context /
+            wire::require(seen);
+            // Actual Replay MarkMessagesReadOnBackendAsync constructs this
+            // request without setting its context. Preserve its valid empty
+            // context in the default realm instead of rejecting every view.
+            const auto path = directory / "marketing" / std::to_string(id.titleId) /
+                              publicationContext(context) /
                               (std::to_string(id.userId) + ".views.json");
             auto data =
                 load(path, Json{{"schema", 1}, {"owner", id.userId}, {"views", Json::object()}});
@@ -394,7 +527,7 @@ namespace services
                                             wire::Reader &p)
     {
         if (service == 104 && task == 6)
-            return messages(p);
+            return messages(directory, id, p);
         if (service == 104 && task == 7)
             return viewed(directory, id, p);
         if (service == 194 && task == 1)

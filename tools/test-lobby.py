@@ -735,6 +735,15 @@ try:
     checks.append(
         "same-Replay marketing location/count schema and native empty message collection"
     )
+    import marketing_fixtures
+
+    marketing_fixture = marketing_fixtures.exercise(
+        client,
+        directory,
+        title,
+        (structure, pb_integer, pb_text, pb_bytes),
+        checks,
+    )
 
     def enroll_params(owner):
         return structure(
@@ -3752,6 +3761,7 @@ try:
     relay_fixtures.check_restart(client, relay_fixture, checks)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
     copy_content_fixtures.check_restart(client, copy_fixture, checks)
+    marketing_fixtures.check_restart(client, marketing_fixture, checks)
     multipart_content_fixtures.check_restart(client, multipart_fixture, checks)
     with post("/platform/login/peer", os.urandom(32)) as response:
         purchase_peer_platform = response.read()

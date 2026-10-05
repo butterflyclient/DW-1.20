@@ -89,7 +89,7 @@ GAPS = {
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
     "80": "Task 58 inventory-token validation; task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
-    "104": "Local marketing is empty; populated publication/result contract still required.",
+    "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
     "125": "Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.",
     "145": "Multiuser lobby join/host migration; legacy tournament task 21, automatic tournament scheduling/match assignment/push notifications and native ready/accept/leave/rejoin callbacks. Native registration/state callbacks are verified; remote relay deployment/migration and native two-game relay forwarding remain open.",
@@ -201,6 +201,10 @@ def main():
             relay_proofs[task] = (tournament_path.name, tournament_proof)
     for filename in ("relay_provider.cpp", "crypto.cpp", "platform.cpp"):
         sources["src/" + filename] = digest(ROOT / "src" / filename)
+    marketing_path = DATA / "native-marketing-verification.json"
+    marketing_proof = (
+        json.loads(marketing_path.read_bytes()) if marketing_path.exists() else None
+    )
     for service, task in sorted(pairs):
         constructors = [
             proof
@@ -210,6 +214,8 @@ def main():
         proof_filename, relay_proof = (
             relay_proofs.get(task, (None, None)) if service == 145 else (None, None)
         )
+        if (service, task) == (104, 6) and marketing_proof:
+            proof_filename, relay_proof = marketing_path.name, marketing_proof
         native = bool(
             relay_proof
             and relay_proof.get("passed")

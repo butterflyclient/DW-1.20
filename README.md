@@ -92,7 +92,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 | 80 | 69, 106, 125, 132, 134, 243, 245 | Native inventory/balance reads, published SKU catalog, atomic owner purchases with full ResultV4/PlayerAssetsV3 or legacy coupon results, signed-credential reconciliation |
 | 123 | 1, 2 | Published redeemable codes/payloads, atomic inventory/currency grants, owner binding and durable retry receipts |
 | 151 | 1 | Explicit local esports-registration publication and native boolean DTO |
-| 104 / 194 | 6, 7 / 1 | Empty local marketing, durable viewed-message reports and signed empty AB enrollment |
+| 104 / 194 | 6, 7 / 1 | Full published marketing messages with native field/blob layouts and location/language/time selection, owned view receipts and signed empty AB enrollment |
 | 50 / 58 | 2, 3, 9, 10, 15, 16, 18, 19, 20 / 5, 6, 18, 20, 21 | Whole-file metadata/listing, real HTTP upload/download/COPY, persistent multipart stages, owner-bound copy commits, tags/summaries and safe retry receipts |
 | 125 | 1, 2, 3, 4, 5, 6, 9 | Published achievement definitions/states/activation, complete owner/batch event ingestion, binary/REST retry normalization, archived receipts and user-state JSON |
 | 145 | 2, 3, 4, 8, 9, 10, 13, 15, 16, 18, 19, 20, 22, 23, 24, 25, 26, 28, 29 | Player/token, real UDP QoS, relay discovery/authentication, playlist catalog, lobby/host CAS and lifecycle; explicitly published tournament registration/state, owned ready/accept/decline/leave/rejoin |
@@ -141,6 +141,7 @@ Credentials, request bodies, headers and retry tokens are excluded from logs.
 - `data/content-streaming/<title>/multipart.json`: signed-owner multipart staging and stable ten-URL pages. Parts are immutable, capabilities expire after ten inactive minutes, and a commit verifies every contiguous part and the byte total before publishing one file. Limits are 128 active sessions, 1024 parts per file and 16 MiB per file. A 64 MiB pending-data limit applies per title alongside whole-file uploads held in memory.
 - `data/content-streaming/<title>/copies.json`: up to 128 source-snapshot copy stages with 600-second capabilities. `files.json` atomically commits the clone, source counter, owned slot replacement and durable `copy_receipts` journal. See [content-copy.md](docs/content-copy.md) for limits, ownership, retry behavior and target-versus-source-oracle provenance.
 - `data/marketing/<title>/<context>/<user>.views.json`: owner-scoped viewed-message receipts.
+- `data/marketing/<title>/<context>/catalog.json`: complete bounded message publications. See [marketing-messages.md](docs/marketing-messages.md) for the schema, native blob limits and consumer requirements.
 - `data/esports/<title>/registered.json`: explicit registered-account catalog.
 - `data/achievement-user-state` and `data/achievement-engine`: persistent state and explicitly published local rules.
 - `data/achievements/<title>/<context>/<user>/events.json`: recent event journal and 256 hot retry receipts. Binary event UUIDs normalize to the same reversed-byte REST UUID. Batch first-party IDs are checked against signed identity claims; attribution is included in the retry digest.
