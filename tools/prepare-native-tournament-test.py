@@ -69,6 +69,7 @@ else:
                 "data_center": "local",
                 "expires": int(time.time()) + 3600,
                 "registration_open": True,
+                "live_updates": True,
                 "start_search_offset_seconds": 600.25,
                 "state": {
                     "tournamentID": tournament,

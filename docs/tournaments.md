@@ -167,6 +167,40 @@ not generate duplicate updates. Each current, authenticated connection for an
 eligible account can receive the update; offline accounts recover through task
 145/20. This is an update transport, not an automatic team-formation scheduler.
 
+## Live publication changes and disband
+
+Set `live_updates: true` on a publication before players register to opt those
+enrollments into the idle watcher. It samples connected accepted accounts once
+per second. Bracket edits produce event 2010 without a client state request or
+either process restarting. The writer compares the complete derived document
+and suppresses identical periodic snapshots per connection. Explicit lifecycle
+task notifications still retain their normal semantics. Polling notifications
+wait 500 ms and are revalidated immediately before writing; a newer document,
+leave or disabled live publication suppresses an obsolete queued frame.
+
+An expired/removed publication or removed assignment emits event 2012: typed
+UInt64 tournament ID, typed UInt64 reason, and typed message string after the
+event number. This local realm uses reason zero for unavailable publication.
+Replay's decoder `0x14213F1C0` and callback `0x14103F470` define this envelope.
+Corrupt publication data suppresses delivery and remains a task-level storage
+error. It is never converted into a synthetic tournament disband. A removed
+publication leaves enrollment available for diagnosis or an authenticated leave.
+The same missing/expired snapshot is sent once per connection; a restored
+publication can send a fresh bracket. Native join assignment and automatic
+team formation remain separate work.
+
+Native validation changed a PLAYING publication from 16 players in teams of two
+to eight players in teams of one. The same running game parsed the changed
+counts without a tournament task or either process restarting. Expiring that
+publication then delivered event 2012: Replay displayed "Tournament has been
+disbanded" and cleared its tournament state/bracket while DW stayed connected.
+The receiver fixture still explicitly seeds acceptance after actual native UI
+registration; this does not establish native join-assignment completion.
+`verify-native-tournament-publication.py` records the edit/log boundary and
+requires the native before/after counts, unchanged process receipts, cleared
+expiry state and exact data restoration. Its screenshot remains separate
+visual evidence of the native error message. No match is scheduled by the tool.
+
 Independent encrypted clients verify receipt by both reporting and opposing
 accounts, the exact target event layout, stale snapshot suppression and recipient
 revocation. The native receiver check completed actual UI registration, then

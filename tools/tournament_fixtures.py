@@ -482,3 +482,106 @@ def check_restart(client, fixture, checks):
     checks.append(
         "Tournament result and advancement survive a real backend restart; original authenticated reporter can retry without duplicate writes or published bracket edits"
     )
+
+
+def live_publications(client, peer, directory, title, user, peer_user, helpers, checks):
+    """Exercise idle publication watching without issuing a task to fetch edits."""
+    u64, text, boolean = helpers
+    root = directory / "tournaments" / str(title)
+    catalog_path, enrollment_path = root / "catalog.json", root / "enrollments.json"
+    original_catalog, original_enrollment = (
+        catalog_path.read_bytes(),
+        enrollment_path.read_bytes(),
+    )
+    tournament = (1 << 62) + 271
+    catalog = json.loads(original_catalog)
+    row = copy.deepcopy(catalog["tournaments"][0])
+    row.update(
+        id=tournament,
+        name=str(tournament),
+        expires=int(time.time()) + 3600,
+        live_updates=True,
+    )
+    state = row["state"]
+    state["tournamentID"] = tournament
+    state["tournamentStatus"] = "PLAYING"
+    state["tournamentDefinition"] = {"teamSize": 2, "numTeams": 8, "numPlayers": 16}
+    state["players"] = [{"playerID": user}, {"playerID": peer_user}]
+    state["teams"] = [
+        {"teamID": i, "playerIDs": [user] if i == 0 else [peer_user] if i == 1 else []}
+        for i in range(8)
+    ]
+    for r in state["rounds"]:
+        for i, match in enumerate(r["matches"]):
+            match.update(
+                teamIDs=[2 * i, 2 * i + 1] if r["roundID"] == 0 else [],
+                readyPlayerIDs=[],
+                lobbyID=0,
+                expired=False,
+                winningTeamID=-1,
+            )
+            match.pop("scores", None)
+    catalog["tournaments"] = [row]
+
+    def publish(value=catalog):
+        pending = catalog_path.with_suffix(".json.pending")
+        pending.write_text(json.dumps(value))
+        pending.replace(catalog_path)
+
+    def disband():
+        for connection in (client, peer):
+            kind, packet = connection.receive()
+            assert kind == 2 and packet == b"\x08\xdc\x07\0\0" + u64(tournament) + u64(
+                0
+            ) + text("Tournament publication is no longer available")
+
+    try:
+        assert peer.task(145, 22) == []
+        assert client.task(145, 22) == []
+        no_update(client)
+        no_update(peer)
+        publish()
+        registration = text(
+            json.dumps(
+                {"data_center": row["data_center"], "tournament_name": row["name"]}
+            )
+        )
+        for connection in (client, peer):
+            assert connection.task(145, 29, registration)
+            assert connection.task(145, 23, u64(tournament) + boolean(True)) == []
+            updates((client,) if connection is client else (client, peer), state)
+        time.sleep(1.2)
+        no_update(client)
+        no_update(peer)
+        state["tournamentDefinition"].update(teamSize=1, numPlayers=8)
+        publish()
+        updates((client, peer), state)
+        checks.append(
+            "Opt-in idle tournament publication edits reach both signed receivers as native event 2010 without a task, game restart or server restart; identical periodic snapshots are suppressed"
+        )
+        damaged = copy.deepcopy(catalog)
+        damaged["tournaments"][0]["state"]["teams"][1]["teamID"] = 0
+        publish(damaged)
+        time.sleep(1.6)
+        no_update(client)
+        no_update(peer)
+        client.task(145, 20, error=102)
+        publish()
+        row["expires"] = int(time.time()) - 1
+        publish()
+        disband()
+        time.sleep(1.2)
+        no_update(client)
+        no_update(peer)
+        row["expires"] = int(time.time()) + 3600
+        publish()
+        updates((client, peer), state)
+        catalog_path.unlink()
+        disband()
+        assert peer.task(145, 22) == [] and client.task(145, 22) == []
+        checks.append(
+            "Exact native event-2012 ID/reason/string disbands on expiry or removed publication, once per connection snapshot; corrupt publication produces no fake disband, and authenticated leave revokes delivery"
+        )
+    finally:
+        catalog_path.write_bytes(original_catalog)
+        enrollment_path.write_bytes(original_enrollment)

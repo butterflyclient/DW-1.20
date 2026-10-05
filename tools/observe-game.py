@@ -643,6 +643,7 @@ try:
     )
     server_lines = []
     server_log_reset = False
+    server_log_file_size = None
     if connection and "server_log_offset" in connection:
         with (root / "data" / "server.log").open("rb") as log:
             server_log_reset = (
@@ -650,6 +651,7 @@ try:
             ).stat().st_size < connection["server_log_offset"]
             log.seek(0 if server_log_reset else connection["server_log_offset"])
             server_lines = log.read().decode(errors="replace").splitlines()
+            server_log_file_size = log.tell()
         if server_log_reset:
             cutoff = datetime.fromisoformat(
                 connection.get("requested_utc", connection.get("launched_utc")).replace(
@@ -1187,6 +1189,7 @@ try:
         "server_baseline": baseline,
         "server_counter_changes_since_launch": delta,
         "server_log_since_launch": server_lines,
+        "server_log_file_size": server_log_file_size,
         "server_log_reset_detected": server_log_reset,
         "native_encrypted_lobby_task_completion": "not observed by this state reader",
         "connection_receipt": connection,

@@ -3,6 +3,9 @@
 
 namespace services
 {
+    std::optional<Delivery> currentTournamentDelivery(const std::filesystem::path &directory,
+                                                      uint32_t title,
+                                                      uint64_t user);
     bool tournamentDeliveryValid(const std::filesystem::path &directory,
                                  uint32_t title,
                                  const Delivery &delivery);

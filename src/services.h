@@ -24,6 +24,8 @@ namespace services
         uint32_t clanEvent = 0, clanRole = 0;
         uint64_t tournamentId = 0;
         std::string tournamentStateHash;
+        bool tournamentUnavailable = false;
+        bool tournamentRefresh = false;
     };
 
     struct Reply
@@ -42,6 +44,7 @@ namespace services
     void initialize(const std::filesystem::path &directory);
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user);
     bool deliveryValid(uint32_t title, const Delivery &delivery);
+    std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user);
     Reply dispatch(const platform::LobbyIdentity &identity,
                    uint8_t service,
                    uint8_t task,

@@ -14,6 +14,7 @@
 #include <thread>
 #include <map>
 #include <unordered_map>
+#include <set>
 
 namespace lobby
 {
@@ -32,6 +33,8 @@ namespace lobby
             std::mutex mutex;
             platform::LobbyIdentity identity;
             std::function<bool(std::span<const uint8_t>)> writer;
+            uint64_t lastTournament = 0;
+            std::string lastTournamentHash;
         };
 
         std::mutex endpointMutex;
@@ -41,6 +44,7 @@ namespace lobby
         std::mutex onlineMutex;
         std::map<std::pair<uint32_t, uint64_t>, unsigned> onlineUsers;
         void route(uint32_t title, const services::Delivery &delivery);
+        void startTournamentUpdates();
 
         struct PushLease
         {
@@ -55,6 +59,7 @@ namespace lobby
             {
                 endpoint->identity = identity;
                 endpoint->writer = std::move(writer);
+                startTournamentUpdates();
                 std::lock_guard lock(endpointMutex);
                 wire::require(!endpoints.contains(connection));
                 // Routing holds this same lock when selecting recipients. Publish the
@@ -144,11 +149,22 @@ namespace lobby
                 // cannot overtake a previously validated push waiting for this lock.
                 if (!services::deliveryValid(title, delivery))
                     return;
+                if (delivery.tournamentRefresh &&
+                    endpoint->lastTournament == delivery.tournamentId &&
+                    endpoint->lastTournamentHash == delivery.tournamentStateHash)
+                    continue;
                 try
                 {
-                    if (endpoint->writer && platform::valid(endpoint->identity) &&
-                        !endpoint->writer(delivery.payload))
-                        endpoint->writer = {};
+                    if (endpoint->writer && platform::valid(endpoint->identity))
+                    {
+                        if (!endpoint->writer(delivery.payload))
+                            endpoint->writer = {};
+                        else if (delivery.tournamentId)
+                        {
+                            endpoint->lastTournament = delivery.tournamentId;
+                            endpoint->lastTournamentHash = delivery.tournamentStateHash;
+                        }
+                    }
                 }
                 catch (...)
                 {
@@ -229,6 +245,80 @@ namespace lobby
             }
         };
 
+        DeliveryQueue &deliveryQueue()
+        {
+            static DeliveryQueue queue;
+            return queue;
+        }
+
+        void startTournamentUpdates()
+        {
+            // Construct the writer queue first so the idle publisher is joined
+            // before that queue is destroyed during orderly process shutdown.
+            (void)deliveryQueue();
+
+            // Snapshot connection leases before reading the service store. Never
+            // retain endpointMutex or a service lock while sending a native frame.
+            struct Updates
+            {
+                std::mutex mutex;
+                std::condition_variable condition;
+                bool stopping = false;
+                std::thread worker;
+
+                Updates()
+                    : worker(
+                          [this]
+                          {
+                              std::unique_lock lock(mutex);
+                              while (!condition.wait_for(lock,
+                                                         std::chrono::seconds(1),
+                                                         [this]
+                                                         {
+                                                             return stopping;
+                                                         }))
+                              {
+                                  lock.unlock();
+                                  std::set<std::pair<uint32_t, uint64_t>> accounts;
+                                  {
+                                      std::lock_guard endpointLock(endpointMutex);
+                                      for (const auto &entry : endpoints)
+                                          accounts.emplace(entry.second->identity.titleId,
+                                                           entry.second->identity.userId);
+                                  }
+                                  for (const auto &[title, user] : accounts)
+                                      try
+                                      {
+                                          const auto update =
+                                              services::tournamentUpdate(title, user);
+                                          if (update)
+                                              route(title, *update);
+                                      }
+                                      catch (const std::exception &)
+                                      {
+                                          // A malformed publication is not a disband.
+                                          // The task reader still reports its storage error.
+                                      }
+                                  lock.lock();
+                              }
+                          })
+                {
+                }
+
+                ~Updates()
+                {
+                    {
+                        std::lock_guard lock(mutex);
+                        stopping = true;
+                    }
+                    condition.notify_one();
+                    worker.join();
+                }
+            };
+
+            static Updates updates;
+        }
+
         void route(uint32_t title, const services::Delivery &delivery)
         {
             if (!delivery.delayMs)
@@ -236,8 +326,7 @@ namespace lobby
                 deliver(title, delivery, targetsFor(title, delivery.user));
                 return;
             }
-            static DeliveryQueue queue;
-            queue.add(title, delivery);
+            deliveryQueue().add(title, delivery);
         }
 
         Bytes frame(const IO &io, bool keepalive = true)

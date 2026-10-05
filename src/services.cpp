@@ -481,6 +481,12 @@ namespace services
         return deliveries;
     }
 
+    std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user)
+    {
+        std::lock_guard lock(storeMutex);
+        return currentTournamentDelivery(directory, title, user);
+    }
+
     bool deliveryValid(uint32_t title, const Delivery &delivery)
     {
         std::lock_guard lock(storeMutex);

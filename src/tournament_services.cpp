@@ -211,6 +211,8 @@ namespace services
                                        row["data_center"].get<std::string>())
                               .second);
                 validateBracket(row.at("state"), row["id"].get<uint64_t>());
+                if (row.contains("live_updates"))
+                    persisted(row["live_updates"].is_boolean());
             }
             return result["tournaments"];
         }
@@ -241,6 +243,8 @@ namespace services
                               value["ready_round"].get<uint64_t>() < 4 &&
                               value.at("ready_match").is_number_unsigned() &&
                               value["ready_match"].get<uint64_t>() < 8);
+                if (value.contains("live_updates"))
+                    persisted(value["live_updates"].is_boolean());
             }
             return result;
         }
@@ -517,7 +521,63 @@ namespace services
                     reply.deliveries.push_back(std::move(delivery));
                 }
         }
+
+        std::string unavailableHash(uint64_t tournament)
+        {
+            return stateHash(Json{{"tournamentID", tournament}, {"event", 2012}, {"reason", 0}});
+        }
     } // namespace
+
+    std::optional<Delivery> currentTournamentDelivery(const std::filesystem::path &directory,
+                                                      uint32_t title,
+                                                      uint64_t user)
+    {
+        const auto root = directory / "tournaments" / std::to_string(title);
+        const auto enrollmentPath = root / "enrollments.json";
+        if (!std::filesystem::exists(enrollmentPath))
+            return std::nullopt;
+        const auto enrollment = enrollments(enrollmentPath, title);
+        const auto key = std::to_string(user);
+        if (!enrollment["players"].contains(key) ||
+            enrollment["players"][key]["accepted"] != true ||
+            !enrollment["players"][key].value("live_updates", false))
+            return std::nullopt;
+        const auto tournament = enrollment["players"][key]["id"].get<uint64_t>();
+        const auto rows = catalog(root / "catalog.json", title);
+        const auto *row = published(rows, tournament, user);
+        if (row && !row->value("live_updates", false))
+            return std::nullopt;
+        wire::Writer push;
+        Delivery delivery;
+        delivery.user = user;
+        delivery.tournamentId = tournament;
+        delivery.delayMs = 500;
+        delivery.tournamentRefresh = true;
+        if (!row)
+        {
+            // Replay 0x14213F1C0 reads 2012 as ID, UInt64 reason and string.
+            // Game 0x14103F470 forwards it to the native disband consumer.
+            // Reason zero is this local realm's generic unavailable-publication reason.
+            push.u32(2012);
+            push.u64(tournament);
+            push.u64(0);
+            push.text("Tournament publication is no longer available");
+            delivery.tournamentUnavailable = true;
+            delivery.tournamentStateHash = unavailableHash(tournament);
+        }
+        else
+        {
+            const auto journal = results(
+                root / "results" / (std::to_string(tournament) + ".json"), title, tournament);
+            const auto state = stateWithReadiness(
+                stateWithResults(*row, journal), tournament, enrollment["players"]);
+            push.u32(2010);
+            push.text(state.dump());
+            delivery.tournamentStateHash = stateHash(state);
+        }
+        delivery.payload = std::move(push.data);
+        return delivery;
+    }
 
     bool tournamentDeliveryValid(const std::filesystem::path &directory,
                                  uint32_t title,
@@ -533,8 +593,14 @@ namespace services
         const auto &player = state["players"][key];
         if (player["id"] != delivery.tournamentId || player["accepted"] != true)
             return false;
+        if (delivery.tournamentRefresh && !player.value("live_updates", false))
+            return false;
         const auto rows = catalog(root / "catalog.json", title);
         const auto *row = published(rows, delivery.tournamentId, delivery.user);
+        if (delivery.tournamentRefresh && row && !row->value("live_updates", false))
+            return false;
+        if (delivery.tournamentUnavailable)
+            return !row && delivery.tournamentStateHash == unavailableHash(delivery.tournamentId);
         if (!row)
             return false;
         const auto journal =
@@ -657,6 +723,8 @@ namespace services
                 if (players.size() >= 4096)
                     return Reply{108, {}, "tournament-enrollment-capacity"};
                 players[key] = {{"id", tournament}, {"accepted", false}, {"ready", false}};
+                if (selected->value("live_updates", false))
+                    players[key]["live_updates"] = true;
                 write(path, state);
             }
             wire::Writer result;

@@ -2895,6 +2895,17 @@ try:
     )
     import copy_content_fixtures
 
+    tournament_fixtures.live_publications(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        (u64, text, boolean),
+        checks,
+    )
+
     copy_fixture = copy_content_fixtures.exercise(
         client,
         peer_client,
