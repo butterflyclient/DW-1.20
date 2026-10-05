@@ -97,6 +97,9 @@ if not relocations.get("passed") or relocations["sha256"] != actual:
 saved = json.loads((ROOT / "data" / "workstation-source-receipt.json").read_text())
 records = {item["source_sha256"]: item for item in report["cpp"]}
 for source in saved["sources"]:
+    for override in (snapshot_receipt or {}).get("dw_private_revision_overrides", []):
+        if source["id"] == override["id"]:
+            source["content_sha256"] = source["revision"] = override["content_sha256"]
     if source["content_sha256"] not in records:
         raise RuntimeError("DW source revision was not compiled: " + source["name"])
     source["compiled_source"] = records[source["content_sha256"]]["source"]
@@ -106,9 +109,17 @@ startup_sha256 = hashlib.sha256(startup_source.read_bytes()).hexdigest()
 startup_object = records.get(startup_sha256)
 if not startup_object or "func_1403061A0" not in report["symbols"]:
     raise RuntimeError("DW startup compatibility source was not compiled")
+probe_source = ROOT / "integration/replay/DW_WindowsStartupProbe.cpp"
+probe_digest = hashlib.sha256(probe_source.read_bytes()).hexdigest()
+probe_object = records.get(probe_digest)
+if not probe_object or "func_141489DA0" not in report["symbols"]:
+    raise RuntimeError("Proxy-free startup source was not compiled")
 endpoint_cases = verification.get("dw_local_endpoints", [])
-if len(endpoint_cases) != 2 or not all(
-    item.get("compiled_startup_constructor_returns") for item in endpoint_cases
+if len(endpoint_cases) != 3 or not all(
+    item.get("compiled_startup_constructor_returns")
+    and item.get("compiled_startup_probe_returns")
+    and item.get("compiled_public_address_serialization")
+    for item in endpoint_cases
 ):
     raise RuntimeError(
         "DW startup constructor and filename selection were not verified"
@@ -149,6 +160,7 @@ required_private_sources = {
     "DW_LocalPlatformCrypto.cpp",
     "DW_LocalCachedContentCrypto.cpp",
     "DW_LocalResources.cpp",
+    "DW_LocalConfig.cpp",
 }
 if {
     Path(item["source"]).name for item in private_objects
@@ -163,7 +175,11 @@ if {
     raise RuntimeError(
         "Linked local platform integration has no complete validation receipt"
     )
-local_cases = [item for item in endpoint_cases if item.get("enabled")]
+local_cases = [
+    item
+    for item in endpoint_cases
+    if item.get("enabled") and item.get("configured_host") == "127.0.0.1"
+]
 if len(local_cases) != 1 or not local_cases[0].get(
     "compiled_profile_license_and_account_metadata"
 ):
@@ -391,6 +407,16 @@ receipt = {
         "placement_rva": report["symbols"]["func_1403061A0"],
         "method": "C++ constructor replacement linked from native PE unwind ownership",
     },
+    "windows_import_probe": {
+        "source": str(probe_source),
+        "source_sha256": probe_digest,
+        "object_sha256": probe_object["object_sha256"],
+        "symbol": "func_141489DA0",
+        "placement_rva": report["symbols"]["func_141489DA0"],
+        "native_bootstrap_retained": True,
+        "native_crt_allocation_and_parent_cleanup_verified": True,
+        "native_runtime_verified": False,
+    },
 }
 (ROOT / "data" / "deployment.json").write_text(json.dumps(receipt, indent=2) + "\n")
 readiness = {
@@ -439,12 +465,13 @@ readiness = {
         "timed_client_stage_markers_added": True,
     },
     "remaining_scope": [
-        "native-game acceptance pending",
-        "other online domains including matchmaking not implemented",
-        "crossplay/Uno account-linking flow not implemented; local PC legacy account flow selected",
-        "remote publisher overrides and publisher content not supplied; Replay local version documents are supplied",
-        "friends/clan/mail mutations, achievement events/rewards, playlist/loot and party domains remain unimplemented",
-        "leaderboard validation tokens not implemented",
+        "proxy-free native-game acceptance and two-network gameplay are separate pending gates",
+        "full backend implementation paused for the owner-hosted remote test",
+        "see backend-coverage-inventory.json for reviewed routes and unresolved DTO methods",
+        "host migration, automatic public lobby fill and tournament scheduling remain open",
+        "marketplace gifts/discounts and validation-token semantics remain open",
+        "object-store listing and large-upload variants remain open",
+        "crossplay/Uno account linking and broader native progression/reward validation remain open",
     ],
     "source_hashes": {
         str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()

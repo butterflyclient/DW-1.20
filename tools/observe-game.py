@@ -18,6 +18,12 @@ parser.add_argument(
     help="Attach read-only to an owner-launched DW process without a launch receipt",
 )
 parser.add_argument(
+    "--deployment",
+    type=Path,
+    default=root / "data/deployment.json",
+    help="Hash-bound image/build receipt for a separate controlled test executable",
+)
+parser.add_argument(
     "--commands", action="store_true", help="Include all native command registrations"
 )
 parser.add_argument(
@@ -37,7 +43,7 @@ parser.add_argument(
     help="Read native global-counter tables and task slots, without changing them",
 )
 args = parser.parse_args()
-deployment = json.loads((root / "data" / "deployment.json").read_text())
+deployment = json.loads(args.deployment.read_text())
 launch = (
     None
     if args.pid
@@ -915,11 +921,36 @@ try:
                 native_wire_sha256=hashlib.sha256(native_wire).hexdigest(),
             )
     relay_association = None
+    common_address = None
     if "gl_152EA3250" in symbols:
         # Exact Replay 1414EEBA0 -> 14217A520 -> 14218C910 -> 142195760:
         # net singleton +640 socket router, +184 routing layer, +32 bound ref.
         net = struct.unpack("<Q", read(symbols["gl_152EA3250"], 8))[0]
         router = struct.unpack("<Q", read(net - base + 640, 8))[0] if net else 0
+        # Same-Replay bdSocketRouter::getLocalCommonAddr (14218D7F0)
+        # owns a reference at +88. Read it without calling/incrementing refs.
+        common = struct.unpack("<Q", read(router - base + 88, 8))[0] if router else 0
+        if common:
+            record = read(common - base, 952)
+            count = struct.unpack_from("<I", record, 776)[0]
+            if count > 5:
+                raise RuntimeError("Native common-address local slot count changed")
+
+            def endpoint(offset):
+                return {
+                    "family": struct.unpack_from("<H", record, offset)[0],
+                    "port": struct.unpack_from(">H", record, offset + 2)[0],
+                    "ipv4": ".".join(str(b) for b in record[offset + 4 : offset + 8]),
+                }
+
+            common_address = {
+                "local": [endpoint(16 + 152 * slot) for slot in range(count)],
+                "public": endpoint(784),
+                "nat_type": struct.unpack_from("<I", record, 936)[0],
+                "hash": struct.unpack_from("<I", record, 940)[0],
+                "platform": struct.unpack_from("<I", record, 948)[0],
+                "is_self": bool(record[944]),
+            }
         association = (
             struct.unpack("<Q", read(router - base + 216, 8))[0] if router else 0
         )
@@ -1168,6 +1199,7 @@ try:
         "native_relay_server_auth": relay_server_auth,
         "native_relay_transport": relay_transport,
         "native_relay_association": relay_association,
+        "native_common_address": common_address,
         "native_fences_controller_0": fences,
         "native_reconciliation": {
             "passing": bool(read(symbols["gl_144493DE0"] + 64, 1)[0]),

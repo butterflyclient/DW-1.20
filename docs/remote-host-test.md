@@ -22,6 +22,28 @@ loopback for backend transport and publishes the router's mapped IPv4 address
 for game traffic. Guests select their own provisioned identities. Restart the
 process to reload configuration.
 
+Host example (`game_dx12_ship_replay_dw.ini` beside the EXE):
+
+```ini
+host=127.0.0.1
+public_address=YOUR_ROUTER_PUBLIC_IPV4
+local_address=YOUR_HOST_LAN_IPV4
+game_port=3074
+```
+
+Guest example (the package supplies the real profile key):
+
+```ini
+host=YOUR_HOST_PUBLIC_IPV4
+profile=remote-test-1
+access_key=YOUR_PROVISIONED_64_CHARACTER_KEY
+```
+
+`host` accepts an IPv4 address. The current transport ports are TCP 8085 for
+platform/auth/content and TCP 3075 for the encrypted lobby. The generated guest
+package uses the executable-specific INI, so an older same-name INI cannot
+silently override its connection settings.
+
 ## Native address handling
 
 The C++ replacement for Replay's `bdCommonAddr` constructor retains the native
@@ -52,6 +74,15 @@ and bandwidth. UPnP mapping ownership is checked before modification. The
 administrator firewall script restricts rules to the backend and DW game paths.
 It changes no unrelated programs' firewall settings.
 
+Endpoint publication follows the actual connection peer. Loopback clients receive
+loopback HTTP, QoS, relay and bandwidth endpoints; other clients receive the
+configured public address. Each connection/datagram has a scoped thread-local
+publication context. Immutable resource handles have separate local/public
+variants, and relay credentials retain the selected endpoint in their signed
+native representation. The owner can therefore use the same external backend
+without requiring the router to support NAT loopback. This does not change the
+host's public native game address.
+
 Run the host's normal `Run_Replay_DW.cmd` from the root game folder. Give the
 guest only the generated guest ZIP. The guest extracts it into their compatible
 Replay root, keeps normal game data/dependencies, removes any local proxy from
@@ -70,3 +101,9 @@ two-network playability. The handoff records the current image/server hashes,
 native menu/fence evidence, address publication and any remaining owner-run
 remote gate. A failed local connection to the public address does not distinguish
 an inbound failure from a router without NAT loopback support.
+
+Two native processes using the same Replay root contend for the exclusively
+opened `toc1.dcache`. The controlled second-instance test reached native account
+and relay authentication, then reported that cache lock. Validate their startup
+sequentially, or use separate computers for the party test. Do not weaken the
+game's cache locking to manufacture a local two-process success.

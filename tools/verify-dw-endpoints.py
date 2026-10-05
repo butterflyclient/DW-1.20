@@ -10,9 +10,10 @@ def verify(pe, report):
     if "DW_LocalBackend_IsEnabled" not in report["symbols"]:
         raise ValueError("DW integration was not linked")
     cases = []
-    for executable, enabled in (
-        ("game_dx12_ship_replay.exe", False),
-        ("game_dx12_ship_replay_dw.exe", True),
+    for executable, enabled, host in (
+        ("game_dx12_ship_replay.exe", False, "127.0.0.1"),
+        ("game_dx12_ship_replay_dw.exe", True, "127.0.0.1"),
+        ("game_dx12_ship_replay_dw.exe", True, "203.0.113.12"),
     ):
         machine = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_64)
         base = pe.OPTIONAL_HEADER.ImageBase
@@ -41,6 +42,18 @@ def verify(pe, report):
         machine.mem_write(
             symbols["__imp_GetModuleFileNameA"], struct.pack("<Q", filename_thunk)
         )
+        profile_thunk = arena + 0xF180
+        machine.mem_write(
+            symbols["__imp_CreateFileA"], struct.pack("<Q", profile_thunk)
+        )
+        read_thunk, close_thunk = arena + 0xF190, arena + 0xF1A0
+        machine.mem_write(symbols["__imp_ReadFile"], struct.pack("<Q", read_thunk))
+        machine.mem_write(symbols["__imp_CloseHandle"], struct.pack("<Q", close_thunk))
+        remote = host != "127.0.0.1"
+        ini = (
+            f"host={host}\nprofile=remote-test-1\naccess_key={'a'*64}\n"
+            f"public_address={host}\nlocal_address=192.168.1.124\ngame_port=3074\n"
+        ).encode()
         native = bytearray(2088)
         native[:36] = bytes(range(36))
         auth, lobby = b"native.auth.invalid\0", b"native.lobby.invalid\0"
@@ -51,6 +64,33 @@ def verify(pe, report):
         machine.mem_write(config, bytes(native))
 
         def platform(uc, address, size, data):
+            if address == symbols["func_14223AD14"]:
+                assert uc.reg_read(x.UC_X86_REG_RCX) == 0x20000
+                stack = uc.reg_read(x.UC_X86_REG_RSP)
+                target = struct.unpack("<Q", uc.mem_read(stack, 8))[0]
+                uc.reg_write(x.UC_X86_REG_RAX, arena + 0x5000)
+                uc.reg_write(x.UC_X86_REG_RSP, stack + 8)
+                uc.reg_write(x.UC_X86_REG_RIP, target)
+                return
+            if address in (profile_thunk, read_thunk, close_thunk):
+                stack = uc.reg_read(x.UC_X86_REG_RSP)
+                target = struct.unpack("<Q", uc.mem_read(stack, 8))[0]
+                if address == read_thunk:
+                    uc.mem_write(uc.reg_read(x.UC_X86_REG_RDX), ini)
+                    uc.mem_write(
+                        uc.reg_read(x.UC_X86_REG_R9), struct.pack("<I", len(ini))
+                    )
+                uc.reg_write(
+                    x.UC_X86_REG_RAX,
+                    (
+                        (99 if remote else 0xFFFFFFFFFFFFFFFF)
+                        if address == profile_thunk
+                        else 1
+                    ),
+                )
+                uc.reg_write(x.UC_X86_REG_RSP, stack + 8)
+                uc.reg_write(x.UC_X86_REG_RIP, target)
+                return
             if address != filename_thunk:
                 return
             assert uc.reg_read(x.UC_X86_REG_RCX) == 0
@@ -86,8 +126,8 @@ def verify(pe, report):
         auth_address = string(config + 36)
         assert auth_port == (8443 if enabled else 443)
         assert lobby_port == (3075 if enabled else 3074)
-        assert auth_address == ("127.0.0.1" if enabled else "native.auth.invalid")
-        assert lobby_address == ("127.0.0.1" if enabled else "native.lobby.invalid")
+        assert auth_address == (host if enabled else "native.auth.invalid")
+        assert lobby_address == (host if enabled else "native.lobby.invalid")
         assert bytes(machine.mem_read(config, 36)) == bytes(native[:36])
         assert bytes(machine.mem_read(config + 1060, len(native) - 1060)) == bytes(
             native[1060:]
@@ -102,6 +142,11 @@ def verify(pe, report):
         before_constructor = bytes(machine.mem_read(config, len(native)))
         run("func_1403061A0")
         assert bytes(machine.mem_read(config, len(native))) == before_constructor
+        assert run("func_141489DA0") == 0
+        assert (
+            struct.unpack("<Q", machine.mem_read(symbols["gl_14E5C2A58"], 8))[0] + 4096
+            == arena + 0x5000
+        )
         # Execute the linked C++ payload validator. OS cryptography is checked
         # separately against this same source's actual Windows build.
         now, nonce_address = 1791136800, arena + 0x3000
@@ -358,14 +403,21 @@ def verify(pe, report):
                 (a1, a2, a3, a4),
             ):
                 machine.reg_write(reg, value)
-            machine.emu_start(symbols[name], sentinel, count=20000)
+            try:
+                machine.emu_start(symbols[name], sentinel, count=20000)
+            except unicorn.UcError as error:
+                rip = machine.reg_read(x.UC_X86_REG_RIP)
+                stack = machine.reg_read(x.UC_X86_REG_RSP)
+                raise RuntimeError(
+                    f"{name}: {error}; RIP={rip:#x}; stack={bytes(machine.mem_read(stack, 64)).hex()}"
+                ) from error
             assert machine.reg_read(x.UC_X86_REG_RIP) == sentinel
             return machine.reg_read(x.UC_X86_REG_RAX)
 
-        machine.mem_write(config, b"https://127.0.0.1:8443/auth/\0")
+        machine.mem_write(config, f"https://{host}:8443/auth/\0".encode())
         assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
         assert chosen_urls[-1] == (
-            "http://127.0.0.1:8085/auth/" if enabled else "https://127.0.0.1:8443/auth/"
+            f"http://{host}:8085/auth/" if enabled else f"https://{host}:8443/auth/"
         )
         machine.mem_write(config, b"https://native.auth.invalid/auth/\0")
         assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
@@ -375,7 +427,7 @@ def verify(pe, report):
             machine.mem_write(config, legacy.encode() + b"\0")
             assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
             assert chosen_urls[-1] == (
-                "http://127.0.0.1:8085/v1.0/tokens/lsg/?client=replaylocal"
+                f"http://{host}:8085/v1.0/tokens/lsg/?client=replaylocal"
                 if enabled
                 else legacy
             )
@@ -685,10 +737,67 @@ def verify(pe, report):
                 == 0
             )
             assert web_completions[-1] == (1, b"", 0x1234)
+        # Execute native local/relay constructors and the 84-byte serializer.
+        # The Tiger hash factory requires Windows SDK initialization; verify
+        # its dispatch occurs after publication at that platform boundary.
+        common, array, addresses, public, serialized = (
+            arena + 0xC000,
+            arena + 0xC700,
+            arena + 0xC800,
+            arena + 0xCA00,
+            arena + 0xCB00,
+        )
+        local = bytearray(152)
+        local[:8] = bytes([2, 0, 12, 2, 192, 168, 1, 124])
+        original_public = bytearray(local)
+        original_public[4:8] = bytes([192, 168, 1, 124])
+        hash_calls = []
+
+        def hash_boundary(uc, address, size, data):
+            if address == symbols["func_1420EC5C0"]:
+                assert uc.reg_read(x.UC_X86_REG_RCX) == common
+                hash_calls.append(bytes(uc.mem_read(common + 784, 8)))
+                return_native(uc)
+
+        machine.hook_add(unicorn.UC_HOOK_CODE, hash_boundary)
+        htons_thunk = arena + 0xF1B0
+        for imported in ("__imp_htons", "__imp_ntohs"):
+            if imported in symbols:
+                machine.mem_write(symbols[imported], struct.pack("<Q", htons_thunk))
+
+        def socket_api(uc, address, size, data):
+            if address == htons_thunk:
+                value = uc.reg_read(x.UC_X86_REG_RCX) & 0xFFFF
+                return_native(uc, ((value & 255) << 8) | (value >> 8))
+
+        machine.hook_add(unicorn.UC_HOOK_CODE, socket_api)
+        machine.mem_write(addresses, bytes(local))
+        machine.mem_write(public, bytes(original_public))
+        machine.mem_write(array, struct.pack("<QII", addresses, 1, 1))
+        machine.mem_write(rsp + 40, struct.pack("<Q", 101))
+        assert invoke("func_1420EC390", common, array, public, 3) == common
+        assert bytes(machine.mem_read(common + 16, 152)) == bytes(local)
+        assert struct.unpack("<I", machine.mem_read(common + 776, 4))[0] == 1
+        expected_ip = (
+            bytes(map(int, host.split("."))) if remote else original_public[4:8]
+        )
+        assert bytes(machine.mem_read(common + 788, 4)) == expected_ip
+        assert hash_calls == [bytes([2, 0, 12, 2]) + bytes(expected_ip)]
+        assert struct.unpack("<I", machine.mem_read(common + 936, 4))[0] == (
+            1 if remote else 3
+        )
+        machine.mem_write(serialized, bytes(84))
+        assert invoke("func_1420ECA10", common, serialized, 0) & 255 == 1
+        assert bytes(machine.mem_read(serialized + 30, 6)) == bytes(
+            expected_ip
+        ) + struct.pack("<H", 3074)
         cases.append(
             {
                 "executable": executable,
                 "enabled": enabled,
+                "configured_host": host,
+                "compiled_public_address_serialization": True,
+                "compiled_startup_probe_returns": True,
                 "auth_address": auth_address,
                 "auth_port": auth_port,
                 "lobby_address": lobby_address,

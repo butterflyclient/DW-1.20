@@ -1,6 +1,7 @@
 // Authored source is imported through the Replay workstation revision API.
 // Only the *_dw.exe build selects local endpoints. Other builds retain native values.
 #include "com_debugstates.h"
+#include "DW_LocalConfig.h"
 
 extern "C"
 {
@@ -21,6 +22,7 @@ extern "C"
 // configuration prefix. Port getters originally read +0x424 / +0x826; the
 // corresponding native address arrays occupy the preceding 1024 bytes.
 #pragma pack(push, 1)
+
 struct DWReplayLoginConfigPrefix
 {
     unsigned char platformAndTitle[36];
@@ -29,6 +31,7 @@ struct DWReplayLoginConfigPrefix
     char lobbyAddress[1024];
     uint16_t lobbyPort;
 };
+
 #pragma pack(pop)
 static_assert(offsetof(DWReplayLoginConfigPrefix, authAddress) == 36);
 static_assert(offsetof(DWReplayLoginConfigPrefix, authPort) == 1060);
@@ -43,7 +46,6 @@ namespace
     bool s_registered = false;
     cmd_function_s s_statusCommand{}, s_probeCommand{};
     char s_response[2048]{};
-    constexpr char localAddress[] = "127.0.0.1";
 
     bool Contains(const char *text, const char *needle)
     {
@@ -121,7 +123,7 @@ namespace
                 Handle session = open(L"IW8-Replay-LocalDW/1", 1, nullptr, nullptr, 0);
                 Handle connection = nullptr, message = nullptr;
                 if (session && timeouts(session, 1000, 1000, 1000, 1000))
-                    connection = connect(session, L"127.0.0.1", 8085, 0);
+                    connection = connect(session, DW_LocalConfig_WideHost(), 8085, 0);
                 if (connection)
                     message = request(connection, L"GET", L"/health", nullptr, nullptr, nullptr, 0);
                 if (message && send(message, nullptr, 0, nullptr, 0, 0, 0) &&
@@ -200,7 +202,11 @@ extern "C" uint16_t DW_LocalBackend_GetAuthPort(void *nativeConfig)
     if (!DW_LocalBackend_IsEnabled())
         return config->authPort;
     // buildAuthReq calls this before formatting its HTTPS URL from authAddress.
-    for (unsigned i = 0; i < sizeof(localAddress); ++i)
+    const auto *localAddress = DW_LocalConfig_Host();
+    unsigned length = 0;
+    while (localAddress[length])
+        ++length;
+    for (unsigned i = 0; i <= length; ++i)
         config->authAddress[i] = localAddress[i];
     return 8443;
 }
@@ -208,7 +214,7 @@ extern "C" uint16_t DW_LocalBackend_GetAuthPort(void *nativeConfig)
 extern "C" const char *DW_LocalBackend_GetLSGAddress(const void *nativeConfig)
 {
     return DW_LocalBackend_IsEnabled()
-               ? localAddress
+               ? DW_LocalConfig_Host()
                : static_cast<const DWReplayLoginConfigPrefix *>(nativeConfig)->lobbyAddress;
 }
 

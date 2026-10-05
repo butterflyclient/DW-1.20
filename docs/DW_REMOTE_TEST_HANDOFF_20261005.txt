@@ -1,0 +1,93 @@
+REPLAY DW REMOTE TEST HANDOFF - 2026-10-05
+
+The complete backend implementation remains paused for this host/guest test.
+The new game EXE is freshly compiled through a private frozen Replay Workstation
+snapshot. Shared compiler sources and unrelated game assets were preserved.
+
+Installed game:
+E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: 9429d3f1db31e780b6a721fcfd8db2384468b8039f767997fcb953c73279d81c
+Compiler job: 1a530b481d2a4f82
+Backend SHA256: 1d88793755cbdb20fc1e35b42c25987c09e884cd8673de79a9a9305d051ef239
+
+Give the guest E:\DW\IW8\data\Replay-DW-Guest-Test.zip.
+It contains the exact EXE, its executable-specific INI, a root-folder launcher
+and READ_ME.txt. No proxy DLL or backend signing keys are included.
+The guest needs their compatible 1.20 Replay game files and normal dependencies.
+Use one guest configuration on one computer at a time.
+
+INI configuration:
+The EXE reads its own basename with .ini instead of .exe, then replay-dw.ini as
+a fallback. host selects the DW backend IPv4 address. Your host uses 127.0.0.1;
+the packaged guest uses 198.255.173.206 and the remote-test-1 profile/access key.
+public_address/local_address/game_port publish the host's native game endpoint.
+Restart the game after changing INI settings. Current transport ports are fixed:
+TCP 8085 platform/auth/content, TCP 3075 encrypted lobby; UDP 3074 game,
+3076 QoS, 3077 relay, 3078 bandwidth.
+
+Host procedure:
+1. Keep the backend running. After a reboot, run E:\DW\IW8\start-server.ps1.
+2. Run Run_Replay_DW.cmd in E:\IW8\Builds\1.20-replay.
+3. Choose Multiplayer and create a private party/match. Select Shipment.
+4. Have ReplayGuest join DWPlayer through Social, then start the match.
+5. Check both players load, can see one another, move, shoot and finish a match.
+6. Test a controlled full restart/rejoin. Do not use dw_leave.
+
+Guest procedure:
+1. Extract all four archive files into the compatible Replay root game folder.
+2. Keep a local XInput9_1_0.dll proxy out of the DLL search path; keep normal
+   shipped dependency DLLs. Allow the game through its firewall prompt if asked.
+3. Run Run_Replay_DW_Guest.cmd. Identity: ReplayGuest. Host friend: DWPlayer.
+4. Enter Multiplayer and join the host's private party through Social.
+5. Test Shipment with the host. A backend process is not needed on the guest PC.
+
+Confirmed validation:
+- Both distinct native identities sign in and pass all 27 startup fences when
+  run separately. Native relay authentication reaches established state.
+- Root game startup works without the local proxy. XInput loads from System32.
+- Native host common address publishes 198.255.173.206:3074, retains both local
+  addresses, uses open NAT publication and has a populated native hash.
+- 174 protocol/service checks pass, plus signed auth/resource and concurrent
+  local/public QoS, relay-credential and content-address checks.
+- Router mappings and exact-program firewall rules are configured/verified.
+- Independent external nodes connect to TCP 8085 and 3075; external /health
+  checks return HTTP 200.
+- Native startup worker retains the CRT allocation/parent cleanup contract and
+  complete original bootstrap while omitting the privileged user-mode probe.
+- Host loopback publication avoids requiring router NAT loopback. Remote
+  callers continue receiving public addresses and provisioned identities.
+
+Not yet confirmed:
+- A native host/guest party join or playable match across two networks.
+- Public UDP game/relay forwarding end-to-end with the remote player's game.
+The two-local-process test hit the game's exclusive toc1.dcache lock. Native
+guest authentication/relay succeeded before that error. Separate computers do
+not share that cache. No map runs were performed during this packaging pass.
+
+Progress of the paused complete backend:
+The current reviewed inventory contains 140 target task routes, 133 registered
+handlers and 7 reviewed target tasks without handlers. This is a scoped ledger,
+not proof of every SDK/indirect call. Implemented domains include signed platform
+identity, native/legacy auth, encrypted protocol 210, publisher variables and
+content, TU19 playlists, profiles/contextual files/object ownership, friends and
+presence, user lists/mail/clans, purchase/redemption/catalog-backed loot and
+progression, trusted leaderboard writes, QoS/bandwidth/authenticated relay,
+matchmaking selection/owned lobbies/presence joins/host updates/session expiry,
+durable matchmaking transactions and tournament publications/events/results.
+
+Open reviewed routes: 50/22, 58/22, 80/58, 193/9, 193/10, 193/12, 193/24.
+Other open scope: host migration, automatic public lobby fill, tournament
+scheduling, gifts/discounts/validation tokens, large-upload/listing variants,
+crossplay account linking and broader native progression/reward validation.
+Deferred gifts changes remain unapplied. No claim of complete DW emulation.
+
+Evidence:
+E:\DW\IW8\data\remote-readiness.json
+E:\DW\IW8\validation\20261005-proxy-free-host-guest.json
+E:\DW\IW8\data\backend-coverage-inventory.json
+E:\DW\IW8\data\remote-package-receipt.json
+
+Temporary root-folder test EXEs were removed. The original proxy is retained at
+E:\DW\IW8\data\proxy-retained\XInput9_1_0.dll. Development command flags/configs
+are retained under data\remote-test-retained; normal launches do not poll them.
+No unrelated game builds, assets or compiler editor revisions were deleted.

@@ -127,6 +127,26 @@ for source in (ORIGINAL / "tools" / "native").rglob("*"):
     ):
         copy_file(source, snapshot / source.relative_to(ORIGINAL))
 copy_file(ORIGINAL / "source-units.json", snapshot / "source-units.json")
+# DW-owned endpoint implementation is overlaid in this private snapshot only.
+# Its saved workstation ownership remains the same; the new content gets its
+# own revision/hash and deployment must prove the exact compiled object.
+private_overrides = []
+user_path = snapshot / "source-workstation/user-functions.json"
+user_document = json.loads(user_path.read_text())
+frame_id, frame_unit = next((key, value) for key, value in user_document["functions"].items() if value.get("name") == "DW_LocalBackend_Frame")
+frame_source = ROOT / "integration/replay/DW_LocalBackend_Frame.cpp"
+frame_destination = snapshot / frame_unit["path"]
+frame_record = next(item for item in records if Path(item["snapshot"]) == frame_destination)
+frame_record["original_sha256"] = frame_record["sha256"]
+frame_destination.write_bytes(frame_source.read_bytes())
+frame_record["sha256"] = hashlib.sha256(frame_destination.read_bytes()).hexdigest()
+frame_unit["sha256"] = frame_unit["revision"] = frame_record["sha256"]
+unit_record = next(item for item in records if Path(item["snapshot"]) == user_path)
+unit_record["original_sha256"] = unit_record["sha256"]
+user_path.write_text(json.dumps(user_document, indent=2) + "\n")
+unit_record["sha256"] = hashlib.sha256(user_path.read_bytes()).hexdigest()
+private_overrides.append({"id": frame_id, "content_sha256": frame_record["sha256"], "source": str(frame_source)})
+
 # DW-only startup source stays outside the shared compiler/editor revisions.
 # Its native function ownership and placement are derived by the usual linker.
 private_sources = ROOT / "integration" / "replay"
@@ -177,7 +197,7 @@ configuration["publication_root"] = str(ROOT / "data" / "workstation-output")
 for item in records:
     if (
         hashlib.sha256(Path(item["original"]).read_bytes()).hexdigest()
-        != item["sha256"]
+        != item.get("original_sha256", item["sha256"])
     ):
         raise RuntimeError(
             "Workstation source changed before snapshot completion: " + item["original"]
@@ -343,6 +363,7 @@ manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
             "files": records,
             "preparation_path_rebinding": "same evidence, new source paths only",
             "dw_saved_revision_fallbacks": revision_fallbacks,
+            "dw_private_revision_overrides": private_overrides,
             "validation_overlay": {
                 "path": str(overlay),
                 "sha256": hashlib.sha256(overlay.read_bytes()).hexdigest(),
