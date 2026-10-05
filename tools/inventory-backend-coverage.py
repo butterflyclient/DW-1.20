@@ -33,7 +33,7 @@ ROUTES = [
         50,
         "content streaming",
         "content_services.cpp",
-        [2, 3, 9, 10, 15, 16, 18, 19, 20],
+        [2, 3, 5, 6, 9, 10, 15, 16, 18, 19, 20],
     ),
     (58, "content streaming", "content_services.cpp", [5, 6, 18, 20, 21]),
     (67, "telemetry", "engagement_services.cpp", [5]),
@@ -84,7 +84,7 @@ GAPS = {
     "27": "Configured geography is local metadata, not real IP geolocation.",
     "29": "Native tasks 2 and categorized/status variants; dynamic send-duration branch remains unresolved in CFG inventory.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
-    "50": "Tasks 6 whole-user post and 22 live download; copy preparation IDs 15/20 are source-oracle contracts without target constructor proofs. Full positive native copy lifecycle still unobserved.",
+    "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
     "80": "Task 58 inventory-token validation; task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
@@ -233,7 +233,7 @@ def main():
                 target_constructor_audit_covered=bool(constructors),
                 preparation_contract_provenance=(
                     "SDK source oracle only; not recovered as a Replay request writer"
-                    if (service, task) in ((50, 15), (50, 20))
+                    if (service, task) in ((50, 5), (50, 15), (50, 20))
                     else None
                 ),
                 static_fixture_references=references.get((service, task), []),

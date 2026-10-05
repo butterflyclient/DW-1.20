@@ -321,9 +321,9 @@ namespace
         }
         else if (method == "PUT" && path.starts_with("/content-streaming/upload/"))
         {
-            if (!hasLength)
+            if (!hasLength || rangeHeader)
             {
-                reply(socket, 400, "{\"error\":\"content_length_required\"}");
+                reply(socket, 400, "{\"error\":\"whole_upload_content_length_required\"}");
                 return;
             }
             try

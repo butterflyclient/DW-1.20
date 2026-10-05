@@ -19,6 +19,7 @@ namespace services
         constexpr size_t maxStore = 16 * 1024 * 1024, maxFiles = 4096;
         constexpr size_t maxMultipartParts = 1024, maxMultipartSessions = 128;
         constexpr size_t maxCopySessions = 128, maxCopyReceipts = 32768;
+        constexpr size_t maxUserUploads = 128, maxUserUploadReceipts = 4096;
         constexpr uint32_t copyLifetimeSeconds = 600;
         std::filesystem::path dataRoot;
         std::string origin;
@@ -162,6 +163,9 @@ namespace services
                               hashText(text(receipt.at("token"), 33), 32) &&
                               hashText(text(receipt.at("request_sha256"), 65)));
             }
+            if (row.contains("upload_receipt"))
+                wire::require(row.at("kind") == "user" &&
+                              hashText(text(row.at("upload_receipt"), 33), 32));
             if (row.contains("parts"))
             {
                 const auto &parts = row.at("parts");
@@ -213,6 +217,32 @@ namespace services
                                       hashText(text(receipt.at("request_sha256"), 65)));
                     }
                 }
+                if (data.contains("upload_receipts"))
+                {
+                    const auto &receipts = data.at("upload_receipts");
+                    wire::require(receipts.is_object() && receipts.size() <= maxUserUploadReceipts);
+                    std::set<uint64_t> receiptFiles;
+                    for (const auto &entry : receipts.items())
+                    {
+                        const auto &receipt = entry.value();
+                        wire::require(hashText(entry.key(), 32) && receipt.is_object() &&
+                                      hashText(text(receipt.at("request_sha256"), 65)));
+                        const auto &row = receipt.at("row");
+                        validateFile(row);
+                        wire::require(row.at("kind") == "user" &&
+                                      row.at("upload_receipt") == entry.key() &&
+                                      receiptFiles.insert(number(row.at("id"))).second);
+                    }
+                }
+                for (const auto &row : data.at("files"))
+                    if (row.contains("upload_receipt"))
+                    {
+                        const auto &receipt = data.at("upload_receipts")
+                                                  .at(row.at("upload_receipt").get<std::string>());
+                        const auto &original = receipt.at("row");
+                        for (const auto *key : {"id", "owner", "slot", "content", "size"})
+                            wire::require(original.at(key) == row.at(key));
+                    }
                 for (const auto &row : data.at("files"))
                     if (row.contains("copy_receipt"))
                     {
@@ -392,10 +422,80 @@ namespace services
             return bytes;
         }
 
+        std::filesystem::path userUploadPath(uint32_t title)
+        {
+            return dataRoot / "content-streaming" / std::to_string(title) / "user-uploads.json";
+        }
+
+        Json loadUserUploads(uint32_t title)
+        {
+            const auto path = userUploadPath(title);
+            if (!std::filesystem::exists(path))
+                return Json{{"schema", 1}, {"title", title}, {"sessions", Json::array()}};
+            if (std::filesystem::file_size(path) > maxStore)
+                throw std::runtime_error("User upload store size invalid");
+            std::ifstream in(path);
+            if (!in)
+                throw std::runtime_error("User upload store read failed");
+            auto data = Json::parse(in);
+            try
+            {
+                wire::require(data.at("schema") == 1 &&
+                              number(data.at("title"), UINT32_MAX) == title);
+                const auto &sessions = data.at("sessions");
+                wire::require(sessions.is_array() && sessions.size() <= maxUserUploads);
+                std::set<std::string> tokens;
+                std::set<uint64_t> files;
+                for (const auto &row : sessions)
+                {
+                    const auto token = text(row.at("token"), 33);
+                    wire::require(hashText(token, 32) && tokens.insert(token).second &&
+                                  number(row.at("file"), UINT64_MAX - 1) &&
+                                  files.insert(number(row.at("file"))).second &&
+                                  number(row.at("owner"), UINT64_MAX - 1));
+                    wire::require(!text(row.at("name"), 128).empty());
+                    (void)text(row.at("owner_name"), 64);
+                    (void)number(row.at("slot"), UINT16_MAX);
+                    (void)number(row.at("category"), UINT16_MAX);
+                    (void)number(row.at("size"), maximumStreamingBody);
+                    const auto created = number(row.at("created"), UINT32_MAX);
+                    wire::require(number(row.at("expires"), UINT32_MAX) > created);
+                    const auto hash = text(row.at("content"), 65);
+                    wire::require(hash.empty() || hashText(hash));
+                }
+            }
+            catch (const std::runtime_error &)
+            {
+                throw std::runtime_error("User upload store schema invalid");
+            }
+            auto &sessions = data["sessions"];
+            sessions.erase(std::remove_if(sessions.begin(),
+                                          sessions.end(),
+                                          [](const auto &row)
+                                          {
+                                              return row.at("expires").template get<uint32_t>() <=
+                                                     now();
+                                          }),
+                           sessions.end());
+            return data;
+        }
+
+        void saveUserUploads(uint32_t title, const Json &data)
+        {
+            const auto encoded = data.dump();
+            if (encoded.size() > maxStore)
+                throw std::runtime_error("User upload store capacity exceeded");
+            atomic(userUploadPath(title),
+                   std::span(reinterpret_cast<const uint8_t *>(encoded.data()), encoded.size()));
+        }
+
         uint64_t allocateFile(uint32_t title, const Json &files, const Json &sessions)
         {
             const auto copies = loadCopies(title);
-            const auto receipts = load(title).value("copy_receipts", Json::object());
+            const auto userUploads = loadUserUploads(title);
+            const auto catalog = load(title);
+            const auto receipts = catalog.value("copy_receipts", Json::object());
+            const auto uploadReceipts = catalog.value("upload_receipts", Json::object());
             uint64_t file = 0;
             do
             {
@@ -406,6 +506,18 @@ namespace services
                                  [file](const auto &receipt)
                                  {
                                      return receipt.at("file") == file;
+                                 }) ||
+                     std::any_of(uploadReceipts.begin(),
+                                 uploadReceipts.end(),
+                                 [file](const auto &receipt)
+                                 {
+                                     return receipt.at("row").at("id") == file;
+                                 }) ||
+                     std::any_of(userUploads["sessions"].begin(),
+                                 userUploads["sessions"].end(),
+                                 [file](const auto &row)
+                                 {
+                                     return row.at("file") == file;
                                  }) ||
                      std::any_of(copies["sessions"].begin(),
                                  copies["sessions"].end(),
@@ -968,6 +1080,9 @@ namespace services
                 }
             Json destination = snapshot;
             destination.erase("parts");
+            // Transfer receipts identify the operation that created this file.
+            // A copy must not inherit its source's upload-commit identity.
+            destination.erase("upload_receipt");
             destination["id"] = file;
             destination["kind"] = "user";
             destination["owner"] = id.userId;
@@ -1002,6 +1117,205 @@ namespace services
             wire::Writer result;
             result.u64(file);
             return {0, {std::move(result.data)}, "streaming-copy-committed"};
+        }
+
+        Reply preUserUpload(const platform::LobbyIdentity &id, wire::Reader &params)
+        {
+            // OpenIW8's _preUpload supplies the 50/5 contract. Its constructor is
+            // not exported in the Replay database; do not claim a target binding.
+            const auto name = params.text(129);
+            const auto slot = params.u16();
+            const auto size = params.u32();
+            const auto category = params.u16();
+            const auto checksum = params.blob(32);
+            wire::require(params.text(1).empty());
+            params.end();
+            wire::require(!name.empty() && name.size() < 128 && size <= maximumStreamingBody &&
+                          (checksum.empty() || checksum.size() == 32));
+            // The SDK sends an optional opaque X-Checksum. Its algorithm is not
+            // established for Replay. Reject this variant rather than ignore it.
+            if (!checksum.empty())
+                return {108, {}, "streaming-user-upload-checksum-unclassified"};
+            auto pending = loadUserUploads(id.titleId);
+            auto catalog = load(id.titleId);
+            const auto receipts = catalog.value("upload_receipts", Json::object());
+            if (pending["sessions"].size() >= maxUserUploads ||
+                receipts.size() >= maxUserUploadReceipts)
+                return {102, {}, "streaming-user-upload-capacity-exceeded"};
+            const auto &files = catalog.at("files");
+            const bool replacing = std::any_of(files.begin(),
+                                               files.end(),
+                                               [&](const auto &row)
+                                               {
+                                                   return row.at("kind") == "user" &&
+                                                          row.at("owner") == id.userId &&
+                                                          row.at("slot") == slot;
+                                               });
+            if (files.size() >= maxFiles && !replacing)
+                return {102, {}, "streaming-file-capacity-exceeded"};
+            auto multipart = loadMultipart(id.titleId);
+            expireMultipart(multipart);
+            const auto file = allocateFile(id.titleId, files, multipart.at("sessions"));
+            std::string token;
+            do
+            {
+                token = hex(crypto::random(16));
+            } while (receipts.contains(token) || std::any_of(pending["sessions"].begin(),
+                                                             pending["sessions"].end(),
+                                                             [&](const auto &row)
+                                                             {
+                                                                 return row.at("token") == token;
+                                                             }));
+            const auto created = now();
+            pending["sessions"].push_back(Json{{"token", token},
+                                               {"file", file},
+                                               {"owner", id.userId},
+                                               {"owner_name", id.name},
+                                               {"name", name},
+                                               {"slot", slot},
+                                               {"category", category},
+                                               {"size", size},
+                                               {"created", created},
+                                               {"expires", created + 600},
+                                               {"content", ""}});
+            saveUserUploads(id.titleId, pending);
+            // Complete Replay bdURL reader 142163B40, maximum ten URL results.
+            wire::Writer out;
+            out.text(origin + "/content-streaming/upload/user/" + std::to_string(id.titleId) + "/" +
+                     token);
+            out.u16(0);
+            out.text(token);
+            out.u64(file);
+            return {0, {std::move(out.data)}, "streaming-user-upload-prepared"};
+        }
+
+        unsigned putUserUpload(const std::string &request, std::span<const uint8_t> bytes)
+        {
+            constexpr std::string_view prefix = "/content-streaming/upload/user/";
+            const auto suffix = request.substr(prefix.size());
+            const auto split = suffix.find('/');
+            if (split == std::string::npos || split == 0)
+                return 404;
+            uint32_t title = 0;
+            const auto parsed = std::from_chars(suffix.data(), suffix.data() + split, title);
+            const auto token = suffix.substr(split + 1);
+            if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + split || !title ||
+                suffix.substr(0, split) != std::to_string(title) || !hashText(token, 32))
+                return 404;
+            auto pending = loadUserUploads(title);
+            auto &sessions = pending["sessions"];
+            auto found = std::find_if(sessions.begin(),
+                                      sessions.end(),
+                                      [&](const auto &row)
+                                      {
+                                          return row.at("token") == token;
+                                      });
+            if (found == sessions.end())
+                return 404;
+            if (bytes.size() != found->at("size") || bytes.size() > maximumStreamingBody)
+                return 400;
+            const auto hash = hex(crypto::sha256(bytes));
+            if (found->at("content") != "")
+            {
+                (void)readBlob(title, found->at("content").get<std::string>(), bytes.size());
+                return found->at("content") == hash ? 200 : 409;
+            }
+            if (std::filesystem::exists(blobPath(title, hash)))
+                (void)readBlob(title, hash, bytes.size());
+            else
+                atomic(blobPath(title, hash), bytes);
+            (*found)["content"] = hash;
+            saveUserUploads(title, pending);
+            return 200;
+        }
+
+        Reply postUserUpload(const platform::LobbyIdentity &id, wire::Reader &params)
+        {
+            // Complete same-Replay _postUploadFile writer 1421339F0. Its result is
+            // bdFileMetaData when +42080 is set, otherwise bdFileID at +42072.
+            const auto requestBytes = params.data.subspan(params.offset);
+            const auto name = params.text(129);
+            const auto slot = params.u16(), location = params.u16();
+            const auto token = params.text(129);
+            const auto size = params.u32();
+            const auto category = params.u16();
+            const auto extra = params.blob(2048);
+            const auto pairTags = tags(params);
+            wire::require(params.text(1).empty());
+            params.end();
+            wire::require(!name.empty() && name.size() < 128 && !location && hashText(token, 32) &&
+                          size <= maximumStreamingBody);
+            const auto fingerprint = hex(crypto::sha256(requestBytes));
+            auto catalog = load(id.titleId);
+            auto receipts = catalog.value("upload_receipts", Json::object());
+            if (receipts.contains(token))
+            {
+                const auto &receipt = receipts.at(token);
+                const auto &row = receipt.at("row");
+                if (row.at("owner") != id.userId)
+                    return {101, {}, "streaming-user-upload-owner-denied"};
+                wire::require(receipt.at("request_sha256") == fingerprint);
+                (void)readBlob(id.titleId, row.at("content").get<std::string>(), size);
+                return {0, {metadata(id.titleId, row)}, "streaming-user-upload-commit-retried"};
+            }
+            const auto pending = loadUserUploads(id.titleId);
+            const auto &sessions = pending.at("sessions");
+            const auto found = std::find_if(sessions.begin(),
+                                            sessions.end(),
+                                            [&](const auto &row)
+                                            {
+                                                return row.at("token") == token;
+                                            });
+            if (found == sessions.end())
+                return {108, {}, "streaming-user-upload-not-found"};
+            if (found->at("owner") != id.userId)
+                return {101, {}, "streaming-user-upload-owner-denied"};
+            wire::require(found->at("name") == name && found->at("slot") == slot &&
+                          found->at("size") == size && found->at("category") == category &&
+                          found->at("content") != "");
+            (void)readBlob(id.titleId, found->at("content").get<std::string>(), size);
+            if (receipts.size() >= maxUserUploadReceipts)
+                return {102, {}, "streaming-user-upload-receipt-capacity-exceeded"};
+            Json row{{"id", found->at("file")},
+                     {"kind", "user"},
+                     {"owner", id.userId},
+                     {"owner_name", found->at("owner_name")},
+                     {"name", name},
+                     {"category", category},
+                     {"slot", slot},
+                     {"created", found->at("created")},
+                     {"modified", now()},
+                     {"size", size},
+                     {"content", found->at("content")},
+                     {"summary", ""},
+                     {"summary_size", 0u},
+                     {"metadata", wire::base64Encode(extra)},
+                     {"tags", pairTags},
+                     {"copies", 0u},
+                     {"origin", 0u},
+                     {"upload_receipt", token}};
+            auto &files = catalog["files"];
+            files.erase(std::remove_if(files.begin(),
+                                       files.end(),
+                                       [&](const auto &current)
+                                       {
+                                           return current.at("kind") == "user" &&
+                                                  current.at("owner") == id.userId &&
+                                                  current.at("slot") == slot;
+                                       }),
+                        files.end());
+            if (files.size() >= maxFiles)
+                return {102, {}, "streaming-file-capacity-exceeded"};
+            files.push_back(row);
+            receipts[token] = Json{{"request_sha256", fingerprint}, {"row", row}};
+            catalog["upload_receipts"] = std::move(receipts);
+            // Snapshot and slot replacement share one atomic catalog publication.
+            // A retry after another upload/copy replaced this slot returns the old
+            // snapshot, without republishing it. Both native result variants work:
+            // bdFileID reads the first UInt64; 1420FE060 permits unread trailing data.
+            auto result = metadata(id.titleId, row);
+            save(id.titleId, catalog);
+            return {0, {std::move(result)}, "streaming-user-upload-committed"};
         }
 
         void prune()
@@ -1135,6 +1449,10 @@ namespace services
         if (service != 50 && service != 58)
             return std::nullopt;
         std::lock_guard lock(contentMutex);
+        if (service == 50 && task == 5)
+            return preUserUpload(id, p);
+        if (service == 50 && task == 6)
+            return postUserUpload(id, p);
         if (service == 58 && task == 5)
             return preUpload(id, p);
         if (service == 58 && task == 6)
@@ -1313,6 +1631,8 @@ namespace services
     {
         std::lock_guard lock(contentMutex);
         constexpr std::string_view prefix = "/content-streaming/upload/";
+        if (request.starts_with("/content-streaming/upload/user/"))
+            return putUserUpload(request, bytes);
         if (request.starts_with("/content-streaming/upload/multipart/"))
             return putMultipart(request, bytes);
         if (!request.starts_with(prefix) || !hashText(request.substr(prefix.size()), 32))

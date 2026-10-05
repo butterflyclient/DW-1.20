@@ -2895,6 +2895,19 @@ try:
         (u32, u64, text, blob, boolean),
         checks,
     )
+    import user_content_fixtures
+
+    user_content_fixture = user_content_fixtures.exercise(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        base,
+        (u32, u64, text, blob),
+        checks,
+    )
     checks.append(
         "separately authenticated content commit cannot impersonate the original uploader"
     )
@@ -3761,6 +3774,7 @@ try:
     relay_fixtures.check_restart(client, relay_fixture, checks)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
     copy_content_fixtures.check_restart(client, copy_fixture, checks)
+    user_content_fixtures.check_restart(client, user_content_fixture, checks)
     marketing_fixtures.check_restart(client, marketing_fixture, checks)
     multipart_content_fixtures.check_restart(client, multipart_fixture, checks)
     with post("/platform/login/peer", os.urandom(32)) as response:
