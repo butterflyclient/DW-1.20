@@ -37,7 +37,17 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         kind, packet = client.receive()
         assert kind == 2 and packet.startswith(u32(2005) + u64(mm))
         if party:
-            assert peer.receive() == (kind, packet)
+            lobby = struct.unpack_from("<Q", packet, 15)[0]
+            # The non-searching party member needs JoinLobby, whose native
+            # envelope omits the create event's update-ID field.
+            assert peer.receive() == (
+                2,
+                u32(2001) + u64(mm) + u64(lobby) + packet[32:],
+            )
+            assert strings(peer.task(145, 13, u64(lobby))) == strings(packet[32:])
+            checks.append(
+                "new party lobby sends create only to its searching host and join to its peer, with the same assigned search ID and readable shared documents"
+            )
         return struct.unpack_from("<Q", packet, 15)[0], mm, strings(packet[32:])
 
     def join(lobby):

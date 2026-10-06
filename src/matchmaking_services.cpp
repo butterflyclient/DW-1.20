@@ -891,7 +891,13 @@ namespace services
                 wire::Writer result;
                 result.text(Json{{"mm_id", mmId}}.dump());
                 Reply reply{0, {std::move(result.data)}, "matchmaker-search-created"};
-                notify(reply, lobby, 2005, mmId);
+                // Replay's CreateNewLobby accepts only the searching host's
+                // state. Other party members enter through JoinLobby instead.
+                const std::set<uint64_t> creator{id.userId};
+                notify(reply, lobby, 2005, mmId, &creator);
+                auto joiningMembers = users;
+                joiningMembers.erase(id.userId);
+                notify(reply, lobby, 2001, mmId, &joiningMembers);
                 return reply;
             }
             if (task == 8 || task == 9)

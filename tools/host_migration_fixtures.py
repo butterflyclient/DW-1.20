@@ -64,8 +64,11 @@ def exercise(
         mm = strings(owner.task(145, 18, text(json.dumps(request))))[0]["mm_id"]
         kind, packet = owner.receive()
         assert kind == 2 and packet.startswith(u32(2005) + u64(mm))
-        assert candidate.receive() == (kind, packet)
         lobby = struct.unpack_from("<Q", packet, 15)[0]
+        assert candidate.receive() == (
+            2,
+            u32(2001) + u64(mm) + u64(lobby) + packet[32:],
+        )
         return lobby, mm, strings(packet[32:])
 
     def claim(lobby, docs, revision=None, error=0):
