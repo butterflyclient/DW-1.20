@@ -4,6 +4,7 @@
 #include "achievement_services.h"
 #include "social_services.h"
 #include "regulation_services.h"
+#include "objectstore_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <set>
@@ -151,12 +152,21 @@ namespace services
                     proto::Reader header{f.bytes};
                     proto::Field h;
                     std::set<uint32_t> fields;
+                    std::string key, value;
                     while (header.next(h))
                         if (h.tag == 1 || h.tag == 2)
                         {
                             wire::require(fields.insert(h.tag).second);
-                            (void)textField(h, h.tag == 1 ? 64 : 4096);
+                            auto text = textField(h, h.tag == 1 ? 64 : 4096);
+                            (h.tag == 1 ? key : value) = std::move(text);
                         }
+                    wire::require(fields.contains(1) && fields.contains(2) && !key.empty());
+                    for (auto &c : key)
+                        if (c >= 'A' && c <= 'Z')
+                            c = static_cast<char>(c + ('a' - 'A'));
+                    if (key == "dw-objectstore-objectids" || key == "authorization" ||
+                        key == "content-type")
+                        wire::require(out.headers.emplace(key, value).second);
                 }
             }
             wire::require(parameters && !out.uri.empty() && out.accept >= 1 && out.accept <= 3);
@@ -214,6 +224,11 @@ namespace services
         if (auto handled = regulations(directory, id, r))
         {
             handled->detail = reply.detail;
+            return *handled;
+        }
+        if (auto handled = objectStoreRest(directory, id, r))
+        {
+            handled->detail += reply.detail;
             return *handled;
         }
         RESTResult result;

@@ -2970,6 +2970,12 @@ try:
     username_fixtures.exercise(
         client, title, user, peer_user, native_rest, rest_response, blob, checks
     )
+    import objectstore_rest_fixtures
+
+    objectstore_rest_restart = objectstore_rest_fixtures.exercise(
+        client, peer_client, directory, title, user, peer_user, native_rest, rest_response,
+        (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields), checks,
+    )
     peer_client.task(58, 6, content_fixture["post"], error=101)
     import lobby_join_fixtures
 
@@ -4186,6 +4192,9 @@ try:
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
     regulation_restart(client)
+    objectstore_rest_fixtures.check_restart(
+        client, objectstore_rest_restart, rest_response, checks
+    )
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
     validated_stats_fixtures.check_restart(client, validated_stats_fixture, checks)
     inventory_validation_fixtures.check_restart(

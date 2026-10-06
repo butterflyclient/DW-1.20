@@ -1,0 +1,98 @@
+REPLAY DW USER-OBJECT REST TRANSPORT - 2026-10-06
+
+Scope
+Backend-only implementation of Replay's vector user-object REST GET and PUT.
+The freshly compiled backend is ce16a7b4d7b0bfc07537eeb606179077da5b3abde64c99192715c313ce8cd119.
+The game remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
+No game source, client package, player identity, INI or external port changes
+are required for this implementation.
+
+Exact-target research
+The original Replay PE supplies the environment hostname pointers, request
+writers, engine-created response vtables and response/error readers. The
+continuously updated SQLite export supplies function boundaries and candidate
+names; names alone do not establish a wire layout. The retained receipt records
+the original PE hash, source-byte hashes and audit-tool hash:
+validation/20261006-objectstore-rest-target-layout.json.
+
+Request writers 0x142145DE0 and 0x142146E60 bind
+ObjectsVectorizedResourceUsers / get_objects and put_objects. The environment
+getter supplies objectstore.dev.demonware.net, objectstore.cert.demonware.net
+and objectstore.prod.demonware.net. GET uses /v2/core/users/objects/ and the
+DW-Objectstore-ObjectIDs header. PUT uses that path, or /v2/users/objects/ when
+tags require it, with the client/context query and optional validationToken
+expansion. Writer 0x142145630 emits owner/name and optional objectVersion and
+checksum cache hints. Native response tables 0x14269F860 and 0x14269F8E8 select
+the real GET and PUT success readers. The GET reader validates the object/error
+count and original request indices. The native error reader recognizes the
+exact Error:ClientError:NotModified string and retains cached content.
+
+Implementation
+REST and service 193 use one object store, owner/ACL rules, metadata, checksums,
+expiry rules, tags and atomic upload journal. Both transports preflight complete
+requests and response size before publishing an upload window. Downloads verify
+stored content and checksum before returning content or a cache response.
+Each requested object produces exactly one indexed object/error result.
+
+The local cache policy returns NotModified when at least one nonempty cache
+hint is supplied and every supplied hint matches current metadata. Stale or
+inconsistent hints return current content. The target establishes the optional
+hint format and NotModified consumer; it does not establish the retail server's
+cache predicate. This implementation deliberately records that distinction.
+
+REST output uses the existing 256 KiB REST response limit. The older structured
+transport retains its existing 65535-byte window. Consumed header names are
+ASCII case-folded; duplicate ObjectIDs, Authorization or Content-Type records
+are rejected. Header values, authorization credentials and object bodies are
+never added to diagnostic logs. Unknown header names remain compatible.
+Duplicate JSON keys, excessive nesting, malformed cache hints, unknown query
+fields and mismatched method/body/content-type contracts fail before writes.
+
+Verification
+Clean Release /W4 /WX compilation and the 78-file C++ formatting check passed.
+Signed platform, native auth and platform-resource checks passed for the same
+backend hash. The independent encrypted native-wire suite passed 265 groups:
+validation/20261006-objectstore-rest-wire.json.
+
+Five new groups cover all three environment routes, tags, owner/private/public
+ACLs, cross-transport consistency, exact cache errors and indices, stale hints,
+malformed/duplicate headers, URI/body validation, downloads larger than the
+older 64 KiB transport window, and persistence after an actual process restart.
+The legacy recovery fixture now emits native owner/name identifiers rather
+than passing upload ACL metadata to the download request writer.
+
+Actual root-folder game startup passed profile/Online state, all 27 fences and
+three completed empty friend lists. Its own private-party channel received the
+diagnostic peer's first native message before and after separate backend stop/
+start plus dw_restart. The same game process/account recovered fresh relay
+credentials and an authenticated UDP association. Stability after reconnect:
+108.4 seconds, 11 keepalive replies and zero rejected packets. No map/match test
+was performed. The game closed normally, owned test controls were removed and
+the EXE, INI and existing machine identity hashes remained unchanged.
+
+validation/20261006-objectstore-rest-channel-native-message.json
+validation/20261006-objectstore-rest-channel-native-message-after-restart.json
+validation/20261006-objectstore-rest-native-reconnect.json
+
+This pass establishes actual compiled-backend/game compatibility. The native
+per-method completion of these newly implemented REST vector calls remains
+unverified; their exact target contracts and encrypted wire fixtures are
+recorded separately. The unchanged game uses the existing structured object
+transport in the observed startup paths.
+
+Remaining backend work
+The full backend is incomplete. The coverage ledger retains six known binary
+result bindings without handlers and incomplete indirect/dynamic REST coverage.
+Vector user-object REST native callbacks and several other individual method
+callbacks still require real game evidence. Two-native-game party JOIN/DATA
+and two-network gameplay remain separate multiplayer readiness gates.
+
+Related research did not justify adding placeholder success replies:
+- UNO rename reads crossplayAccessInfo, not the legacy Umbrella token. The
+  current local login does not populate a real crossplay token lifecycle, and
+  the engine also gates rename on rename currency. Those dependencies must be
+  implemented before claiming a usable native rename route.
+- Live multipart tasks 50/22 and 58/22 consume extended streaming metadata:
+  rolling URLs, counts, offsets and total parts. A regular file metadata or
+  generic multipart-URL DTO does not satisfy that reader. The exact response
+  deserializer still needs recovery. The target offset/max writer uses Int16.

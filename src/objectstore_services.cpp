@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "objectstore_services.h"
+#include "rest_services.h"
 #include "protobuf.h"
 #include "crypto.h"
 #include "network.h"
@@ -10,6 +11,7 @@
 #include <mutex>
 #include <charconv>
 #include <memory>
+#include <map>
 
 namespace services
 {
@@ -25,6 +27,7 @@ namespace services
         struct Request
         {
             std::string method, url, objectIds, body, contentType;
+            std::optional<uint32_t> restVersion;
         };
 
         std::string text(const proto::Field &f, size_t capacity)
@@ -104,6 +107,41 @@ namespace services
             return filename(Json{{"context", context}}, "context", 16);
         }
 
+        void validateRestURL(const std::string &url, bool upload)
+        {
+            const auto query = url.find('?');
+            wire::require(query != std::string::npos && url.find('#') == std::string::npos);
+            const auto path = url.substr(0, query);
+            wire::require(path == "/v2/core/users/objects/" ||
+                          (upload && path == "/v2/users/objects/"));
+            std::map<std::string, std::string> fields;
+            size_t position = query + 1;
+            while (position < url.size())
+            {
+                const auto end = url.find('&', position);
+                const auto pair =
+                    url.substr(position, end == std::string::npos ? end : end - position);
+                const auto equal = pair.find('=');
+                wire::require(equal != std::string::npos);
+                const auto key = pair.substr(0, equal), value = pair.substr(equal + 1);
+                wire::require((key == "client" || key == "context" || (upload && key == "extra")) &&
+                              fields.emplace(key, value).second);
+                if (end == std::string::npos)
+                    break;
+                wire::require(end + 1 < url.size());
+                position = end + 1;
+            }
+            wire::require(fields.contains("client") && fields.contains("context") &&
+                          !fields.at("client").empty() && fields.at("client").size() < 64 &&
+                          (!fields.contains("extra") || fields.at("extra") == "validationToken"));
+            for (const unsigned char c : fields.at("client"))
+                wire::require((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                              (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.');
+            // The common decoder validates the decoded namespace against the
+            // complete native 16-byte context layout, including empty context.
+            (void)contextFromURL(url);
+        }
+
         Request request(wire::Reader &p)
         {
             proto::Reader reader{p.structure(65535)};
@@ -174,8 +212,9 @@ namespace services
         {
             std::vector<std::set<std::string>> keys;
             bool unique = true;
-            auto callback = [&](int, Json::parse_event_t event, Json &value)
+            auto callback = [&](int depth, Json::parse_event_t event, Json &value)
             {
+                wire::require(depth <= 32);
                 if (event == Json::parse_event_t::object_start)
                     keys.emplace_back();
                 else if (event == Json::parse_event_t::key)
@@ -192,9 +231,17 @@ namespace services
         Reply response(const Json &body,
                        const char *operation,
                        uint32_t status = 200,
-                       bool contentDownload = false)
+                       bool contentDownload = false,
+                       std::optional<uint32_t> restVersion = std::nullopt)
         {
             const auto json = body.dump();
+            if (restVersion)
+            {
+                wire::require(json.size() <= 256 * 1024);
+                Reply reply{0, {}, operation};
+                reply.rest = RESTResult{*restVersion, status, json};
+                return reply;
+            }
             wire::require(json.size() < 65535);
             Reply reply{0, {}, operation, true, {}};
             wire::Bytes header;
@@ -793,8 +840,9 @@ namespace services
                 writes.emplace_back(path, std::move(stored));
                 body["objects"].push_back(std::move(result));
             }
-            auto reply = response(
-                body, "user-objects-uploaded"); // required validationTokens array can be empty
+            // Both native transports consume the same complete JSON contract.
+            // Preflight the reply before publishing any member of the window.
+            auto reply = response(body, "user-objects-uploaded", 200, false, r.restVersion);
             Json journal = {{"schema", 1},
                             {"title", id.titleId},
                             {"user", id.userId},
@@ -827,11 +875,38 @@ namespace services
             const auto context = contextFromURL(r.url);
             const auto ids = parameters(r.objectIds);
             wire::require(ids.is_array() && !ids.empty() && ids.size() <= 50);
-            Json body = {{"objects", Json::array()}, {"errors", Json::array()}};
-            unsigned index = 0;
+
+            struct Selected
+            {
+                std::string user, name, cachedVersion, cachedChecksum;
+            };
+
+            std::vector<Selected> selected;
             for (const auto &object : ids)
             {
-                const auto user = owner(id, object), name = filename(object, "name", 65);
+                wire::require(object.is_object());
+                for (const auto &entry : object.items())
+                    wire::require(entry.key() == "owner" || entry.key() == "name" ||
+                                  entry.key() == "objectVersion" || entry.key() == "checksum");
+                const auto cacheField = [&](const char *key)
+                {
+                    if (!object.contains(key))
+                        return std::string{};
+                    wire::require(object.at(key).is_string());
+                    const auto value = object.at(key).get<std::string>();
+                    wire::require(value.size() < 33 && value.find('\0') == std::string::npos);
+                    return value;
+                };
+                selected.push_back({owner(id, object),
+                                    filename(object, "name", 65),
+                                    cacheField("objectVersion"),
+                                    cacheField("checksum")});
+            }
+            Json body = {{"objects", Json::array()}, {"errors", Json::array()}};
+            unsigned index = 0;
+            for (const auto &object : selected)
+            {
+                const auto &user = object.user, &name = object.name;
                 if (const auto userId = account(user))
                     recoverUploads(directory, id, *userId);
                 const auto path = userPath(directory, id, context, user, name);
@@ -853,9 +928,23 @@ namespace services
                         const auto bytes = unbase64(content, 48000);
                         wire::require(metadata.at("contentLength") == bytes.size() &&
                                       metadata.at("checksum") == hex(crypto::md5(bytes)));
-                        stored["requestIndex"] = index;
-                        body["objects"].push_back(std::move(stored));
-                        found = true;
+                        // 142145630 emits optional cached version/checksum, not a
+                        // request for an old object revision. The real error reader
+                        // accepts this exact NotModified string and retains cache.
+                        const bool cached =
+                            (!object.cachedVersion.empty() || !object.cachedChecksum.empty()) &&
+                            (object.cachedVersion.empty() ||
+                             metadata.at("objectVersion") == object.cachedVersion) &&
+                            (object.cachedChecksum.empty() ||
+                             metadata.at("checksum") == object.cachedChecksum);
+                        if (cached)
+                            error = "Error:ClientError:NotModified";
+                        else
+                        {
+                            stored["requestIndex"] = index;
+                            body["objects"].push_back(std::move(stored));
+                            found = true;
+                        }
                     }
                 }
                 if (!found)
@@ -865,7 +954,7 @@ namespace services
                                               {"error", error}});
                 ++index;
             }
-            auto reply = response(body, "user-objects-read");
+            auto reply = response(body, "user-objects-read", 200, false, r.restVersion);
             reply.detail = " requested_objects=" + std::to_string(ids.size()) +
                            " available=" + std::to_string(body["objects"].size()) +
                            " missing=" + std::to_string(body["errors"].size());
@@ -907,6 +996,41 @@ namespace services
                             wire::Reader &p)
     {
         return publisher(directory, id, request(p));
+    }
+
+    std::optional<Reply> objectStoreRest(const std::filesystem::path &directory,
+                                         const platform::LobbyIdentity &id,
+                                         const RESTRequest &r)
+    {
+        // Same-Replay 1421443E0 strips https:// from these environment hosts;
+        // 142145DE0/142146E60 bind the vector GET/PUT resource and operation.
+        if ((r.service != "objectstore.dev.demonware.net" &&
+             r.service != "objectstore.cert.demonware.net" &&
+             r.service != "objectstore.prod.demonware.net") ||
+            r.resource != "ObjectsVectorizedResourceUsers" ||
+            (r.operation != "get_objects" && r.operation != "put_objects"))
+            return std::nullopt;
+        const bool writing = r.operation == "put_objects";
+        wire::require(r.accept == 1 && r.method == (writing ? 0x505554u : 0x474554u));
+        validateRestURL(r.uri, writing);
+        Request common;
+        common.method = writing ? "PUT" : "GET";
+        common.url = r.uri;
+        common.restVersion = r.version;
+        if (writing)
+        {
+            wire::require(r.hasBody && r.content == 1 && !r.body.empty() &&
+                          !r.headers.contains("dw-objectstore-objectids"));
+            common.body.assign(reinterpret_cast<const char *>(r.body.data()), r.body.size());
+            wire::require(common.body.find('\0') == std::string::npos);
+            if (r.headers.contains("content-type"))
+                wire::require(r.headers.at("content-type") == "application/json");
+            common.contentType = "application/json";
+            return upload(directory, id, common);
+        }
+        wire::require(!r.hasBody && r.headers.contains("dw-objectstore-objectids"));
+        common.objectIds = r.headers.at("dw-objectstore-objectids");
+        return download(directory, id, common);
     }
 
     Reply objectStore(const std::filesystem::path &directory,

@@ -19,7 +19,12 @@ def exercise(client, directory, title, user, upload, read, reply, checks):
         }
         for index, (owner, name) in enumerate(zip(owners, names))
     ]
-    ids = [item["metadata"] for item in items]
+    # The native request writer emits object IDs/cache hints, not upload ACLs
+    # or complete metadata. Keep the recovery test on that actual wire layout.
+    ids = [
+        {"owner": item["metadata"]["owner"], "name": item["metadata"]["name"]}
+        for item in items
+    ]
     paths = [
         root / "iw8" / owner / f"{name}.object.json"
         for owner, name in zip(owners, names)

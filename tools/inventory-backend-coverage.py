@@ -150,15 +150,47 @@ REST_HANDLERS = {
     ("umbrella", "Regulations", "getUserPreference"): "regulation_services.cpp",
     ("social-service", "Users", "get_usernames"): "social_services.cpp",
 }
+for environment in ("dev", "cert", "prod"):
+    for operation in ("get_objects", "put_objects"):
+        REST_HANDLERS[
+            (
+                f"objectstore.{environment}.demonware.net",
+                "ObjectsVectorizedResourceUsers",
+                operation,
+            )
+        ] = "objectstore_services.cpp"
+
+GAPS["193"] += (
+    " The same native REST vector GET/PUT routes now share the struct-buffer domain, "
+    "complete account-owned storage and journal recovery. Matching cache version/checksum "
+    "hints use the target NotModified reader; REST body windows retain their 256 KiB cap. "
+    "Native REST method callbacks remain unverified."
+)
 
 
 def rest_coverage(inventory):
+    receipt_path = ROOT / "validation/20261006-objectstore-rest-target-layout.json"
+    proof = json.loads(receipt_path.read_bytes())
+    if proof["target_image_sha256"] != inventory["target_image_sha256"] or proof[
+        "audit_tool_sha256"
+    ] != digest(ROOT / "tools/research-objectstore-rest-target.py"):
+        raise ValueError("Refresh the exact object-store REST target receipt")
+    proven_requests = {row["va"]: row for row in proof["requests"]}
     requests = []
     for original in inventory["requests"]:
         row = dict(original)
+        environment_binding = proven_requests.get(row["function_address"])
+        if environment_binding:
+            if row["resource_operations"] != [
+                [environment_binding["resource"], environment_binding["operation"]]
+            ]:
+                raise ValueError("Object-store REST target operation changed")
+            row["services"] = proof["environment_services"]
+            row["service_operation_binding_resolved"] = True
+            row["target_binding_receipt"] = receipt_path.relative_to(ROOT).as_posix()
         bound = (
             row["service_operation_binding_resolved"]
-            and len(row["services"]) == 1
+            and (len(row["services"]) == 1 or bool(environment_binding))
             and len(row["resource_operations"]) == 1
         )
         handler = (

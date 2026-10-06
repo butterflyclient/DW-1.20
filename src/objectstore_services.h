@@ -3,6 +3,10 @@
 
 namespace services
 {
+    struct RESTRequest;
+    std::optional<Reply> objectStoreRest(const std::filesystem::path &,
+                                         const platform::LobbyIdentity &,
+                                         const RESTRequest &);
     Reply publisherMetadata(const std::filesystem::path &,
                             const platform::LobbyIdentity &,
                             wire::Reader &);

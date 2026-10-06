@@ -1,6 +1,47 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND - BULK USERNAME HYDRATION AND REST ROUTING
+CURRENT BACKEND - SHARED USER-OBJECT REST TRANSPORT
+Backend SHA256: ce16a7b4d7b0bfc07537eeb606179077da5b3abde64c99192715c313ce8cd119
+Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+This backend-only pass requires no game recompile or new client package.
+
+Replay's vector REST user-object GET/PUT routes now use the same object store
+as its structured transport, for all three environment hosts. Complete native
+headers, metadata, cache hints, indexed errors, tags, ACLs, expiry, checksums
+and atomic upload/recovery are handled by the shared implementation. Exact
+original PE writers/response vtables/readers are retained in
+validation/20261006-objectstore-rest-target-layout.json. The local NotModified
+predicate is documented separately from the proven native response consumer.
+
+Release /W4 /WX compilation, C++ formatting, signed platform/auth/resources and
+265 independent encrypted protocol/service groups passed for this backend.
+Wire proof: validation/20261006-objectstore-rest-wire.json.
+
+Actual root-folder startup passed profile/Online state, all 27 fences and three
+completed empty friend lists. A game-owned private-party chat consumed the
+diagnostic peer's first message before and after separate backend stop/start
+plus dw_restart. The same game process/account recovered fresh relay tokens
+and an authenticated native UDP association. Stability: 108.4 seconds, eleven
+keepalive replies and zero rejected packets. No map or match test was run.
+The game closed normally, owned test controls were removed, and executable,
+INI and existing machine identity hashes were preserved. Backend remains live.
+
+Current native receipts:
+validation/20261006-objectstore-rest-channel-native-message.json
+validation/20261006-objectstore-rest-channel-native-message-after-restart.json
+validation/20261006-objectstore-rest-native-reconnect.json
+Implementation/provenance: docs/DW_OBJECTSTORE_REST_20261006.txt.
+
+The backend remains incomplete: 140 reviewed binary routes, 134 handlers and
+six known missing result bindings. The direct REST inventory records nineteen
+dedicated handlers, five known literal bindings without handlers and five
+unresolved dynamic/helper bindings. Indirect/inlined paths remain an audit
+gap. New vector REST method callbacks, bulk-name/regulation method completion,
+profile-isolated two-game checks and actual two-network party JOIN/DATA/gameplay
+remain open. Startup/chat/reconnect does not establish full multiplayer play.
+Earlier sections below retain evidence for their original artifact hashes.
+
+RETAINED BACKEND - BULK USERNAME HYDRATION AND REST ROUTING
 Backend SHA256: 74ccca38c956651299a44c7e4b05365319de6cd1ef5c58885f80e0fec0c7dfa1
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 This backend-only pass requires no game recompile or new client package.
