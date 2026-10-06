@@ -1,0 +1,47 @@
+REPLAY OBJECT-STORE UPLOAD WINDOWS
+
+Task 193/7 retains the verified native PUT/struct-buffer request and JSON
+objects/errors/validationTokens response. No engine address or wire task ID
+changes. The shared struct-buffer reader retains its complete task-boundary
+check. Duplicate JSON keys now reject before a new upload intent is prepared.
+
+An upload window may contain at most 50 objects. Each object contains metadata,
+opaque base64 content and optional tags. Namespace, owner, name, context,
+checksum, content size, extra-data size and tags are validated before intent
+publication. Metadata creation times and the exact generated object versions
+are retained in that prepared intent. No profile payload or credential is logged.
+
+The journal is per title and universal account, below
+objectstore/users/<title>/_transactions/<user>.json. It binds schema/title/user,
+phase and complete writes. Each write binds context, owner, name and its full
+document; it cannot supply an arbitrary filesystem path. Both accepted uno and
+bnet aliases belong to the same account journal, so a mixed-alias window can
+recover together. Other accounts' uploads remain independent.
+
+Publication flushes the prepared journal, each complete object and the final
+applied marker using FlushFileBuffers and write-through replacement. A failed
+prepared upload returns error 102, not a successful partial result. It can
+already have replaced some files; the contract is durable roll-forward, not
+rollback. Every participating read/write recovers the account's pending intent
+before exposing object data. While recovery cannot finish, those reads fail.
+Private/public ACL and signed-title ownership checks still apply after recovery.
+
+Recovery preflights all destinations and complete object layouts before any
+replacement. Corrupt/duplicate/foreign/escaping snapshots fail closed as storage
+errors. Duplicate detection accounts for Windows letter-case aliases in both
+new uploads and stored intents, while retaining existing object filenames.
+An applied marker has no writes and causes no replay. Restart recovery
+uses the same snapshots, without regenerating versions, timestamps or contents.
+No unsolicited success callback is emitted for an interrupted request.
+
+tools/objectstore_transaction_fixtures.py covers actual second-file failures,
+blocked reads, every-snapshot preflight, namespace/checksum/content/tag corruption,
+mixed-owner-alias recovery, idempotent reads, complete task-boundary rejection
+and recovery after a process restart. Existing native object-store wire tests
+continue covering profile metadata, ACLs and content response layouts.
+
+The category-list routes 193/9 and 193/10 remain unresolved. Original constructors
+0x14212A960 and 0x14212AA70 and request writers 0x142144F50 and 0x142145310 are
+verified. Response binding still lacks sufficient original-target evidence;
+database names alone were contradicted by binary/reference research. No guessed
+response has been counted as native completion.

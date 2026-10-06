@@ -3939,6 +3939,11 @@ try:
     checks.append(
         "live-Replay platform-6 universal-ID owner upload/read and cross-account rejection"
     )
+    import objectstore_transaction_fixtures
+
+    objectstore_transaction_fixture = objectstore_transaction_fixtures.exercise(
+        client, directory, title, user, user_upload, user_read, object_reply, checks
+    )
     # More than the old lifetime limit of 128 pings, at a non-flood rate. The
     # same authenticated session must still accept its next encrypted task.
     for _ in range(140):
@@ -3955,6 +3960,9 @@ try:
     )
     matchmaking_transaction_fixtures.prepare_restart(
         client, matchmaking_transaction_fixture, (u32, u64, text, boolean), checks
+    )
+    objectstore_transaction_fixtures.prepare_restart(
+        client, objectstore_transaction_fixture
     )
     client.close()
     c = Client()
@@ -3989,6 +3997,7 @@ try:
     process.wait(timeout=5)
     output.flush()
     matchmaking_transaction_fixtures.before_restart(matchmaking_transaction_fixture)
+    objectstore_transaction_fixtures.before_restart(objectstore_transaction_fixture)
     # Turn on the actual loopback QoS peer for the restart phase. The earlier
     # empty/configured-fleet checks remain unchanged and production is untouched.
     (directory / "qos" / "local-provider.json").write_text('{"enabled":true}')
@@ -4021,6 +4030,9 @@ try:
     client = Client()
     matchmaking_transaction_fixtures.check_restart(
         client, matchmaking_transaction_fixture, (u32, u64, text, boolean), checks
+    )
+    objectstore_transaction_fixtures.check_restart(
+        client, objectstore_transaction_fixture, pb_fields, checks
     )
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)

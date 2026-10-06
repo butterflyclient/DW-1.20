@@ -1,0 +1,68 @@
+REPLAY DW OBJECT-STORE UPLOAD READINESS
+2026-10-06
+
+Issue
+An interrupted multi-object upload could leave only some profile objects saved.
+Subsequent reads could expose that partial window. Windows letter-case aliases
+also allowed two requested names to target the same stored file.
+
+Research
+Replay task 193/7 uses the existing PUT struct-buffer and objects/errors/
+validationTokens response. Task 193/6 reads the same opaque profile documents.
+The old writer validated a batch, then published its objects individually.
+A real failure opening the second object's pending file reproduced partial disk
+publication. Backend dispatch already serializes participating reads/writes.
+Windows filename comparisons required case-aware destination deduplication.
+
+Fix
+A per-title/account journal binds the entire validated window, including exact
+contents, metadata, versions and tags. Prepared intent and each object are
+flushed before replacement. A failed upload returns a storage error. Reads
+recover the complete pending window before returning any object data; recovery
+failure blocks those reads. Both supported uno/bnet aliases share one account
+journal. Recovery preflights all entries and deduplicates Windows destinations
+before replacing a file. Foreign, escaping, corrupt or duplicated intents fail
+closed. Recovery retains versions/timestamps and emits no invented callback.
+The guarantee is recoverable roll-forward, not rollback of already written files.
+No engine recompile, proxy DLL, new port, profile replacement or friend seed.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 6522a2c5a41cc059e35f231f829f3d8250037621e27ac1be4ac02cd749297a6c
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+202 grouped independent encrypted-protocol/service checks passed on this image.
+Six new groups cover interrupted-window persistence, complete preflight,
+mixed-alias recovery, task-boundary rejection, Windows duplicate filenames and
+process-restart recovery. Signed platform/auth/resource gates passed.
+Native startup passed all 27 fences, profile sign-in and Online state. Restarting
+the backend and dispatching dw_restart preserved the same game process/account
+and established a fresh authenticated relay. It stayed healthy for 100.771
+seconds with ten fresh keepalive replies and no relay rejections.
+Machine-local identity/registration persisted unchanged across that restart.
+The image-bound receipts below distinguish protocol/domain recovery from native
+startup and reconnect. Fault-injection uses isolated fixture accounts/storage,
+not the owner's local identity or profile. No map or match test is required for
+this change. Native profile-window failure recovery and two-network gameplay
+remain separate gates.
+
+validation/20261006-objectstore-transactions.json
+validation/20261006-objectstore-native-reconnect.json
+data/lobby-verification.json
+docs/objectstore-upload-recovery.txt
+
+Remaining gates
+Full backend implementation remains active. Category-list request constructors
+and writers were verified against the original target, but response binding for
+193/9 and 193/10 remains unresolved. No guessed handler has been counted as
+native completion. Six known constructor routes remain missing, together with
+additional indirect, REST and push coverage gaps. Native public-menu joining,
+host migration, split-screen consumption and two-network party gameplay remain
+unverified. The current UI is stopped at the unaccepted Terms of Agreement;
+acceptance authorization was requested separately. Startup/relay observations
+behind that screen do not prove menu-driven lobby play. Use controlled restarts
+and dw_restart; the broken dw_leave command remains excluded.

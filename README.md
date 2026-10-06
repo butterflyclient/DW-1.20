@@ -51,8 +51,10 @@ receipt remains unchanged. Backend rebinding clears stale native-validation
 flags until the new image is independently observed.
 The host-membership iteration is recorded separately in
 `validation/20261006-membership-native-reconnect.json`.
-The current primary-slot/platform iteration has its own receipt at
+The primary-slot/platform iteration has its own receipt at
 `validation/20261006-constraints-native-reconnect.json`.
+The current object-store recovery iteration is recorded in
+`validation/20261006-objectstore-native-reconnect.json`.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
@@ -116,6 +118,8 @@ they are not silently promoted to a newer build.
 | validation/20261006-membership-native-reconnect.json | Membership backend image: native startup/reconnect and stability, with any pre-connection retired-route rejection explicitly accounted |
 | validation/20261006-constraints.json | Primary/secondary slot capacity, presence reservation replacement, PC platform restrictions, departure cleanup and legacy compatibility |
 | validation/20261006-constraints-native-reconnect.json | Constraint backend image: focused native startup, backend restart and renewed authenticated relay stability |
+| validation/20261006-objectstore-transactions.json | Complete user-object upload windows, real interrupted-write recovery, preflight, owner aliases and process persistence |
+| validation/20261006-objectstore-native-reconnect.json | Object-store backend image: focused native startup/reconnect and sustained authenticated relay |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -202,6 +206,11 @@ fail the proof. See [the membership handoff](docs/DW_MEMBERSHIP_READINESS_202610
 Writes flush temporary files and publish atomically. Owners, contexts, wire
 types and capacities are bounded. Opaque profile/stat payloads are preserved.
 Credentials, request bodies, headers and retry tokens are excluded from logs.
+
+User-object vector uploads retain a flushed per-title/account intent until the
+whole window is applied. Native reads recover pending uploads or reject partial
+state, and restart recovery retains the original versions/content. See
+[the object-store recovery contract](docs/objectstore-upload-recovery.txt).
 
 - `data/platform-profile.bin`: stable default identity; never replace it to make a peer.
 - `%LOCALAPPDATA%\ReplayDW\player-identity.bin`: the player's local P-256 identity, protected with Windows user DPAPI and created on first launch.

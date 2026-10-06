@@ -98,7 +98,7 @@ GAPS = {
     "150": "Positive native scheduled match operations; local publication required.",
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
-    "193": "Tasks 3/9/10/12/24 category/list/large-upload families; response binding unresolved for some recovered writers.",
+    "193": "Verified user-object PUT/read and publisher metadata/content retain native envelopes. Complete multi-object upload windows use flushed per-title/account intents, full namespace/content/tag preflight and blocked-read/process-restart recovery; native profile-window recovery still needs a targeted client failure run. Tasks 3/9/10/12/24 category/list/large-upload families remain open; response binding is unresolved for some recovered writers.",
     "194": "Signed empty local enrollment; populated experiments need explicit treatment rules.",
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",

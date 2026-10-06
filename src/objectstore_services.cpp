@@ -8,6 +8,8 @@
 #include <fstream>
 #include <set>
 #include <mutex>
+#include <charconv>
+#include <memory>
 
 namespace services
 {
@@ -41,6 +43,16 @@ namespace services
             for (auto c : value)
                 wire::require((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
                               (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.');
+            return value;
+        }
+
+        std::string storageKey(std::string value)
+        {
+            // Stored object names use the bounded ASCII filename alphabet above.
+            // Windows resolves its letter case aliases to the same destination.
+            for (auto &c : value)
+                if (c >= 'A' && c <= 'Z')
+                    c = static_cast<char>(c - 'A' + 'a');
             return value;
         }
 
@@ -160,8 +172,20 @@ namespace services
 
         Json parameters(const std::string &data)
         {
-            auto out = Json::parse(data, nullptr, false);
-            wire::require(!out.is_discarded());
+            std::vector<std::set<std::string>> keys;
+            bool unique = true;
+            auto callback = [&](int, Json::parse_event_t event, Json &value)
+            {
+                if (event == Json::parse_event_t::object_start)
+                    keys.emplace_back();
+                else if (event == Json::parse_event_t::key)
+                    unique = keys.back().insert(value.get<std::string>()).second && unique;
+                else if (event == Json::parse_event_t::object_end)
+                    keys.pop_back();
+                return true;
+            };
+            auto out = Json::parse(data, callback, false);
+            wire::require(!out.is_discarded() && unique);
             return out;
         }
 
@@ -297,10 +321,25 @@ namespace services
             auto pending = path;
             pending += ".pending";
             const auto bytes = object.dump();
+            wire::require(bytes.size() <= 6 * 1024 * 1024);
+            const auto handle = CreateFileW(pending.c_str(),
+                                            GENERIC_WRITE,
+                                            0,
+                                            nullptr,
+                                            CREATE_ALWAYS,
+                                            FILE_ATTRIBUTE_NORMAL,
+                                            nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Object persistence failed");
             {
-                std::ofstream stream(pending, std::ios::binary | std::ios::trunc);
-                if (!stream.write(bytes.data(), static_cast<std::streamsize>(bytes.size())) ||
-                    !stream.flush())
+                const std::unique_ptr<void, decltype(&CloseHandle)> file(handle, &CloseHandle);
+                DWORD written = 0;
+                if (!WriteFile(handle,
+                               bytes.data(),
+                               static_cast<DWORD>(bytes.size()),
+                               &written,
+                               nullptr) ||
+                    written != bytes.size() || !FlushFileBuffers(handle))
                     throw std::runtime_error("Object persistence failed");
             }
             if (!MoveFileExW(pending.c_str(),
@@ -402,6 +441,117 @@ namespace services
                 (void)string("summaryChecksum", 33);
             if (data.contains("summaryContentLength") && !data.at("summaryContentLength").is_null())
                 require(data.at("summaryContentLength").is_number_unsigned());
+        }
+
+        std::optional<uint64_t> account(const std::string &owner)
+        {
+            const auto start = owner.starts_with("uno-") ? 4 : owner.starts_with("bnet-") ? 5 : 0;
+            if (!start)
+                return std::nullopt;
+            const auto suffix = owner.substr(start);
+            uint64_t user = 0;
+            const auto parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(), user);
+            if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + suffix.size() || !user ||
+                std::to_string(user) != suffix)
+                return std::nullopt;
+            return user;
+        }
+
+        std::filesystem::path uploadJournal(const std::filesystem::path &directory,
+                                            uint32_t title,
+                                            uint64_t user)
+        {
+            return directory / "objectstore" / "users" / std::to_string(title) / "_transactions" /
+                   (std::to_string(user) + ".json");
+        }
+
+        void validateUpload(const Json &entry, uint64_t user)
+        {
+            wire::require(entry.is_object() && entry.size() == 4);
+            const auto owner = filename(entry, "owner", 30);
+            const auto context = filename(entry, "context", 16);
+            const auto name = filename(entry, "name", 65);
+            wire::require(account(owner) == user);
+            const auto &stored = entry.at("document");
+            wire::require(stored.is_object() && stored.dump().size() < 96000 &&
+                          stored.contains("metadata") && stored.contains("content") &&
+                          stored.at("content").is_string());
+            const auto &metadata = stored.at("metadata");
+            validateMetadata(metadata, owner, name, context);
+            const auto bytes = unbase64(stored.at("content").get<std::string>(), 48000);
+            wire::require(metadata.at("contentLength") == bytes.size() &&
+                          metadata.at("checksum") == hex(crypto::md5(bytes)));
+            if (metadata.contains("extraData") && !metadata.at("extraData").is_null())
+                wire::require(metadata.at("extraDataSize") ==
+                              unbase64(metadata.at("extraData").get<std::string>(), 2048).size());
+            if (stored.contains("tags"))
+                tags(stored.at("tags"));
+        }
+
+        void applyUploads(const std::filesystem::path &directory,
+                          const platform::LobbyIdentity &id,
+                          Json journal)
+        {
+            // Preflight every namespace and complete metadata/content/tag layout
+            // before publishing any snapshot. No journal-supplied filesystem path.
+            wire::require(journal.is_object() && journal.size() == 5 && journal.at("schema") == 1 &&
+                          journal.at("title") == id.titleId && journal.at("user") == id.userId &&
+                          journal.at("writes").is_array());
+            const auto &phase = journal.at("phase");
+            const auto &writes = journal.at("writes");
+            wire::require((phase == "applied" && writes.empty()) ||
+                          (phase == "prepared" && !writes.empty() && writes.size() <= 50));
+            if (phase == "applied")
+                return;
+            std::set<std::string> destinations;
+            for (const auto &entry : writes)
+            {
+                validateUpload(entry, id.userId);
+                wire::require(destinations
+                                  .insert(storageKey(userPath(directory,
+                                                              id,
+                                                              entry.at("context"),
+                                                              entry.at("owner"),
+                                                              entry.at("name"))
+                                                         .generic_string()))
+                                  .second);
+            }
+            for (const auto &entry : writes)
+                publish(
+                    userPath(
+                        directory, id, entry.at("context"), entry.at("owner"), entry.at("name")),
+                    entry.at("document"));
+            journal["phase"] = "applied";
+            journal["writes"] = Json::array();
+            publish(uploadJournal(directory, id.titleId, id.userId), journal);
+        }
+
+        void recoverUploads(const std::filesystem::path &directory,
+                            const platform::LobbyIdentity &identity,
+                            uint64_t user)
+        {
+            const auto path = uploadJournal(directory, identity.titleId, user);
+            if (!std::filesystem::exists(path))
+                return;
+            try
+            {
+                wire::require(std::filesystem::file_size(path) <= 6 * 1024 * 1024);
+                std::ifstream stream(path, std::ios::binary);
+                if (!stream)
+                    throw std::runtime_error("Object upload journal read failed");
+                std::string bytes((std::istreambuf_iterator<char>(stream)),
+                                  std::istreambuf_iterator<char>());
+                stream.close();
+                auto id = identity;
+                id.userId = user;
+                applyUploads(directory, id, parameters(bytes));
+            }
+            catch (const std::exception &)
+            {
+                // A malformed durable record is storage failure, not invalid
+                // native request parameters. Never expose its opaque payload.
+                throw std::runtime_error("Object upload recovery failed");
+            }
         }
 
         std::optional<Json> publisherDocument(const std::filesystem::path &directory,
@@ -574,6 +724,7 @@ namespace services
                           input.at("objects").is_array());
             const auto &objects = input.at("objects");
             wire::require(!objects.empty() && objects.size() <= 50);
+            recoverUploads(directory, id, id.userId);
             // Validate the entire window before publishing any member. Each durable
             // object contains content and metadata together, so a reader never sees a
             // partially published content/metadata pair after a restart.
@@ -597,7 +748,7 @@ namespace services
                                     " authenticated_universal_id=" + std::to_string(id.userId);
                     return denied;
                 }
-                wire::require(names.insert(name).second);
+                wire::require(names.insert(storageKey(name)).second);
                 const auto content = object.at("content").get<std::string>();
                 const auto bytes = unbase64(content, 48000);
                 const auto path = userPath(directory, id, context, user, name);
@@ -644,8 +795,26 @@ namespace services
             }
             auto reply = response(
                 body, "user-objects-uploaded"); // required validationTokens array can be empty
+            Json journal = {{"schema", 1},
+                            {"title", id.titleId},
+                            {"user", id.userId},
+                            {"phase", "prepared"},
+                            {"writes", Json::array()}};
             for (const auto &[path, object] : writes)
-                publish(path, object);
+            {
+                (void)path;
+                const auto &metadata = object.at("metadata");
+                journal["writes"].push_back({{"context", context},
+                                             {"owner", metadata.at("owner")},
+                                             {"name", metadata.at("name")},
+                                             {"document", object}});
+            }
+            // A prepared intent can roll forward after a process or disk failure.
+            // Return native success only after the complete window is durable.
+            for (const auto &entry : journal["writes"])
+                validateUpload(entry, id.userId);
+            publish(uploadJournal(directory, id.titleId, id.userId), journal);
+            applyUploads(directory, id, std::move(journal));
             reply.detail = " stored_objects=" + std::to_string(writes.size());
             return reply;
         }
@@ -663,6 +832,8 @@ namespace services
             for (const auto &object : ids)
             {
                 const auto user = owner(id, object), name = filename(object, "name", 65);
+                if (const auto userId = account(user))
+                    recoverUploads(directory, id, *userId);
                 const auto path = userPath(directory, id, context, user, name);
                 std::string error = "Error:ClientError:NotFound";
                 bool found = false;
