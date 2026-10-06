@@ -144,18 +144,18 @@ def exercise(
     )
 
     lobby, initial = created()
-    playing = {**initial[0], "game_state": {"state": "playing"}}
+    playing = {**initial[0], "game_state": {"state": "in_game"}}
     assert host.task(
         145, 15, u64(lobby) + u64(1) + text(json.dumps(playing))
     ) == boolean(True)
     assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(2))
     unchanged_reject(lobby, join)
-    # Publish a matching join-in-progress pool, then exercise its playing state.
+    # Replay's native UpdateHostDoc writes in_game, rather than playing.
     disband(lobby)
     progress = copy.deepcopy(create)
     progress["ruleset_payload"]["join_in_progress"] = True
     lobby, initial = created(progress)
-    playing = {**initial[0], "game_state": {"state": "playing"}}
+    playing = {**initial[0], "game_state": {"state": "in_game"}}
     assert host.task(
         145, 15, u64(lobby) + u64(1) + text(json.dumps(playing))
     ) == boolean(True)
@@ -171,5 +171,5 @@ def exercise(
     assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(3))
     disband(lobby, True)
     checks.append(
-        "playing lobbies honor the native join-in-progress policy and retain the same assigned game instead of spawning a second match"
+        "native in_game lobbies honor join-in-progress policy and retain the same assigned game instead of spawning a second match"
     )

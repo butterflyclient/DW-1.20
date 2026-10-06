@@ -108,7 +108,34 @@ matching = [
 assert matching and matching[-1]["expires"] > datetime.now(timezone.utc).timestamp()
 assert after["server"]["relay"]["active_associations"] == 1
 assert after["server"]["relay"]["verified_associations"] == 1
-assert after["server"]["relay"]["rejected_packets"] == 0
+relay_health = after["server"]["relay"]
+retired_rejections = []
+if relay_health["rejected_packets"]:
+    # A packet can arrive from the game's previous association between server
+    # startup and dw_restart. Permit only completely accounted, header-correlated
+    # old routes rejected before the fresh association established. Unknown,
+    # known-current-route, init, rate-limited and suppressed events still fail.
+    established_position = events.index(matching[-1])
+    retired_rejections = [
+        (position, row)
+        for position, row in enumerate(events)
+        if row["action"] == "rejected" and row["relay_id"] == association["relay_id"]
+    ]
+    assert (
+        len(retired_rejections)
+        == relay_health["rejected_packets"]
+        == relay_health["rejection_events"]
+    )
+    assert relay_health["suppressed_rejection_events"] == 0
+    old_route = before["native_relay_association"]["route"]
+    assert old_route != association["route"]
+    assert all(
+        position < established_position
+        and row["reason"] == "unknown-route"
+        and row["route"] == old_route
+        and 2 <= row["packet_type"] <= 11
+        for position, row in retired_rejections
+    )
 delta = after["server_counter_changes_since_launch"]
 assert all(
     delta[key] > 0
@@ -145,6 +172,7 @@ receipt = {
         for path in (args.before.resolve(), args.after.resolve())
     },
     "transport_events_sha256": digest(events_path),
+    "pre_connection_retired_route_rejections": [row for _, row in retired_rejections],
 }
 if args.stability:
     stable = load(args.stability)
@@ -166,7 +194,7 @@ if args.stability:
     )
     health, initial_health = stable["server"]["relay"], after["server"]["relay"]
     assert health["active_associations"] == health["verified_associations"] == 1
-    assert health["rejected_packets"] == 0
+    assert health["rejected_packets"] == initial_health["rejected_packets"]
     pings = health["ping_replies"] - initial_health["ping_replies"]
     assert pings > 0
     receipt.update(

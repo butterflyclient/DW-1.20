@@ -239,6 +239,136 @@ namespace services
             return maximum;
         }
 
+        uint64_t nextDocumentTime(const Json &lobby)
+        {
+            uint64_t previous = 0;
+            for (const auto *document : {&lobby.at("host_doc"), &lobby.at("backend_doc")})
+            {
+                if (document->contains("update_time"))
+                {
+                    const auto &time = document->at("update_time");
+                    wire::require(time.is_number_unsigned());
+                    previous = std::max(previous, time.get<uint64_t>());
+                }
+            }
+            wire::require(previous != UINT64_MAX);
+            // Replay UpdateLobbyDocument 0x14104C6D0 drops equal timestamps,
+            // even with a newer update ID. Several commits can share one second.
+            return std::max(now(), previous + 1);
+        }
+
+        void eraseUsers(Json &array, const std::set<uint64_t> &users)
+        {
+            wire::require(array.is_array() && array.size() <= 200);
+            for (const auto &user : array)
+                wire::require(user.is_number_unsigned() && user.get<uint64_t>());
+            array.erase(std::remove_if(array.begin(),
+                                       array.end(),
+                                       [&](const Json &user)
+                                       {
+                                           return users.contains(user.get<uint64_t>());
+                                       }),
+                        array.end());
+        }
+
+        std::vector<matchmaking_store::Write> reconcileMembers(const std::filesystem::path &root,
+                                                               const platform::LobbyIdentity &id,
+                                                               Json &lobby,
+                                                               Json &host)
+        {
+            const auto owner = std::to_string(id.userId);
+            wire::require(host.at("player_state").contains(owner) &&
+                          host.at("player_state").at(owner).get<uint64_t>() < 4);
+            std::set<uint64_t> removed;
+            // Replay UpdateHostDoc 0x14104BFA0 sends the complete primary-player
+            // snapshot and omits member status 4 (eREADY_TO_REMOVE). A present
+            // status 3 (eWONT_CONNECT) remains acknowledged until that omission.
+            for (const auto &user : lobby.at("members"))
+            {
+                const auto key = std::to_string(user.get<uint64_t>());
+                if (!host.at("player_state").contains(key) || host["player_state"][key] == 4)
+                    removed.insert(user.get<uint64_t>());
+            }
+            if (removed.empty())
+                return {};
+            wire::require(!removed.contains(id.userId));
+            auto &backend = lobby.at("backend_doc");
+            std::set<uint64_t> searches;
+            for (const auto user : removed)
+            {
+                const auto key = std::to_string(user);
+                searches.insert(backend.at("player_id_to_mm_id").at(key).get<uint64_t>());
+                host["player_state"].erase(key);
+                for (const char *field : {"players",
+                                          "player_id_to_mm_id",
+                                          "player_id_to_service_level",
+                                          "player_id_to_performance",
+                                          "player_id_to_slots"})
+                {
+                    if (backend.contains(field))
+                    {
+                        wire::require(backend.at(field).is_object());
+                        backend[field].erase(key);
+                    }
+                }
+            }
+            eraseUsers(lobby["members"], removed);
+            eraseUsers(backend["listen_server"]["lobby_host_order"], removed);
+            // Replay ParseTeamInfo consumes both teams and squads as objects of
+            // UInt64 arrays. Remove every assignment, retaining empty team slots.
+            for (const char *field : {"teams", "squads"})
+            {
+                auto &groups = backend.at("team_balance").at(field);
+                wire::require(groups.is_object() && groups.size() <= 200);
+                for (auto &group : groups)
+                    eraseUsers(group, removed);
+            }
+            std::vector<matchmaking_store::Write> writes;
+            for (const auto &value : backend.at("player_id_to_mm_id"))
+                searches.erase(value.get<uint64_t>());
+            for (const auto searchId : searches)
+            {
+                const auto name = "searches/" + std::to_string(searchId) + ".json";
+                const auto path = root / name;
+                if (!std::filesystem::exists(path))
+                    continue;
+                wire::require(std::filesystem::file_size(path) <= 128 * 1024);
+                std::ifstream stream(path);
+                Json search;
+                if (!stream || !(stream >> search))
+                    throw std::runtime_error("Removed member search read failed");
+                wire::require(search.at("schema") == 1 && search.at("title") == id.titleId &&
+                              search.at("id") == searchId &&
+                              search.at("lobby_id") == lobby.at("id") &&
+                              search.at("active").is_boolean());
+                if (search.at("active") != false)
+                {
+                    search["active"] = false;
+                    writes.push_back({name, std::move(search)});
+                }
+            }
+            auto assignments = currentLobbies(root, id);
+            bool changed = false;
+            for (const auto user : removed)
+            {
+                const auto key = std::to_string(user);
+                if (assignments["lobbies"].contains(key) &&
+                    assignments["lobbies"][key] == lobby.at("id"))
+                {
+                    assignments["lobbies"].erase(key);
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                const auto revision = assignments.at("revision").get<uint64_t>();
+                wire::require(revision != UINT64_MAX);
+                assignments["revision"] = revision + 1;
+                writes.push_back({"current-lobbies.json", std::move(assignments)});
+            }
+            return writes;
+        }
+
         Json publicPool(const Json &query, const PlaylistSelection &selection)
         {
             auto rules = selection.rules;
@@ -266,13 +396,13 @@ namespace services
             } while (std::filesystem::exists(root / "searches" / (std::to_string(mmId) + ".json")));
             const auto revision = lobby.at("update_id").get<uint64_t>();
             wire::require(revision != UINT64_MAX);
-            const auto time = now();
+            const auto documentTime = nextDocumentTime(lobby);
             lobby["expires"] = std::min(lobby.at("expires").get<uint64_t>(), id.expires);
             lobby["update_id"] = revision + 1;
             for (auto *document : {&lobby["host_doc"], &lobby["backend_doc"]})
             {
                 (*document)["update_id"] = revision + 1;
-                (*document)["update_time"] = time;
+                (*document)["update_time"] = documentTime;
             }
             auto &backend = lobby["backend_doc"];
             auto &teams = backend["team_balance"]["teams"];
@@ -370,7 +500,7 @@ namespace services
                                 }))
                     continue;
                 const auto state = host.at("game_state").value("state", std::string{});
-                if (state != "intermission" && !(inProgress && state == "playing"))
+                if (state != "intermission" && !(inProgress && state == "in_game"))
                     continue;
                 candidates.push_back(std::move(candidate));
             }
@@ -587,6 +717,8 @@ namespace services
                     {"lobby_open", true},
                     {"lobby_open_for_pres_join", true},
                     {"team_balance", {{"can_change_teams", true}}},
+                    {"update_id", uint64_t{1}},
+                    {"update_time", time},
                     {"game_state", {{"state", "intermission"}}}};
                 Json lobby = {{"schema", 1},
                               {"title", id.titleId},
@@ -766,27 +898,28 @@ namespace services
                     host["team_balance"].is_object() &&
                     host["team_balance"].contains("can_change_teams") &&
                     host["team_balance"]["can_change_teams"].is_boolean());
-                for (auto it = host["player_state"].begin(); it != host["player_state"].end(); ++it)
-                {
-                    wire::require(it.value().is_number_unsigned() &&
-                                  it.value().get<uint64_t>() <= 4);
-                    wire::require(lobby["backend_doc"]["players"].contains(it.key()));
-                }
                 const auto revision = lobby.at("update_id").get<uint64_t>();
                 wire::Writer result;
                 result.boolean(update == revision);
                 Reply reply{0, {std::move(result.data)}, "matchmaker-host-update-conflict"};
                 if (update != revision)
                     return reply;
+                for (auto it = host["player_state"].begin(); it != host["player_state"].end(); ++it)
+                {
+                    wire::require(it.value().is_number_unsigned() &&
+                                  it.value().get<uint64_t>() <= 4);
+                    wire::require(lobby["backend_doc"]["players"].contains(it.key()));
+                }
                 wire::require(revision != UINT64_MAX);
+                const auto documentTime = nextDocumentTime(lobby);
+                auto writes = reconcileMembers(root, id, lobby, host);
                 lobby["update_id"] = revision + 1;
                 host["update_id"] = revision + 1;
-                host["update_time"] = now();
+                host["update_time"] = documentTime;
                 lobby["host_doc"] = host;
                 lobby["backend_doc"]["update_id"] = revision + 1;
-                lobby["backend_doc"]["update_time"] = now();
-                const std::array<matchmaking_store::Write, 1> writes = {
-                    matchmaking_store::Write{"lobbies/" + path.filename().string(), lobby}};
+                lobby["backend_doc"]["update_time"] = documentTime;
+                writes.insert(writes.begin(), {"lobbies/" + path.filename().string(), lobby});
                 matchmaking_store::commit(root, id.titleId, writes);
                 reply.operation = "matchmaker-host-document-updated";
                 notify(reply, lobby, 2006);

@@ -20,7 +20,7 @@ true and no candidate exists, the request returns unavailable without creating
 a different lobby. A private_lobby field excludes a query/lobby from public
 filling. Explicit by-player/by-lobby presence joins retain their native path.
 
-Intermission is eligible. A playing lobby requires join_in_progress. Countdown
+Intermission is eligible. Replay's native in_game state requires join_in_progress. Countdown
 and unclassified host states are not implicitly considered safe to join. The
 fullest eligible lobby is chosen first, with lobby ID as a deterministic tie
 breaker. An overlapping party does not get added a second time by public fill.
@@ -39,3 +39,7 @@ assignments. Every rejected request checks that lobby/search/index bytes remain
 unchanged. These are protocol/domain proofs, not native public-menu callbacks or
 two-network gameplay proof. The existing local native startup/relay test remains
 a separately hash-bound validation step.
+
+Host snapshots now retire departed members and release their capacity through
+the same transaction store. See docs/matchmaking-membership.txt for the complete
+member-state layout, shared-search handling and monotonic document clock.

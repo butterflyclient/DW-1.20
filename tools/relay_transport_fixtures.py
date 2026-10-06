@@ -368,6 +368,34 @@ def exercise(client, peer, user, peer_user, directory, base, checks, old_token):
             and status["ping_replies"] == 7
             and status["rejected_packets"] >= 10
         )
+        rejected = [
+            json.loads(line)
+            for line in (directory / "relay/transport-events.jsonl")
+            .read_text()
+            .splitlines()
+            if json.loads(line)["action"] == "rejected"
+            and json.loads(line)["relay_id"] == status["relay_id"]
+        ]
+        assert len(rejected) == status["rejected_packets"] == status["rejection_events"]
+        assert status["suppressed_rejection_events"] == 0
+        assert all(
+            set(row)
+            == {
+                "schema",
+                "time",
+                "action",
+                "relay_id",
+                "port",
+                "reason",
+                "bytes",
+                "route",
+                "packet_type",
+            }
+            for row in rejected
+        )
+        checks.append(
+            "rejected relay packets retain bounded header-only diagnostics matching transport counters without credentials, packet bodies or peer addresses"
+        )
         checks.append(
             "relay live signed-session binding, Replay platform enforcement, authenticated DISCONNECT_ACK and closed-route rejection; real transport counters"
         )

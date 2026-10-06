@@ -45,10 +45,12 @@ native sign-out cancels outstanding tasks. The focused 2026-10-06 run verified
 all 27 fences, profile/Online/friend lists, a fresh relay-token task and native
 BIND/VERIFY/ESTABLISHED after restarting the backend in the same game process.
 The original image-bound receipt is `validation/20261006-native-reconnect.json`.
-The backend public-matching iteration has its own current-image receipt at
+The initial backend public-matching iteration has its own receipt at
 `validation/20261006-public-matchmaking-native-reconnect.json`; the earlier
 receipt remains unchanged. Backend rebinding clears stale native-validation
 flags until the new image is independently observed.
+The current host-membership iteration is recorded separately in
+`validation/20261006-membership-native-reconnect.json`.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
@@ -107,7 +109,9 @@ they are not silently promoted to a newer build.
 | lobby-verification.json | Latest independent wire checks, backend/KDF hash and fixture directory |
 | validation/20261006-native-reconnect.json | Hash-bound native startup, same-process backend restart, new relay token and authenticated UDP relay completion |
 | validation/20261006-public-matchmaking.json | Two independent encrypted clients fill one compatible public lobby; privacy, capacity, live-host assignment and join-in-progress checks |
-| validation/20261006-public-matchmaking-native-reconnect.json | Current backend image: 27 native fences, unchanged game process, renewed relay credentials and sustained authenticated keepalives |
+| validation/20261006-public-matchmaking-native-reconnect.json | Initial public-matching image: 27 native fences, unchanged game process, renewed relay credentials and sustained authenticated keepalives |
+| validation/20261006-membership.json | Full host snapshot retirement, shared-search/newer-assignment preservation, interrupted-publication recovery, monotonic clocks and native in_game matching |
+| validation/20261006-membership-native-reconnect.json | Membership backend image: native startup/reconnect and stability, with any pre-connection retired-route rejection explicitly accounted |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -137,7 +141,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 | 29 | 4, 5, 7, 9, 10 | Durable mail send/header/body/delete, packed arrays, read state and expiration return |
 | 4 | 1, 4, 11, 13, 14, 16, 17 | Atomic replace/add/max writes; rank/entity reads; included/excluded asset-column projections; trusted local server-validated stat batches with atomic retry receipts |
 | 67 | 5, 6 | Durable telemetry archive/recent window and native filter initialization/push |
-| 80 | 69, 106, 125, 132, 134, 243, 245 | Native inventory/balance reads, published SKU catalog, atomic owner purchases with full ResultV4/PlayerAssetsV3 or legacy coupon results, signed-credential reconciliation |
+| 80 | 58, 69, 106, 125, 132, 134, 243, 245 | Native token validation, inventory/balance reads, published SKU catalog, atomic owner purchases with full ResultV4/PlayerAssetsV3 or legacy coupon results, signed-credential reconciliation |
 | 123 | 1, 2 | Published redeemable codes/payloads, atomic inventory/currency grants, owner binding and durable retry receipts |
 | 151 | 1 | Explicit local esports-registration publication and native boolean DTO |
 | 104 / 194 | 6, 7 / 1 | Full published marketing messages with native field/blob layouts and location/language/time selection, owned view receipts and signed empty AB enrollment |
@@ -170,6 +174,18 @@ lobby assignment. See [the public-matching contract](docs/public-matchmaking.txt
 and [the current handoff](docs/DW_PUBLIC_MATCHMAKING_READINESS_20261006.txt).
 Native public-menu callbacks and two-network party gameplay remain separate
 validation gates.
+
+Host snapshots now retire omitted/READY_TO_REMOVE players across the complete
+membership layout, free their slots and preserve shared party searches and
+newer lobby assignments. Rapid document updates use a monotonic timestamp so
+Replay does not discard equal-second changes. See
+[the native snapshot contract](docs/matchmaking-membership.txt).
+
+Relay rejection diagnostics retain only bounded header metadata and expose
+logged/suppressed counts. A native restart proof permits only completely
+accounted packets naming the previous relay route before the new association
+establishes. Current-route, unexplained and post-connection rejections still
+fail the proof. See [the membership handoff](docs/DW_MEMBERSHIP_READINESS_20261006.txt).
 
 ## Persistent data and configuration
 

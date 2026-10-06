@@ -1,0 +1,67 @@
+REPLAY DW HOST MEMBERSHIP AND RESTART READINESS
+2026-10-06
+
+Confirmed issues
+Public filling checked playing, while Replay writes in_game for active matches.
+Host snapshots did not reconcile departed members into backend documents.
+Members could occupy capacity and retain team/index/search records after removal.
+Equal-second update timestamps were dropped by Replay despite newer revisions.
+One native restart rejection lacked diagnostics and prevented an honest proof.
+
+Implementation
+Active-match filling now uses the native in_game value and join-in-progress policy.
+Complete host snapshots retire omitted or explicit READY_TO_REMOVE members.
+WONT_CONNECT remains acknowledged until omission. The full layout is reconciled:
+members, player state, expected players, matchmaking IDs, service level,
+optional performance/slots, migration order, teams and squads. Shared party
+searches and newer assignments survive removal from an older lobby.
+Lobby/search/index changes use the existing recoverable transaction mechanism.
+Stale snapshots return native false before checking keys removed by a newer revision.
+Joins and updates advance document clocks monotonically. Overflow fails closed.
+
+Relay diagnostics now record only size/type/route/reason/time, never packet
+bodies, credentials or peer addresses. Logging is capped at 64 rejections per
+minute; counters continue to count all events and expose suppressed diagnostics.
+The focused restart caught a type-6 packet naming the game's previous relay route
+before fresh association setup. The backend correctly rejected this unknown route.
+The receipt explicitly retains such pre-connection packets. A proof still rejects
+unexplained, current-route, init, suppressed or post-connection rejections.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 7941c1548b5a6b2c8d4c01749f9ecd92af843a69ae85f43d46880246be88d8ad
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+No proxy DLL, game recompile, extra external port or player-identity replacement.
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp changes remain separate.
+
+Evidence
+191 independent encrypted-protocol grouped checks passed on this exact backend.
+Two-client membership checks covered rejection, status-3/omission, explicit 4,
+capacity/rejoin, optional fields, shared searches, newer assignments and stale CAS.
+A real blocked index .pending path verified interrupted removal and recovery.
+Monotonic clock and UInt64-overflow checks passed.
+Signed platform, native auth, platform resources and persistent local identity passed.
+Native game launched from the root folder, with all 27 fences/profile/Online ready.
+Same-process backend restart and dw_restart renewed native credentials and relay.
+The native receipt records the precise stability interval and keepalive count.
+This pass sustained 81 seconds and eight fresh keepalive replies, with no new
+rejections after connection. One earlier unknown-route type-6 packet is retained.
+The UI remained at unaccepted Terms of Agreement; no menu/match/departure claim.
+
+validation/20261006-membership.json
+validation/20261006-membership-native-reconnect.json
+data/native-membership-final-20261006.jpg
+data/lobby-verification.json
+data/local-player-verification.json
+data/backend-coverage-inventory.json
+docs/matchmaking-membership.txt
+
+Remaining work
+The overall backend goal remains active. There are still six known missing task
+routes and additional indirect/REST/push research gaps. Native public-menu joins,
+gameplay departures, host migration, secondary-client slot publication, broader
+matchmaking filters, tournament scheduling and two-network gameplay remain open.
+The other tester's machine-local identity failure remains unverified on that PC.
+Use controlled restarts; dw_leave remains broken. No new friendship was created.

@@ -2964,6 +2964,19 @@ try:
         client, peer_client, directory, title, user, peer_user, player_info,
         match_query, (u32, u64, text, boolean), checks,
     )
+    import matchmaking_membership_fixtures
+
+    matchmaking_membership_fixtures.exercise(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        match_query,
+        (u32, u64, text, boolean),
+        checks,
+    )
     import tournament_fixtures
 
     tournament_fixture = tournament_fixtures.exercise(

@@ -205,6 +205,9 @@ namespace relay_provider
             std::map<uint32_t, Association> associations;
             std::ofstream events;
             std::atomic<uint64_t> verified{0}, forwarded{0}, pings{0}, rejected{0}, active{0};
+            std::atomic<uint64_t> rejectionEvents{0}, suppressedRejectionEvents{0};
+            Clock::time_point rejectionWindow = Clock::now();
+            unsigned rejectionWindowCount = 0;
             std::atomic<Failure> failure{Failure::none};
             std::atomic<bool> running{true};
             std::jthread worker;
@@ -295,6 +298,47 @@ namespace relay_provider
                 events.flush();
                 if (!events)
                     throw ProviderFailure{Failure::eventWrite};
+            }
+
+            void rejectedPacket(std::span<const uint8_t> bytes,
+                                const char *overrideReason = nullptr)
+            {
+                ++rejected;
+                const auto clock = Clock::now();
+                if (clock - rejectionWindow >= std::chrono::minutes(1))
+                {
+                    rejectionWindow = clock;
+                    rejectionWindowCount = 0;
+                }
+                // Keep invalid UDP traffic from producing an unbounded log rate.
+                // Counters still include every rejection; proofs detect omissions.
+                if (++rejectionWindowCount > 64)
+                {
+                    ++suppressedRejectionEvents;
+                    return;
+                }
+                const bool header = bytes.size() >= 7;
+                const uint32_t route = header ? wire::at<uint32_t>(bytes, 1) : 0;
+                const auto reason = overrideReason                             ? overrideReason
+                                    : bytes.size() < 12 || bytes.size() > 1288 ? "invalid-size"
+                                    : bytes[0] <= 1                            ? "init-rejected"
+                                    : !associations.contains(route) ? "unknown-route"
+                                                                    : "known-route-rejected";
+                Json record = {{"schema", 1},
+                               {"time", now()},
+                               {"action", "rejected"},
+                               {"relay_id", relayId},
+                               {"port", port},
+                               {"reason", reason},
+                               {"bytes", bytes.size()},
+                               {"route", route},
+                               {"packet_type", bytes.empty() ? -1 : int(bytes[0])}};
+                // Never retain packet bodies, credentials, keys or peer addresses.
+                events << record.dump() << '\n';
+                events.flush();
+                if (!events)
+                    throw ProviderFailure{Failure::eventWrite};
+                ++rejectionEvents;
             }
 
             bool session(const Association &item) const
@@ -590,7 +634,8 @@ namespace relay_provider
                         }
                         if (++count > 2048)
                         {
-                            ++rejected;
+                            rejectedPacket(std::span(buffer.data(), static_cast<size_t>(bytes)),
+                                           "rate-limit");
                             continue;
                         }
                         try
@@ -608,7 +653,7 @@ namespace relay_provider
                         }
                         catch (...)
                         {
-                            ++rejected;
+                            rejectedPacket(std::span(buffer.data(), static_cast<size_t>(bytes)));
                         }
                     }
                 }
@@ -690,7 +735,10 @@ namespace relay_provider
                     {"active_associations", provider ? provider->active.load() : 0},
                     {"forwarded_packets", provider ? provider->forwarded.load() : 0},
                     {"ping_replies", provider ? provider->pings.load() : 0},
-                    {"rejected_packets", provider ? provider->rejected.load() : 0}}
+                    {"rejected_packets", provider ? provider->rejected.load() : 0},
+                    {"rejection_events", provider ? provider->rejectionEvents.load() : 0},
+                    {"suppressed_rejection_events",
+                     provider ? provider->suppressedRejectionEvents.load() : 0}}
             .dump();
     }
 } // namespace relay_provider

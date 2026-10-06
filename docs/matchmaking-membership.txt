@@ -1,0 +1,69 @@
+REPLAY HOST SNAPSHOTS AND MEMBER RETIREMENT
+
+Target-build evidence
+Original Replay UpdateHostDoc: 0x14104BFA0.
+Original TaskUpdateLobbyDocument: 0x14104BA20.
+Original UpdateLobbyDocument: 0x14104C6D0.
+Original ReconcileExpectedPlayers: 0x141047E60.
+Original player-status table: SetPlayerCurrentStatus at 0x141049B50.
+Original StartMatchmaking primary-member/token writer: 0x14104A450.
+These addresses are research provenance for the original 1.20 image, not
+addresses transplanted into the shifted compiled executable.
+
+The native host writer emits the complete primary-player state snapshot.
+The native search uses the same primary-account filter for members and tokens;
+secondary/splitscreen clients are represented separately through slot counts.
+Member states are 0 UNACKNOWLEDGED, 1 MAY_CONNECT, 2 CONNECTED,
+3 WONT_CONNECT and 4 READY_TO_REMOVE. The writer skips READY_TO_REMOVE and
+already removing players. Status 3 can be sent and acknowledged before the
+following complete snapshot omits the player. Backend expected players are
+read from every key of the players object; leaving departed keys there keeps
+them expected regardless of the value's text.
+
+Task 145/15 validates ownership, the creator's live session and document shape.
+Its compare-and-swap result precedes semantic member validation: an outdated
+otherwise well-formed snapshot returns native false, even if a newer revision
+already retired one of its player keys. A matching snapshot cannot introduce
+unknown players, omit the host or mark the host READY_TO_REMOVE. Host departure
+uses the existing native disband path; this does not invent host migration.
+
+A matching complete snapshot retires non-host players it omits or marks 4.
+Present status 3 remains acknowledged until omission. Retirement removes the
+member, host state, backend expected-player key, matchmaking ID, service level,
+optional performance/slot fields, migration order, every team array and every
+squad array. Empty team/squad arrays retain their identifiers. The existing
+host address, DTLS keys, map/rules publication and capacity limit are preserved.
+
+A member's current-player index entry is removed only if it still points to
+this lobby. A newer lobby assignment remains intact. A search becomes inactive
+only when no remaining member references its matchmaking ID. This preserves
+searches shared by retained members of the same party. The original search
+query remains the immutable request record.
+
+Lobby, affected searches and current-player index publish in one recoverable
+transaction. Remaining members receive the native event 2006 document update.
+Retired members no longer qualify for pending assignment/update delivery or
+document reads. No new wire event, forced game fence, synthetic host endpoint,
+automatic friendship or engine patch is introduced.
+
+Replay compares update_time and drops equal/older timestamps even if update_id
+increases. Every join or host update now uses max(current wall-clock seconds,
+previous host/backend timestamp + 1). This is a monotonic document clock;
+credential expiration continues to use actual wall time. Incoming host clocks
+cannot advance the persisted clock. UInt64 overflow rejects before publication.
+The native game-state writer uses in_game for active matches. Public filling
+recognizes that exact value and still requires join_in_progress.
+
+Validation
+tools/matchmaking_membership_fixtures.py uses two authenticated encrypted
+clients. It covers owner/malformed snapshot rejection; status-3 acknowledgment
+and later omission; released capacity/rejoining; explicit status 4; full team,
+squad, optional-field and migration-list cleanup; shared search preservation;
+newer assignment preservation; stale compare-and-swap; monotonic timestamps
+and overflow rejection. A real blocked .pending index path verifies interrupted
+retirement and complete recovery. Error 102 after preparation does not promise
+rollback: the existing transaction contract rolls forward on the next read.
+
+These are protocol/domain checks. A basic native startup/reconnect run guards
+the current deployment separately. Native gameplay departure, host migration
+and two-network party gameplay are still separate unverified gates.
