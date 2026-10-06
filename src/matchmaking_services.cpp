@@ -996,16 +996,74 @@ namespace services
                     result.text(lobby.at("backend_doc").dump());
                     return Reply{0, {std::move(result.data)}, "matchmaker-lobby-documents-read"};
                 }
-                if (lobby.at("owner") != id.userId)
-                    return Reply{101, {}, "matchmaker-host-update-owner-denied"};
-                if (!hostSessionActive(lobby, id.titleId) ||
-                    lobby.at("owner_session") != wire::base64Encode(crypto::sha256(id.key)))
-                    return Reply{108, {}, "matchmaker-host-update-session-expired"};
+                const bool migration = lobby.at("owner") != id.userId;
+                std::string address;
+                if (migration)
+                {
+                    // Replay PostMigrationBecomeHost 0x141046BC0 fetches the
+                    // existing documents. UpdatedLobbyDocumentsBecomeHost
+                    // 0x14104DBD0 retains their DTLS keys and sets its own UID
+                    // and native address before UpdateHostDoc 0x14104BFA0.
+                    // The party elects its host; this service validates its claim.
+                    if (hostSessionActive(lobby, id.titleId))
+                        return Reply{101, {}, "matchmaker-host-update-owner-denied"};
+                    const auto assignments = currentLobbies(root, id);
+                    const auto key = std::to_string(id.userId);
+                    if (!assignments["lobbies"].contains(key) ||
+                        assignments["lobbies"][key] != lobbyId)
+                        return Reply{108, {}, "matchmaker-migration-assignment-expired"};
+                    const auto playerPath = root / "players" / (key + ".json");
+                    if (!std::filesystem::exists(playerPath))
+                        return Reply{108, {}, "matchmaker-migration-token-missing"};
+                    const auto player = read(playerPath, id);
+                    if (player.value("token_expires", uint64_t{}) <= now() ||
+                        player.value("token_session", std::string{}) != sessionFingerprint(id) ||
+                        !lobby::sessionOnline(id.titleId, id.userId, sessionFingerprint(id)))
+                        return Reply{108, {}, "matchmaker-migration-session-expired"};
+                    const auto searchId =
+                        lobby["backend_doc"]["player_id_to_mm_id"].at(key).get<uint64_t>();
+                    const auto searchPath =
+                        root / "searches" / (std::to_string(searchId) + ".json");
+                    if (!std::filesystem::exists(searchPath) ||
+                        std::filesystem::file_size(searchPath) > 128 * 1024)
+                        return Reply{108, {}, "matchmaker-migration-search-expired"};
+                    std::ifstream stream(searchPath);
+                    Json search;
+                    if (!stream || !(stream >> search))
+                        throw std::runtime_error("Migration search read failed");
+                    wire::require(search.at("schema") == 1 && search.at("title") == id.titleId &&
+                                  search.at("id") == searchId && search.at("lobby_id") == lobbyId);
+                    if (!search.value("active", false) ||
+                        search.at("expires").get<uint64_t>() <= now())
+                        return Reply{108, {}, "matchmaker-migration-search-expired"};
+                    const auto &query = search.at("query");
+                    wire::require(query.at("members").is_array() && query.at("tokens").is_array() &&
+                                  query["members"].size() == query["tokens"].size() &&
+                                  query["members"].size() <= 200);
+                    bool bound = false;
+                    for (size_t i = 0; i < query["members"].size(); ++i)
+                        if (query["members"][i] == id.userId &&
+                            query["tokens"][i] == player.at("token"))
+                            bound = true;
+                    if (!bound)
+                        return Reply{108, {}, "matchmaker-migration-membership-session-expired"};
+                    address = player.at("info")
+                                  .at("listen_server")
+                                  .at("local_address")
+                                  .get<std::string>();
+                    wire::require(address.size() == 112 && wire::base64(address, 84).size() == 84);
+                }
+                else
+                {
+                    if (!hostSessionActive(lobby, id.titleId) ||
+                        lobby.at("owner_session") != sessionFingerprint(id))
+                        return Reply{108, {}, "matchmaker-host-update-session-expired"};
+                    address = lobby["host_doc"]["listen_server"]["host_address"].get<std::string>();
+                }
                 wire::require(
                     host.contains("listen_server") && host["listen_server"].is_object() &&
                     host["listen_server"].value("host_player_id", uint64_t{}) == id.userId &&
-                    host["listen_server"].value("host_address", std::string{}) ==
-                        lobby["host_doc"]["listen_server"]["host_address"].get<std::string>() &&
+                    host["listen_server"].value("host_address", std::string{}) == address &&
                     host.contains("player_state") && host["player_state"].is_object() &&
                     host["player_state"].size() <= 200 && host.contains("ruleset_payload") &&
                     host["ruleset_payload"].is_object() && host.contains("team_balance") &&
@@ -1026,6 +1084,15 @@ namespace services
                 }
                 wire::require(revision != UINT64_MAX);
                 const auto documentTime = nextDocumentTime(lobby);
+                if (migration)
+                {
+                    lobby["owner"] = id.userId;
+                    lobby["owner_session"] = sessionFingerprint(id);
+                    auto &order = lobby["backend_doc"]["listen_server"]["lobby_host_order"];
+                    wire::require(order.is_array() && order.size() <= 200);
+                    eraseUsers(order, {id.userId});
+                    order.insert(order.begin(), id.userId);
+                }
                 auto writes = reconcileMembers(root, id, lobby, host);
                 lobby["update_id"] = revision + 1;
                 host["update_id"] = revision + 1;
@@ -1035,7 +1102,8 @@ namespace services
                 lobby["backend_doc"]["update_time"] = documentTime;
                 writes.insert(writes.begin(), {"lobbies/" + path.filename().string(), lobby});
                 matchmaking_store::commit(root, id.titleId, writes);
-                reply.operation = "matchmaker-host-document-updated";
+                reply.operation = migration ? "matchmaker-lobby-host-migrated"
+                                            : "matchmaker-host-document-updated";
                 notify(reply, lobby, 2006);
                 return reply;
             }

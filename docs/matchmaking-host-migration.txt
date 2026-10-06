@@ -1,0 +1,68 @@
+REPLAY NATIVE LOBBY HOST CLAIMS
+
+Issue
+The backend formerly rejected every task 145/15 update from a non-creator,
+even after the native party elected a replacement for a disconnected host.
+The lobby address, host authority and pending document deliveries then stayed
+tied to the departed session.
+
+Target evidence
+Original 1.20 PostMigrationBecomeHost: 0x141046BC0.
+Original TaskGetLobbyDocuments: 0x14104E4F0.
+Original UpdatedLobbyDocumentsBecomeHost: 0x14104DBD0.
+Original UpdateHostDoc: 0x14104BFA0.
+Original registered async document decoder: 0x14213F1C0, event 2006.
+The original functions are retained in data/native-mm-document-parsers.json
+and data/native-host-doc-callback-callers-20261006.json. Display names alone
+are not proof: the get-documents wrapper has a misleading player-token alias
+in the growing SQLite export, but its lobby ID/result and callback establish
+the document operation. OpenIW8 is a behavior oracle, not Replay RVA proof.
+These addresses describe the original image, not the shifted deployed image.
+
+Native flow
+The party elects its host. PostMigrationBecomeHost requests the existing lobby
+documents. Its successful callback keeps the backend DTLS security ID/key,
+sets the local host UID and address, reconciles players, and dirties the host
+document for the ordinary update task. No new migration task, unsolicited
+election event, generated endpoint or engine patch is needed.
+
+Backend behavior
+A member's ownership claim is rejected while the previous owner's bound live
+lease exists. After it ends, a successor must still be assigned to this lobby,
+hold a current live matchmaking token for the requesting session, and have
+that exact token in its retained active search's original member/token query.
+A new login cannot inherit an old search token. A newer lobby assignment
+cannot claim authority over an abandoned lobby.
+
+The submitted host ID must equal the caller and the native 84-byte address
+must equal its registered player-info address. The normal complete player
+snapshot bounds, known-member checks, host-presence requirement and revision
+compare-and-swap remain in place. A stale valid claim returns native false.
+No state is changed by invalid claims.
+
+A matching claim publishes owner/session, host ID/address, successor-first
+migration order and both monotonic document revisions together. Existing DTLS
+keys, map/match selection and backend rules remain intact, as Replay's native
+become-host callback expects. The same membership reconciliation retires
+omitted/status-4 former-host fields across players, tokens, slots, teams,
+squads, migration order, current-player index and unreferenced searches.
+Shared searches survive when retained members still reference them.
+
+The existing durable transaction store publishes the entire change and rolls
+forward after interruption. An error after preparing a journal does not imply
+rollback. Recovery yields complete authority/index state; it does not promise
+a replayed push for the failed request. Clients can fetch current documents
+and submit a fresh revision. Successful claims use ordinary update event 2006.
+Normal host authorization, tournament/ExpectGame authorization and delayed
+document-delivery checks now consult the migrated owner/session automatically.
+A returned former host receives no ownership exemption.
+
+Limits
+This supports a party-elected host after the prior native host lease ends.
+It does not elect a peer on behalf of the engine, treat an explicit disband as
+migration, or infer a relinquishment while the old host lease is still live.
+A transient same-key reconnect before a claim keeps the original authority.
+Protocol fixtures exercise real authenticated disconnects, address replacement,
+member retirement and interrupted publication. Native startup/reconnect is a
+separate regression gate. In-game migration callbacks, playable peer hosting
+and two-network gameplay remain unverified without their own game evidence.

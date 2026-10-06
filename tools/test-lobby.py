@@ -3397,6 +3397,23 @@ try:
     assert renewed_peer.task(145, 13, u64(offline_lobby))[0] == 16
     assert renewed_peer.task(145, 10, u64(offline_lobby)) == []
     assert renewed_peer.receive() == (2, u32(2002) + u64(offline_lobby) + u64(0))
+    from host_migration_fixtures import exercise as test_host_migration
+
+    renewed_peer = test_host_migration(
+        client,
+        renewed_peer,
+        renewed_peer_auth,
+        Client,
+        directory,
+        title,
+        user,
+        peer_user,
+        match_query,
+        native_rest,
+        rest_response,
+        (u32, u64, text, boolean),
+        checks,
+    )
     from session_presence_fixtures import exercise as test_session_presence
 
     test_session_presence(

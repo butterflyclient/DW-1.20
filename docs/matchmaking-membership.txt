@@ -20,12 +20,14 @@ following complete snapshot omits the player. Backend expected players are
 read from every key of the players object; leaving departed keys there keeps
 them expected regardless of the value's text.
 
-Task 145/15 validates ownership, the creator's live session and document shape.
+Task 145/15 validates ownership, the current host's live session and document shape.
 Its compare-and-swap result precedes semantic member validation: an outdated
 otherwise well-formed snapshot returns native false, even if a newer revision
 already retired one of its player keys. A matching snapshot cannot introduce
-unknown players, omit the host or mark the host READY_TO_REMOVE. Host departure
-uses the existing native disband path; this does not invent host migration.
+unknown players, omit the host or mark the host READY_TO_REMOVE. A departed
+host can use the native disband path. A party-elected replacement also uses
+the native get-documents/update-host-document migration sequence described in
+docs/matchmaking-host-migration.txt.
 
 A matching complete snapshot retires non-host players it omits or marks 4.
 Present status 3 remains acknowledged until omission. Retirement removes the
@@ -65,5 +67,5 @@ retirement and complete recovery. Error 102 after preparation does not promise
 rollback: the existing transaction contract rolls forward on the next read.
 
 These are protocol/domain checks. A basic native startup/reconnect run guards
-the current deployment separately. Native gameplay departure, host migration
-and two-network party gameplay are still separate unverified gates.
+the current deployment separately. Native gameplay departure, the in-game
+migration callback and two-network party gameplay are separate unverified gates.

@@ -1,0 +1,69 @@
+REPLAY DW HOST-MIGRATION READINESS
+2026-10-06
+
+Issue
+Lobby host updates were creator-only. Native party migration could read the
+old documents but could not publish a successor's host ID/address.
+
+Research
+Original Replay PostMigrationBecomeHost 0x141046BC0 calls the document request
+whose successful TaskGetLobbyDocuments callback 0x14104E4F0 invokes
+UpdatedLobbyDocumentsBecomeHost 0x14104DBD0. It retains the lobby's backend
+DTLS keys, changes its local host UID/address and dirties the ordinary host
+snapshot for UpdateHostDoc 0x14104BFA0. No extra backend election task/event
+was inferred from display names or another game's numeric addresses.
+
+Fix
+Task 145/15 accepts a party-elected member after the original owner's bound
+session ends. It verifies the current lobby assignment, live requesting token
+session, original active search-token binding and registered 84-byte native
+address. The normal document revision, player-state and capacity bounds still
+apply. Ownership/session, successor-first migration order, host address and
+departed-member/index/search reconciliation publish in the existing durable
+transaction. DTLS keys and backend map/rules remain intact. Successful updates
+use native event 2006. Former-host reconnection confers no ownership privilege.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 7069ed6be1d2261fd6b5117902638ac8d48323c0dee86902a462d0aaf5fc5cc9
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+219 grouped encrypted protocol/service checks passed on this backend image.
+Six new host-migration groups cover live-host takeover denial, stale CAS,
+native address/host-state rejection, token/search/assignment binding, successful
+ownership/retirement, returned former-host denial and actual interrupted index
+publication followed by full recovery. Current-image signed platform/auth/
+resource checks and resumed local-identity persistence passed.
+
+The root-folder game reached native profile sign-in, Online state, all 27
+startup fences, completed empty friend lists and authenticated relay establishment.
+Separate backend stop/start followed by dw_restart reconnected the same owned
+game process/account with a fresh relay credential. Initial pending callbacks
+settled normally. Relay stability lasted 88.407 seconds with nine fresh ping
+replies and no new rejection during that interval. One old-route keepalive
+before establishment was fully correlated with the previous native route.
+The owned game closed normally and temporary command markers were removed.
+The current backend remains running. No game rebuild, proxy, map/match test,
+new friendship, owner identity change or additional public port.
+
+validation/20261006-host-migration.json
+validation/20261006-host-migration-native-reconnect.json
+data/lobby-verification.json
+data/host-migration-build-20261006.log
+data/host-migration-suite-20261006.log
+data/native-host-migration-final-20261006.jpg
+docs/matchmaking-host-migration.txt
+
+Remaining
+The full backend goal remains active: 134 of 140 inventoried constructor task
+routes are registered. Exact response bindings for six live-download/category/
+large-upload routes remain open, plus indirect/REST/push and native consumer
+coverage. This iteration validates the native wire contract with independent
+clients and startup/reconnect in the actual game; it does not claim a playable
+in-game host change or two-network party gameplay. The Terms of Agreement
+screen remained unaccepted, limiting menu-driven tests. Controlled restarts
+and dw_restart are supported; dw_leave remains excluded.
