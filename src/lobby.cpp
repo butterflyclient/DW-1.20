@@ -16,6 +16,7 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <tuple>
 
 namespace lobby
 {
@@ -42,6 +43,11 @@ namespace lobby
             uint64_t lastTournamentRoundLobby = 0, lastTournamentRoundSearch = 0;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
+            // This is transport publication history, not a guessed native state.
+            // Each serialized writer publishes a required join before a message
+            // and coalesces the same join still pending in the delayed queue.
+            using ChannelMember = std::tuple<std::string, uint64_t, uint64_t>;
+            std::map<ChannelMember, std::pair<uint32_t, uint32_t>> channelJoins;
         };
 
         std::mutex endpointMutex;
@@ -182,6 +188,15 @@ namespace lobby
                 }
                 if (!services::deliveryValid(title, delivery))
                     return;
+                const PushEndpoint::ChannelMember channelMember = {
+                    delivery.channelCategory, delivery.channelId, delivery.channelMember};
+                const auto channelGeneration = std::make_pair(delivery.channelMemberGeneration,
+                                                              delivery.channelRecipientGeneration);
+                const auto priorJoin = endpoint->channelJoins.find(channelMember);
+                const bool joined = priorJoin != endpoint->channelJoins.end() &&
+                                    priorJoin->second == channelGeneration;
+                if (delivery.channelEvent == 24 && joined)
+                    continue;
                 if (delivery.tournamentRoundLobby &&
                     endpoint->lastTournamentRoundLobby == delivery.lobbyId &&
                     endpoint->lastTournamentRoundSearch == delivery.searchId)
@@ -198,8 +213,29 @@ namespace lobby
                 {
                     if (endpoint->writer && platform::valid(endpoint->identity))
                     {
+                        if (!delivery.channelJoinPayload.empty() && !joined)
+                        {
+                            if (!endpoint->writer(delivery.channelJoinPayload))
+                            {
+                                endpoint->writer = {};
+                                continue;
+                            }
+                            if (endpoint->channelJoins.size() >= 8192 &&
+                                !endpoint->channelJoins.contains(channelMember))
+                                endpoint->channelJoins.erase(endpoint->channelJoins.begin());
+                            endpoint->channelJoins[channelMember] = channelGeneration;
+                        }
                         if (!endpoint->writer(delivery.payload))
                             endpoint->writer = {};
+                        else if (delivery.channelEvent == 24)
+                        {
+                            if (endpoint->channelJoins.size() >= 8192 &&
+                                !endpoint->channelJoins.contains(channelMember))
+                                endpoint->channelJoins.erase(endpoint->channelJoins.begin());
+                            endpoint->channelJoins[channelMember] = channelGeneration;
+                        }
+                        else if (delivery.channelEvent == 25)
+                            endpoint->channelJoins.erase(channelMember);
                         else if (delivery.mailId)
                             endpoint->lastMail[delivery.mailContext] = delivery.mailId;
                         else if (delivery.tournamentRoundLobby)

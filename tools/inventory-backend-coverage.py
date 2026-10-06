@@ -102,7 +102,7 @@ GAPS = {
     "194": "Signed empty local enrollment; populated experiments need explicit treatment rules.",
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
-    "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. Native private-party create and real peer join/leave callbacks are recorded in the hash-bound channel proof. Native channel-message callbacks, a second game's subscribe/unsubscribe task callbacks and multi-game chat remain open.",
+    "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
     "255": "Friends/user lists/presence/event ingestion implemented. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; other REST mutations need explicit request/result/domain contracts.",
 }
 
@@ -259,10 +259,28 @@ def main():
     map_policy_proof = (
         json.loads(map_policy_path.read_bytes()) if map_policy_path.exists() else None
     )
-    channel_path = ROOT / "validation/20261006-channel-native-membership.json"
-    channel_proof = (
-        json.loads(channel_path.read_bytes()) if channel_path.exists() else None
-    )
+    channel_path, channel_proof = None, None
+    for path in sorted((ROOT / "validation").glob("*channel-native-*.json")):
+        proof = json.loads(path.read_bytes())
+        if (
+            proof.get("passed")
+            and proof.get("server_sha256") == current_hash
+            and proof.get("game_sha256") == deployment["sha256"]
+            and proof.get("native_channel_create_completion_verified")
+            and proof.get("positive_native_member_callback_verified")
+        ):
+            channel_path, channel_proof = path, proof
+    rest_path = DATA / "native-rest-callgraph.json"
+    rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
+    if rest_inventory:
+        if rest_inventory["inventory_tool_sha256"] != digest(
+            ROOT / "tools/inventory-native-rest.py"
+        ):
+            raise ValueError("Regenerate the native REST inventory after tool changes")
+        if rest_inventory.get("target_database_changed"):
+            raise ValueError(
+                "Regenerate the native REST inventory from a stable database"
+            )
     for service, task in sorted(pairs):
         constructors = [
             proof
@@ -292,6 +310,8 @@ def main():
                 and channel_proof.get("positive_native_member_callback_verified")
             )
             scope = "Native private-party create response installed its real channel/host; peer event-24/25 callbacks updated its native member records. The peer's subscribe/unsubscribe task requests came from an independent wire client, not another game"
+            if channel_proof.get("native_channel_message_verified"):
+                scope += "; the first real peer message was consumed in native chat history. The peer send request came from the wire client"
         if (service, task) == (95, 1) and map_policy_proof:
             completion = bool(
                 completion
@@ -375,6 +395,20 @@ def main():
             ),
         ),
         tasks=tasks,
+        native_rest_inventory=(
+            dict(
+                receipt="data/native-rest-callgraph.json",
+                sha256=digest(rest_path),
+                target_image_sha256=rest_inventory["target_image_sha256"],
+                exported_functions=rest_inventory["exported_functions"],
+                requests=rest_inventory["requests"],
+                unresolved=rest_inventory["unresolved"],
+                full_rest_audit_complete=False,
+                native_response_verified=False,
+            )
+            if rest_inventory
+            else None
+        ),
         domain_gaps=GAPS,
         non_task_subsystems=[
             dict(
@@ -467,6 +501,17 @@ def main():
         "The JSON ledger retains exact constructor call-site provenance and static fixture source references.",
         "No map tests performed. No generic success replies or native fence overrides.",
     ]
+    if rest_inventory:
+        text += [
+            "",
+            "Exact-target direct REST request inventory (response semantics remain separate):",
+        ]
+        for request in rest_inventory["requests"]:
+            text.append(
+                f'  0x{request["function_address"]:X} {request["function"]}: '
+                f'services={request["services"]}; resource/operations={request["resource_operations"]}; '
+                f'literal binding resolved={request["service_operation_binding_resolved"]}'
+            )
     (DATA / "backend-coverage-inventory.txt").write_text("\n".join(text) + "\n")
     print(json.dumps(inventory["counts"]))
 

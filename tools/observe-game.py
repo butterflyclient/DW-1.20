@@ -253,6 +253,53 @@ try:
                     )
                 if len({member["user"] for member in members}) != count:
                     raise RuntimeError("Native channel contains duplicate members")
+                # AddMessageToChat 141B316F0 stores a 1200-pointer ring at
+                # +11248 and uses a global pool of 1200 records, each 576 bytes.
+                # Expose hashes rather than private chat text.
+                total, retired = struct.unpack_from("<II", header, 8)
+                retained = (total - retired) & 0xFFFFFFFF
+                if retained > 1200:
+                    raise RuntimeError("Native channel message ring bounds changed")
+                messages = []
+                message_pool = symbols["gl_151ACEAE0"]
+                for back in range(min(retained, 16), 0, -1):
+                    sequence = (total - back) & 0xFFFFFFFF
+                    pointer = struct.unpack(
+                        "<Q", read(address + 11248 + (sequence % 1200) * 8, 8)
+                    )[0]
+                    if not pointer:
+                        continue  # The shared pool can retire another chat's slot.
+                    offset = pointer - base - message_pool
+                    if offset < 0 or offset >= 1200 * 576 or offset % 576:
+                        raise RuntimeError("Native channel message is outside its pool")
+                    message = read(pointer - base, 576)
+                    sender, message_channel = struct.unpack_from("<QQ", message)
+                    owner = struct.unpack_from("<Q", message, 560)[0]
+                    name, content = message[16:52], message[52:552]
+                    if (
+                        message_channel != channel
+                        or owner != base + address
+                        or b"\0" not in name
+                        or b"\0" not in content
+                    ):
+                        raise RuntimeError("Native channel message layout is invalid")
+                    content = content.split(b"\0", 1)[0]
+                    messages.append(
+                        {
+                            "sequence": sequence,
+                            "sender": sender,
+                            "sender_name": name.split(b"\0", 1)[0].decode(
+                                errors="replace"
+                            ),
+                            "body_length": len(content),
+                            "body_sha256": hashlib.sha256(content).hexdigest(),
+                            "received_at": struct.unpack_from("<I", message, 552)[0],
+                            "message_state": struct.unpack_from("<I", message, 556)[0],
+                            "filter_state": struct.unpack_from("<I", message, 568)[0],
+                        }
+                    )
+                if header != read(address, 36):
+                    continue
                 chats.append(
                     {
                         "slot": slot,
@@ -262,6 +309,9 @@ try:
                         "controller": controller,
                         "member_count": count,
                         "members": members,
+                        "message_sequence": total,
+                        "retired_message_sequence": retired,
+                        "messages": messages,
                     }
                 )
                 break

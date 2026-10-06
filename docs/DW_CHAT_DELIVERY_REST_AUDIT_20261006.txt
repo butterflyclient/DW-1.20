@@ -1,0 +1,87 @@
+REPLAY DW CHAT DELIVERY AND REST AUDIT - 2026-10-06
+
+Issue
+Replay could drop a peer's first text message before its delayed join arrived.
+The native handler requires the sender to exist in the channel member pool.
+
+Exact target research
+Untouched Replay image SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+0x140F3D410: OnChatChannelMessage finds the active chat, applies sender privacy
+flags, then drops the message if GetMemberFromChatById cannot find the sender.
+0x141B316F0: AddMessageToChat stores incoming records in a shared 1200-element
+pool of 576-byte messages. Each chat has its own 1200-pointer ring at +11248.
+The message text buffer is 500 bytes including its terminator. Incoming state
+is 2; owner pointer and channel ID bind the record to the actual native chat.
+
+Fix
+The channel service carries a real committed sender-join snapshot with a first
+message when the sender joined after the recipient. The serialized endpoint
+writer publishes that join before the message and coalesces its delayed copy.
+Actor and recipient generations are revalidated before delivery. Publication
+history is bounded and owned by the connection, and leaves retire its entry.
+No native state is guessed, written, or bypassed. Sender privacy flags remain.
+Text chat/clanChat reject missing or embedded NULs and bodies over 500 bytes.
+Other channel categories retain their existing bounded binary payload support.
+
+Verified build and artifacts
+Release backend was freshly compiled with MSVC /W4 /WX; formatting passed.
+Backend SHA256:
+614c2a01ec1351d1b1f8ce600537311d6b58970941bdfc59ce5cf652ffccc042
+Unchanged root-folder game SHA256:
+b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+252 isolated encrypted protocol/service groups passed, including immediate
+broadcast/whisper ordering, duplicate-join coalescing and malformed text.
+Signed platform, native authentication and resource verification passed.
+
+Actual native validation
+The game created its own private-party channel. The existing diagnostic peer
+subscribed and immediately sent its first message, without waiting for native
+membership. Replay retained exactly one incoming message with the real peer
+ID/name and body hash. Unsubscribe removed the membership but kept the message.
+The same check passed after separate backend stop/start and native dw_restart.
+The same game process and identity recovered Online state and all 27 fences.
+A fresh native relay remained stable for 87.6 seconds with nine keepalive
+replies and zero rejected packets. No map/match test was performed.
+The game closed normally; owned root command/flag files were removed. Game and
+INI hashes were preserved. The verified backend remains running.
+
+Receipts
+validation/20261006-channel-native-message.json
+validation/20261006-channel-native-message-after-restart.json
+validation/20261006-channel-message-native-reconnect.json
+Private observations and preservation receipts remain under data/.
+tools/native-channel-message-test.py reads native history through the observer;
+neither tool writes game memory or logs private message text.
+The peer requests came from an authenticated wire client. These results prove
+the host's native create completion and incoming push/history consumer. They
+do not prove another game's subscribe/send task callbacks or two-game chat.
+
+Expanded target inventory
+tools/inventory-native-rest.py scans direct compiled builder calls in the
+untouched image, checks instruction boundaries and follows bounded CFG/register
+facts. Display names are candidate aliases; exact addresses establish ownership.
+All explicit and implicit register writes invalidate facts; partial writes never
+retain full image pointers. Dynamic arguments and unknown branches stay explicit.
+54 direct builder calls were recovered in 29 containing functions; 51 calls
+have literal arguments. 22 containing functions have one resolved literal
+service/resource/operation binding. Three service calls use dynamic arguments;
+helpers and callers without a local service setter remain separately recorded.
+Seven literal service families were found: ae.demonware.net, friends, presence,
+social-service, umbrella, uno and userlists. Recovered operations include account
+authentication/link/rename/update, regulation publication/preferences, friends,
+presence, lists, username resolution, achievements, AB enrollment and objectstore.
+The coverage ledger includes this inventory, its target/tool hashes and unknowns.
+Receipt: validation/20261006-native-rest-inventory.json
+
+Remaining work
+Direct builder enumeration is not a complete indirect/inlined REST audit.
+Recovered request names are not proof of response DTOs or native completion.
+Regulation/account and uncovered objectstore response handlers need their full
+native schemas and ownership/lifetime semantics before implementation.
+The reviewed binary task ledger remains 140 routes, 134 handlers and six known
+unhandled result bindings: 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24.
+Multi-instance native profile/settings/command isolation needs implementation
+before safely testing two games on this Windows account. Actual two-network
+party JOIN/DATA/gameplay, native migration and broader coverage remain open.
+The full backend goal remains active. No new firewall or router ports were opened.

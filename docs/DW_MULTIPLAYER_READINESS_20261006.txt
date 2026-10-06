@@ -205,3 +205,17 @@ The new game includes current private integration inputs, including existing
 side-session Con_Developer/DW_PlayerDataPath work. Those files were not edited
 or committed in this pass. Shared compiler/editor work and game assets remain.
 Full DW backend implementation continues; this is a readiness milestone.
+
+CURRENT BACKEND ADDENDUM - NATIVE FIRST CHAT MESSAGE
+Backend SHA256: 614c2a01ec1351d1b1f8ce600537311d6b58970941bdfc59ce5cf652ffccc042
+Game SHA256 remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
+252 encrypted protocol/service groups and signed platform/auth/resource gates
+passed. A peer's first message was retained in the actual native chat history
+before and after separate backend stop/start and dw_restart. Native account,
+Online and 27 fences recovered; relay stability passed for 87.6 seconds with
+nine keepalives and no rejected packets. No game executable rebuild was needed.
+No map test or two-game native chat/gameplay claim is made by this pass.
+The test game closed normally; its owned command files were removed. The game
+EXE, owner INI and unrelated compiler work were preserved. Backend remains live.
+See DW_CHAT_DELIVERY_REST_AUDIT_20261006.txt for proof paths, expanded exact-target
+REST inventory and the remaining backend/profile-isolation work.

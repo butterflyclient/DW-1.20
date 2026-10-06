@@ -203,6 +203,70 @@ def exercise(directory, title, new_client, helpers, checks):
         checks.append(
             "Complete channel title/category/key/member/name/revision/generation layouts reject corrupted storage before mutation; real blocked atomic publication emits no phantom leave and an owned retry publishes it once"
         )
+
+        # Text-chat's native consumer requires an existing sender. A message may
+        # arrive immediately while that sender's ordinary join is delayed.
+        category = "chat"
+        result = owner.task(198, 6, request(), structured=True)
+        channel = dict(
+            (tag, value) for tag, _, value in pb_fields(pb_fields(result)[0][2])
+        )[2]
+        message = b"REPLAY_DW_ORDERED_CHAT_FIXTURE\0"
+        message_type = 256  # The diagnostic sender permits crossplay visibility.
+
+        def send(connection, whisper=False, content=message):
+            payload = pb_text(1, category) + pb_integer(2, channel)
+            if whisper:
+                payload += pb_integer(3, owner_id)
+            payload += pb_bytes(4 if whisper else 3, content)
+            payload += pb_integer(5 if whisper else 4, message_type)
+            return connection.task(
+                198, 4 if whisper else 3, structure(payload), structured=True
+            )
+
+        def message_received(connection, actor, whisper=False):
+            # Independent exact native V2 DTO, including sender's privacy flags.
+            def integer32(value):
+                return b"\x08" + value.to_bytes(4, "little")
+
+            expected = (
+                integer32(23 if whisper else 22)
+                + u64(actor)
+                + text(names[actor])
+                + text(category)
+                + u64(channel)
+                + b"\x13"
+                + integer32(len(message))
+                + message
+                + integer32(message_type)
+            )
+            assert connection.receive() == (2, expected)
+
+        peer.task(198, 1, request(channel), structured=True)
+        send(peer)
+        receive(owner, peer_id, True, channel, 2)
+        message_received(owner, peer_id)
+        message_received(peer, peer_id)
+        no_update(owner)  # The original delayed event-24 is now coalesced.
+        third.task(198, 1, request(channel), structured=True)
+        send(third, whisper=True)
+        receive(owner, third_id, True, channel, 3)
+        message_received(owner, third_id, whisper=True)
+        receive(peer, third_id, True, channel, 3)
+        no_update(owner)
+        no_update(third)
+        for bad in (b"unterminated", b"early\0tail\0", b"x" * 500 + b"\0"):
+            payload = (
+                pb_text(1, category)
+                + pb_integer(2, channel)
+                + pb_bytes(3, bad)
+                + pb_integer(4, message_type)
+            )
+            peer.task(198, 3, structure(payload), error=106)
+        no_update(owner)
+        checks.append(
+            "First broadcast and whisper publish the real sender join before the exact native message DTO, preserve sender privacy flags and coalesce the delayed join; unterminated, embedded-NUL and oversized native text are rejected without delivery"
+        )
     finally:
         for _, connection in clients:
             connection.close()

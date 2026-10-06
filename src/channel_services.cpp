@@ -49,11 +49,10 @@ namespace services
             return delivery;
         }
 
-        void notifyMembership(std::vector<Delivery> &deliveries,
-                              const Json &channel,
-                              uint64_t actor,
-                              const Json &member,
-                              bool joined)
+        wire::Bytes membershipPacket(const Json &channel,
+                                     uint64_t actor,
+                                     const Json &member,
+                                     bool joined)
         {
             // Exact Replay 0x142120A80 selects subscribed for event 24, then
             // 0x1420FE9A0 reads the complete typed channel-info-with-category DTO.
@@ -72,6 +71,16 @@ namespace services
             push.boolean(false);
             push.boolean(false);
             push.u32(channel.at("revision"));
+            return std::move(push.data);
+        }
+
+        void notifyMembership(std::vector<Delivery> &deliveries,
+                              const Json &channel,
+                              uint64_t actor,
+                              const Json &member,
+                              bool joined)
+        {
+            const auto packet = membershipPacket(channel, actor, member, joined);
             for (const auto &recipient : channel["members"].items())
             {
                 const auto user = std::stoull(recipient.key()); // Validated canonical UInt64.
@@ -82,7 +91,7 @@ namespace services
                                         actor,
                                         joined ? 24 : 25,
                                         member.at("generation").get<uint32_t>());
-                delivery.payload = push.data;
+                delivery.payload = packet;
                 delivery.delayMs = 250;
                 deliveries.push_back(std::move(delivery));
             }
@@ -298,6 +307,15 @@ namespace services
                                            : task == 3 ? 30U
                                            : task == 4 ? 62U
                                                        : 14U));
+        if ((task == 3 || task == 4) && (cat == "chat" || cat == "clanChat"))
+        {
+            // Replay's text-chat consumer copies a NUL-terminated C string into
+            // OnlineChatMessage::m_message[500]. Other channel categories carry
+            // binary tournament/game payloads and retain the SDK's 1024-byte cap.
+            wire::require(!message.empty() && message.size() <= 500 && message.back() == 0 &&
+                          std::find(message.begin(), message.end() - 1, uint8_t{0}) ==
+                              message.end() - 1);
+        }
         if (task == 5)
             wire::require(user <= 256);
         else if (task != 4 && user && user != id.userId)
@@ -401,6 +419,14 @@ namespace services
                                                 task == 3 ? 22 : 23,
                                                 members[member]["generation"].get<uint32_t>());
                         delivery.payload = push.data;
+                        // Native OnChatChannelMessage 140F3D410 requires the sender
+                        // to exist already. Its delayed join may still be queued.
+                        // Carry the same real membership snapshot so the serialized
+                        // endpoint writer can publish it before the first message.
+                        if (target != id.userId &&
+                            delivery.channelMemberGeneration > delivery.channelRecipientGeneration)
+                            delivery.channelJoinPayload =
+                                membershipPacket(channel, id.userId, members[member], true);
                         reply.deliveries.push_back(std::move(delivery));
                     }
                 }

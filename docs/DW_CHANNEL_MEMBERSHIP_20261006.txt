@@ -81,8 +81,15 @@ stable for 110.4 seconds with 11 keepalive replies and zero rejected packets.
 The test game then closed normally; owned root command files were removed,
 game/INI hashes were preserved and the backend was left running.
 
+Update: native first-message consumer
+The subsequent 614c2a01 backend pass verified a first peer message in actual
+native chat history before and after backend restart/dw_restart. The sender
+join is serialized before that message; its delayed duplicate is coalesced.
+See DW_CHAT_DELIVERY_REST_AUDIT_20261006.txt for the exact artifact hashes,
+native receipts, text limits and separate incoming-message proof scope.
+
 Remaining
-Native channel-message callbacks, a second game's subscribe/unsubscribe task
-callbacks and two-game chat need their own observation.
+A second game's subscribe/unsubscribe/send task callbacks and two-game chat
+need their own observation.
 Actual two-network JOIN/DATA/gameplay remains unverified.
 The broader DW implementation and indirect/REST/push inventory are incomplete.
