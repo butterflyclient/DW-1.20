@@ -63,6 +63,17 @@ mail events asynchronously while preserving strict order for other result/push
 types; dedicated mail checks consume the recorded raw events explicitly.
 
 Actual native startup/reconnect is a separate current-image regression gate.
-The in-game mail callback and its body-processing consumer remain unverified
-until a controlled native mail test can reach that flow. No protocol fixture
-or ordinary startup fence is treated as proof of that consumer.
+The first startup/reconnect receipt did not claim the mail consumer. A separate
+focused native test subsequently reached the stock callback with an inert mail
+from an existing, separate validation identity. It observed pending 0 -> 1,
+manager idle -> get-header initialization -> idle, native header/body task
+completion, matching native body ID/length, native deletion and the expected
+ProcessingDone buffer clear. The message disappeared before its 300-second
+expiration; it was not removed by fixture code. All 27 fences remained passing.
+validation/20261006-mail-native-consumer.json retains that scoped evidence.
+
+The body had already been cleared when the final snapshot was taken, so this
+does not claim an exact payload hash captured inside the native body buffer.
+Application-specific mail handlers, rewards and populated category/status
+variants remain outside this inert diagnostic. No protocol fixture or ordinary
+startup fence is treated as proof of those consumers.

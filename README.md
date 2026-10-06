@@ -63,12 +63,16 @@ The party-elected host-claim iteration is recorded in
 `validation/20261006-host-migration-native-reconnect.json`; its exact contract,
 membership/session checks and interrupted-publication behavior are described in
 [matchmaking-host-migration.txt](docs/matchmaking-host-migration.txt).
-Its protocol checks do not establish an in-game migration callback.
+Those protocol checks do not establish an in-game migration callback.
+The stock new-mail callback, header/body completion and deletion flow have
+their own focused native receipt at
+`validation/20261006-mail-native-consumer.json`. This uses one inert message
+from a separate test identity and does not claim application mail handlers.
 The current native-mail iteration has its own scoped startup/reconnect receipt at
 `validation/20261006-mail-notifications-native-reconnect.json`. Recipient event 18,
 idle expiration returns and per-connection unread catch-up are described in
-[mail-notifications.txt](docs/mail-notifications.txt); the in-game mail callback
-and body consumer still require their own validation.
+[mail-notifications.txt](docs/mail-notifications.txt). Application-specific mail
+handlers and native send/expiration-return consumers remain separate gates.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are

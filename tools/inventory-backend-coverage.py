@@ -84,7 +84,7 @@ GAPS = {
     "12": "Native utility methods outside the recovered request set remain unclassified.",
     "23": "Full native positive signed increment/read roundtrip still needs observation.",
     "27": "Configured geography is local metadata, not real IP geolocation.",
-    "29": "Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. Native game mail callback/body consumers remain unverified.",
+    "29": "Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
@@ -221,6 +221,8 @@ def main():
     marketing_proof = (
         json.loads(marketing_path.read_bytes()) if marketing_path.exists() else None
     )
+    mail_path = ROOT / "validation/20261006-mail-native-consumer.json"
+    mail_proof = json.loads(mail_path.read_bytes()) if mail_path.exists() else None
     for service, task in sorted(pairs):
         constructors = [
             proof
@@ -232,8 +234,20 @@ def main():
         )
         if (service, task) == (104, 6) and marketing_proof:
             proof_filename, relay_proof = marketing_path.name, marketing_proof
+        proof_filename = "data/" + proof_filename if proof_filename else None
+        if service == 29 and task in (4, 5, 10) and mail_proof:
+            proof_filename = str(mail_path.relative_to(ROOT)).replace("\\", "/")
+            relay_proof = mail_proof
         completion = bool(relay_proof and relay_proof.get("passed"))
         scope = None
+        if service == 29 and task in (4, 5, 10) and mail_proof:
+            completion = bool(
+                completion
+                and mail_proof.get("native_game_mail_callback_verified")
+                and mail_proof.get("native_mail_header_and_body_completion_verified")
+                and mail_proof.get("native_mail_deletion_and_idle_return_verified")
+            )
+            scope = "Stock native onNewMail wakeup, header/body completion, deletion and idle return for one inert diagnostic; application mail handlers unverified"
         if (service, task) == (145, 18) and relay_proof:
             completion = bool(
                 relay_proof.get("native_friend_menu_invitation_handshake_verified")
@@ -265,7 +279,7 @@ def main():
                 ),
                 static_fixture_references=references.get((service, task), []),
                 native_positive_completion_verified_current_binary=native,
-                native_completion_evidence="data/" + proof_filename if native else None,
+                native_completion_evidence=proof_filename if native else None,
                 native_completion_scope=scope if native else None,
                 native_fence_completion_is_not_per_method_proof=True,
             )

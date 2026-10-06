@@ -1,0 +1,60 @@
+REPLAY DW NATIVE MAIL CONSUMER
+2026-10-06
+
+Issue
+The new mail lifecycle had passed encrypted fixtures, but native onNewMail,
+header/body decoding and stock deletion still needed actual game evidence.
+
+Research
+Original dwMail_PumpStateIdle 0x1415033A0 selects pending mail for controller 0.
+GetHeaderInit 0x141503170 invokes wrapper 0x140F70880, whose actual SDK call is
+task 29/10 despite a misleading exported DWTeams display name. GetDataInit
+0x141502CB0 uses task 29/4. GetData 0x141502A00 consumes the native decoded
+body and routes unrecognized payloads to stock deletion. ProcessingDone
+0x1415027C0 clears the 1,024-byte body buffer. Read-only observations resolve
+the rebuilt image's linked globals; original addresses are research only.
+
+Changes
+observe-game.py --mail reads the bounded native manager state, pending count,
+body ID/length and body hash. native-mail-test.py sends one inert 42-byte
+diagnostic with a five-minute lifetime from the existing native-social fixture
+identity. It never signs in as the running game, changes friendships or deletes
+mail itself. record-native-mail-proof.py validates the snapshots, native fields,
+ordered backend results, publication disappearance before expiration and exact
+game/backend hashes. The coverage ledger records only native tasks 29/10, 29/4
+and 29/5 as positive consumer completions; the separate sender's task 29/9 is
+not presented as a game-side send completion.
+
+Evidence
+Fresh backend SHA256:
+af43d46e2638504bc022c208142592eb6edeb2ac63b435a8d1febf3b20862567
+Unchanged root-folder game SHA256:
+b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private game compiler job retained: 436f999a3d444276
+226 grouped encrypted checks already passed on this same backend image.
+
+The actual game pending counter rose from zero to one and selected get-header
+initialization. It fetched one native header and body, deleted that exact
+message and returned to idle with pending zero and no active task. Its decoded
+body ID and 42-byte length matched the diagnostic. Its final body buffer hash
+matched 42 zero bytes, as ProcessingDone specifies. The message was absent
+before its 300-second expiration. All 27 native fences remained passing.
+No memory writes, new game build, proxy, friendship, map/match, extra listener
+or owner identity replacement was involved. The game closed normally and
+temporary command markers were removed; the tested backend remains running.
+
+validation/20261006-mail-native-consumer.json
+data/native-mail-before-20261006.json
+data/native-mail-after-20261006.json
+data/native-mail-consumed-20261006.json
+data/native-mail-diagnostic-20261006.json
+data/native-mail-consumed-final-20261006.jpg
+
+Limits
+This verifies stock callback/header/body/delete consumption of an inert mail.
+The payload buffer was cleared before the final snapshot, so its original
+payload hash was not captured inside native memory. Application handlers,
+inventory grants, categorized/status methods, native send/expiration-return
+consumers and two-network gameplay remain separate gates. Terms remained
+unaccepted. The full backend inventory is still 134 registered routes out of
+140 known constructor routes, with six exact response bindings unresolved.

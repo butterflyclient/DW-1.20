@@ -72,3 +72,9 @@ not evidence of that consumer. The Terms of Agreement remained unaccepted,
 limiting menu-driven tests. Actual two-network party gameplay still needs
 validation. Controlled restarts and dw_restart are supported; dw_leave is
 excluded. Mail IDs must remain monotonic during a live connection.
+
+Later native consumer pass
+The subsequent inert-message test verified the stock callback, header/body
+completion, deletion and idle return on this same backend/game image. See
+DW_NATIVE_MAIL_CONSUMER_20261006.txt and the separate native-consumer receipt;
+the earlier fixture/startup receipts retain their original narrower claims.

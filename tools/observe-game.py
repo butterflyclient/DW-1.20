@@ -42,6 +42,11 @@ parser.add_argument(
     action="store_true",
     help="Read native global-counter tables and task slots, without changing them",
 )
+parser.add_argument(
+    "--mail",
+    action="store_true",
+    help="Read native mail manager state and bounded body hashes without changing it",
+)
 args = parser.parse_args()
 deployment = json.loads(args.deployment.read_text())
 launch = (
@@ -979,6 +984,54 @@ try:
                 ),
                 port=struct.unpack_from(">H", record, 1042)[0] if state == 3 else None,
             )
+    mail_state = None
+    if args.mail:
+        # Original Replay dwMail_PumpStateIdle 0x1415033A0, GetHeaderInit
+        # 0x141503170 and GetData 0x141502A00 establish these manager fields.
+        # Resolve their linked globals; never carry original RVAs into the
+        # shifted executable. No body text or mailbox credentials are emitted.
+        manager = "s_dwMailManager.dwmailmanagerstate"
+        body_id = "s_dwMailManager.bdmailbody.m_mailID"
+        required = (
+            manager,
+            body_id,
+            "gl_14E6C1018",
+            "gl_14E6C4BE8",
+            "gl_14E6C1090",
+            "gl_14E6C1098",
+            "gl_14E6C1310",
+            "gl_14E6C1318",
+            "gl_142716710",
+        )
+        if not all(name in symbols for name in required):
+            raise RuntimeError("Native mail globals missing from linked image")
+        initialized, pending = struct.unpack("<ii", read(symbols["gl_14E6C4BE8"], 8))
+        body_pointer = struct.unpack("<Q", read(symbols["gl_14E6C1310"], 8))[0]
+        body_length = struct.unpack("<I", read(symbols["gl_14E6C1318"], 4))[0]
+        if body_length > 1024 or (body_length and not body_pointer):
+            raise RuntimeError("Native mail body bounds changed")
+        mail_state = {
+            "enabled": struct.unpack("<I", read(symbols["gl_14E6C1018"] + 4, 4))[0],
+            "state": struct.unpack("<i", read(symbols[manager], 4))[0],
+            "controller_0_initialized": initialized,
+            "controller_0_pending": pending,
+            "active_controller": struct.unpack("<i", read(symbols["gl_14E6C1090"], 4))[
+                0
+            ],
+            "task_active": bool(
+                struct.unpack("<Q", read(symbols["gl_14E6C1098"], 8))[0]
+            ),
+            "body_mail_id": struct.unpack("<Q", read(symbols[body_id], 8))[0],
+            "body_length": body_length,
+            "body_sha256": (
+                hashlib.sha256(read(body_pointer - base, body_length)).hexdigest()
+                if body_length
+                else None
+            ),
+            "context": read(symbols["gl_142716710"], 16)
+            .split(b"\0", 1)[0]
+            .decode("ascii"),
+        }
     result = {
         "schema": 6,
         "pid": pid,
@@ -1167,6 +1220,7 @@ try:
         "native_frontend_active": bool(read(symbols["gl_14C4EBE6C"], 1)[0]),
         "native_selected_dvars": selected_dvars,
         "native_global_counters": counter_state,
+        "native_mail_manager": mail_state,
         # Replay's real publisher download callback 141B3CD00 sets
         # loaded and clears in-flight; no backend success is substituted.
         "native_content_creator_list": (
