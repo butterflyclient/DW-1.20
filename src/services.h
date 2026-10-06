@@ -28,6 +28,7 @@ namespace services
         bool tournamentRefresh = false;
         bool tournamentJoin = false;
         bool tournamentFormationDisband = false;
+        bool tournamentRoundLobby = false;
         std::string mailContext;
         uint64_t mailId = 0;
     };
@@ -49,6 +50,7 @@ namespace services
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user);
     bool deliveryValid(uint32_t title, const Delivery &delivery);
     std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user);
+    std::optional<Delivery> tournamentLobbyUpdate(uint32_t title, uint64_t user);
     std::vector<Delivery> mailUpdates(uint32_t title, uint64_t user);
     Reply dispatch(const platform::LobbyIdentity &identity,
                    uint8_t service,

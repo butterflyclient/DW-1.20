@@ -193,6 +193,7 @@ try:
             session_ticket, session_key = (
                 (ticket, key) if auth_identity is None else auth_identity
             )
+            self.fixture_auth_identity = (session_ticket, session_key)
             self.s = socket.create_connection(("127.0.0.1", 3075 + offset), timeout=5)
             self.outgoing = self.incoming = 1
             self.mail_notifications = []
@@ -3079,6 +3080,13 @@ try:
     tournament_formation_fixtures.exercise(
         client, peer_client, directory, title, user, peer_user, player_info,
         new_tournament_client, (u64, text, boolean), checks,
+    )
+
+    import tournament_round_fixtures
+
+    tournament_round_fixtures.exercise(
+        directory, title, player_info, match_query, new_tournament_client,
+        (u64, text, boolean), checks,
     )
 
     copy_fixture = copy_content_fixtures.exercise(

@@ -39,6 +39,7 @@ namespace lobby
             uint64_t lastTournamentSearch = 0;
             bool lastTournamentJoin = false;
             bool lastTournamentFormationDisband = false;
+            uint64_t lastTournamentRoundLobby = 0, lastTournamentRoundSearch = 0;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
         };
@@ -181,7 +182,11 @@ namespace lobby
                 }
                 if (!services::deliveryValid(title, delivery))
                     return;
-                if (delivery.tournamentRefresh &&
+                if (delivery.tournamentRoundLobby &&
+                    endpoint->lastTournamentRoundLobby == delivery.lobbyId &&
+                    endpoint->lastTournamentRoundSearch == delivery.searchId)
+                    continue;
+                if (!delivery.tournamentRoundLobby && delivery.tournamentRefresh &&
                     endpoint->lastTournament == delivery.tournamentId &&
                     endpoint->lastTournamentSearch == delivery.searchId &&
                     endpoint->lastTournamentJoin == delivery.tournamentJoin &&
@@ -197,6 +202,11 @@ namespace lobby
                             endpoint->writer = {};
                         else if (delivery.mailId)
                             endpoint->lastMail[delivery.mailContext] = delivery.mailId;
+                        else if (delivery.tournamentRoundLobby)
+                        {
+                            endpoint->lastTournamentRoundLobby = delivery.lobbyId;
+                            endpoint->lastTournamentRoundSearch = delivery.searchId;
+                        }
                         else if (delivery.tournamentId)
                         {
                             endpoint->lastTournament = delivery.tournamentId;
@@ -336,6 +346,10 @@ namespace lobby
                                               services::tournamentUpdate(title, user);
                                           if (update)
                                               route(title, *update);
+                                          const auto lobbyUpdate =
+                                              services::tournamentLobbyUpdate(title, user);
+                                          if (lobbyUpdate)
+                                              route(title, *lobbyUpdate);
                                       }
                                       catch (const std::exception &)
                                       {

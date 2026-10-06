@@ -116,6 +116,9 @@ namespace services
                 (!state.contains("disbanded") || state["disbanded"].is_boolean());
             if (!valid)
                 throw std::runtime_error("Invalid persisted lobby layout");
+            if (state["backend_doc"].contains("tournament"))
+                matchmaking_store::validateWrite({"lobbies/" + path.filename().string(), state},
+                                                 id.titleId);
             std::set<uint64_t> members;
             for (const auto &user : state["members"])
                 if (!user.is_number_unsigned() || !user.get<uint64_t>() ||
@@ -343,6 +346,83 @@ namespace services
             wire::require(maximum > 0 && maximum <= 200 &&
                           occupiedSlots(query.at("members"), requestedSlots(query)) <= maximum);
             return maximum;
+        }
+
+        Json createLobbyDocument(const platform::LobbyIdentity &id,
+                                 const Json &query,
+                                 const std::set<uint64_t> &users,
+                                 const Json &listen,
+                                 const PlaylistSelection &selection,
+                                 uint64_t lobbyId,
+                                 const Json &matchIds,
+                                 uint64_t expires,
+                                 const std::string &ownerSession)
+        {
+            const auto time = now();
+            Json rules = selection.rules;
+            Json players = Json::object(), states = Json::object(), levels = Json::object();
+            for (const auto user : users)
+            {
+                const auto key = std::to_string(user);
+                players[key] = "connected";
+                states[key] = 2;
+                levels[key] = "paid";
+            }
+            Json backend = {{"lobby_id", lobbyId},
+                            {"update_id", 1},
+                            {"update_time", time},
+                            {"listen_server", {{"lobby_host_order", Json::array({id.userId})}}},
+                            {"dtls",
+                             {{"security_id", listen["security_id"]},
+                              {"security_key", listen["security_key"]}}},
+                            {"players", players},
+                            {"player_id_to_mm_id", matchIds},
+                            {"player_id_to_service_level", levels},
+                            {"player_id_to_slots", requestedSlots(query)},
+                            {"ruleset_payload", rules},
+                            {"performance", query.value("performance", Json{{"game_type", 1}})},
+                            {"team_balance",
+                             {{"teams", {{"0", query["members"]}}},
+                              {"squad_size", 1},
+                              {"squads", Json::object()}}}};
+            if (query.contains("team_balance") && query["team_balance"].contains("num_teams"))
+            {
+                const auto &count = query["team_balance"]["num_teams"];
+                wire::require(count.is_number_unsigned() && count.get<uint64_t>() <= 200);
+                for (uint64_t team = 1; team < count.get<uint64_t>(); ++team)
+                    backend["team_balance"]["teams"][std::to_string(team)] = Json::array();
+            }
+            if (query.contains("private_lobby"))
+                backend["private_lobby"] = query["private_lobby"];
+            Json host = {
+                {"listen_server",
+                 {{"host_player_id", id.userId}, {"host_address", listen["local_address"]}}},
+                {"player_state", states},
+                {"ruleset_payload", {{"is_merge_src", false}, {"is_merge_dst", false}}},
+                {"lobby_open", true},
+                {"lobby_open_for_pres_join", true},
+                {"team_balance", {{"can_change_teams", true}}},
+                {"update_id", uint64_t{1}},
+                {"update_time", time},
+                {"game_state", {{"state", "intermission"}}}};
+            Json lobby = {{"schema", 1},
+                          {"title", id.titleId},
+                          {"id", lobbyId},
+                          {"owner", id.userId},
+                          {"owner_session", ownerSession},
+                          {"members", query["members"]},
+                          {"update_id", uint64_t{1}},
+                          {"expires", expires},
+                          {"host_doc", host},
+                          {"backend_doc", backend},
+                          {"query_constraints",
+                           {{"acceptable_platforms",
+                             query.value("acceptable_platforms", Json::array({"bnet"}))}}},
+                          {"match_selection", selection.metadata}};
+            lobby["maximum_members"] = requestCapacity(query);
+            wire::require(lobby["host_doc"].dump().size() < 16384 &&
+                          lobby["backend_doc"].dump().size() < 16384);
+            return lobby;
         }
 
         uint64_t nextDocumentTime(const Json &lobby)
@@ -745,7 +825,7 @@ namespace services
                 }
                 if (!users.contains(id.userId))
                     return Reply{101, {}, "matchmaker-request-owner-denied"};
-                const auto maximum = requestCapacity(query);
+                (void)requestCapacity(query);
                 if (!platformAllowed(query))
                     return Reply{108, {}, "matchmaker-platform-unavailable"};
                 if (auto tournament = startTournamentSearch(directory, id, query))
@@ -786,72 +866,20 @@ namespace services
                     lobbyId = randomId();
                 } while (std::filesystem::exists(root / "lobbies" /
                                                  (std::to_string(lobbyId) + ".json")));
-                Json rules = selection->rules;
-                Json players = Json::object(), states = Json::object(), matchIds = Json::object(),
-                     levels = Json::object();
+                Json matchIds = Json::object();
                 for (const auto user : users)
-                {
-                    const auto key = std::to_string(user);
-                    players[key] = "connected";
-                    states[key] = 2;
-                    matchIds[key] = mmId;
-                    levels[key] = "paid";
-                }
-                Json backend = {{"lobby_id", lobbyId},
-                                {"update_id", 1},
-                                {"update_time", time},
-                                {"listen_server", {{"lobby_host_order", Json::array({id.userId})}}},
-                                {"dtls",
-                                 {{"security_id", listen["security_id"]},
-                                  {"security_key", listen["security_key"]}}},
-                                {"players", players},
-                                {"player_id_to_mm_id", matchIds},
-                                {"player_id_to_service_level", levels},
-                                {"player_id_to_slots", requestedSlots(query)},
-                                {"ruleset_payload", rules},
-                                {"performance", query.value("performance", Json{{"game_type", 1}})},
-                                {"team_balance",
-                                 {{"teams", {{"0", query["members"]}}},
-                                  {"squad_size", 1},
-                                  {"squads", Json::object()}}}};
-                if (query.contains("team_balance") && query["team_balance"].contains("num_teams"))
-                {
-                    const auto &count = query["team_balance"]["num_teams"];
-                    wire::require(count.is_number_unsigned() && count.get<uint64_t>() <= 200);
-                    for (uint64_t team = 1; team < count.get<uint64_t>(); ++team)
-                        backend["team_balance"]["teams"][std::to_string(team)] = Json::array();
-                }
-                if (query.contains("private_lobby"))
-                    backend["private_lobby"] = query["private_lobby"];
-                Json host = {
-                    {"listen_server",
-                     {{"host_player_id", id.userId}, {"host_address", listen["local_address"]}}},
-                    {"player_state", states},
-                    {"ruleset_payload", {{"is_merge_src", false}, {"is_merge_dst", false}}},
-                    {"lobby_open", true},
-                    {"lobby_open_for_pres_join", true},
-                    {"team_balance", {{"can_change_teams", true}}},
-                    {"update_id", uint64_t{1}},
-                    {"update_time", time},
-                    {"game_state", {{"state", "intermission"}}}};
-                Json lobby = {{"schema", 1},
-                              {"title", id.titleId},
-                              {"id", lobbyId},
-                              {"owner", id.userId},
-                              {"owner_session", wire::base64Encode(crypto::sha256(id.key))},
-                              {"members", query["members"]},
-                              {"update_id", uint64_t{1}},
-                              {"expires", std::min(time + 3600, id.expires)},
-                              {"host_doc", host},
-                              {"backend_doc", backend},
-                              {"query_constraints",
-                               {{"acceptable_platforms",
-                                 query.value("acceptable_platforms", Json::array({"bnet"}))}}},
-                              {"match_selection", selection->metadata}};
-                lobby["maximum_members"] = maximum;
+                    matchIds[std::to_string(user)] = mmId;
+                auto lobby = createLobbyDocument(id,
+                                                 query,
+                                                 users,
+                                                 listen,
+                                                 *selection,
+                                                 lobbyId,
+                                                 matchIds,
+                                                 std::min(time + 3600, id.expires),
+                                                 sessionFingerprint(id));
                 if (!query.contains("private_lobby"))
                     lobby["public_pool"] = publicPool(query, *selection);
-                wire::require(host.dump().size() < 16384 && backend.dump().size() < 16384);
                 const auto assignments =
                     prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
                 const std::array<matchmaking_store::Write, 3> writes = {
@@ -1114,6 +1142,192 @@ namespace services
         }
     } // namespace
 
+    std::optional<TournamentLobbyPlan> prepareTournamentRoundLobby(
+        const std::filesystem::path &directory,
+        uint32_t title,
+        uint64_t tournament,
+        unsigned round,
+        unsigned match,
+        const Json &teams,
+        const std::vector<Json> &searches,
+        const Json &roundQuery,
+        uint64_t expires)
+    {
+        wire::require(tournament && round < 4 && match < 8 && teams.is_array() &&
+                      teams.size() == 2 && !searches.empty() && searches.size() <= 8);
+        const auto root = directory / "matchmaking" / std::to_string(title);
+        Json query = roundQuery, matchIds = Json::object(), sessions = Json::object();
+        query["members"] = Json::array();
+        query["player_id_to_slots"] = Json::object();
+        std::set<uint64_t> users, searchIds;
+        const auto index = currentLobbies(root, platform::LobbyIdentity{.titleId = title});
+        Json hostPlayer;
+        platform::LobbyIdentity owner;
+        owner.titleId = title;
+        expires = std::min(expires, now() + 3600);
+        for (const auto &search : searches)
+        {
+            const auto searchId = search.at("id").get<uint64_t>();
+            matchmaking_store::validateWrite(
+                {"searches/" + std::to_string(searchId) + ".json", search}, title);
+            wire::require(search.at("tournament_id") == tournament &&
+                          searchIds.insert(searchId).second);
+            expires = std::min(expires, search.at("expires").get<uint64_t>());
+            for (size_t position = 0; position < search["query"]["members"].size(); ++position)
+            {
+                const auto user = search["query"]["members"][position].get<uint64_t>();
+                const auto key = std::to_string(user);
+                wire::require(users.insert(user).second);
+                platform::LobbyIdentity identity;
+                identity.titleId = title;
+                identity.userId = user;
+                const auto player = read(root / "players" / (key + ".json"), identity);
+                const auto session = search.at("member_sessions").at(key).get<std::string>();
+                if (!lobby::sessionOnline(title, user, session) ||
+                    player.value("token_session", std::string{}) != session ||
+                    !player.contains("token") ||
+                    player["token"] != search["query"]["tokens"][position] ||
+                    player.value("token_expires", uint64_t{}) <= now())
+                    return std::nullopt;
+                if (index["lobbies"].contains(key))
+                {
+                    const auto previousPath =
+                        root / "lobbies" /
+                        (std::to_string(index["lobbies"][key].get<uint64_t>()) + ".json");
+                    if (std::filesystem::exists(previousPath))
+                    {
+                        const auto previous = loadLobby(previousPath, identity);
+                        if (!previous.value("disbanded", false) &&
+                            previous["expires"].get<uint64_t>() > now() &&
+                            hostSessionActive(previous, title) &&
+                            (!previous["backend_doc"].contains("tournament") ||
+                             previous["backend_doc"]["tournament"]["tournament_id"] != tournament ||
+                             previous["backend_doc"]["tournament"]["round_id"].get<unsigned>() >=
+                                 round))
+                            return std::nullopt;
+                    }
+                }
+                expires = std::min(expires, player["token_expires"].get<uint64_t>());
+                sessions[key] = session;
+                matchIds[key] = searchId;
+                query["members"].push_back(user);
+                const auto slots = requestedSlots(search["query"]);
+                query["player_id_to_slots"][key] = slots[key];
+                if (!owner.userId && user == search["user"] && player.contains("info") &&
+                    player["info"]["listen_server"].contains("local_address") &&
+                    player["info"]["listen_server"].contains("security_id") &&
+                    player["info"]["listen_server"].contains("security_key"))
+                {
+                    owner.userId = user;
+                    hostPlayer = player;
+                }
+            }
+        }
+        if (!owner.userId || expires <= now())
+            return std::nullopt;
+        std::set<uint64_t> assigned;
+        Json nativeTeams = Json::object();
+        for (size_t side = 0; side < teams.size(); ++side)
+        {
+            const auto &team = teams[side];
+            wire::require(team.at("teamID").is_number_unsigned() &&
+                          team["teamID"].get<uint64_t>() < 16 && team.at("playerIDs").is_array() &&
+                          !team["playerIDs"].empty() && team["playerIDs"].size() <= 4);
+            nativeTeams[std::to_string(side)] = team["playerIDs"];
+            for (const auto &user : team["playerIDs"])
+                wire::require(user.is_number_unsigned() &&
+                              assigned.insert(user.get<uint64_t>()).second);
+        }
+        wire::require(assigned == users);
+        query["lobby_slots"] = {{"max", users.size()}};
+        query["team_balance"] = {{"num_teams", uint64_t{2}}};
+        const auto selection = selectPlaylist(directory, title, query);
+        if (!selection)
+            return std::nullopt;
+        const auto &listen = hostPlayer.at("info").at("listen_server");
+        if (!listen.contains("local_address") || !listen.contains("security_id") ||
+            !listen.contains("security_key"))
+            return std::nullopt;
+        wire::require(wire::base64(listen.at("local_address").get<std::string>(), 84).size() ==
+                          84 &&
+                      wire::base64(listen.at("security_id").get<std::string>(), 8).size() == 8 &&
+                      wire::base64(listen.at("security_key").get<std::string>(), 16).size() == 16);
+        uint64_t lobbyId = 0;
+        do
+        {
+            lobbyId = randomId();
+        } while (std::filesystem::exists(root / "lobbies" / (std::to_string(lobbyId) + ".json")));
+        auto state = createLobbyDocument(owner,
+                                         query,
+                                         users,
+                                         listen,
+                                         *selection,
+                                         lobbyId,
+                                         matchIds,
+                                         expires,
+                                         sessions[std::to_string(owner.userId)].get<std::string>());
+        auto &backend = state["backend_doc"];
+        backend["team_balance"]["teams"] = nativeTeams;
+        backend["tournament"] = {{"tournament_id", tournament},
+                                 {"lobby_to_tournament_team_ids",
+                                  {{"0", teams[0]["teamID"]}, {"1", teams[1]["teamID"]}}},
+                                 {"round_id", round}};
+        state["host_doc"]["team_balance"]["can_change_teams"] = false;
+        // A tournament match is a closed allocation, never a public/presence pool.
+        state["host_doc"]["lobby_open_for_pres_join"] = false;
+        TournamentLobbyPlan plan;
+        plan.lobbyId = lobbyId;
+        plan.writes.push_back({"lobbies/" + std::to_string(lobbyId) + ".json", state});
+        for (auto search : searches)
+        {
+            search["lobby_id"] = lobbyId;
+            search["round_id"] = round;
+            search["match_id"] = match;
+            search["expires"] = expires;
+            search["active"] = true;
+            plan.writes.push_back(
+                {"searches/" + std::to_string(search["id"].get<uint64_t>()) + ".json", search});
+        }
+        plan.writes.push_back({"current-lobbies.json",
+                               prepareLobbyAssignments(root, owner, query["members"], lobbyId)});
+        return plan;
+    }
+
+    std::optional<Delivery> tournamentRoundLobbyDelivery(const std::filesystem::path &directory,
+                                                         uint32_t title,
+                                                         uint64_t user,
+                                                         uint64_t tournament,
+                                                         uint64_t lobbyId,
+                                                         const Json &metadata)
+    {
+        platform::LobbyIdentity identity;
+        identity.titleId = title;
+        identity.userId = user;
+        const auto root = directory / "matchmaking" / std::to_string(title);
+        const auto path = root / "lobbies" / (std::to_string(lobbyId) + ".json");
+        if (!std::filesystem::exists(path))
+            return std::nullopt;
+        const auto state = loadLobby(path, identity);
+        if (!member(state, user) || !state["backend_doc"].contains("tournament") ||
+            state["backend_doc"]["tournament"] != metadata || state.value("disbanded", false) ||
+            state["expires"].get<uint64_t>() <= now() || !hostSessionActive(state, title))
+            return std::nullopt;
+        const auto search =
+            state["backend_doc"]["player_id_to_mm_id"].at(std::to_string(user)).get<uint64_t>();
+        Reply reply;
+        const std::set<uint64_t> recipient{user};
+        // Native create/join envelopes retain the allocated party's mmID.
+        notify(reply, state, state["owner"] == user ? 2005 : 2001, search, &recipient);
+        auto delivery = reply.deliveries.at(0);
+        const auto bytes = Json::array({state["host_doc"], state["backend_doc"]}).dump();
+        delivery.tournamentId = tournament;
+        delivery.tournamentRoundLobby = true;
+        delivery.tournamentStateHash = wire::base64Encode(
+            crypto::sha256({reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()}));
+        delivery.delayMs = 750;
+        return delivery;
+    }
+
     uint32_t matchmakingHostAuthorized(const std::filesystem::path &directory,
                                        const platform::LobbyIdentity &id,
                                        uint64_t lobbyId,
@@ -1169,6 +1383,28 @@ namespace services
             std::ifstream stream(searchPath);
             Json search;
             stream >> search;
+            if (delivery.tournamentRoundLobby)
+            {
+                matchmaking_store::validateWrite(
+                    {"searches/" + std::to_string(delivery.searchId) + ".json", search}, title);
+                const auto index = currentLobbies(root, id);
+                if (!index["lobbies"].contains(key) || index["lobbies"][key] != delivery.lobbyId ||
+                    search.at("tournament_id") != delivery.tournamentId)
+                    return false;
+                id.userId = delivery.user;
+                const auto player = read(root / "players" / (key + ".json"), id);
+                const auto &session = search.at("member_sessions").at(key);
+                if (!lobby::sessionOnline(title, delivery.user, session.get<std::string>()) ||
+                    player.at("token_session") != session ||
+                    player.at("token_expires").get<uint64_t>() <= now())
+                    return false;
+                bool tokenMatches = false;
+                for (size_t position = 0; position < search["query"]["members"].size(); ++position)
+                    if (search["query"]["members"][position] == delivery.user)
+                        tokenMatches = player.at("token") == search["query"]["tokens"][position];
+                if (!tokenMatches)
+                    return false;
+            }
             return search.at("schema") == 1 && search.at("title") == title &&
                    search.at("lobby_id") == delivery.lobbyId && search.value("active", false) &&
                    search.at("expires").get<uint64_t>() > now();

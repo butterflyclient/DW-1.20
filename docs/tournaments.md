@@ -2,10 +2,11 @@
 
 The server implements Replay tasks 145/19, 20, 21, 22, 23, 28 and 29. These are
 backend handlers, without game executable changes or fabricated native fences.
-The implementation uses an explicit published bracket. Automatic scheduling,
-forming teams from matchmaking parties, match assignment and join/disband push
-events remain separate work. Host-authorized result submissions persist
-the scores and advance winners in the published bracket. Task 145/27 from another
+Publications can provide an explicit bracket or generate one from authenticated
+matchmaking parties. Capacity publications with round rules allocate closed
+native lobbies after both teams are ready. Host-authorized result submissions
+persist scores and advance winners. Native tournament gameplay and forfeits
+remain separate validation and implementation work. Task 145/27 from another
 source build is not silently substituted.
 
 The following evidence comes from the original Replay executable and its
@@ -138,8 +139,9 @@ other nonretryable error, 14529. A foreign reporting user receives 101.
 
 Task 145/20 derives its document from the current publication and that journal.
 It fills each destination match only once both preceding winners are known,
-preserving left/right score and global-team order. It never invents a next-round
-lobby. Its complete output is validated against Replay's native fixed arrays
+preserving left/right score and global-team order. Advancement alone never
+allocates a next-round lobby; the scheduler below requires fresh readiness and
+live party searches. Its complete output is validated against Replay's native fixed arrays
 and 16 KiB capacity before returning it. Replay `0x141071680` checks these same
 two-child prerequisites; `0x141074530` reads the winner, team IDs and scores.
 
@@ -265,8 +267,8 @@ backend publishes exact native event **2011**, typed tournament ID, to those
 members. A persisted disband marker permits idle/reconnect catch-up. New valid
 party searches clear that marker in the allocation transaction; queued obsolete
 disbands are suppressed when the user is assigned again. Once `PLAYING`, team
-membership stays fixed; match forfeits and playable round scheduling remain
-separate unfinished work.
+membership stays fixed; match forfeits remain unfinished work. Round scheduling
+uses the publication described below.
 
 `tools/tournament_formation_fixtures.py` uses eight separately authenticated
 clients; six enter through signed machine registration without provisioning.
@@ -274,6 +276,66 @@ It checks partial/full formation, native array generation, acceptance gating,
 readiness, immutable competition identity, interrupted cross-domain writes,
 party withdrawal, event 2011, slot reuse and owned decline. These are protocol
 fixtures, not native game bracket UI or playable tournament evidence.
+
+## Ready rounds and native lobby allocation
+
+An automatic `formation` publication may include `round_rules`: three query
+objects for eight teams, or four for sixteen teams. Each query contains
+`ruleset_payload` with the normal native playlist filter. Optional `performance`
+and `acceptable_platforms: ["bnet"]` are supported. Client members, tokens,
+capacity, listen addresses and teams are derived from authenticated searches;
+they are not publisher overrides. Round rules are pinned with the competition
+definition, so changing them under an allocated tournament ID fails closed.
+
+For example, append this array to an eight-team formation publication, replacing
+the playlist version with the current published catalog version:
+
+```json
+"round_rules": [
+  {"ruleset_payload": {"filter": {"playlist_id": 1, "playlist_version": 13, "netcode_version": 1}}},
+  {"ruleset_payload": {"filter": {"playlist_id": 1, "playlist_version": 13, "netcode_version": 1}}},
+  {"ruleset_payload": {"filter": {"playlist_id": 1, "playlist_version": 13, "netcode_version": 1}}}
+]
+```
+
+A round requires two complete teams, both preceding winners when applicable,
+all members' fresh round-scoped readiness and acceptance, and the actual live
+sessions/tokens that authorized their party searches. Cancelled or expired
+searches do not silently become valid again. Selection uses the same playlist
+catalog and available-map policy as ordinary matchmaking. Unavailable maps or
+missing native host information leave the lobby unallocated until a valid retry
+or idle update can prepare it.
+
+Allocation uses the shared lobby document builder and real registered native
+listen address/DTLS fields. The backend document includes `tournament_id`,
+UInt16-compatible `round_id` and `lobby_to_tournament_team_ids` mapping local
+teams `"0"`/`"1"` to global bracket teams. Team rosters retain their actual user
+IDs and party search IDs. Presence joins and user team changes are disabled;
+the lobby is not a public matchmaking pool. The owned host receives native event
+2005 (create), while opponents receive event 2001 (join), with the actual search
+ID and ordinary host/backend document envelopes.
+
+The formation record, lobby, affected searches, account assignment index and
+enrollment snapshot share one flushed recoverable transaction. A failed write
+rolls forward the same allocation, rather than creating a second lobby on retry.
+Host-authorized results advance winners; the next round still requires new
+readiness. Its searches retain their identity while receiving the new lobby,
+round and match assignment.
+
+The existing idle publisher recovers bracket and round delivery after a
+temporary same-session disconnect. Once a round is allocated, its bracket is
+delivered even if optional live publication updates were disabled, so the native
+client sees the allocation before the create/join callback. Current enrollment,
+host lease, token/session, search/account assignment and document snapshot are
+revalidated before writing. Each connection receives a given round lobby/search
+join once; ordinary host document updates continue on their existing path.
+
+`tools/tournament_round_fixtures.py` exercises eight signed machine registrations,
+map-policy waiting, interrupted coupled publication, all four first-round
+allocations, temporary reconnect and all seven result-driven matches. These are
+encrypted protocol checks. Native tournament callbacks, client round-map pool
+alignment, host departure/forfeit rules and playable two-game tournaments remain
+unverified; startup/reconnect evidence does not establish those gates.
 
 ## Live publication changes and disband
 
@@ -294,8 +356,8 @@ Corrupt publication data suppresses delivery and remains a task-level storage
 error. It is never converted into a synthetic tournament disband. A removed
 publication leaves enrollment available for diagnosis or an authenticated leave.
 The same missing/expired snapshot is sent once per connection; a restored
-publication can send a fresh bracket. Native join/formation callback validation
-and playable round assignment remain separate work.
+publication can send a fresh bracket. Native join/formation and playable round
+callback validation remain separate work.
 
 Native validation changed a PLAYING publication from 16 players in teams of two
 to eight players in teams of one. The same running game parsed the changed

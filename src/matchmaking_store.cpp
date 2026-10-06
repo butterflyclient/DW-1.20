@@ -154,7 +154,7 @@ namespace matchmaking_store
                 if (state.contains("tournament_id"))
                 {
                     require(
-                        state["lobby_id"] == 0 && state["tournament_id"].is_number_unsigned() &&
+                        state["tournament_id"].is_number_unsigned() &&
                         state["tournament_id"].get<uint64_t>() &&
                         state.at("owner_session").is_string() &&
                         state["owner_session"].get_ref<const std::string &>().size() == 44 &&
@@ -174,6 +174,11 @@ namespace matchmaking_store
                         state["member_sessions"][std::to_string(state["user"].get<uint64_t>())] ==
                             state["owner_session"]);
                     std::set<uint64_t> members;
+                    if (state["lobby_id"] != 0)
+                        require(state.at("round_id").is_number_unsigned() &&
+                                state["round_id"].get<uint64_t>() < 4 &&
+                                state.at("match_id").is_number_unsigned() &&
+                                state["match_id"].get<uint64_t>() < 8);
                     for (size_t i = 0; i < state["query"]["members"].size(); ++i)
                     {
                         const auto &member = state["query"]["members"][i];
@@ -207,6 +212,35 @@ namespace matchmaking_store
                 require(member.is_number_unsigned() && member.get<uint64_t>() &&
                         members.insert(member.get<uint64_t>()).second);
             require(members.contains(state["owner"].get<uint64_t>()));
+            if (state["backend_doc"].contains("tournament"))
+            {
+                // Exact Replay 0x1410451D0: UInt64 ID, two UInt32 global team
+                // indices, UInt16 round. Validate the entire closed-match layout.
+                const auto &metadata = state["backend_doc"]["tournament"];
+                require(metadata.is_object() && metadata.size() == 3 &&
+                        metadata.at("tournament_id").is_number_unsigned() &&
+                        metadata["tournament_id"].get<uint64_t>() &&
+                        metadata.at("round_id").is_number_unsigned() &&
+                        metadata["round_id"].get<uint64_t>() < 4);
+                const auto &mapping = metadata.at("lobby_to_tournament_team_ids");
+                require(mapping.is_object() && mapping.size() == 2 &&
+                        mapping.at("0").is_number_unsigned() && mapping["0"].get<uint64_t>() < 16 &&
+                        mapping.at("1").is_number_unsigned() && mapping["1"].get<uint64_t>() < 16 &&
+                        mapping["0"] != mapping["1"]);
+                const auto &teams = state["backend_doc"].at("team_balance").at("teams");
+                require(teams.is_object() && teams.size() == 2 && teams.at("0").is_array() &&
+                        teams.at("1").is_array() && !teams["0"].empty() && teams["0"].size() <= 4 &&
+                        teams["0"].size() == teams["1"].size() &&
+                        state["host_doc"].at("lobby_open_for_pres_join") == false &&
+                        state["host_doc"].at("team_balance").at("can_change_teams") == false &&
+                        !state.contains("public_pool"));
+                std::set<uint64_t> assigned;
+                for (const auto &team : teams)
+                    for (const auto &member : team)
+                        require(member.is_number_unsigned() &&
+                                assigned.insert(member.get<uint64_t>()).second);
+                require(assigned == members);
+            }
             if (state.contains("owner_session"))
             {
                 require(state["owner_session"].is_string());

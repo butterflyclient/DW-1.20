@@ -1,0 +1,76 @@
+REPLAY DW TOURNAMENT ROUND LOBBIES - 2026-10-06
+
+Issue
+- Automatic formation produced a native bracket, but ready teams had no round
+  lobby, native create/join delivery or later-round matchmaking assignment.
+
+Target-build research
+- Original Replay StartMatchmaking 0x14104A450 writes tournament.team_size.
+- Decoder 0x14213F1C0 defines event 2005 create and event 2001 join envelopes.
+  Both carry the actual party search ID, lobby ID and native document strings.
+- Native backend parser 0x1410451D0 consumes tournament_id, round_id through a
+  UInt16 getter and lobby_to_tournament_team_ids with keys 0 and 1. JoinLobby
+  0x1410443C0 checks the tournament ID against the client's cached competition.
+- Wire IDs and layouts come from the original Replay database. The IW8 source
+  oracle was used only to clarify behavior, not to transfer RVAs or task IDs.
+
+Implementation
+- Capacity publications can pin three/eight-team or four/sixteen-team round
+  rulesets. Real party searches provide users, tokens, sessions and host data.
+- Both teams must be complete, have preceding winners when applicable, and
+  have fresh round-scoped readiness/acceptance from still-live sessions.
+- The common playlist selector honors available-map policy. Missing maps or
+  valid native host data leave the round unallocated instead of inventing them.
+- The common lobby builder produces actual host/backend documents, registered
+  native address/DTLS data, exact team rosters and global-to-local team mapping.
+  Closed tournament lobbies are excluded from public/presence matchmaking.
+- Native create/join callbacks retain the real party search IDs. No simulated
+  native flags, seed friendships, game changes or extra ports were introduced.
+- Bracket, enrollment, new lobby, affected searches and account assignment
+  index commit through one flushed recoverable transaction. Retry recovers the
+  same allocation. Current assignments and leases revoke stale queued pushes.
+- The existing idle publisher restores bracket and allocated join delivery on
+  temporary same-session reconnect. A given lobby/search is delivered once per
+  connection. Host document updates still use the existing update path.
+- Authenticated owned result submissions advance winners; later rounds require
+  fresh readiness and update the existing search identity to their new lobby.
+- Complete persisted bracket validation rejects allocated one-team matches and
+  allocations without pinned rules or a PLAYING formation record.
+
+Compilation and verification
+- Release server SHA256:
+  517b8bd7d15daff7d6723036cd2d6dcf5aa59be41ff58033d2989c98512b5b21
+- Unchanged root-folder game SHA256:
+  b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+- Build passed: data/tournament-round-build-final-20261006.log.
+- All 240 encrypted protocol/service groups passed on this image, including
+  four new groups with eight accounts created through signed machine login.
+- Fixtures cover map-policy waiting, a real blocked account-index write and
+  coupled recovery, four distinct first-round allocations, native envelope and
+  metadata equality, temporary reconnect/deduplication, and all seven matches
+  of an eight-team bracket through authenticated host result submissions.
+- Protocol receipt: validation/20261006-tournament-rounds.json.
+- Signed platform/auth/resource checks passed before launching the game.
+- Separate root-folder native startup/backend restart/dw_restart proof:
+  validation/20261006-tournament-round-native-reconnect.json.
+- Native observations require all 27 startup fences, native auth/profile/Online,
+  empty fetched friend lists, unchanged game PID and identity, renewed relay
+  credentials, matching BIND/VERIFY/ESTABLISHED and a stable keepalive interval.
+
+Remaining gates
+- Protocol scheduling is implemented; playable native tournaments are not yet
+  verified. Native join/formation/ready/round/result callbacks remain open.
+- The client's seeded tournament map pool must be aligned with server round
+  selection before claiming a complete playable tournament.
+- Host departure, forfeits, reauthenticated party migration and distributed
+  tournament gameplay remain separate work. Cancelled searches are not revived.
+- No map/match test, two-network gameplay proof or Terms acceptance is claimed.
+- Full backend work continues; this is a round-allocation readiness milestone.
+
+Operational handoff
+- The current backend is running through start-server.ps1. The owned test game
+  closed normally and temporary root command/opt-in files were removed.
+- Existing client package and game INI/identity remain valid and unchanged.
+- Use docs/tournaments.md for the publication schema and switching rules.
+- Historical formation receipts retain their original image hashes.
+- Unrelated dirty integration/replay files and Replay compiler work were preserved.

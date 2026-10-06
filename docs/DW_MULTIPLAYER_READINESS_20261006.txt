@@ -1,19 +1,24 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - AUTOMATIC TOURNAMENT FORMATION
-Backend SHA256: 13f9f3441bb8f99519b5a3c79a19e08281ae4bd2ee20d6785c3ce5caab07bb12
+CURRENT BACKEND ADDENDUM - AUTOMATIC TOURNAMENT ROUND LOBBIES
+Backend SHA256: 517b8bd7d15daff7d6723036cd2d6dcf5aa59be41ff58033d2989c98512b5b21
 Game is unchanged from the baseline below; no new client package is required.
-236 encrypted protocol/service groups passed on the current backend image.
+240 encrypted protocol/service groups passed on the current backend image.
 Capacity publications now allocate complete authenticated parties to teams and
 generate the native bracket. Every slot and live-session acknowledgement must
 be present before PLAYING; no player IDs or acceptance are seeded. A forming
 party withdrawal releases its slots, preserves peer registration, resets their
 acceptance and sends event 2011. Coupled snapshots recover interrupted writes.
-Native tournament join/formation callbacks, playable round assignment and
-forfeits remain open. No two-network gameplay or map test claim is made.
-Current native startup/reconnect: validation/20261006-tournament-formation-native-reconnect.json.
-Current formation protocol proof: validation/20261006-tournament-formation.json.
-Details: docs/DW_TOURNAMENT_FORMATION_20261006.txt and docs/tournaments.md.
+Pinned round rules now allocate closed native lobbies after complete readiness,
+using the shared playlist/map policy and actual party search IDs/host data.
+Coupled bracket/lobby/search/index/enrollment writes recover interruption.
+Eight signed accounts verify all seven matches and temporary join catch-up.
+Native tournament callbacks, client round-map alignment, playable tournaments
+and forfeits remain open. No two-network gameplay or map test claim is made.
+Current native startup/reconnect: validation/20261006-tournament-round-native-reconnect.json.
+Current round protocol proof: validation/20261006-tournament-rounds.json.
+Historical formation proof: validation/20261006-tournament-formation.json.
+Details: docs/DW_TOURNAMENT_ROUNDS_20261006.txt and docs/tournaments.md.
 The artifact hashes and native evidence below are the retained baseline pass.
 
 BASELINE ARTIFACTS
