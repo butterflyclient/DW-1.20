@@ -35,6 +35,7 @@ add_executable(iw8-dw-server
     src/clan_services.cpp
     src/mail_services.cpp
     src/identity_services.cpp
+    src/identity_rest_services.cpp
     src/social_services.cpp
     src/scheduled_services.cpp
     src/counter_services.cpp

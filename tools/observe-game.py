@@ -30,6 +30,12 @@ parser.add_argument(
     help="Hash-bound image/build receipt for a separate controlled test executable",
 )
 parser.add_argument(
+    "--connection-receipt",
+    type=Path,
+    default=root / "data/current-runtime-connection.json",
+    help="Owned per-instance dw_restart receipt, separate from the original launch",
+)
+parser.add_argument(
     "--commands", action="store_true", help="Include all native command registrations"
 )
 parser.add_argument(
@@ -62,6 +68,11 @@ parser.add_argument(
     "--ab-testing",
     action="store_true",
     help="Read native AB completion and bounded enrollment/treatment records",
+)
+parser.add_argument(
+    "--presence-records",
+    action="store_true",
+    help="Read bounded native presence cache records and their active subscription bits",
 )
 args = parser.parse_args()
 deployment = json.loads(args.deployment.read_text())
@@ -140,7 +151,7 @@ try:
         finally:
             kernel.CloseHandle(server_process)
     connection = launch
-    connection_path = root / "data/current-runtime-connection.json"
+    connection_path = args.connection_receipt
     if launch and server_deployment and connection_path.exists():
         refreshed = json.loads(connection_path.read_text(encoding="utf-8-sig"))
         if (
@@ -1032,6 +1043,7 @@ try:
         presence_subscriptions = dict(
             controller=0,
             subscribed_count=counts[0],
+            cached_record_count=counts[0],
             pending_subscribe=counts[1],
             pending_unsubscribe=counts[2],
             batch_count=batch,
@@ -1045,6 +1057,38 @@ try:
             )[0]
             - base,
         )
+        if args.presence_records:
+            # 141058E70 clears the requested type bits without removing an
+            # existing 64-byte cache record or decrementing the count. Keep
+            # cached entries distinct from active crossplay subscriptions.
+            address = symbols["gl_14C38CDC0"]
+            records = read(address, counts[0] * 64) if counts[0] else b""
+            confirm_count = struct.unpack("<I", read(address + 60800, 4))[0]
+            confirm = read(address, len(records)) if records else b""
+            stable = confirm_count == counts[0] and confirm == records
+            presence_subscriptions["records_stable"] = stable
+            presence_subscriptions["records"] = None
+            if stable:
+                entries = []
+                for index in range(counts[0]):
+                    record = records[index * 64 : (index + 1) * 64]
+                    mask, tracked = record[56], record[57]
+                    entries.append(
+                        dict(
+                            index=index,
+                            user_id=struct.unpack_from("<Q", record)[0],
+                            online=bool(record[48]),
+                            subscription_mask=mask,
+                            tracked_online_mask=tracked,
+                            platform_friend=bool(mask & 2),
+                            crossplay_friend=bool(mask & 4),
+                            clan_member=bool(mask & 16),
+                        )
+                    )
+                presence_subscriptions["records"] = entries
+                presence_subscriptions["active_crossplay_records"] = sum(
+                    entry["crossplay_friend"] for entry in entries
+                )
     relay_client_auth = None
     relay_transport = None
     if "s_instance_1" in symbols:
@@ -1220,6 +1264,9 @@ try:
         "sha256": deployment["sha256"],
         "server_process_verified": server_deployment,
         "observed_utc": datetime.now(timezone.utc).isoformat(),
+        "observer_source_sha256": hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest(),
         "method": "read-only state from the verified live process, ASLR module base and linked native getter/global symbols",
         "platform_auth_state": struct.unpack("<I", read(auth_rva, 4))[0],
         "platform_auth_failure": struct.unpack("<I", read(auth_rva + 456, 4))[0],

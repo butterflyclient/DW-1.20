@@ -31,3 +31,24 @@ instruction evidence are required before claiming response compatibility.
 Evidence: validation/20261006-target-consumer-alias-correction.json binds the
 untouched image and exact function hashes, calls and literal occurrence counts.
 The corresponding full read-only research windows remain under private data.
+
+CATEGORY OWNER TRACE ADDENDUM
+The original OnlineStorage::ExecuteTask at 0x1410692C0 selects publisher category
+operation 3 through 0x141506C70 -> 0x140F73B90 -> 0x14212A960 (task 193/9).
+It passes the task's externally owned response pointer at +112, publisher
+infinityward and limit 50. The SDK submits the response's StructBuffer base +8.
+The user path is 0x141506D60 -> 0x140F73D20 -> 0x14212AA70 (193/10), task response
+pointer +120, UNO owner and limit 30. That SDK response base is +432.
+
+Neither category response class name nor category response source filename is
+present anywhere in the untouched image. nextPageToken is absent; the bounded
+SDK reader search still finds pageToken only in the existing user-list reader.
+Those observations narrow the research but do not prove no indirect or shared
+category parser exists. The response allocation/vtable binding remains open.
+Do not adopt the ordinary metadata vector DTO for these two opaque owners.
+
+Private read-only evidence: data/objectstore-category-native-callers-target.json,
+data/objectstore-category-engine-callers-target.json,
+data/objectstore-category-callers-target.json,
+data/objectstore-category-task-target.json and
+data/objectstore-category-readers-20261006.json. SQLite aliases remain candidates.

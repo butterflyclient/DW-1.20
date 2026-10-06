@@ -138,6 +138,7 @@ GAPS["194"] += (
 # Dedicated domain handlers only. A configured GET publication is not equivalent
 # to an implemented authenticated account/objectstore mutation.
 REST_HANDLERS = {
+    ("uno", "UserResource", "renameUsername"): "identity_rest_services.cpp",
     ("abtesting", "abtesting", "enroll"): "abtesting_services.cpp",
     ("umbrella", "UserResource", "usernamesearch"): "social_services.cpp",
     ("presence", "UserPresence", "set_user_presence"): "social_services.cpp",

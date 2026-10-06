@@ -1,9 +1,15 @@
 param(
     [Parameter(Mandatory=$true)][ValidateSet('alpha','bravo')][string]$Instance,
-    [ValidateSet('Start','Stop')][string]$Action = 'Start'
+    [ValidateSet('Start','Stop')][string]$Action = 'Start',
+    [string]$StateRoot = (Join-Path $PSScriptRoot 'data\native-pair-20261006')
 )
 $ErrorActionPreference = 'Stop'
-$state = Join-Path $PSScriptRoot ('data\native-pair-20261006\' + $Instance)
+$StateRoot = [IO.Path]::GetFullPath($StateRoot)
+$dataRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'data')) + [IO.Path]::DirectorySeparatorChar
+if (-not $StateRoot.StartsWith($dataRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Keep private native test receipts inside the backend data directory.'
+}
+$state = Join-Path $StateRoot $Instance
 $deploymentPath = Join-Path $state 'deployment.json'
 $launchPath = Join-Path $state 'launch.json'
 $record = Get-Content -LiteralPath $deploymentPath -Raw | ConvertFrom-Json
@@ -29,7 +35,7 @@ if ($Action -eq 'Stop') {
 foreach ($process in $running) {
     $verified = $false
     foreach ($peer in @('alpha','bravo')) {
-        $peerState = Join-Path $PSScriptRoot ('data\native-pair-20261006\' + $peer)
+        $peerState = Join-Path $StateRoot $peer
         $peerLaunch = Join-Path $peerState 'launch.json'
         if (Test-Path -LiteralPath $peerLaunch) {
             $previous = Get-Content -LiteralPath $peerLaunch -Raw | ConvertFrom-Json

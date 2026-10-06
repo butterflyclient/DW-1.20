@@ -6,6 +6,7 @@
 #include "../integration/replay/dw_platform_protocol.h"
 #include "../integration/replay/dw_client_identity.h"
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <charconv>
 #include <cstring>
@@ -597,6 +598,81 @@ namespace platform
             if (entry.second.userId == user)
                 return std::string(entry.second.name);
         return std::nullopt;
+    }
+
+    RenameResult renameAccount(const LobbyIdentity &owner,
+                               const std::string &accessToken,
+                               const std::string &name)
+    {
+        std::lock_guard lock(mutex);
+        const auto time = now();
+        const bool authorized =
+            accessToken.size() == 64 && owner.expires > time &&
+            std::any_of(
+                issuedSessions.begin(),
+                issuedSessions.end(),
+                [&](const auto &session)
+                {
+                    return session.payload.expires > time && session.titleId == owner.titleId &&
+                           session.payload.userId == owner.userId &&
+                           session.ivSeed == owner.ivSeed &&
+                           crypto::equal(session.sessionKey, owner.key) &&
+                           crypto::equal(
+                               std::span(reinterpret_cast<const uint8_t *>(accessToken.data()),
+                                         accessToken.size()),
+                               std::span(
+                                   reinterpret_cast<const uint8_t *>(session.umbrellaToken.data()),
+                                   session.umbrellaToken.size()));
+                });
+        if (!authorized)
+            return RenameResult::Unauthorized;
+
+        Identity *selected = nullptr;
+        std::filesystem::path path;
+        bool machineOwned = false;
+        if (identity.userId == owner.userId)
+        {
+            selected = &identity;
+            path = identityDirectory / "platform-profile.bin";
+        }
+        for (auto &[keyName, profile] : profiles)
+            if (profile.userId == owner.userId)
+            {
+                selected = &profile;
+                path = identityDirectory / "platform-profiles" / (keyName + ".bin");
+            }
+        for (auto &[fingerprint, profile] : clientProfiles)
+            if (profile.userId == owner.userId)
+            {
+                selected = &profile;
+                machineOwned = true;
+                path = identityDirectory / "platform-client-profiles" / (fingerprint + ".bin");
+            }
+        if (!selected)
+            return RenameResult::Unauthorized;
+        const auto persisted = readIdentity(path);
+        if (std::memcmp(&persisted, selected, sizeof(persisted)) != 0)
+            throw std::runtime_error("Persisted platform identity changed during the live session");
+        try
+        {
+            availableName(name, owner.userId, machineOwned);
+        }
+        catch (const std::runtime_error &error)
+        {
+            if (std::string(error.what()) == "Invalid local profile name")
+                return RenameResult::InvalidName;
+            if (std::string(error.what()) == "Local player name already in use")
+                return RenameResult::NameUnavailable;
+            throw;
+        }
+        if (name == selected->name)
+            return RenameResult::Unchanged;
+        auto changed = *selected;
+        std::memset(changed.name, 0, sizeof(changed.name));
+        std::memcpy(changed.name, name.data(), name.size());
+        write(path, &changed, sizeof(changed));
+        *selected = changed;
+        return RenameResult::Changed;
     }
 
     std::vector<Account> findAccounts(const std::string &username, bool prefix)

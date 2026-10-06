@@ -1,13 +1,39 @@
 """Deploy a verified private test image under two owned root-folder filenames."""
 
 import copy
+import argparse
 import hashlib
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "data/native-pair-20261006"
-job = json.loads((ROOT / "data/workstation-job.json").read_text())
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--job-receipt", type=Path, default=ROOT / "data/workstation-job.json"
+)
+parser.add_argument(
+    "--snapshot-receipt",
+    type=Path,
+    default=ROOT / "data/compiler-snapshot-receipt.json",
+)
+parser.add_argument("--state-root", type=Path, default=STATE)
+parser.add_argument("--profiles-root", type=Path, default=STATE)
+parser.add_argument("--server-receipt", type=Path)
+args = parser.parse_args()
+STATE = args.state_root.resolve()
+profiles_root = args.profiles_root.resolve()
+for directory in (STATE, profiles_root):
+    assert directory.is_relative_to(
+        ROOT / "data"
+    ), "Keep private test state inside data"
+job_receipt = args.job_receipt.resolve()
+snapshot_receipt = args.snapshot_receipt.resolve()
+for receipt in (job_receipt, snapshot_receipt):
+    assert receipt.is_relative_to(ROOT / "data"), "Use an owned private build receipt"
+job_bytes = job_receipt.read_bytes()
+snapshot_bytes = snapshot_receipt.read_bytes()
+job = json.loads(job_bytes)
 assert job["status"] == "succeeded" and job["profile"] == "engine"
 build = Path(job["build_directory"]).resolve()
 assert build.parent == (ROOT / "data/workstation-builds").resolve()
@@ -35,13 +61,18 @@ assert any(
     for row in report["cpp"]
 )
 STATE.mkdir(parents=True, exist_ok=True)
-(STATE / "compiled-job.json").write_bytes(
-    (ROOT / "data/workstation-job.json").read_bytes()
-)
-(STATE / "compiled-snapshot-receipt.json").write_bytes(
-    (ROOT / "data/compiler-snapshot-receipt.json").read_bytes()
-)
+(STATE / "compiled-job.json").write_bytes(job_bytes)
+(STATE / "compiled-snapshot-receipt.json").write_bytes(snapshot_bytes)
 normal = json.loads((ROOT / "data/deployment.json").read_text())
+server_sha256 = normal["server_sha256"]
+if args.server_receipt:
+    server_receipt = args.server_receipt.resolve()
+    assert server_receipt.is_relative_to(ROOT / "data")
+    server = json.loads(server_receipt.read_text(encoding="utf-8-sig"))
+    server_image = Path(server["executable"]).resolve()
+    assert server_image == (ROOT / "build/Release/iw8-dw-server.exe").resolve()
+    assert hashlib.sha256(server_image.read_bytes()).hexdigest() == server["sha256"]
+    server_sha256 = server["sha256"]
 game = Path(normal["executable"]).parent
 assert game == Path(r"E:\IW8\Builds\1.20-replay")
 assert (
@@ -51,8 +82,9 @@ assert (
 for index, instance in enumerate(("alpha", "bravo")):
     state = STATE / instance
     state.mkdir(parents=True, exist_ok=True)
+    profile = profiles_root / instance
     for directory in ("appdata", "home"):
-        (state / directory).mkdir(exist_ok=True)
+        (profile / directory).mkdir(parents=True, exist_ok=True)
     executable = game / f"game_dx12_ship_replay_pair_{instance}_dw.exe"
     receipt = state / "deployment.json"
     if executable.exists():
@@ -75,6 +107,7 @@ for index, instance in enumerate(("alpha", "bravo")):
     record.update(
         executable=str(executable),
         sha256=digest,
+        server_sha256=server_sha256,
         build_directory=str(build),
         compiler_source_root=report["source_root"],
         job_id=job["id"],
@@ -82,8 +115,8 @@ for index, instance in enumerate(("alpha", "bravo")):
         private_test_home_helper_sha256=hashlib.sha256(helper.read_bytes()).hexdigest(),
         test_command_file=command_file,
         test_enabled_file=enabled_file,
-        localappdata=str(state / "appdata"),
-        home=str(state / "home"),
+        localappdata=str(profile / "appdata"),
+        home=str(profile / "home"),
         game_port=3074 + index * 5,
         primary_executable_unchanged_sha256=normal["sha256"],
         evidence_scope="Private native pair test; no two-game connection asserted by deployment",

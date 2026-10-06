@@ -54,6 +54,19 @@ namespace platform
     // Relay INIT omits the lobby ticket; bind its signed digest to a live session.
     bool relaySessionMatches(uint32_t title, uint64_t user, std::span<const uint8_t> digest);
     bool sessionTokenMatches(const LobbyIdentity &identity, const std::string &token);
+    enum class RenameResult
+    {
+        Changed,
+        Unchanged,
+        Unauthorized,
+        InvalidName,
+        NameUnavailable
+    };
+    // Persist only an existing account owned by this live lobby and its issued
+    // legacy access token. The signed identity/session payload stays immutable.
+    RenameResult renameAccount(const LobbyIdentity &identity,
+                               const std::string &accessToken,
+                               const std::string &name);
     std::string legacyLogin(const std::string &request);
     unsigned legacyLogins();
 } // namespace platform

@@ -1,0 +1,108 @@
+REPLAY DW ACCOUNT RENAME DOMAIN
+2026-10-06
+
+IMPLEMENTATION
+The existing REST task 255/10 now handles uno / UserResource / renameUsername.
+The original Replay writer at 0x142100230 uses PUT, JSON userName, the path
+/v1.0/users/{auth-info.userID}/securedfields/?client=replaylocal and an
+Authorization header with two spaces after Bearer. Both the native two-space
+form and ordinary one-space form accept only the issued 64-byte access token.
+
+The backend requires a live, unexpired lobby identity and a legacy access token
+issued to that exact user/title/IV/session key. A different account path, token
+from another session, stale token, malformed request, invalid name or name
+collision cannot rename the player. Diagnostic operation labels include no
+token, header/body contents, player name or identity key material.
+
+The mutation selects the existing platform identity or named fixture profile or
+machine-keyed player profile. It never provisions a new player. It validates
+the complete persisted identity against the live canonical record before
+changing it, flushes a temporary file and atomically replaces the same profile.
+The in-memory canonical name changes only after publication succeeds. IDs,
+platform account mapping and signed session payloads remain intact. Exact
+same-name retries do not rewrite the file. Lookup/search use the canonical name.
+
+Player INI names remain explicit login overrides. A nonempty player_name can
+replace a backend-renamed display name on the player's next signed login.
+The machine's private identity file is not edited or distributed by this route.
+
+NATIVE CONTRACT
+Original constructor 0x1421005E0 installs response vtable 0x14269E3D0.
+Slot 1 is 0x142100900: JSON success field, error code at response +40.
+Slot 2 is 0x142100670: numeric UNO error reader; 0x1421009B0 reads code/name/msg.
+Successful committed changes return HTTP 200 and {success:true}. Ownership/token
+failures return HTTP 403 with UNO 220000; invalid names return HTTP 400 with
+214500; occupied names return HTTP 409 with 214500. Persistence faults remain
+task failures. No failed write is reported as a successful rename.
+
+This is the local account policy. It does not issue retail rename inventory or
+claim to implement retail rename-token billing. The original engine owner at
+0x140F2E750 checks rename inventory/currency and uses CrossplayAccessInfo's token.
+The current legacy login does not establish that native crossplay rename flow.
+The native rename menu callback remains unverified; protocol fixtures are not
+a substitute for that callback.
+
+Target byte/vtable evidence: validation/20261006-native-identity-rename-layout.json
+Research script: tools/research-identity-rename-target.py
+Encrypted request/failure/restart fixtures: tools/identity_rest_fixtures.py
+
+PRIVATE BUILD WORKFLOW
+tools/build-server-snapshot.py freezes committed CMake/src/integration/third_party
+and tools inputs, then accepts explicitly named owned source overlays. It builds
+only the backend, records all input hashes and verifies frozen inputs after
+compilation. It does not deploy or modify the game. Unrelated dirty matchmaking
+and integration work is excluded unless explicitly selected as an overlay.
+
+The final backend SHA256 is
+4b089496d887970d38dace5441bb60bbc8788fb947b254cc73cd5d29eb8939df.
+Its private build receipt is
+data/backend-snapshot-1791313520951998500/build-receipt.json.
+The game EXE is unchanged. Runtime/protocol receipts separately identify the
+backend and private game image used for each test.
+
+VALIDATION AND CURRENT DEPLOYMENT
+The final backend passed all 283 encrypted service fixture groups. Rename cases
+cover exact native headers, account/session ownership, invalid or occupied
+names, unchanged retries, malformed paths/body fields, atomic-write failure,
+persisted-identity mismatch and persistence across a backend process restart.
+No mutation changes the account's IDs or signed identity/session payload.
+
+Two native Replay clients then ran from E:\IW8\Builds\1.20-replay with separate
+local profiles and caches. Both showed Online status, logged-in profiles, all
+27 controller-0 fences passing, no network error and empty friend lists. After
+the backend process was stopped and started, each completed dw_restart in the
+same game process. Their established native relay associations stayed stable
+over the subsequent observation interval (more than 80 seconds for Alpha).
+The backend remains running; the two controlled game instances were closed.
+Owned temporary EXEs, INIs and command flags were removed from the game root.
+
+These tests reused the already compiled private two-client game image, SHA256
+73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644.
+The shipping game EXE, its INI, the owner's local identity and unrelated compiler
+work were preserved. No game rebuild or map test was needed for this pass.
+No firewall, UPnP or external port configuration was changed.
+
+An earlier native add/remove-friend pass demonstrated that Replay retains its
+64-byte presence cache entry after clearing subscription bits. The retained
+record count and old cached online byte do not prove an active subscription.
+The observer now reports cached_record_count and active_crossplay_records
+separately and double-reads the bounded records before reporting their masks.
+Both clients had empty friend lists, zero active crossplay records and drained
+subscribe/unsubscribe queues after removal. The remove confirmation displayed
+nil instead of the friend's name; this separate client UI issue remains open.
+
+Readiness: validation/20261006-identity-rename-native-readiness.json
+Protocol: data/lobby-verification.json
+Private native observations: data/native-pair-rename-20261006
+Each observation records the actual observer-source SHA. The readiness tool
+checks the archived source against those hashes and verifies that later
+formatting did not change the reconnect readers' Python AST. Startup used the
+same native readers before the per-instance connection-receipt selector existed.
+
+REMAINING WORK
+The complete backend is still in development. Six known binary routes remain
+without confirmed target-compatible response bindings: 50/22, 58/22, 193/9,
+193/10, 193/12 and 193/24. Four directly identified account REST operations also
+remain unimplemented. Other implemented domains still need native callback or
+multi-player lifecycle coverage. No full-backend, live rename-menu or WAN
+gameplay completion is claimed by this receipt.

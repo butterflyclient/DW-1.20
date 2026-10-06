@@ -6,6 +6,7 @@
 #include "regulation_services.h"
 #include "objectstore_services.h"
 #include "abtesting_services.h"
+#include "identity_rest_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <set>
@@ -217,6 +218,11 @@ namespace services
         Reply reply{0, {}, "rest-route-not-configured"};
         reply.detail = " rest_service=" + r.service + " resource=" + r.resource +
                        " operation_name=" + r.operation + " method=" + std::to_string(r.method);
+        if (auto handled = identityRest(id, r))
+        {
+            handled->detail = reply.detail;
+            return *handled;
+        }
         if (auto handled = social(directory, id, r))
         {
             handled->detail = reply.detail;

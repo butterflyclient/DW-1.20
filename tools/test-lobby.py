@@ -23,6 +23,18 @@ subprocess.run(
     stdout=subprocess.DEVNULL,
     creationflags=subprocess.CREATE_NO_WINDOW,
 )
+subprocess.run(
+    [
+        str(exe),
+        str(directory),
+        "--provision-profile",
+        "rename",
+        "Rename Original",
+    ],
+    check=True,
+    stdout=subprocess.DEVNULL,
+    creationflags=subprocess.CREATE_NO_WINDOW,
+)
 
 
 def choose_offset():
@@ -171,6 +183,7 @@ try:
     }
     with post("/v1.0/tokens/lsg/?client=replaylocal", legacy) as response:
         account = json.load(response)
+        rename_access_token = account["accessToken"]
         assert (
             account["umbrellaID"] == user
             and account["expires"] > time.time()
@@ -781,7 +794,8 @@ try:
         return structure(
             pb_text(1, "POST")
             + pb_text(
-                2, f"/v2/users/bnet-{owner}/enrollments/?client=replaylocal&context={context}"
+                2,
+                f"/v2/users/bnet-{owner}/enrollments/?client=replaylocal&context={context}",
             )
         )
 
@@ -2587,7 +2601,13 @@ try:
     )
 
     def native_rest(
-        service, resource, operation, method=0x474554, body=None, uri="/fixture"
+        service,
+        resource,
+        operation,
+        method=0x474554,
+        body=None,
+        uri="/fixture",
+        headers=None,
     ):
         params = (
             pb_integer(1, 1)
@@ -2607,6 +2627,8 @@ try:
             + pb_integer(102, 1)
             + pb_integer(302, 1)
         )
+        for name, value in (headers or {}).items():
+            message += pb_bytes(14, pb_text(1, name) + pb_text(2, value))
         payload = b"" if body is None else json.dumps(body).encode()
         return u32(713) + blob(message) + boolean(body is not None) + blob(payload)
 
@@ -2614,6 +2636,21 @@ try:
 
     regulation_restart = regulation_fixtures.exercise(
         client, directory, title, user, native_rest, rest_response, blob, checks
+    )
+    import identity_rest_fixtures
+
+    rename_restart = identity_rest_fixtures.exercise(
+        client,
+        rename_access_token,
+        directory,
+        title,
+        seed,
+        post,
+        Client,
+        native_rest,
+        rest_response,
+        blob,
+        checks,
     )
 
     event_body = {
@@ -2983,15 +3020,32 @@ try:
     import abtesting_rest_fixtures
 
     ab_rest_fixture = abtesting_rest_fixtures.exercise(
-        client, peer_client, directory, title, user, peer_user, native_rest, rest_response,
-        enroll_params, (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields), checks,
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        native_rest,
+        rest_response,
+        enroll_params,
+        (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields),
+        checks,
     )
 
     import objectstore_rest_fixtures
 
     objectstore_rest_restart = objectstore_rest_fixtures.exercise(
-        client, peer_client, directory, title, user, peer_user, native_rest, rest_response,
-        (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields), checks,
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        native_rest,
+        rest_response,
+        (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields),
+        checks,
     )
     peer_client.task(58, 6, content_fixture["post"], error=101)
     import lobby_join_fixtures
@@ -3016,8 +3070,16 @@ try:
     import public_matchmaking_fixtures
 
     public_matchmaking_fixtures.exercise(
-        client, peer_client, directory, title, user, peer_user, player_info,
-        match_query, (u32, u64, text, boolean), checks,
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        player_info,
+        match_query,
+        (u32, u64, text, boolean),
+        checks,
     )
     import matchmaking_membership_fixtures
 
@@ -3073,8 +3135,14 @@ try:
     import tournament_join_fixtures
 
     tournament_join_fixtures.exercise(
-        client, peer_client, directory, title, user, peer_user,
-        (u64, text, boolean), checks,
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        (u64, text, boolean),
+        checks,
     )
 
     import tournament_formation_fixtures
@@ -3086,15 +3154,23 @@ try:
         # profile provisioning, copied identity, credentials or seeded account ID.
         signer = ec.generate_private_key(ec.SECP256R1())
         numbers = signer.public_key().public_numbers()
-        public_key = struct.pack("<II", 0x31534345, 32) + numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
+        public_key = (
+            struct.pack("<II", 0x31534345, 32)
+            + numbers.x.to_bytes(32, "big")
+            + numbers.y.to_bytes(32, "big")
+        )
         nonce = os.urandom(32)
         with post("/platform/client/challenge", public_key + nonce) as response:
             challenge = response.read()
         assert len(challenge) == 32
         name = ("Tournament Fixture " + str(index)).encode().ljust(36, b"\0")
-        prefix = struct.pack("<II", 0x31494452, 1) + nonce + challenge + public_key + name
+        prefix = (
+            struct.pack("<II", 0x31494452, 1) + nonce + challenge + public_key + name
+        )
         assert len(prefix) == 180
-        r, s = utils.decode_dss_signature(signer.sign(prefix, ec.ECDSA(hashes.SHA256())))
+        r, s = utils.decode_dss_signature(
+            signer.sign(prefix, ec.ECDSA(hashes.SHA256()))
+        )
         signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
         with post("/platform/client/login", prefix + signature) as response:
             issued = response.read()
@@ -3104,30 +3180,50 @@ try:
             "session_token": issued[112:176].decode(),
             "account_token": issued[177:241].decode(),
         }
-        with post("/auth/", dict(request, extra_data=json.dumps(credentials))) as response:
+        with post(
+            "/auth/", dict(request, extra_data=json.dumps(credentials))
+        ) as response:
             auth = json.load(response)
-        return identity, Client(auth_identity=(
-            base64.b64decode(auth["server_ticket"]),
-            base64.b64decode(auth["client_ticket"])[97:121],
-        ))
+        return identity, Client(
+            auth_identity=(
+                base64.b64decode(auth["server_ticket"]),
+                base64.b64decode(auth["client_ticket"])[97:121],
+            )
+        )
 
     tournament_formation_fixtures.exercise(
-        client, peer_client, directory, title, user, peer_user, player_info,
-        new_tournament_client, (u64, text, boolean), checks,
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        player_info,
+        new_tournament_client,
+        (u64, text, boolean),
+        checks,
     )
 
     import tournament_round_fixtures
 
     tournament_round_fixtures.exercise(
-        directory, title, player_info, match_query, new_tournament_client,
-        (u64, text, boolean), checks,
+        directory,
+        title,
+        player_info,
+        match_query,
+        new_tournament_client,
+        (u64, text, boolean),
+        checks,
     )
 
     import channel_membership_fixtures
 
     channel_membership_fixtures.exercise(
-        directory, title, new_tournament_client,
-        (u64, text, structure, pb_text, pb_integer, pb_bytes, pb_fields), checks,
+        directory,
+        title,
+        new_tournament_client,
+        (u64, text, structure, pb_text, pb_integer, pb_bytes, pb_fields),
+        checks,
     )
 
     copy_fixture = copy_content_fixtures.exercise(
@@ -4209,6 +4305,7 @@ try:
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
     regulation_restart(client)
+    rename_restart()
     objectstore_rest_fixtures.check_restart(
         client, objectstore_rest_restart, rest_response, checks
     )
