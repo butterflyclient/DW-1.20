@@ -50,7 +50,7 @@ Known task routes: 140; registered: 134; known target tasks without handler: 6
 29: mail
   Handlers: 4,5,7,9,10
   Missing known handlers: none in current constructor set
-  Remaining: Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.
+  Remaining: Original sendMail 0x14212D970 forwards to sendMailWithDuration 0x14212D9D0, whose raw conditional-move/stack-save path selects task 7 for an explicit sender and task 9 otherwise; that forwarding method is not evidence for task 2. Categorized/status SDK variants not recovered in Replay remain unclassified. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.
 
 38: anti-cheat and auth reports
   Handlers: 2,6,7,8
@@ -150,6 +150,15 @@ Known task routes: 140; registered: 134; known target tasks without handler: 6
 Additional audit gaps: indirect/virtual task dispatch, memory-derived IDs and unclassified REST/push paths.
 The JSON ledger retains exact constructor call-site provenance and static fixture source references.
 No map tests performed. No generic success replies or native fence overrides.
+
+Independent original-instruction task inventory:
+  Receipt: validation/20261006-native-task-byte-inventory.json
+  123 routes; 495 inspected functions; 494 PE unwind bounds; 1 SQLite boundary hint.
+  24 independent register/stack/branch fixtures passed; 16 state-limited paths and 183 unresolved paths remain.
+  Exported-text routes: 121; text-only routes: []; additional raw routes: 29/7, 29/9
+  Original function byte hashes and direct branch targets rechecked; aliases do not resolve calls.
+  Conditional moves retain both alternatives; branch feasibility, indirect dispatch and stack arguments remain open.
+  Potential routes and handler registration do not establish native callback completion.
 
 Current-backend offline tournament maintenance evidence:
   Receipt: validation/20261006-offline-tournament-startup.json

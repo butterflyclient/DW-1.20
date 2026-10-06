@@ -1,0 +1,78 @@
+REPLAY DW ORIGINAL-INSTRUCTION TASK INVENTORY
+2026-10-06
+
+Issue
+The exported assembly inventory uses continually changing SQLite aliases. Its
+register tracker misses conditional moves and values saved in stack locals.
+Those omissions hid the original mail sender's task 7/task 9 selection even
+though both backend handlers were already registered.
+
+Implementation
+tools/inventory-native-task-bytes.py independently scans original executable
+sections for direct calls/jumps to the three verified task constructors. It
+decodes bounded control flow from function entries before accepting raw call
+candidates. PE unwind bounds take priority; one function uses a SQLite start
+and size hint. SQLite names are display labels, not call resolution inputs.
+
+The tracker follows register widths, argument forwarding, nonvolatile registers,
+conditional-move alternatives, saved stack locals, stack adjustment and frame
+pointers. Volatile registers, overwritten/shadow stack slots and escaped locals
+are invalidated conservatively. Unknown memory values remain unknown. Direct
+forwarding wrappers are revisited for at most six passes. Each function is
+limited to 10,000 states; no flag or branch-feasibility solver is claimed.
+
+tools/test-native-task-bytes.py passes 24 independent x64 cases covering those
+rules, including overlapping writes, unknown memory mutation and escaped
+stack pointers. These cases exercise the analyzer; they are not backend task
+fixtures or native game callback tests.
+
+tools/inventory-backend-coverage.py now accepts the audit only when its target,
+tool, test and raw-inventory hashes match. It independently rechecks all bounded
+function byte hashes and every accepted direct call/jump target against the
+untouched PE. Literal routes join the ledger's route set and retain separate
+original_byte_callsite_proofs. A new backend binary cannot inherit completion
+from this static evidence or from earlier native game tests.
+
+Target
+E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe
+SHA256 68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+
+Result
+123 distinct potential service/task routes; 581 call-site records.
+495 inspected functions: 494 PE unwind bounds and one SQLite boundary hint.
+All 121 exported-text routes are independently recovered from original bytes.
+Additional raw routes are 29/7 and 29/9. No unowned candidate sites remain.
+183 unresolved paths remain, including 16 functions that hit the state limit.
+
+Original sendMail at 0x14212D970 forwards to sendMailWithDuration 0x14212D9D0.
+Its conditional move selects task 7 for an explicit sender and task 9 otherwise;
+the selected value survives in a stack local before constructor call 0x14212DAFC.
+That forwarding method does not establish a task-2 contract. Both recovered
+variants already use the backend's existing complete mail serializer and store.
+
+The reviewed backend ledger remains at 140 routes and 134 registered handlers.
+Six known routes still need exact result bindings: 50/22, 58/22, 193/9, 193/10,
+193/12 and 193/24. No ordinary metadata reply was substituted for the extended
+live DTO, whose consumer accesses URL fields beyond that ordinary allocation.
+
+Limits
+Potential direct routes do not prove feasible caller conditions, virtual or
+indirect dispatch, stack argument values, every linked SDK method, a successful
+response deserializer or a native application callback. There are five argument
+forwarding records and unresolved paths outside the literal route set. The
+SQLite boundary hint is not equivalent to a PE unwind bound. The full native
+method audit and full backend implementation remain incomplete.
+
+Evidence
+validation/20261006-native-task-byte-inventory.json is the compact committed
+receipt. data/native-task-bytes-20261006.json retains the full private byte-bound
+call, boundary and unresolved-path inventory. Regenerate with the primary
+Python runtime and the existing Capstone/pefile site-packages:
+
+python -B tools/inventory-native-task-bytes.py --output data/native-task-bytes-20261006.json --receipt validation/20261006-native-task-byte-inventory.json
+python -B tools/inventory-backend-coverage.py
+
+Runtime
+This pass changes audit/coverage tools only. It does not recompile or deploy a
+backend/game image and does not change profiles, map packages or external ports.
+The existing backend and shipping launch readiness are checked separately.

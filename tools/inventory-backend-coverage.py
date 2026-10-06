@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import struct
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -84,7 +85,7 @@ GAPS = {
     "12": "Native utility methods outside the recovered request set remain unclassified.",
     "23": "Full native positive signed increment/read roundtrip still needs observation.",
     "27": "Configured geography is local metadata, not real IP geolocation.",
-    "29": "Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.",
+    "29": "Original sendMail 0x14212D970 forwards to sendMailWithDuration 0x14212D9D0, whose raw conditional-move/stack-save path selects task 7 for an explicit sender and task 9 otherwise; that forwarding method is not evidence for task 2. Categorized/status SDK variants not recovered in Replay remain unclassified. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native multipart upload/commit remains unverified.",
@@ -489,6 +490,117 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def native_byte_task_evidence():
+    """Accept only a current, byte-bound audit; this establishes no callbacks."""
+    receipt = ROOT / "validation/20261006-native-task-byte-inventory.json"
+    if not receipt.is_file():
+        return None, []
+    proof = json.loads(receipt.read_bytes())
+    raw_path = (ROOT / proof["raw_inventory"]["path"]).resolve()
+    image = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe")
+    if not (
+        proof.get("passed") is True
+        and proof.get("schema") == 1
+        and proof.get("audit_tool_sha256")
+        == digest(ROOT / "tools/inventory-native-task-bytes.py")
+        and proof.get("test_tool_sha256")
+        == digest(ROOT / "tools/test-native-task-bytes.py")
+        and proof.get("independent_x64_trace_cases") == 24
+        and proof.get("target_image_sha256") == digest(image)
+        and raw_path.is_relative_to(DATA)
+        and raw_path.is_file()
+        and proof["raw_inventory"]["sha256"] == digest(raw_path)
+        and proof.get("original_assembly_text_used") is False
+        and proof.get("database_aliases_used_for_call_resolution") is False
+        and proof.get("full_method_audit_complete") is False
+        and proof.get("native_completion_verified") is False
+    ):
+        raise ValueError("Regenerate the original-byte task audit and receipt")
+    raw = json.loads(raw_path.read_bytes())
+    if (
+        raw["target_image_sha256"] != proof["target_image_sha256"]
+        or raw["audit_tool_sha256"] != proof["audit_tool_sha256"]
+        or len(raw["inspected_functions"]) != proof["inspected_functions"]
+        or raw.get("database_changed_during_labels")
+    ):
+        raise ValueError("Original-byte task audit provenance is inconsistent")
+    # Keep the ledger dependency-free. Recheck bounded function bytes and each
+    # direct branch against the original PE, without using SQLite display names.
+    with image.open("rb") as stream:
+        header = stream.read(64)
+        if header[:2] != b"MZ":
+            raise ValueError("Original target is not a PE image")
+        pe_offset = struct.unpack_from("<I", header, 60)[0]
+        stream.seek(pe_offset)
+        header = stream.read(24)
+        if header[:4] != b"PE\0\0":
+            raise ValueError("Original target PE signature is invalid")
+        section_count, optional_size = (
+            struct.unpack_from("<H", header, 6)[0],
+            struct.unpack_from("<H", header, 20)[0],
+        )
+        optional = stream.read(optional_size)
+        if struct.unpack_from("<H", optional)[0] != 0x20B:
+            raise ValueError("Original target is not a PE32+ image")
+        base = struct.unpack_from("<Q", optional, 24)[0]
+        sections = []
+        for _ in range(section_count):
+            section = stream.read(40)
+            rva, size, offset = struct.unpack_from("<III", section, 12)
+            sections.append((base + rva, size, offset))
+
+        def original_bytes(address, size):
+            for start, raw_size, offset in sections:
+                if start <= address and address + size <= start + raw_size:
+                    stream.seek(offset + address - start)
+                    data = stream.read(size)
+                    if len(data) == size:
+                        return data
+            raise ValueError("Task evidence lies outside original file-backed sections")
+
+        regions = {row["start"]: row for row in raw["inspected_functions"]}
+        if len(regions) != len(raw["inspected_functions"]):
+            raise ValueError("Duplicate original-byte function bounds")
+        for row in regions.values():
+            size = row["end"] - row["start"]
+            if (
+                not 0 < size <= 65536
+                or hashlib.sha256(original_bytes(row["start"], size)).hexdigest()
+                != row["bytes_sha256"]
+            ):
+                raise ValueError("Original-byte function bounds or hash changed")
+        for row in raw["calls"]:
+            region = regions.get(row["function"])
+            if (
+                not region
+                or not region["start"] <= row["callsite"] <= region["end"] - 5
+                or row["constructor"] not in (0x1421170B0, 0x142156330, 0x142117C10)
+            ):
+                raise ValueError("Original-byte task call ownership is invalid")
+            branch = original_bytes(row["callsite"], 5)
+            target = row["callsite"] + 5 + struct.unpack_from("<i", branch, 1)[0]
+            if branch[0] not in (0xE8, 0xE9) or target != row["callee"]:
+                raise ValueError("Original-byte task call target changed")
+    calls = [
+        row
+        for row in raw["calls"]
+        if isinstance(row["service"], int) and isinstance(row["task"], int)
+    ]
+    routes = {(row["service"], row["task"]) for row in calls}
+    if (
+        routes != {(row["service"], row["task"]) for row in raw["routes"]}
+        or len(routes) != proof["route_count"]
+    ):
+        raise ValueError("Original-byte task route totals are inconsistent")
+    summary = dict(proof)
+    summary.update(
+        receipt=receipt.relative_to(ROOT).as_posix(),
+        receipt_sha256=digest(receipt),
+        original_function_bytes_and_direct_call_targets_rechecked=True,
+    )
+    return summary, calls
+
+
 def offline_tournament_maintenance_evidence(server_hash):
     path = ROOT / "validation/20261006-offline-tournament-startup.json"
     if not path.is_file():
@@ -644,6 +756,7 @@ def private_pair_evidence(server_hash):
 
 def main():
     graph = json.loads((DATA / "native-service-callgraph.json").read_bytes())
+    byte_evidence, byte_calls = native_byte_task_evidence()
     deployment = json.loads((DATA / "deployment.json").read_bytes())
     fixture = json.loads((DATA / "lobby-verification.json").read_bytes())
     executable = ROOT / "build/Release/iw8-dw-server.exe"
@@ -714,11 +827,15 @@ def main():
                 )
             )
     tasks = []
-    pairs = set(routes) | {
-        (int(service), task)
-        for service, values in graph["families"].items()
-        for task in values
-    }
+    pairs = (
+        set(routes)
+        | {
+            (int(service), task)
+            for service, values in graph["families"].items()
+            for task in values
+        }
+        | {(row["service"], row["task"]) for row in byte_calls}
+    )
     relay_proofs = {}
     for task, filename in (
         (26, "native-relay-client-verification.json"),
@@ -912,7 +1029,16 @@ def main():
                 handler_registered=(service, task) in routes,
                 handler_source=routes.get((service, task)),
                 exact_target_constructor_proofs=constructors,
-                target_constructor_audit_covered=bool(constructors),
+                original_byte_callsite_proofs=[
+                    proof
+                    for proof in byte_calls
+                    if (proof["service"], proof["task"]) == (service, task)
+                ],
+                target_constructor_audit_covered=bool(constructors)
+                or any(
+                    (proof["service"], proof["task"]) == (service, task)
+                    for proof in byte_calls
+                ),
                 preparation_contract_provenance=(
                     "SDK source oracle only; not recovered as a Replay request writer"
                     if (service, task) in ((50, 5), (50, 15), (50, 20))
@@ -935,6 +1061,7 @@ def main():
         target_database_size=graph["database_size"],
         target_database_mtime_ns=graph["database_mtime_ns"],
         callgraph_sha256=digest(DATA / "native-service-callgraph.json"),
+        native_byte_task_inventory=byte_evidence,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),
         target_database_changed_during_inventory=graph.get(
@@ -1123,6 +1250,25 @@ def main():
         "The JSON ledger retains exact constructor call-site provenance and static fixture source references.",
         "No map tests performed. No generic success replies or native fence overrides.",
     ]
+    if byte_evidence:
+        text += [
+            "",
+            "Independent original-instruction task inventory:",
+            "  Receipt: " + byte_evidence["receipt"],
+            f'  {byte_evidence["route_count"]} routes; {byte_evidence["inspected_functions"]} inspected functions; '
+            f'{byte_evidence["unwind_bounded_functions"]} PE unwind bounds; {byte_evidence["sqlite_fallback_functions"]} SQLite boundary hint.',
+            f'  {byte_evidence["independent_x64_trace_cases"]} independent register/stack/branch fixtures passed; '
+            f'{byte_evidence["state_limited_paths"]} state-limited paths and {byte_evidence["unresolved_paths"]} unresolved paths remain.',
+            f'  Exported-text routes: {byte_evidence["text_inventory_routes"]}; text-only routes: '
+            f'{byte_evidence["text_routes_not_recovered_from_bytes"]}; additional raw routes: '
+            + ", ".join(
+                f"{service}/{task}"
+                for service, task in byte_evidence["additional_raw_routes"]
+            ),
+            "  Original function byte hashes and direct branch targets rechecked; aliases do not resolve calls.",
+            "  Conditional moves retain both alternatives; branch feasibility, indirect dispatch and stack arguments remain open.",
+            "  Potential routes and handler registration do not establish native callback completion.",
+        ]
     retirement = inventory["private_native_tournament_retirement_evidence"]
     if retirement:
         text += [
