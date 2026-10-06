@@ -83,6 +83,35 @@ namespace
         return true;
     }
 
+    bool TestFilename(const char *value, const char *extension)
+    {
+        // Opt-in controls are simple leaves in the game working directory.
+        // No absolute paths, parent traversal, streams or device filenames.
+        constexpr char prefix[] = "replay-dw-test-";
+        unsigned i = 0;
+        for (; prefix[i]; ++i)
+            if (value[i] != prefix[i])
+                return false;
+        const unsigned first = i;
+        for (; value[i]; ++i)
+        {
+            if (!((value[i] >= 'a' && value[i] <= 'z') || (value[i] >= '0' && value[i] <= '9') ||
+                  value[i] == '-' || value[i] == '.'))
+                return false;
+            if (value[i] == '.' && value[i + 1] == '.')
+                return false;
+        }
+        unsigned length = 0;
+        while (extension[length])
+            ++length;
+        if (i <= first + length)
+            return false;
+        for (unsigned at = 0; at < length; ++at)
+            if (value[i - length + at] != extension[at])
+                return false;
+        return true;
+    }
+
     void Load()
     {
         unsigned expected = 0;
@@ -90,6 +119,7 @@ namespace
                 &s_state, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
         {
             char port[8]{};
+            bool customCommand = false, customEnabled = false;
             // An executable-specific file allows independent native test instances.
             // Normal guest installations use replay-dw.ini in the game folder.
             char executableIni[264]{};
@@ -127,6 +157,10 @@ namespace
                         Field(text + at, "local_address", s_local, sizeof(s_local));
                         Field(text + at, "game_port", port, sizeof(port));
                         Field(text + at, "player_name", s_playerName, sizeof(s_playerName));
+                        customCommand |= Field(
+                            text + at, "test_command_file", s_testCommand, sizeof(s_testCommand));
+                        customEnabled |= Field(
+                            text + at, "test_enabled_file", s_testEnabled, sizeof(s_testEnabled));
                         while (at < count && text[at] != '\n')
                             ++at;
                         if (at < count)
@@ -134,6 +168,13 @@ namespace
                     }
             }
             bool valid = !s_fieldOverflow && IPv4(s_host);
+            // Never fall back to another client's controls after invalid input.
+            if ((customCommand && !TestFilename(s_testCommand, ".command")) ||
+                (customEnabled && !TestFilename(s_testEnabled, ".enabled")))
+            {
+                s_testCommand[0] = s_testEnabled[0] = 0;
+                valid = false;
+            }
             if (s_public[0] || s_local[0])
                 valid = valid && IPv4(s_public) && IPv4(s_local);
             if (port[0])

@@ -18,6 +18,12 @@ parser.add_argument(
     help="Attach read-only to an owner-launched DW process without a launch receipt",
 )
 parser.add_argument(
+    "--launch-receipt",
+    type=Path,
+    default=root / "data/current-runtime-launch.json",
+    help="Owned per-instance launch receipt, retaining log/counter baselines",
+)
+parser.add_argument(
     "--deployment",
     type=Path,
     default=root / "data/deployment.json",
@@ -62,9 +68,7 @@ deployment = json.loads(args.deployment.read_text())
 launch = (
     None
     if args.pid
-    else json.loads(
-        (root / "data" / "current-runtime-launch.json").read_text(encoding="utf-8-sig")
-    )
+    else json.loads(args.launch_receipt.read_text(encoding="utf-8-sig"))
 )
 if launch and deployment["sha256"] != launch["sha256"]:
     raise RuntimeError("Launch receipt does not match the deployed DW image")
@@ -278,21 +282,31 @@ try:
                     if offset < 0 or offset >= 1200 * 576 or offset % 576:
                         raise RuntimeError("Native channel message is outside its pool")
                     message = read(pointer - base, 576)
-                    sender, message_channel = struct.unpack_from("<QQ", message)
+                    # +8 is the recipient, not an invariant channel ID.
+                    # Target 140F3A9F0 uses the local XUID for instant messages;
+                    # 140F3D950/3E160 use zero for local/system player events.
+                    # Ownership is established by the chat pointer at +560.
+                    sender, recipient = struct.unpack_from("<QQ", message)
                     owner = struct.unpack_from("<Q", message, 560)[0]
                     name, content = message[16:52], message[52:552]
                     if (
-                        message_channel != channel
-                        or owner != base + address
+                        owner != base + address
                         or b"\0" not in name
                         or b"\0" not in content
                     ):
-                        raise RuntimeError("Native channel message layout is invalid")
+                        raise RuntimeError(
+                            "Native channel message layout is invalid: "
+                            f"slot={slot}, sequence={sequence}, "
+                            f"owner_matches={owner == base + address}, "
+                            f"name_terminated={b'\0' in name}, "
+                            f"content_terminated={b'\0' in content}"
+                        )
                     content = content.split(b"\0", 1)[0]
                     messages.append(
                         {
                             "sequence": sequence,
                             "sender": sender,
+                            "recipient": recipient,
                             "sender_name": name.split(b"\0", 1)[0].decode(
                                 errors="replace"
                             ),

@@ -1,5 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Output,
-      [string]$ScreenshotDirectory)
+      [string]$ScreenshotDirectory,
+      [string]$DeploymentReceipt = (Join-Path $PSScriptRoot 'data\deployment.json'),
+      [string]$LaunchReceipt = (Join-Path $PSScriptRoot 'data\current-runtime-launch.json'))
 $ErrorActionPreference='Stop'
 $target=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Output))
 $dataRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'data'))+[IO.Path]::DirectorySeparatorChar
@@ -13,7 +15,7 @@ $screens=if($ScreenshotDirectory) { @([IO.Path]::GetFullPath($ScreenshotDirector
 }
 $before=@{}
 Get-ChildItem -LiteralPath $screens -Filter '*.jpg' -ErrorAction SilentlyContinue | ForEach-Object { $before[$_.FullName]=$_.LastWriteTimeUtc.Ticks }
-& (Join-Path $PSScriptRoot 'invoke-game-command.ps1') -Command 'screenshotJpeg'
+& (Join-Path $PSScriptRoot 'invoke-game-command.ps1') -Command 'screenshotJpeg' -DeploymentReceipt $DeploymentReceipt -LaunchReceipt $LaunchReceipt
 $deadline=[DateTime]::UtcNow.AddSeconds(15)
 while([DateTime]::UtcNow -lt $deadline) {
     $changed=@(Get-ChildItem -LiteralPath $screens -Filter '*.jpg' -ErrorAction SilentlyContinue | Where-Object {

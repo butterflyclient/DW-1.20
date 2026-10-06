@@ -1,0 +1,33 @@
+REPLAY DW TARGET CONSUMER AUDIT CORRECTION
+2026-10-06
+
+The continuously named SQLite export contains descriptive aliases. A name is
+not proof of a target response class, virtual slot, field layout or wire schema.
+
+The alias bdObjectStoreCompleteUploadSessionsResponse::deserialize at original
+address 0x1420F1890 is incompatible with that description. The untouched EXE's
+128-byte function calls 0x1420F3A70, 0x1420F3D20, 0x1420F3C60 and 0x1420F3B40
+and passes a 20-byte length twice. It does not parse upload-completion JSON.
+The expected NUL-terminated sessionID, uploadUrl, uploadURL,
+uploadSessionCompletions and finalContentLength keys are absent from the image.
+Absence of those literals alone does not prove every possible indirect parser
+is absent. It prevents using this function alias as a response-layout contract.
+
+The native multipart consumer at 0x142130F70 reads URL storage at +18700 and a
+URL count at +28952. An ordinary file-metadata DTO of size 19744 cannot satisfy
+that complete result layout. A synthetic ordinary DTO reply would risk reads
+beyond the object and does not implement tasks 50/22 or 58/22 correctly.
+
+Object-store category writers 193/9 and 193/10 are present, but their exact
+target response bindings remain unresolved. The recovered pageToken reader at
+0x142148050 handles a userList response, not a category-list response. Large
+upload tasks 193/12 and 193/24 are selected inside the original streaming
+state machine; the request/response owners are opaque virtual objects.
+
+No generic-success handler or inferred class layout was added for these six
+routes. OpenIW8 remains a behavior oracle; target constructor, vtable and actual
+instruction evidence are required before claiming response compatibility.
+
+Evidence: validation/20261006-target-consumer-alias-correction.json binds the
+untouched image and exact function hashes, calls and literal occurrence counts.
+The corresponding full read-only research windows remain under private data.

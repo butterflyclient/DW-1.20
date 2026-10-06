@@ -55,6 +55,8 @@ def verify(pe, report):
             f"host={host}\nprofile=remote-test-1\naccess_key={'a'*64}\n"
             f"public_address={host}\nlocal_address=192.168.1.124\ngame_port=3074\n"
             "player_name=Replay INI Tester\n"
+            "test_command_file=replay-dw-test-alpha.command\n"
+            "test_enabled_file=replay-dw-test-alpha.enabled\n"
         ).encode()
         if bom:
             ini = b"\xef\xbb\xbf" + ini
@@ -137,9 +139,21 @@ def verify(pe, report):
             native[1060:]
         )
         header_address = run("DW_LocalConfig_Headers")
-        header_text = bytes(machine.mem_read(header_address, 512)).decode("utf-16le").split("\0", 1)[0]
+        header_text = (
+            bytes(machine.mem_read(header_address, 512))
+            .decode("utf-16le")
+            .split("\0", 1)[0]
+        )
         assert header_text == "Content-Type: application/octet-stream\r\n"
-        assert string(run("DW_LocalConfig_PlayerName")) == ("Replay INI Tester" if remote else "")
+        assert string(run("DW_LocalConfig_PlayerName")) == (
+            "Replay INI Tester" if remote else ""
+        )
+        assert string(run("DW_LocalConfig_TestCommand")) == (
+            "replay-dw-test-alpha.command" if remote else "replay-dw-test.command"
+        )
+        assert string(run("DW_LocalConfig_TestEnabled")) == (
+            "replay-dw-test-alpha.enabled" if remote else "replay-dw-test.enabled"
+        )
         assert "DW_LocalIdentity_Login" in symbols
         if not enabled:
             assert bytes(machine.mem_read(config, len(native))) == bytes(native)
@@ -243,9 +257,11 @@ def verify(pe, report):
             arena + 0xF760,
             arena + 0xF770,
         )
-        for name, thunk in (("LoadLibraryA", library_thunk),
-                            ("GetProcAddress", procedure_thunk),
-                            ("FreeLibrary", free_library_thunk)):
+        for name, thunk in (
+            ("LoadLibraryA", library_thunk),
+            ("GetProcAddress", procedure_thunk),
+            ("FreeLibrary", free_library_thunk),
+        ):
             machine.mem_write(symbols["__imp_" + name], struct.pack("<Q", thunk))
 
         def return_native(uc, value=0):
@@ -270,7 +286,9 @@ def verify(pe, report):
                 "func_1417EC990": "logon",
             }
             if address == environment_thunk:
-                assert string(args[0]) == "CODPC_NOCLOUD_SYNC" and string(args[1]) == "1"
+                assert (
+                    string(args[0]) == "CODPC_NOCLOUD_SYNC" and string(args[1]) == "1"
+                )
                 presence["local_storage"] += 1
                 return_native(uc, 1)
                 return
@@ -279,7 +297,9 @@ def verify(pe, report):
                 return_native(uc, 0xABCDEF)
                 return
             if address == procedure_thunk:
-                assert args[0] == 0xABCDEF and string(args[1]) == "SetEnvironmentVariableA"
+                assert (
+                    args[0] == 0xABCDEF and string(args[1]) == "SetEnvironmentVariableA"
+                )
                 return_native(uc, environment_thunk)
                 return
             if address == free_library_thunk:
@@ -916,12 +936,19 @@ def verify(pe, report):
             assert invoke("func_140C88A30", local_user, 0, 0) == 4
             assert invoke("func_140C88B20", local_platform, 0, 0) == 4
             machine.mem_write(native_auth, struct.pack("<I", 2))
-        for bits, expected in (((1, 0, 0, 0), 2), ((1, 0, 1, 0), 1),
-                               ((1, 0, 0, 1), 3), ((1, 1, 0, 0), 4),
-                               ((0, 0, 0, 0), 4), ((1, 0, 1, 1), 4)):
+        for bits, expected in (
+            ((1, 0, 0, 0), 2),
+            ((1, 0, 1, 0), 1),
+            ((1, 0, 0, 1), 3),
+            ((1, 1, 0, 0), 4),
+            ((0, 0, 0, 0), 4),
+            ((1, 0, 1, 1), 4),
+        ):
             presence["fields"] = dict(zip((15, 8, 5, 7), bits))
             assert invoke("func_140C88A30", local_user + 1, 0, 0) == expected
             assert invoke("func_140C88B20", local_platform + 1, 0, 0) == expected
         cases[-1]["compiled_platform_online_status_persistence"] = True
-        cases[-1]["compiled_native_local_profile_selection"] = presence["local_storage"] > 0
+        cases[-1]["compiled_native_local_profile_selection"] = (
+            presence["local_storage"] > 0
+        )
     return cases

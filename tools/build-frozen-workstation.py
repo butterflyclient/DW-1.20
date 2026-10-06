@@ -242,7 +242,9 @@ verify_text = verify_text.replace(
 )
 verify_text = verify_text.replace(
     "from verify_debug_states import verify as verify_debug_states",
-    "from verify_debug_states import verify as verify_debug_states\nfrom verify_dw_endpoints import verify as verify_dw_endpoints",
+    "from verify_debug_states import verify as verify_debug_states\n"
+    "from verify_dw_endpoints import verify as verify_dw_endpoints\n"
+    "from verify_dw_test_paths import verify as verify_dw_test_paths",
 )
 dw_marker = '        checks["debug_states"] = verify_debug_states(rebuilt, report)'
 if verify_text.count(dw_marker) != 1:
@@ -250,7 +252,9 @@ if verify_text.count(dw_marker) != 1:
 verify_text = verify_text.replace(
     dw_marker,
     dw_marker
-    + '\n    checks["dw_local_endpoints"] = verify_dw_endpoints(rebuilt, report)',
+    + '\n    checks["dw_local_endpoints"] = verify_dw_endpoints(rebuilt, report)'
+    + '\n    if any(item["source"].endswith("DW_TestHomePath.cpp") for item in report["cpp"]):'
+    + '\n        checks["dw_private_test_paths"] = verify_dw_test_paths(rebuilt, report)',
 )
 verify_path.write_text(verify_text)
 verify_record = next(item for item in records if Path(item["snapshot"]) == verify_path)
@@ -286,6 +290,10 @@ debug_record["sha256"] = hashlib.sha256(debug_path.read_bytes()).hexdigest()
 copy_file(
     ROOT / "tools" / "verify-dw-endpoints.py",
     snapshot / "tools" / "verify_dw_endpoints.py",
+)
+copy_file(
+    ROOT / "tools" / "verify-dw-test-paths.py",
+    snapshot / "tools" / "verify_dw_test_paths.py",
 )
 
 # Crash-marker initialization now starts the separate title worker. Keep this

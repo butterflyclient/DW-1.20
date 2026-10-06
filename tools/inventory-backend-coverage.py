@@ -87,7 +87,7 @@ GAPS = {
     "29": "Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
-    "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
+    "58": "Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native multipart upload/commit remains unverified.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
     "80": "Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Task106 recipient SKU orders support published gifting to existing local accounts with full owner/buyer coupon DTOs, flushed multi-account intents, conflicting-image preflight and disk/process recovery. Native gift/purchase callbacks, discount rules, other variants and loot generation remain open.",
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
@@ -175,7 +175,8 @@ GAPS["193"] += (
     " The same native REST vector GET/PUT routes now share the struct-buffer domain, "
     "complete account-owned storage and journal recovery. Matching cache version/checksum "
     "hints use the target NotModified reader; REST body windows retain their 256 KiB cap. "
-    "Native REST method callbacks remain unverified."
+    "Native REST method callbacks remain unverified. The alias at 0x1420F1890 is not an "
+    "upload-completion reader; see validation/20261006-target-consumer-alias-correction.json."
 )
 
 
@@ -331,6 +332,32 @@ def rest_coverage(inventory, friend_evidence):
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def private_pair_evidence(server_hash):
+    path = ROOT / "validation/20261006-native-pair-party-profile.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed") is True
+        and proof.get("server_sha256") == server_hash
+        and proof.get("native_two_game_private_party_join_verified")
+        and proof.get("native_shared_party_channel_member_and_host_callbacks_verified")
+        and proof.get("native_local_settings_persistence_across_new_process_verified")
+        and proof.get("native_startup_fences_passing_per_client") == 27
+    ):
+        return None
+    return dict(
+        receipt=path.relative_to(ROOT).as_posix(),
+        sha256=digest(path),
+        private_game_sha256=proof["game_sha256"],
+        scope=proof["multiplayer_scope"],
+        shipping_executable_native_completion_inherited=False,
+        relay_peer_data_forwarding_verified=False,
+        cross_network_gameplay_verified=False,
+        observed_open_issues=proof["observed_open_issues"],
+    )
 
 
 def main():
@@ -632,6 +659,8 @@ def main():
         server_sha256=current_hash,
         game_sha256=deployment["sha256"],
         source_sha256=sources,
+        source_inventory_scope="Current checkout source hashes; these are not a compiled-backend source receipt",
+        private_native_pair_evidence=private_pair_evidence(current_hash),
         validation=dict(
             independent_suite_matches_binary=valid_fixture,
             grouped_checks=len(fixture["checks"]),

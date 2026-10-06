@@ -305,6 +305,15 @@ namespace
                 return;
         s_testRequest = digest;
         Log("DW_LOCAL_TEST_COMMAND native main-thread command dispatched");
+        // Separate clients share the diagnostic log, but acknowledge only their
+        // own command channel. The request nonce is deliberately not a credential.
+        char acknowledgement[160]{};
+        const char *parts[] = {"DW_LOCAL_TEST_CHANNEL ", DW_LocalConfig_TestCommand()};
+        unsigned used = 0;
+        for (const auto *part : parts)
+            for (; *part && used + 1 < sizeof(acknowledgement); ++part)
+                acknowledgement[used++] = *part;
+        Log(acknowledgement);
         func_1412976C0(0, 0, request + start);
     }
 } // namespace

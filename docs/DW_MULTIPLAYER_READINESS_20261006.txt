@@ -1,5 +1,28 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
+LATEST NATIVE MILESTONE - REAL TWO-CLIENT LOCAL PRIVATE PARTY
+Live backend SHA256:
+9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f
+Private test game SHA256:
+73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+Normal shipping DW executable remains bdc091d3... and was not replaced.
+
+Two real games, independent first-launch identities and isolated native caches
+passed all 27 fences each. Native name search/invitation/acceptance produced
+online friends. Social -> Join Game completed; both Party tabs and both native
+party-chat member pools agreed on two players and the same host. Profile settings
+and identity survived new processes. Native friend removal cleared both lists.
+No map or cross-network gameplay was tested. Relay authentication is established;
+native peer DATA forwarding remains unverified. The removal dialog's nil name and
+retained presence subscription remain open. Unrelated host-migration development
+was excluded from the private build. Root-folder test artifacts were removed;
+the normal EXE/INI/identity and compiler receipts were preserved.
+
+Evidence: validation/20261006-native-pair-party-profile.json
+Details and repeatable tools: docs/DW_NATIVE_PAIR_TESTING_20261006.txt
+The private game's native evidence is not inherited by the shipping image's
+per-method coverage ledger. Full backend implementation remains incomplete.
+
 CURRENT CLIENT - AUTHENTICATED SAME-SERVER RELAY RESTART
 Game SHA256: bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
 Backend SHA256: 612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400

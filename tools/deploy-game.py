@@ -46,6 +46,10 @@ if (
 ):
     raise RuntimeError("Job build directory is outside its expected build root")
 report = json.loads((build / "build-report.json").read_text())
+if any(item["source"].endswith("DW_TestHomePath.cpp") for item in report["cpp"]):
+    raise RuntimeError(
+        "Private native-pair test build: do not replace the normal DW executable"
+    )
 source_root = Path(report["source_root"]).resolve()
 snapshot_receipt = None
 if source_root != COMPILER.resolve():

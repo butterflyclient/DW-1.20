@@ -1,0 +1,103 @@
+REPLAY DW NATIVE TWO-CLIENT VALIDATION
+2026-10-06
+
+The game itself now proves local private-party joining between two independently
+created profiles. This is not a WAN, map or full-backend completion claim.
+
+Private engine build: 728b618c35724535
+Game SHA256: 73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+Backend SHA256: 9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f
+Normal DW EXE SHA256, preserved:
+bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
+
+WHY THE PRIVATE TEST BUILD WAS NECESSARY
+
+Separate LOCALAPPDATA directories isolate first-launch identity creation, but
+the original engine still shares its Documents settings and fs_basepath DCache.
+The first two-game build authenticated both players, then the second instance
+reported that toc1.dcache was locked. This was a native filesystem collision,
+not a failed Demonware protocol task.
+
+Original Replay instructions identify the Documents helper at 0x1413FB0D0,
+FS_FOpenFileReadWrite at 0x1413D9900, FS_BuildOSPath at 0x1413D8B10 and its handle
+owner at 0x1413DA2D0. integration/testing/DW_TestHomePath.cpp reconstructs the
+complete path/helper behavior and routes only the four exact DCache leaf names
+to REPLAY_DW_TEST_HOME. Assets retain the original game fs_basepath. Native OS
+open modes, handle ownership and main/DB/render/server thread selection remain
+in their original consumers. The shared complete dvar layout is retained.
+
+The override requires the DW executable, a valid opt-in and an absolute bounded
+environment path. Invalid explicit paths fail empty. The production deployment
+tool rejects images containing this private helper. This test source must not
+be imported into the normal shipping build. It is not a rendering workaround.
+
+The private linked image passed source/object checks, relocation review, zero
+unresolved symbols and 28 executed helper/cache checks. OS and handle boundaries
+are simulated in those VM checks. The subsequent actual simultaneous processes
+prove native profile/cache separation; VM checks alone would not do so.
+
+ACTUAL GAME RESULTS
+
+Both games ran from E:\IW8\Builds\1.20-replay. Both started with zero friends,
+created distinct local identities automatically, authenticated natively and
+passed all 27 startup fences. The owner's agreement approval covered both test
+profiles; agreements and ordinary first-run setup were completed in the game.
+
+Alpha performed native username search/invitation. Bravo sent the reciprocal
+invitation, exercising the backend's normal acceptance path. Both native lists
+showed the other real player online. Alpha selected Social -> Join Game. The
+native success notification appeared, both Party tabs showed 2/20 and both native
+party-chat pools contained the same channel, both XUIDs and Bravo as leader.
+The backend routed both native session-info instant messages successfully.
+Native relay authentication passed, but relay forwarded_packets remained zero.
+This local party proof does not establish native relay peer DATA forwarding.
+
+Controlled process restarts retained account IDs and friendship. A deliberate
+profile_setToggleADSEnabledKeyboard 1 plus updateGamerProfile survived another
+fresh process; the setting was restored to zero through the same native commands.
+No agreement/audio setup returned after restart. Original native private-party
+leadership fell back to Alpha when Bravo closed; this does not certify backend
+matchmaker host migration or the other session's new host-migration integration.
+
+The temporary friendship was removed through the game. Both native friend lists
+cleared. The confirmation displayed nil for the name, and native presence retained
+one subscription after removal, including a later observation. Those issues remain
+open; friend-list removal is not proof that native unsubscribe completed.
+
+The actual native UDP ports were 3074 and 3091. The second configured INI port was
+3079; the engine selected its own available port. Configured ports must not be
+reported as verified socket bindings. Cross-network endpoint/traversal remains a
+separate validation gate.
+
+TESTING TOOLS AND PROVENANCE
+
+Per-instance test_command_file/test_enabled_file INI leaves are bounded and
+validated. Default names remain compatible. A channel-specific acknowledgement
+prevents a command to one test game from being credited to another. The launch
+script checks image hash, PID and creation time before stopping an owned process.
+The observer and native screenshot script accept per-instance launch receipts.
+
+The private source directory was frozen from committed DW integration plus the
+owned configuration/command-channel changes and test helper. Unrelated dirty
+Con_Developer, PlayerDataPath and host-migration work was not compiled into it.
+The shared compiler workspace was not edited. Normal job/snapshot receipts were
+restored after retaining the private receipts. Both test clients closed normally;
+their two root-folder EXEs, INIs and control files were removed. Private profile,
+build and evidence files remain under the ignored backend data directory.
+The normal EXE, INI and machine identity were hash-checked and preserved.
+
+The native chat observer was also corrected. Message +8 is the recipient; local
+system/player events use zero and instant messages use the local XUID. Ownership
+is established by the chat pointer at +560. Exact untouched-PE instructions, not
+a cross-build source alias, prove these fields. Text contents are never exported.
+
+Receipts:
+validation/20261006-native-pair-first-run.json
+validation/20261006-native-pair-party-profile.json
+validation/20261006-native-chat-recipient-layout.json
+tools/record-native-pair-proof.py validates retained observations and build gates.
+tools/research-native-chat-message-layout.py repeats the untouched-PE field check.
+
+Still open: actual two-network party/gameplay and relay forwarding, the social
+issues above, six known binary result bindings and unverified native callbacks
+for other backend domains. No map was launched in this pass.
