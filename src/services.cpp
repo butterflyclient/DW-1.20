@@ -31,6 +31,7 @@
 #include <fstream>
 #include <mutex>
 #include <optional>
+#include <charconv>
 
 namespace services
 {
@@ -516,6 +517,36 @@ namespace services
             // not discard already prepared native offline presence notifications.
         }
         return deliveries;
+    }
+
+    void maintainTournamentPublications(const std::function<void(const std::string &)> &log)
+    {
+        std::lock_guard lock(storeMutex);
+        const auto root = directory / "tournaments";
+        if (!std::filesystem::exists(root))
+            return;
+        unsigned count = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(root))
+        {
+            wire::require(++count <= 1024);
+            const auto name = entry.path().filename().string();
+            uint32_t title = 0;
+            const auto parsed = std::from_chars(name.data(), name.data() + name.size(), title);
+            if (!entry.is_directory() || entry.is_symlink() || parsed.ec != std::errc{} ||
+                parsed.ptr != name.data() + name.size() || !title || std::to_string(title) != name)
+            {
+                log("TOURNAMENT maintenance rejected invalid realm path");
+                continue;
+            }
+            try
+            {
+                retireUnavailableManagedTournaments(directory, title, log);
+            }
+            catch (const std::exception &)
+            {
+                log("TOURNAMENT maintenance realm storage failure; title=" + std::to_string(title));
+            }
+        }
     }
 
     std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user)

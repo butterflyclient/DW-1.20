@@ -112,10 +112,14 @@ GAPS["145"] += (
     "transaction. A validated system terminal record preserves actual results, prevents "
     "re-published IDs from resurrecting the old competition and enables native event-2012 "
     "catch-up for accepted and pending registrations. Cleanup runs on an enrolled client's "
-    "idle update or authenticated tournament request. A missing personal bracket slot does "
+    "idle update, authenticated tournament request or once-per-second service-store maintenance. "
+    "Maintenance visits persisted enrollments independently of sockets, including server "
+    "startup with no authenticated clients. A missing personal bracket slot does "
     "not cancel a globally live publication; other tournaments and newer assignments are "
-    "preserved. Native allocated-round retirement and all-offline background sweeping remain "
-    "separate gates."
+    "preserved. Offline withdrawal, blocked-transaction recovery, reconnect notification "
+    "and real-clock startup expiry with malformed-realm isolation have exact-binary fixture "
+    "evidence. Native allocated-round retirement, orphan formations without enrollment and "
+    "retail disconnect/forfeit policy remain separate gates."
 )
 
 GAPS["145"] += (
@@ -483,6 +487,72 @@ def rest_coverage(inventory, friend_evidence, server_hash):
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def offline_tournament_maintenance_evidence(server_hash):
+    path = ROOT / "validation/20261006-offline-tournament-startup.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    expected_sources = {
+        "src/server.cpp",
+        "src/services.cpp",
+        "src/services.h",
+        "src/tournament_services.cpp",
+        "src/tournament_services.h",
+    }
+    if not (
+        proof.get("passed") is True
+        and proof.get("backend_sha256") == server_hash
+        and proof.get("test_tool_sha256")
+        == digest(ROOT / "tools/test-offline-tournament-startup.py")
+        and set(proof.get("source_sha256", {})) == expected_sources
+        and all(
+            digest(ROOT / name) == expected
+            for name, expected in proof["source_sha256"].items()
+        )
+        and proof.get("authenticated_lobby_connections") == 0
+        and proof.get("authentication_requests") == 0
+        and proof.get("native_tasks") == 0
+        and proof.get("real_clock_expiry")
+        and proof.get("terminal_committed")
+        and proof.get("readiness_cleared")
+        and proof.get("malformed_realm_preserved")
+        and proof.get("independent_realm_progressed")
+        and proof.get("exact_source_restoration_verified")
+        and proof.get("game_launched") is False
+        and proof.get("receiver_membership_seeded") is True
+    ):
+        return None
+    reference = proof["protocol_evidence"]
+    protocol_path = Path(reference["path"]).resolve()
+    if (
+        not protocol_path.is_relative_to(DATA)
+        or not protocol_path.is_file()
+        or digest(protocol_path) != reference["sha256"]
+    ):
+        return None
+    protocol = json.loads(protocol_path.read_bytes())
+    if not (
+        protocol.get("passed")
+        and protocol.get("server_sha256") == server_hash
+        and len(protocol.get("checks", [])) == proof.get("protocol_groups")
+        and any(
+            item.startswith("Offline managed publication retirement")
+            for item in protocol["checks"]
+        )
+    ):
+        return None
+    return dict(
+        receipt=path.relative_to(ROOT).as_posix(),
+        sha256=digest(path),
+        offline_retirement_and_reconnect_fixture_verified=True,
+        startup_real_clock_expiry_with_zero_authenticated_clients_verified=True,
+        malformed_realm_isolation_verified=True,
+        backend_fixture_membership_seeded=True,
+        native_game_receiver_completion_verified=False,
+        cross_network_gameplay_verified=False,
+    )
 
 
 def private_tournament_retirement_evidence(server_hash):
@@ -878,6 +948,9 @@ def main():
         private_native_tournament_retirement_evidence=private_tournament_retirement_evidence(
             current_hash
         ),
+        offline_tournament_maintenance_evidence=offline_tournament_maintenance_evidence(
+            current_hash
+        ),
         validation=dict(
             independent_suite_matches_binary=valid_fixture,
             grouped_checks=len(fixture["checks"]),
@@ -1061,6 +1134,17 @@ def main():
             "  Same native game/backend processes; complete state clearing and exact restoration verified.",
             "  No native join assignment, allocated-round retirement, map or WAN gameplay credit.",
             "  Shipping-executable completion is not inherited from this private image.",
+        ]
+    maintenance = inventory["offline_tournament_maintenance_evidence"]
+    if maintenance:
+        text += [
+            "",
+            "Current-backend offline tournament maintenance evidence:",
+            "  Receipt: " + maintenance["receipt"],
+            "  Offline retirement, interrupted transaction recovery and exact once-only reconnect notification.",
+            "  Real-clock expiry from server startup with zero authenticated clients/tasks.",
+            "  Malformed neighboring realm preserved; valid realm progressed; fixture files restored exactly.",
+            "  Backend fixture memberships seeded; no native receiver, map or WAN gameplay credit.",
         ]
     if rest_inventory:
         text += [

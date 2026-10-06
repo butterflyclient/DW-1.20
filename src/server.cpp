@@ -642,8 +642,21 @@ namespace
             throw std::runtime_error("cannot bind port " + std::to_string(port) + ": " +
                                      std::to_string(WSAGetLastError()));
         log("LISTEN port=" + std::to_string(port));
+        auto nextMaintenance = std::chrono::steady_clock::now();
         while (!stopping.load())
         {
+            if (handler == http && std::chrono::steady_clock::now() >= nextMaintenance)
+            {
+                nextMaintenance = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+                try
+                {
+                    services::maintainTournamentPublications(log);
+                }
+                catch (const std::exception &)
+                {
+                    log("TOURNAMENT maintenance directory unavailable");
+                }
+            }
             fd_set readable{};
             FD_SET(listener.value, &readable);
             timeval timeout{0, 250000};

@@ -3,6 +3,7 @@
 #include "wire.h"
 #include <filesystem>
 #include <optional>
+#include <functional>
 
 namespace services
 {
@@ -51,6 +52,7 @@ namespace services
     };
 
     void initialize(const std::filesystem::path &directory);
+    void maintainTournamentPublications(const std::function<void(const std::string &)> &log);
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user);
     bool deliveryValid(uint32_t title, const Delivery &delivery);
     std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user);

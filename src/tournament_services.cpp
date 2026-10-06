@@ -1114,7 +1114,7 @@ namespace services
             return writes;
         }
 
-        void retireUnavailableManagedTournament(const std::filesystem::path &directory,
+        bool retireUnavailableManagedTournament(const std::filesystem::path &directory,
                                                 uint32_t title,
                                                 uint64_t tournament,
                                                 const Json &rows,
@@ -1124,13 +1124,13 @@ namespace services
             // Only globally unavailable managed publications enter this path.
             for (const auto &row : rows)
                 if (row["id"] == tournament && row["expires"].get<uint64_t>() > now())
-                    return;
+                    return false;
             if (terminated(directory, title, tournament))
-                return;
+                return false;
             const auto root = directory / "tournaments" / std::to_string(title);
             const auto path = formationPath(root, title, tournament);
             if (!std::filesystem::exists(path))
-                return;
+                return false;
             const auto formation = read(path, 128 * 1024);
             validateFormation(formation, title, tournament);
             auto row = formation["definition"];
@@ -1162,6 +1162,7 @@ namespace services
                     player.erase("ready_match");
                 }
             commitEnrollment(directory, title, enrollment, std::nullopt, writes);
+            return true;
         }
 
         std::optional<Reply> withdrawManagedParticipant(const std::filesystem::path &directory,
@@ -1398,6 +1399,37 @@ namespace services
             return false;
         }
     } // namespace
+
+    void retireUnavailableManagedTournaments(const std::filesystem::path &directory,
+                                             uint32_t title,
+                                             const std::function<void(const std::string &)> &log)
+    {
+        matchmaking_store::recover(directory / "matchmaking" / std::to_string(title), title);
+        const auto root = directory / "tournaments" / std::to_string(title);
+        const auto path = root / "enrollments.json";
+        if (!std::filesystem::exists(path))
+            return;
+        auto enrollment = enrollments(path, title);
+        const auto rows = catalog(root / "catalog.json", title);
+        std::set<uint64_t> competitions;
+        for (const auto &player : enrollment["players"])
+            competitions.insert(player["id"].get<uint64_t>());
+        for (const auto tournament : competitions)
+            try
+            {
+                if (retireUnavailableManagedTournament(
+                        directory, title, tournament, rows, enrollment))
+                    log("TOURNAMENT maintenance retired unavailable publication; title=" +
+                        std::to_string(title) + " tournament=" + std::to_string(tournament));
+            }
+            catch (const std::exception &)
+            {
+                // A bad terminal/formation cannot cancel a live competition or
+                // prevent an independent competition from being examined.
+                log("TOURNAMENT maintenance storage failure; title=" + std::to_string(title) +
+                    " tournament=" + std::to_string(tournament));
+            }
+    }
 
     void validateTournamentFormation(const Json &state, uint32_t title, uint64_t id)
     {

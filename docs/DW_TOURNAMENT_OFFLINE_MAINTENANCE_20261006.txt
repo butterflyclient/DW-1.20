@@ -1,0 +1,94 @@
+REPLAY DW BACKEND: OFFLINE TOURNAMENT MAINTENANCE
+2026-10-06
+
+ISSUE AND RESEARCH
+Managed tournament withdrawal/expiry already had a complete recoverable terminal,
+enrollment, search, lobby and account-index transaction. Its callers depended on
+an authenticated tournament request or an enrolled client's idle publisher. The
+lobby publisher starts after the first authenticated connection and iterates live
+socket endpoints. It cannot guarantee retirement with all participants offline,
+or on a server that has not authenticated any client since startup.
+
+IMPLEMENTATION
+The existing HTTP listener invokes maintenance once per second, before its select
+wait. No new thread, game hook or engine recompile is involved. Maintenance owns
+the same service-store mutex as request dispatch and idle delivery. It recovers
+the existing title journal, validates persisted enrollments/catalogs and visits
+each unique enrolled managed competition through the existing retirement planner.
+
+Title directories must be canonical, nonzero uint32 names, real directories and
+not symbolic links. The scan is bounded to 1024 directory entries. Per-realm and
+per-competition failures are isolated and logged without profile/token contents.
+A prepared shared transaction must recover before new writes can proceed. A
+malformed store does not authorize a fabricated disband or cancellation.
+
+Valid retirement atomically publishes the existing complete terminal layout,
+retired owned searches/lobbies/indexes and cleared readiness. Live publications
+and unrelated competition assignments remain intact. Actual results are retained.
+The existing reconnect publisher supplies exact native event 2012 after durable
+completion; it does not publish successful disband while a write is blocked.
+
+BUILD AND PROTOCOL EVIDENCE
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 8919c101bb62b7cb002c09c114c6c3182c06964ea1e510db4d6f74b0dd59f031
+Frozen source: data/backend-snapshot-1791325176234385200
+Committed baseline: 6613ce8b7cc8b38cad32f536f9e4506f1645f843
+Explicit source overlays: src/server.cpp, src/services.cpp, src/services.h,
+src/tournament_services.cpp and src/tournament_services.h.
+Unrelated dirty matchmaking/game integration files were excluded from compilation.
+MSVC Release /W4 /WX passed. Frozen input hashes and deployed binary were verified.
+
+The independent encrypted native-wire suite passed 295 protocol/service groups.
+New coverage disconnects all eight participants, withdraws their managed playing
+publication, blocks the terminal pending path, observes the prepared journal with
+no participant task, removes the blocker and observes complete recovery. Existing
+issued identities reconnect and receive exact event 2012 once. Owned allocated
+searches/lobbies/indexes retire, actual results are preserved, readiness clears,
+and stale tournament IDs cannot resurrect the competition.
+Fixture source: tools/tournament_unavailability_fixtures.py
+Frozen fixture root: data/backend-validation-1791325376832734500
+Full suite receipt: data/lobby-verification.json
+
+A separate server-startup test uses a real-clock deadline, eight real fixture
+identities with explicitly seeded enrollment, no authenticated lobby connection,
+no platform/auth request and zero native tasks. The server commits retirement
+without a client trigger. A malformed neighboring title store remains unchanged
+while the valid title progresses. The isolated process stops and all five fixture
+files restore byte for byte. Only loopback fixture ports are used.
+Tool: tools/test-offline-tournament-startup.py
+Proof: validation/20261006-offline-tournament-startup.json
+The receipt binds the exact backend, five compiled source inputs, current test
+tool and full protocol receipt hashes. This is backend fixture evidence, not a
+native game disband callback or freshly joined tournament gameplay test.
+
+NATIVE STARTUP AND DEPLOYMENT
+The backend was stopped and started in separate steps. Its previous executable
+and receipt are retained under data/native-tournament-offline-20261006 for rollback.
+An existing privately compiled game launched from E:\IW8\Builds\1.20-replay with
+its independent persisted Alpha profile and previously approved agreement.
+Private game SHA256:
+73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+Two observations in the same process, against the new backend, showed native
+Online status 2, logged-in profile, all 27 passing fences, no failed fences,
+network error zero and relay association state 3. Friend lists and active
+cross-play presence records remained empty. No game/map recompile or map test.
+Readiness: validation/20261006-offline-tournament-native-readiness.json
+Private observations: data/native-tournament-offline-20261006/alpha
+
+The owned game closed. Six temporary root test EXEs/INIs/opt-in files moved into
+the recoverable evidence archive. Shipping EXE, INI and owner identity hashes
+match their protected baselines. launch-game.ps1 -ValidateOnly passes. The new
+backend remains running; no new external port/firewall/UPnP changes were made.
+
+OPEN GATES
+The sweep covers competitions referenced by persisted enrollments. Orphan
+formations without enrollment are not automatically scavenged. Retail forfeits,
+disconnect timeout policy and native allocated-round retirement remain open.
+The prior native seeded tournament receiver proof belongs to its prior binary
+and is not silently transferred to this build. Native startup is verified here.
+The current ledger validates offline maintenance separately from native callback
+completion and still reports 140 known task routes, 134 registered handlers and
+six known binary contracts without complete recovered result bindings:
+50/22, 58/22 and 193/9,10,12,24. Additional indirect/virtual, REST/push and native
+positive callback coverage remain open. Cross-network peer DATA/gameplay has not
+been established by this pass. The complete-backend goal remains active.

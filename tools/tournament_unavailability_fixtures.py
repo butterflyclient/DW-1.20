@@ -43,7 +43,11 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             connection.task(145, 23, u64(row["id"]) + boolean(True))
         return search_id
 
-    for iteration, mode in enumerate(("forming", "playing", "expired"), 10):
+    for iteration, mode in enumerate(
+        ("forming", "playing", "expired", "offline-playing"), 10
+    ):
+        playing = mode in ("playing", "offline-playing")
+        offline = mode == "offline-playing"
         tournament = publication["id"] + iteration
         row = dict(
             publication,
@@ -58,7 +62,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             expires=int(time.time()) + 7200,
         )
         publish(catalog, {"schema": 1, "title": title, "tournaments": [row, other]})
-        count = 8 if mode == "playing" else 2
+        count = 8 if playing else 2
         search_ids = {}
         for position in range(count):
             user, _ = clients[position]
@@ -67,7 +71,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
         assert bracket["tournamentStatus"] == ("PLAYING" if count == 8 else "FORMING")
 
         unrelated_search = None
-        if mode != "playing":
+        if not playing:
             # A registered user without a reserved slot is not itself
             # proof that this globally live publication has been withdrawn.
             register(2, row, search=False, accept=False)
@@ -82,7 +86,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             count = 3
 
         lobby = None
-        if mode == "playing":
+        if playing:
             for position in (0, 1):
                 clients[position][1].task(145, 19, u64(tournament) + u64(0xFFFFFFFF))
                 bracket = updates([peer for _, peer in clients])
@@ -98,14 +102,33 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
         result_path = root / "results" / f"{tournament}.json"
         result_before = result_path.read_bytes() if result_path.exists() else None
         terminal_path = mm / "tournament-terminations" / f"{tournament}.json"
-        if mode == "playing":
+        if playing:
             # Force interrupted durable publication. No successful event can be
             # sent before the complete shared transaction has rolled forward.
             blocker = terminal_path.with_suffix(".json.pending")
             blocker.mkdir()
+            if offline:
+                for _, connection in clients:
+                    connection.close()
             publish(catalog, {"schema": 1, "title": title, "tournaments": [other]})
             try:
-                clients[0][1].task(145, 20, error=102)
+                if offline:
+                    deadline = time.monotonic() + 6
+                    while time.monotonic() < deadline:
+                        journal = json.loads((mm / "transaction.json").read_bytes())
+                        if journal["phase"] == "prepared" and any(
+                            entry["path"]
+                            == f"tournament-terminations/{tournament}.json"
+                            for entry in journal["writes"]
+                        ):
+                            break
+                        time.sleep(0.05)
+                    else:
+                        raise AssertionError(
+                            "Offline retirement did not prepare a transaction"
+                        )
+                else:
+                    clients[0][1].task(145, 20, error=102)
                 assert not terminal_path.exists()
                 journal = json.loads((mm / "transaction.json").read_bytes())
                 assert journal["phase"] == "prepared"
@@ -115,8 +138,9 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
                 assert "tournament-searches.json" in paths
                 assert "tournament-enrollments.json" in paths
                 assert sum(path.startswith("searches/") for path in paths) == 8
-                for _, connection in clients:
-                    no_update(connection)
+                if not offline:
+                    for _, connection in clients:
+                        no_update(connection)
             finally:
                 blocker.rmdir()
         elif mode == "forming":
@@ -126,6 +150,26 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             # deliberately real-clock expiry window. Let the idle publisher run
             # before requiring the buffered native event.
             time.sleep(max(0, row["expires"] - time.time()) + 0.25)
+
+        if offline:
+            deadline = time.monotonic() + 6
+            while time.monotonic() < deadline:
+                if (
+                    terminal_path.exists()
+                    and json.loads((mm / "transaction.json").read_bytes())["phase"]
+                    == "applied"
+                ):
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError(
+                    "Offline retirement did not finish without a client task"
+                )
+            for position, (user, connection) in enumerate(clients):
+                clients[position] = (
+                    user,
+                    type(connection)(auth_identity=connection.fixture_auth_identity),
+                )
 
         for _, connection in clients[:count]:
             assert connection.receive() == (
@@ -198,6 +242,11 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             assert connection.task(145, 22) == []
         if unrelated_search:
             assert clients[3][1].task(145, 22) == []
-        checks.append(
-            f"Managed {mode} publication unavailability atomically retires owned searches/lobbies, preserves unrelated competitions and actual result journals, clears readiness, sends native event-2012 once, recovers interrupted publication and prevents stale ID resurrection"
-        )
+        if offline:
+            checks.append(
+                "Offline managed publication retirement runs without participant connections or tasks, recovers a blocked terminal transaction, retires allocated searches/lobbies/indexes and delivers exact native event-2012 once on reconnect"
+            )
+        else:
+            checks.append(
+                f"Managed {mode} publication unavailability atomically retires owned searches/lobbies, preserves unrelated competitions and actual result journals, clears readiness, sends native event-2012 once, recovers interrupted publication and prevents stale ID resurrection"
+            )
