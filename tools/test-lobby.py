@@ -2037,6 +2037,11 @@ try:
     validated_stats_fixture = validated_stats_fixtures.exercise(
         client, directory, title, user, stat_row, blob, checks
     )
+    import inventory_validation_fixtures
+
+    inventory_validation_fixture = inventory_validation_fixtures.exercise(
+        client, directory, title, user, text, blob, checks
+    )
     # The shared restart gate must include the newly authorized rows/receipts.
     before = statpath.read_bytes()
     # Exercise public rankings across independently stored owners; only the
@@ -2674,23 +2679,50 @@ try:
     )
     search_uri = "/v1.0/users/?client=replaylocal&searchType=username&username="
     for value in ("Fixture%20Peer", "fixture%20peer%230", "Fixture%25"):
-        status, result = rest_response(client.task(
-            255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
-                                uri=search_uri + value + "&provider=uno")))
+        status, result = rest_response(
+            client.task(
+                255,
+                10,
+                native_rest(
+                    "umbrella",
+                    "UserResource",
+                    "usernamesearch",
+                    uri=search_uri + value + "&provider=uno",
+                ),
+            )
+        )
         assert status == 200 and len(result["users"]) == 1
         accounts = result["users"][0]["accounts"]
         assert [row["provider"] for row in accounts] == ["uno", "bnet"]
-        assert all(row["username"] == "Fixture Peer#0" and row["accountID"] > 0
-                   and len(row["created"]) == 20 and len(row["updated"]) == 20
-                   for row in accounts)
+        assert all(
+            row["username"] == "Fixture Peer#0"
+            and row["accountID"] > 0
+            and len(row["created"]) == 20
+            and len(row["updated"]) == 20
+            for row in accounts
+        )
     for value in ("NoSuchReplayUser", "Fixture%20Peer&provider=psn"):
-        status, result = rest_response(client.task(
-            255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
-                                uri=search_uri + value)))
+        status, result = rest_response(
+            client.task(
+                255,
+                10,
+                native_rest(
+                    "umbrella", "UserResource", "usernamesearch", uri=search_uri + value
+                ),
+            )
+        )
         assert status == 200 and result == {"users": []}
-    client.task(255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
-                                     uri=search_uri + "bad%00name"), error=106)
-    checks.append("Replay native username search, UNO account schema, exact/tag/prefix matching and malformed query rejection")
+    client.task(
+        255,
+        10,
+        native_rest(
+            "umbrella", "UserResource", "usernamesearch", uri=search_uri + "bad%00name"
+        ),
+        error=106,
+    )
+    checks.append(
+        "Replay native username search, UNO account schema, exact/tag/prefix matching and malformed query rejection"
+    )
     # Use actual Replay route versions/methods, not a synthetic endpoint alias.
     mutation_uri = f"/v3/user/bnet-{user}/list/recent/"
     assert client.task(
@@ -3210,7 +3242,9 @@ try:
     # A still-unexpired party token cannot introduce an offline member into
     # a new lobby. Reauthenticating the same account cannot revive that token.
     disconnected_peer_state = json.loads(
-        (directory / "matchmaking" / str(title) / "players" / f"{peer_user}.json").read_text()
+        (
+            directory / "matchmaking" / str(title) / "players" / f"{peer_user}.json"
+        ).read_text()
     )
     offline_party_query = {
         **match_query,
@@ -3267,11 +3301,15 @@ try:
     renewed_peer.task(
         145,
         18,
-        text(json.dumps({
-            **match_query,
-            "members": [peer_user],
-            "tokens": [disconnected_peer_state["token"]],
-        })),
+        text(
+            json.dumps(
+                {
+                    **match_query,
+                    "members": [peer_user],
+                    "tokens": [disconnected_peer_state["token"]],
+                }
+            )
+        ),
         error=14507,
     )
     renewed_peer.task(145, 2, text(player_json))
@@ -3280,11 +3318,15 @@ try:
     renewed_peer.task(
         145,
         18,
-        text(json.dumps({
-            **match_query,
-            "members": [peer_user],
-            "tokens": [renewed_match_token],
-        })),
+        text(
+            json.dumps(
+                {
+                    **match_query,
+                    "members": [peer_user],
+                    "tokens": [renewed_match_token],
+                }
+            )
+        ),
     )
     kind, renewed_push = renewed_peer.receive()
     assert kind == 2 and renewed_push.startswith(u32(2005))
@@ -3951,6 +3993,9 @@ try:
     relay_fixtures.check_restart(client, relay_fixture, checks)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
     validated_stats_fixtures.check_restart(client, validated_stats_fixture, checks)
+    inventory_validation_fixtures.check_restart(
+        client, inventory_validation_fixture, checks
+    )
     copy_content_fixtures.check_restart(client, copy_fixture, checks)
     user_content_fixtures.check_restart(client, user_content_fixture, checks)
     marketing_fixtures.check_restart(client, marketing_fixture, checks)

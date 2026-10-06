@@ -13,8 +13,9 @@ token bytes into `bdValidationTokenResult`, and calls the task's blob writer.
 There is no result binding. A successful response therefore has zero results.
 The SDK token object is opaque to the caller; this route does not invent fields
 inside a retail token. Inventory validation `(80, 58)` is a different request:
-context, filename, input token and a bound validation-token result. It remains
-unimplemented rather than sharing this handler accidentally.
+context, filename, input token and a bound validation-token result. Its separate
+[inventory validation handler](inventory-validation.md) consumes trusted local
+issuer publications; it never shares this stat-mutation handler.
 
 ## Local authorization publication
 

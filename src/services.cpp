@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "services.h"
+#include "inventory_validation_services.h"
 #include "protobuf.h"
 #include "startup_services.h"
 #include "rest_services.h"
@@ -540,6 +541,8 @@ namespace services
             if (auto reply = qosServices(directory, id, service, task, p))
                 return *reply;
             if (auto reply = relayServices(directory, id, service, task, p))
+                return *reply;
+            if (auto reply = inventoryValidationServices(directory, id, service, task, p))
                 return *reply;
             if (auto reply = marketplaceServices(directory, id, service, task, p))
                 return *reply;

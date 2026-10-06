@@ -111,6 +111,12 @@ namespace wire
             raw(data, value);
         }
 
+        void i64(int64_t value)
+        {
+            data.push_back(9);
+            raw(data, value);
+        }
+
         void f32(float value)
         {
             data.push_back(13);
