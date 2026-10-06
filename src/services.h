@@ -26,6 +26,7 @@ namespace services
         std::string tournamentStateHash;
         bool tournamentUnavailable = false;
         bool tournamentRefresh = false;
+        bool tournamentJoin = false;
         std::string mailContext;
         uint64_t mailId = 0;
     };

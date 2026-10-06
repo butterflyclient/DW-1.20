@@ -3035,6 +3035,13 @@ try:
         checks,
     )
 
+    import tournament_join_fixtures
+
+    tournament_join_fixtures.exercise(
+        client, peer_client, directory, title, user, peer_user,
+        (u64, text, boolean), checks,
+    )
+
     copy_fixture = copy_content_fixtures.exercise(
         client,
         peer_client,

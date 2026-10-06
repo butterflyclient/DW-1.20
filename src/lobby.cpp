@@ -36,6 +36,8 @@ namespace lobby
             std::string sessionFingerprint;
             std::function<bool(std::span<const uint8_t>)> writer;
             uint64_t lastTournament = 0;
+            uint64_t lastTournamentSearch = 0;
+            bool lastTournamentJoin = false;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
         };
@@ -180,6 +182,8 @@ namespace lobby
                     return;
                 if (delivery.tournamentRefresh &&
                     endpoint->lastTournament == delivery.tournamentId &&
+                    endpoint->lastTournamentSearch == delivery.searchId &&
+                    endpoint->lastTournamentJoin == delivery.tournamentJoin &&
                     endpoint->lastTournamentHash == delivery.tournamentStateHash)
                     continue;
                 try
@@ -193,6 +197,8 @@ namespace lobby
                         else if (delivery.tournamentId)
                         {
                             endpoint->lastTournament = delivery.tournamentId;
+                            endpoint->lastTournamentSearch = delivery.searchId;
+                            endpoint->lastTournamentJoin = delivery.tournamentJoin;
                             endpoint->lastTournamentHash = delivery.tournamentStateHash;
                         }
                     }

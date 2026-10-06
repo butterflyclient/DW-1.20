@@ -1,6 +1,18 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT ARTIFACTS
+CURRENT BACKEND ADDENDUM - TOURNAMENT JOIN PASS
+Backend SHA256: e3275fd3ca2412f74f55e8aff759997d3ed1051ffd77e8f6a7b1144dd8b4401e
+Game is unchanged from the baseline below; no new client package is required.
+231 encrypted protocol/service groups passed on the current backend image.
+Tournament formation searches and exact event-2009 joins now use normal party
+tokens and owned registration, without seeding acceptance. Native tournament
+join callbacks, automatic formation and playable round assignment remain open.
+Current native startup/reconnect: validation/20261006-tournament-join-native-reconnect.json.
+Current join protocol proof: validation/20261006-tournament-join.json.
+Details: docs/DW_TOURNAMENT_JOIN_20261006.txt and docs/tournaments.md.
+The artifact hashes and native evidence below are the retained baseline pass.
+
+BASELINE ARTIFACTS
 Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 Fresh private compiler job: 436f999a3d444276

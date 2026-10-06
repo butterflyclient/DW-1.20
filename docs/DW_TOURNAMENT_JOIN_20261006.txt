@@ -1,0 +1,60 @@
+REPLAY DW TOURNAMENT SEARCH/JOIN IMPLEMENTATION
+Date: 2026-10-06
+
+Issue
+- Tournament task-145/18 requests were handled as ordinary multiplayer searches.
+- The backend sent bracket updates only to accepted enrollments. It did not send
+  the native join event which causes Replay to acknowledge its tournament join.
+
+Target-build research
+- Original Replay StartMatchmaking 0x14104A450 writes tournament.team_size.
+- Original Replay decoder 0x14213F1C0 case 2009 reads one typed UInt64
+  matchmaking search ID and one typed bracket string. No synthetic length.
+- Original callback 0x14103F330 sets the tournament ID from the bracket and calls
+  OnlineTournament_OnJoinTournament 0x141073FC0, which queues the native ack.
+- Other IW8 source was a behavior oracle. These wire IDs and fields were checked
+  against the original 1.20 Replay SQLite/assembly, not borrowed from that source.
+- Local research snapshots: data/native-tournament-search-writer-20261006.json,
+  data/native-tournament-join-decoder-20261006.json, and
+  data/native-tournament-join-state-candidates-20261006.json.
+
+Changes
+- Intercept the native tournament search after normal party-token/live-session
+  validation. Require registered users in the same published team and team size.
+- Commit formation search, member session bindings and per-account search index
+  through the existing flushed/recoverable matchmaking transaction.
+- Return the committed mm_id and deliver event 2009 before acceptance. No direct
+  accepted-enrollment write; native task 145/23 remains the acceptance operation.
+- Reuse matching active searches for retries. Replacement retires old searches.
+- Recover pending joins through the existing idle publisher. Per-connection
+  deduplication includes event kind, search ID and bracket hash.
+- Revalidate publication, enrollment, team membership, current account index,
+  party tokens, live issuing sessions and search expiry at delivery time.
+- Cancel/shutdown, leave, session replacement and expiry suppress stale joins.
+- Ordinary matchmaking map/rules/native-host handling remains its existing path.
+- No game recompile, proxy DLL, extra listener, external port or worker added.
+
+Compilation and protocol evidence
+- Server SHA256:
+  e3275fd3ca2412f74f55e8aff759997d3ed1051ffd77e8f6a7b1144dd8b4401e
+- Game SHA256, unchanged:
+  b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+- Release compilation passed: data/tournament-join-build-20261006.log.
+- 231 encrypted protocol/service checks passed, including five new join groups:
+  data/tournament-join-suite-20261006.log and data/lobby-verification.json.
+- The new groups use two separate encrypted clients, register normally and do
+  not seed accepted enrollment. They check exact join envelope/search identity,
+  acknowledgement/readiness, retries, delayed revocation, replacement, corrupt
+  index rejection and idle expiry suppression.
+- Signed platform, native auth and signed resource checks passed on this server.
+
+Limits and next work
+- A formation search still requires an explicitly published bracket containing
+  the real players. Automatic team allocation/formation and tournament
+  round-to-playable-lobby scheduling are not implemented by this change.
+- Protocol acceptance checks are not native game join/ack callback proof.
+  Native UI join/ready/results and playable tournaments remain separate gates.
+- Root-folder native startup/reconnect validation is recorded separately in
+  validation/20261006-tournament-join-native-reconnect.json.
+- This change does not establish two-network gameplay or native host migration.
+- No Terms were accepted and no map or match test was performed.

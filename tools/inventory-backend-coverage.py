@@ -94,7 +94,7 @@ GAPS = {
     "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
     "125": "Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.",
-    "145": "Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Automatic tournament scheduling/match assignment/join pushes and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open.",
+    "145": "Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Native tournament task-18 searches now use authenticated party tokens, published same-team enrollment and recoverable formation-search/index transactions; exact event-2009 join pushes bind the returned search ID, with retry/deduplication/cancellation/expiry checks covered by two encrypted clients. Native join callback validation, automatic team formation and tournament scheduling/match assignment, and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open.",
     "150": "Positive native scheduled match operations; local publication required.",
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
@@ -195,18 +195,33 @@ def main():
     ):
         path = DATA / filename
         if path.exists():
-            relay_proofs[task] = (filename, json.loads(path.read_bytes()))
+            relay_proofs[task] = ("data/" + filename, json.loads(path.read_bytes()))
     tournament_path = DATA / "native-tournament-verification.json"
     if tournament_path.exists():
         tournament_proof = json.loads(tournament_path.read_bytes())
         for task in (20, 29):
-            relay_proofs[task] = (tournament_path.name, tournament_proof)
+            relay_proofs[task] = ("data/" + tournament_path.name, tournament_proof)
     presence_join_path = DATA / "native-presence-join-verification.json"
     if presence_join_path.exists():
         relay_proofs[18] = (
-            presence_join_path.name,
+            "data/" + presence_join_path.name,
             json.loads(presence_join_path.read_bytes()),
         )
+    # A newly linked backend must not inherit native proof from an older image.
+    # Reconnect receipts prove only the auth/relay methods, not search or join UI.
+    for path in sorted((ROOT / "validation").glob("*native-reconnect*.json")):
+        proof = json.loads(path.read_bytes())
+        if (
+            proof.get("passed")
+            and proof.get("server_sha256") == current_hash
+            and proof.get("game_sha256") == deployment["sha256"]
+            and proof.get("fresh_backend_native_auth_and_lobby_session_verified")
+            and proof.get("native_relay_token_renewed_on_restart")
+            and proof.get("native_relay_bind_verify_established_after_restart")
+            and proof.get("native_relay_join_data_correlated_with_backend_event")
+        ):
+            for task in (24, 26):
+                relay_proofs[task] = (path.relative_to(ROOT).as_posix(), proof)
     for filename in (
         "relay_provider.cpp",
         "crypto.cpp",
@@ -233,8 +248,7 @@ def main():
             relay_proofs.get(task, (None, None)) if service == 145 else (None, None)
         )
         if (service, task) == (104, 6) and marketing_proof:
-            proof_filename, relay_proof = marketing_path.name, marketing_proof
-        proof_filename = "data/" + proof_filename if proof_filename else None
+            proof_filename, relay_proof = "data/" + marketing_path.name, marketing_proof
         if service == 29 and task in (4, 5, 10) and mail_proof:
             proof_filename = str(mail_path.relative_to(ROOT)).replace("\\", "/")
             relay_proof = mail_proof

@@ -112,11 +112,12 @@ namespace matchmaking_store
             const auto &state = entry.document;
             require(state.is_object() && state.at("schema") == 1 && state.at("title") == title &&
                     state.dump().size() <= documentLimit);
-            if (entry.path == "current-lobbies.json")
+            if (entry.path == "current-lobbies.json" || entry.path == "tournament-searches.json")
             {
+                const auto field = entry.path == "current-lobbies.json" ? "lobbies" : "searches";
                 require(state.at("user") == 0 && state.at("revision").is_number_unsigned() &&
-                        state.at("lobbies").is_object() && state["lobbies"].size() <= 4096);
-                for (const auto &assignment : state["lobbies"].items())
+                        state.at(field).is_object() && state[field].size() <= 4096);
+                for (const auto &assignment : state[field].items())
                 {
                     (void)number(assignment.key());
                     require(assignment.value().is_number_unsigned() &&
@@ -136,8 +137,45 @@ namespace matchmaking_store
                 require(state.at("user").is_number_unsigned() && state["user"].get<uint64_t>() &&
                         state.at("revision").is_number_unsigned() &&
                         state.at("lobby_id").is_number_unsigned() &&
-                        state["lobby_id"].get<uint64_t>() && state.at("query").is_object() &&
-                        state.at("active").is_boolean());
+                        state.at("query").is_object() && state.at("active").is_boolean());
+                if (state.contains("tournament_id"))
+                {
+                    require(
+                        state["lobby_id"] == 0 && state["tournament_id"].is_number_unsigned() &&
+                        state["tournament_id"].get<uint64_t>() &&
+                        state.at("owner_session").is_string() &&
+                        state["owner_session"].get_ref<const std::string &>().size() == 44 &&
+                        state.at("member_sessions").is_object() &&
+                        !state["member_sessions"].empty() && state["member_sessions"].size() <= 4 &&
+                        state["query"].at("members").is_array() &&
+                        state["query"]["members"].size() == state["member_sessions"].size() &&
+                        state["query"].at("tokens").is_array() &&
+                        state["query"]["tokens"].size() == state["member_sessions"].size() &&
+                        state["query"].at("tournament").at("team_size").is_number_unsigned() &&
+                        state["query"]["tournament"]["team_size"].get<uint64_t>() >= 1 &&
+                        state["query"]["tournament"]["team_size"].get<uint64_t>() <= 4 &&
+                        state["member_sessions"].size() <=
+                            state["query"]["tournament"]["team_size"].get<uint64_t>() &&
+                        state["member_sessions"].contains(
+                            std::to_string(state["user"].get<uint64_t>())) &&
+                        state["member_sessions"][std::to_string(state["user"].get<uint64_t>())] ==
+                            state["owner_session"]);
+                    std::set<uint64_t> members;
+                    for (size_t i = 0; i < state["query"]["members"].size(); ++i)
+                    {
+                        const auto &member = state["query"]["members"][i];
+                        require(member.is_number_unsigned() && member.get<uint64_t>() &&
+                                members.insert(member.get<uint64_t>()).second &&
+                                state["query"]["tokens"][i].is_number_unsigned() &&
+                                state["query"]["tokens"][i].get<uint64_t>());
+                        const auto &session =
+                            state["member_sessions"].at(std::to_string(member.get<uint64_t>()));
+                        require(session.is_string() &&
+                                session.get_ref<const std::string &>().size() == 44);
+                    }
+                }
+                else
+                    require(state["lobby_id"].get<uint64_t>() != 0);
                 return;
             }
             require(state.at("owner").is_number_unsigned() && state["owner"].get<uint64_t>() &&
@@ -239,6 +277,11 @@ namespace matchmaking_store
     void recover(const std::filesystem::path &root, uint32_t title)
     {
         (void)recoverPending(root, title);
+    }
+
+    void validateWrite(const Write &write, uint32_t title)
+    {
+        validateEntry(write, title);
     }
 
     void commit(const std::filesystem::path &root, uint32_t title, std::span<const Write> writes)

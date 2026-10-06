@@ -15,5 +15,6 @@ namespace matchmaking_store
     // before publishing any snapshot; incomplete commits roll forward.
     void initialize(const std::filesystem::path &directory);
     void recover(const std::filesystem::path &root, uint32_t title);
+    void validateWrite(const Write &write, uint32_t title);
     void commit(const std::filesystem::path &root, uint32_t title, std::span<const Write> writes);
 } // namespace matchmaking_store

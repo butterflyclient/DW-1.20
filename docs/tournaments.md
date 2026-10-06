@@ -167,6 +167,53 @@ not generate duplicate updates. Each current, authenticated connection for an
 eligible account can receive the update; offline accounts recover through task
 145/20. This is an update transport, not an automatic team-formation scheduler.
 
+## Native tournament search and join
+
+Replay `OnlineMatchmakerOmniscient::StartMatchmaking` at `0x14104A450` emits
+`"tournament":{"team_size":N}` in its ordinary task-145/18 search document.
+The backend intercepts that exact search form after validating every party
+member's matchmaking token and live issuing session. All members must have
+registered for the same unexpired publication, belong to the same published
+team, and fit its team size. Private-lobby/presence-join instructions cannot be
+combined with a tournament formation search. Ordinary multiplayer searches
+retain their existing map/rules/host assignment path.
+
+A formation search returns the usual `{"mm_id":...}` string result and emits
+event **2009** to its registered, unaccepted party members. The exact target
+decoder at `0x14213F1C0` reads a typed UInt64 **matchmaking search ID**, followed
+by one typed bracket string. There is no extra length or tournament-ID field.
+Callback `0x14103F330` sets the matchmaker's tournament ID from the bracket and
+calls `OnlineTournament_OnJoinTournament` at `0x141073FC0`, which queues the
+game's native acknowledgement. The server does not seed accepted enrollment.
+Task 145/23 remains the authenticated acceptance/decline operation.
+
+The search and `matchmaking/<title>/tournament-searches.json` account index are
+published together through the existing flushed, recoverable matchmaking
+transaction. Formation searches use `lobby_id:0`, a tournament ID, owner
+session fingerprint and exact member-session bindings. They do not create a
+playable lobby or invent a native host address/DTLS key. Identical active
+search retries reuse the search ID without rewriting the transaction. A new
+search retires the prior indexed formation searches in that same transaction.
+
+Pending joins use the existing idle publisher and serialized writer. Deduplication
+includes event kind, search ID and derived bracket hash, so a join cannot hide
+the subsequent accepted-member update with identical bracket content. Delivery
+requires current enrollment, same published team, current index assignments,
+unchanged member tokens, live issuing sessions and an unexpired active search.
+Cancel/shutdown, leave, session replacement, expiration or publication changes
+revoke stale queued frames. A reconnect under the same active issuing session
+can recover a pending join; a fresh authentication session needs fresh party
+tokens/search. Pending joins work without opting into idle bracket edits.
+
+`tools/tournament_join_fixtures.py` checks the event with two independent
+encrypted clients, exact returned search identity, registration before acceptance,
+subsequent acknowledgement/readiness, idempotent retries, cancellation and
+shutdown, replacement, malformed state and expiry. These protocol checks do
+not establish that the native UI accepted a join or that a tournament is playable.
+Automatic team allocation, bracket formation and round-to-lobby scheduling
+remain to be implemented. Current formation searches still use an explicitly
+published bracket containing the actual players.
+
 ## Live publication changes and disband
 
 Set `live_updates: true` on a publication before players register to opt those
@@ -186,7 +233,7 @@ Corrupt publication data suppresses delivery and remains a task-level storage
 error. It is never converted into a synthetic tournament disband. A removed
 publication leaves enrollment available for diagnosis or an authenticated leave.
 The same missing/expired snapshot is sent once per connection; a restored
-publication can send a fresh bracket. Native join assignment and automatic
+publication can send a fresh bracket. Native join callback validation and automatic
 team formation remain separate work.
 
 Native validation changed a PLAYING publication from 16 players in teams of two

@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "matchmaking_services.h"
 #include "matchmaking_store.h"
+#include "tournament_services.h"
 #include "playlist_catalog.h"
 #include "lobby.h"
 #include "../third_party/nlohmann/json.hpp"
@@ -747,6 +748,8 @@ namespace services
                 const auto maximum = requestCapacity(query);
                 if (!platformAllowed(query))
                     return Reply{108, {}, "matchmaker-platform-unavailable"};
+                if (auto tournament = startTournamentSearch(directory, id, query))
+                    return tournament;
                 if (query.contains("lobby_id_to_presence_join") ||
                     query.contains("player_id_to_presence_join"))
                     return presenceJoin(directory, id, query, users);

@@ -1,5 +1,7 @@
 #include <windows.h>
 #include "tournament_services.h"
+#include "matchmaking_store.h"
+#include "lobby.h"
 #include "matchmaking_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
@@ -553,7 +555,226 @@ namespace services
         {
             return stateHash(Json{{"tournamentID", tournament}, {"event", 2012}, {"reason", 0}});
         }
+
+        Json searchIndex(const std::filesystem::path &root, uint32_t title)
+        {
+            Json index = {{"schema", 1},
+                          {"title", title},
+                          {"user", uint64_t{0}},
+                          {"revision", uint64_t{0}},
+                          {"searches", Json::object()}};
+            if (std::filesystem::exists(root / "tournament-searches.json"))
+                index = read(root / "tournament-searches.json", 128 * 1024);
+            matchmaking_store::validateWrite({"tournament-searches.json", index}, title);
+            return index;
+        }
+
+        Json searchDocument(const std::filesystem::path &root, uint32_t title, uint64_t search)
+        {
+            const auto name = "searches/" + std::to_string(search) + ".json";
+            auto state = read(root / name, 128 * 1024);
+            matchmaking_store::validateWrite({name, state}, title);
+            return state;
+        }
+
+        std::optional<Json> formationSearch(const std::filesystem::path &directory,
+                                            uint32_t title,
+                                            uint64_t user)
+        {
+            const auto root = directory / "matchmaking" / std::to_string(title);
+            matchmaking_store::recover(root, title);
+            const auto index = searchIndex(root, title);
+            const auto key = std::to_string(user);
+            if (!index["searches"].contains(key))
+                return std::nullopt;
+            const auto search = searchDocument(root, title, index["searches"][key].get<uint64_t>());
+            persisted(search.contains("tournament_id"));
+            persisted(search["member_sessions"].contains(key));
+            if (!search["active"].get<bool>() || search["expires"].get<uint64_t>() <= now())
+                return std::nullopt;
+            if (!lobby::sessionOnline(title,
+                                      search["user"].get<uint64_t>(),
+                                      search["owner_session"].get<std::string>()))
+                return std::nullopt;
+            // Bind every party member to the token/session which authorized this
+            // search. A new login, cancellation or partial reassignment retires it.
+            for (size_t i = 0; i < search["query"]["members"].size(); ++i)
+            {
+                const auto member = search["query"]["members"][i].get<uint64_t>();
+                const auto memberKey = std::to_string(member);
+                if (!index["searches"].contains(memberKey) ||
+                    index["searches"][memberKey] != search["id"])
+                    return std::nullopt;
+                const auto player = read(root / "players" / (memberKey + ".json"), 128 * 1024);
+                persisted(player.at("schema") == 1 && player.at("title") == title &&
+                          player.at("user") == member);
+                const auto session = search["member_sessions"][memberKey].get<std::string>();
+                if (player.at("token_session") != session ||
+                    player.at("token") != search["query"]["tokens"][i] ||
+                    player.at("token_expires").get<uint64_t>() <= now() ||
+                    !lobby::sessionOnline(title, member, session))
+                    return std::nullopt;
+            }
+            return search;
+        }
+
+        bool assignedParty(const Json &search, const Json &bracket, const Json &enrolled)
+        {
+            const auto &query = search["query"];
+            if (query["tournament"]["team_size"] != bracket["tournamentDefinition"]["teamSize"])
+                return false;
+            const Json *team = nullptr;
+            for (const auto &candidate : bracket["teams"])
+                if (std::find(candidate["playerIDs"].begin(),
+                              candidate["playerIDs"].end(),
+                              search["user"]) != candidate["playerIDs"].end())
+                    team = &candidate;
+            if (!team)
+                return false;
+            for (const auto &member : query["members"])
+            {
+                const auto key = std::to_string(member.get<uint64_t>());
+                if (!enrolled.contains(key) || enrolled[key]["id"] != search["tournament_id"] ||
+                    std::find((*team)["playerIDs"].begin(), (*team)["playerIDs"].end(), member) ==
+                        (*team)["playerIDs"].end())
+                    return false;
+            }
+            return true;
+        }
+
+        Delivery joinDelivery(uint64_t user, const Json &search, const Json &bracket)
+        {
+            // Exact Replay 0x14213F1C0 case 2009 and callback 0x14103F330:
+            // UInt64 matchmaking ID followed by one typed bracket string.
+            wire::Writer push;
+            push.u32(2009);
+            push.u64(search["id"]);
+            push.text(bracket.dump());
+            Delivery delivery;
+            delivery.user = user;
+            delivery.searchId = search["id"].get<uint64_t>();
+            delivery.tournamentId = search["tournament_id"].get<uint64_t>();
+            delivery.tournamentStateHash = stateHash(bracket);
+            delivery.tournamentJoin = true;
+            delivery.tournamentRefresh = true;
+            delivery.delayMs = 500;
+            delivery.payload = std::move(push.data);
+            return delivery;
+        }
     } // namespace
+
+    std::optional<Reply> startTournamentSearch(const std::filesystem::path &directory,
+                                               const platform::LobbyIdentity &id,
+                                               const Json &query)
+    {
+        if (!query.contains("tournament"))
+            return std::nullopt;
+        // Original StartMatchmaking 0x14104A450 emits this exact object. Member
+        // tokens and their live sessions were checked by the ordinary task-18 path.
+        const auto &request = query["tournament"];
+        wire::require(request.is_object() && request.size() == 1 && request.contains("team_size") &&
+                      request["team_size"].is_number_unsigned() &&
+                      request["team_size"].get<uint64_t>() >= 1 &&
+                      request["team_size"].get<uint64_t>() <= 4 &&
+                      query["members"].size() <= request["team_size"].get<uint64_t>() &&
+                      !query.contains("private_lobby") &&
+                      !query.contains("lobby_id_to_presence_join") &&
+                      !query.contains("player_id_to_presence_join"));
+        const auto tournamentRoot = directory / "tournaments" / std::to_string(id.titleId);
+        const auto enrolled = enrollments(tournamentRoot / "enrollments.json", id.titleId);
+        const auto key = std::to_string(id.userId);
+        if (!enrolled["players"].contains(key))
+            return Reply{14526, {}, "tournament-search-player-not-enrolled"};
+        const auto tournament = enrolled["players"][key]["id"].get<uint64_t>();
+        const auto rows = catalog(tournamentRoot / "catalog.json", id.titleId);
+        const auto *row = published(rows, tournament, id.userId);
+        if (!row || row->at("state")["tournamentDefinition"]["teamSize"] != request["team_size"])
+            return Reply{108, {}, "tournament-search-publication-unavailable"};
+        const auto journal =
+            results(tournamentRoot / "results" / (std::to_string(tournament) + ".json"),
+                    id.titleId,
+                    tournament);
+        const auto bracket =
+            stateWithReadiness(stateWithResults(*row, journal), tournament, enrolled["players"]);
+        const Json *partyTeam = nullptr;
+        for (const auto &team : bracket["teams"])
+            if (std::find(team["playerIDs"].begin(), team["playerIDs"].end(), Json(id.userId)) !=
+                team["playerIDs"].end())
+                partyTeam = &team;
+        persisted(partyTeam != nullptr);
+        for (const auto &member : query["members"])
+        {
+            const auto memberKey = std::to_string(member.get<uint64_t>());
+            if (!enrolled["players"].contains(memberKey) ||
+                enrolled["players"][memberKey]["id"] != tournament ||
+                std::find((*partyTeam)["playerIDs"].begin(),
+                          (*partyTeam)["playerIDs"].end(),
+                          member) == (*partyTeam)["playerIDs"].end())
+                return Reply{101, {}, "tournament-search-party-not-assigned"};
+        }
+        const auto root = directory / "matchmaking" / std::to_string(id.titleId);
+        auto index = searchIndex(root, id.titleId);
+        const auto fingerprint = wire::base64Encode(crypto::sha256(id.key));
+        Json search;
+        if (const auto previous = formationSearch(directory, id.titleId, id.userId);
+            previous && previous->at("user") == id.userId && previous->at("query") == query &&
+            previous->at("tournament_id") == tournament &&
+            previous->at("owner_session") == fingerprint)
+            search = *previous;
+        else
+        {
+            if (enrolled["players"][key]["accepted"] == true)
+                return Reply{108, {}, "tournament-search-already-accepted"};
+            uint64_t searchId = 0;
+            do
+                searchId = wire::at<uint64_t>(crypto::random(8), 0);
+            while (!searchId || std::filesystem::exists(root / "searches" /
+                                                        (std::to_string(searchId) + ".json")));
+            search = {{"schema", 1},
+                      {"title", id.titleId},
+                      {"user", id.userId},
+                      {"revision", uint64_t{0}},
+                      {"id", searchId},
+                      {"lobby_id", uint64_t{0}},
+                      {"tournament_id", tournament},
+                      {"query", query},
+                      {"expires",
+                       std::min({now() + 3600, id.expires, row->at("expires").get<uint64_t>()})},
+                      {"active", true},
+                      {"owner_session", fingerprint},
+                      {"member_sessions", Json::object()}};
+            std::set<uint64_t> obsolete;
+            for (const auto &member : query["members"])
+            {
+                const auto memberKey = std::to_string(member.get<uint64_t>());
+                if (index["searches"].contains(memberKey))
+                    obsolete.insert(index["searches"][memberKey].get<uint64_t>());
+                const auto player = read(root / "players" / (memberKey + ".json"), 128 * 1024);
+                search["member_sessions"][memberKey] = player.at("token_session");
+                index["searches"][memberKey] = searchId;
+            }
+            persisted(index["revision"].get<uint64_t>() != UINT64_MAX);
+            index["revision"] = index["revision"].get<uint64_t>() + 1;
+            std::vector<matchmaking_store::Write> writes;
+            for (const auto old : obsolete)
+            {
+                auto prior = searchDocument(root, id.titleId, old);
+                persisted(prior.contains("tournament_id"));
+                prior["active"] = false;
+                writes.push_back({"searches/" + std::to_string(old) + ".json", std::move(prior)});
+            }
+            writes.push_back({"searches/" + std::to_string(searchId) + ".json", search});
+            writes.push_back({"tournament-searches.json", index});
+            matchmaking_store::commit(root, id.titleId, writes);
+        }
+        wire::Writer result;
+        result.text(Json{{"mm_id", search["id"]}}.dump());
+        Reply reply{0, {std::move(result.data)}, "tournament-search-joined"};
+        for (const auto &member : query["members"])
+            if (enrolled["players"][std::to_string(member.get<uint64_t>())]["accepted"] != true)
+                reply.deliveries.push_back(joinDelivery(member.get<uint64_t>(), search, bracket));
+        return reply;
+    }
 
     std::optional<Delivery> currentTournamentDelivery(const std::filesystem::path &directory,
                                                       uint32_t title,
@@ -565,13 +786,26 @@ namespace services
             return std::nullopt;
         const auto enrollment = enrollments(enrollmentPath, title);
         const auto key = std::to_string(user);
-        if (!enrollment["players"].contains(key) ||
-            enrollment["players"][key]["accepted"] != true ||
-            !enrollment["players"][key].value("live_updates", false))
+        if (!enrollment["players"].contains(key))
             return std::nullopt;
         const auto tournament = enrollment["players"][key]["id"].get<uint64_t>();
         const auto rows = catalog(root / "catalog.json", title);
         const auto *row = published(rows, tournament, user);
+        if (enrollment["players"][key]["accepted"] != true)
+        {
+            const auto search = formationSearch(directory, title, user);
+            if (!row || !search || search->at("tournament_id") != tournament)
+                return std::nullopt;
+            const auto journal = results(
+                root / "results" / (std::to_string(tournament) + ".json"), title, tournament);
+            const auto bracket = stateWithReadiness(
+                stateWithResults(*row, journal), tournament, enrollment["players"]);
+            if (!assignedParty(*search, bracket, enrollment["players"]))
+                return std::nullopt;
+            return joinDelivery(user, *search, bracket);
+        }
+        if (!enrollment["players"][key].value("live_updates", false))
+            return std::nullopt;
         if (row && !row->value("live_updates", false))
             return std::nullopt;
         wire::Writer push;
@@ -618,18 +852,36 @@ namespace services
         if (!state["players"].contains(key))
             return false;
         const auto &player = state["players"][key];
-        if (player["id"] != delivery.tournamentId || player["accepted"] != true)
+        if (player["id"] != delivery.tournamentId || player["accepted"] == delivery.tournamentJoin)
             return false;
-        if (delivery.tournamentRefresh && !player.value("live_updates", false))
+        if (delivery.tournamentRefresh && !delivery.tournamentJoin &&
+            !player.value("live_updates", false))
             return false;
         const auto rows = catalog(root / "catalog.json", title);
         const auto *row = published(rows, delivery.tournamentId, delivery.user);
-        if (delivery.tournamentRefresh && row && !row->value("live_updates", false))
+        if (delivery.tournamentRefresh && !delivery.tournamentJoin && row &&
+            !row->value("live_updates", false))
             return false;
         if (delivery.tournamentUnavailable)
             return !row && delivery.tournamentStateHash == unavailableHash(delivery.tournamentId);
         if (!row)
             return false;
+        if (delivery.tournamentJoin)
+        {
+            const auto search = formationSearch(directory, title, delivery.user);
+            if (!search || search->at("id") != delivery.searchId ||
+                search->at("tournament_id") != delivery.tournamentId)
+                return false;
+            if (!assignedParty(
+                    *search,
+                    stateWithResults(*row,
+                                     results(root / "results" /
+                                                 (std::to_string(delivery.tournamentId) + ".json"),
+                                             title,
+                                             delivery.tournamentId)),
+                    state["players"]))
+                return false;
+        }
         const auto journal =
             results(root / "results" / (std::to_string(delivery.tournamentId) + ".json"),
                     title,
