@@ -23,7 +23,8 @@ The INI now supports player_name=YourName. It applies on a full game start,
 renames the same signed persistent identity and keeps universal/platform IDs,
 local settings and friends. Use a unique name of 1..35 printable ASCII characters,
 without #, %, or spaces at either end. Omitting it retains the last saved name.
-The host INI is currently player_name=DWPlayer.
+The default/example is player_name=DWPlayer. Keep your chosen name in the host
+INI; it applies at the next full launch. The rename test restored DWPlayer.
 
 There are separate guest packages for three people:
 E:\DW\IW8\data\Replay-DW-Guest-Test.zip       (remote-test-1 / ReplayGuest)
