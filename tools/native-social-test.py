@@ -21,13 +21,14 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("action", choices=("invite", "remove", "online", "lobby"))
 parser.add_argument("--hold-seconds", type=int, default=120)
+parser.add_argument("--target", type=int, help="Observed native player UID; legacy fixture default otherwise")
 args = parser.parse_args()
 context = "cod-shared"  # Actual Replay Friends calls use this shared-game scope.
 deployment = json.loads((root / "data/deployment.json").read_text())
 image = Path(deployment["executable"])
 if hashlib.sha256(image.read_bytes()).hexdigest() != deployment["sha256"]:
     raise RuntimeError("Native game deployment changed")
-target = struct.unpack_from("<Q", (root / "data/platform-profile.bin").read_bytes(), 8)[
+target = args.target or struct.unpack_from("<Q", (root / "data/platform-profile.bin").read_bytes(), 8)[
     0
 ]
 profile = root / "data/platform-profiles/native-social.bin"

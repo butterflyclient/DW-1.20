@@ -1,4 +1,6 @@
-"""Provision one unique private guest account while the backend is stopped."""
+"""Provision a legacy private protocol-fixture account while the backend is stopped.
+
+Players use automatic machine-local identities, not this fixture helper."""
 
 import argparse
 import hashlib

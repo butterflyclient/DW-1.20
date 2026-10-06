@@ -15,6 +15,7 @@ extern "C"
 namespace
 {
     unsigned s_state = 0;
+    char s_playerName[36]{};
     char s_host[64] = "127.0.0.1";
     wchar_t s_wideHost[64]{};
     wchar_t s_loginPath[96]{};
@@ -88,7 +89,7 @@ namespace
         if (__atomic_compare_exchange_n(
                 &s_state, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
         {
-            char profile[65]{}, key[65]{}, path[96]{}, headers[256]{}, port[8]{}, name[36]{};
+            char port[8]{};
             // An executable-specific file allows independent native test instances.
             // Normal guest installations use replay-dw.ini in the game folder.
             char executableIni[264]{};
@@ -115,12 +116,10 @@ namespace
                     for (unsigned at = 0; at < count;)
                     {
                         Field(text + at, "host", s_host, sizeof(s_host));
-                        Field(text + at, "profile", profile, sizeof(profile));
-                        Field(text + at, "access_key", key, sizeof(key));
                         Field(text + at, "public_address", s_public, sizeof(s_public));
                         Field(text + at, "local_address", s_local, sizeof(s_local));
                         Field(text + at, "game_port", port, sizeof(port));
-                        Field(text + at, "player_name", name, sizeof(name));
+                        Field(text + at, "player_name", s_playerName, sizeof(s_playerName));
                         while (at < count && text[at] != '\n')
                             ++at;
                         if (at < count)
@@ -147,43 +146,17 @@ namespace
                 else
                     s_gamePort = static_cast<uint16_t>(value);
             }
-            unsigned keyLength = 0;
-            for (; key[keyLength]; ++keyLength)
-                valid = valid && ((key[keyLength] >= 'a' && key[keyLength] <= 'f') ||
-                                  (key[keyLength] >= '0' && key[keyLength] <= '9'));
-            valid = valid && (keyLength == 0 || keyLength == 64);
             unsigned nameLength = 0;
-            for (; name[nameLength]; ++nameLength)
-                valid = valid && name[nameLength] >= 32 && name[nameLength] < 127 &&
-                        name[nameLength] != '#' && name[nameLength] != '%';
+            for (; s_playerName[nameLength]; ++nameLength)
+                valid = valid && s_playerName[nameLength] >= 32 && s_playerName[nameLength] < 127 &&
+                        s_playerName[nameLength] != '#' && s_playerName[nameLength] != '%';
             if (nameLength)
-                valid = valid && name[0] != ' ' && name[nameLength - 1] != ' ';
-            for (unsigned i = 0; profile[i]; ++i)
-                valid = valid && ((profile[i] >= 'a' && profile[i] <= 'z') ||
-                                  (profile[i] >= '0' && profile[i] <= '9') || profile[i] == '-');
+                valid = valid && s_playerName[0] != ' ' && s_playerName[nameLength - 1] != ' ';
             if (!valid)
                 s_host[0] = s_public[0] = s_local[0] = 0;
-            if (profile[0])
-            {
-                Join(s_testCommand, "replay-dw-", profile, "-test.command");
-                Join(s_testEnabled, "replay-dw-", profile, "-test.enabled");
-            }
             Wide(s_wideHost, s_host);
-            Join(path, "/platform/login", profile[0] ? "/" : "", profile);
-            Wide(s_loginPath, path);
-            Join(headers,
-                 key[0] ? "Content-Type: application/octet-stream\r\nX-Replay-Access: "
-                        : "Content-Type: application/octet-stream",
-                 key,
-                 "\r\n");
-            if (valid && nameLength)
-            {
-                unsigned end = 0;
-                while (headers[end])
-                    ++end;
-                Join(headers + end, "X-Replay-Player-Name: ", name, "\r\n");
-            }
-            Wide(s_headers, headers);
+            Wide(s_loginPath, "/platform/client/login");
+            Wide(s_headers, "Content-Type: application/octet-stream\r\n");
             Join(s_authUrl, "http://", s_host, ":8085/auth/");
             Join(s_nativeAuthUrl, "https://", s_host, ":8443/auth/");
             Join(s_legacyUrl, "http://", s_host, ":8085/v1.0/tokens/lsg/?client=replaylocal");
@@ -348,4 +321,10 @@ extern "C" void *func_1420EC390(DWNativeCommonAddrPrefix *self,
     }
     func_1420EC5C0(self);
     return self;
+}
+
+extern "C" const char *DW_LocalConfig_PlayerName()
+{
+    Load();
+    return s_playerName;
 }

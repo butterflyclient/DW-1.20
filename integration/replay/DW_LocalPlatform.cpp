@@ -1,3 +1,4 @@
+#include "dw_client_identity.h"
 #include "com_debugstates.h"
 #include "dw_platform_abi.h"
 #include "dw_platform_protocol.h"
@@ -357,12 +358,14 @@ namespace
         DWLocalPlatformReply reply{};
         const bool ok =
             DW_LocalPlatform_MakeNonce(nonce) &&
-            DW_LocalPlatform_Post(
-                DW_LocalConfig_LoginPath(), nonce, sizeof(nonce), &reply, sizeof(reply)) &&
+            DW_LocalIdentity_Login(
+                DW_LocalConfig_PlayerName(), nonce, &reply, DW_LocalPlatform_Post) &&
             DW_LocalPlatform_VerifyReply(&reply, nonce, DW_LocalPlatform_Time()) &&
             DW_LocalResource_Fetch();
         if (ok)
             s_reply = reply;
+        else
+            Log(DW_LocalIdentity_Error());
         // The worker publishes data only. Native game objects are touched on the
         // engine thread after this release/acquire boundary.
         __atomic_store_n(&s_state, ok ? 2U : 3U, __ATOMIC_RELEASE);

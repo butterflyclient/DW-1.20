@@ -18,15 +18,19 @@ namespace platform
     std::string login(const std::string &nonce,
                       const std::string &profile = "",
                       const std::string &playerName = "");
+    std::string clientChallenge(const std::string &request);
+    std::string clientLogin(const std::string &request);
     void provisionProfile(const std::filesystem::path &directory,
                           const std::string &profile,
                           const std::string &name);
     std::optional<std::string> accountName(uint64_t user);
+
     struct Account
     {
         uint64_t userId;
         std::string name;
     };
+
     std::vector<Account> findAccounts(const std::string &username, bool prefix);
     std::string resource(const std::string &request);
     unsigned sessions();

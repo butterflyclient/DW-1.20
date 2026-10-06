@@ -57,7 +57,7 @@ assert restored_settings["sha256"] != settings["sha256"]
 presence = read("published-presence.json")
 assert presence["online"] is True
 assert presence["platform"] == "bnet"
-assert presence["userID"] == before["native_user_xuid"]
+assert presence.get("userID", presence.get("owner_from_store_filename")) == before["native_user_xuid"]
 assert before["native_social_online_status"] == reloaded["native_social_online_status"] == 2
 fences = restored["native_fences_controller_0"]
 assert len(fences) == 27 and all(row["passing"] and not row["failed"] for row in fences)

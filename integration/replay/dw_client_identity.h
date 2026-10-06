@@ -1,0 +1,36 @@
+#pragma once
+#include "dw_platform_protocol.h"
+
+// A machine-local P-256 key proves ownership of a player. The server nonce is
+// short-lived and single-use; the signature binds the client nonce and name.
+struct DWLocalClientChallengeRequest
+{
+    uint8_t publicKey[72]; // Windows BCRYPT_ECCPUBLIC_BLOB, ECDSA P-256.
+    uint8_t nonce[32];
+};
+
+struct DWLocalClientLoginRequest
+{
+    uint32_t magic;
+    uint32_t version;
+    uint8_t nonce[32];
+    uint8_t challenge[32];
+    uint8_t publicKey[72];
+    char name[36];
+    uint8_t signature[64]; // CNG ECDSA r || s over SHA-256 of the prefix.
+};
+
+constexpr uint32_t DW_LOCAL_CLIENT_MAGIC = 0x31494452;
+constexpr uint32_t DW_LOCAL_CLIENT_VERSION = 1;
+static_assert(sizeof(DWLocalClientChallengeRequest) == 104);
+static_assert(sizeof(DWLocalClientLoginRequest) == 244);
+static_assert(offsetof(DWLocalClientLoginRequest, signature) == 180);
+
+using DWLocalIdentityPost = bool (*)(const wchar_t *, void *, unsigned, void *, unsigned);
+extern "C"
+{
+    bool DW_LocalIdentity_Login(const char *, const uint8_t *, DWLocalPlatformReply *,
+                                DWLocalIdentityPost);
+    bool DW_LocalIdentity_PublicKey(uint8_t *);
+    const char *DW_LocalIdentity_Error();
+}

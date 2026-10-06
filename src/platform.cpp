@@ -4,6 +4,7 @@
 #include "platform_resources.h"
 #include "crypto.h"
 #include "../integration/replay/dw_platform_protocol.h"
+#include "../integration/replay/dw_client_identity.h"
 #include <array>
 #include <chrono>
 #include <charconv>
@@ -42,7 +43,15 @@ namespace platform
         };
 
         Identity identity;
-        std::map<std::string, Identity> profiles;
+        std::map<std::string, Identity> profiles, clientProfiles;
+
+        struct Challenge
+        {
+            std::array<uint8_t, 32> nonce, value;
+            uint64_t expires;
+        };
+
+        std::map<std::string, Challenge> challenges;
         std::filesystem::path identityDirectory;
         BCRYPT_ALG_HANDLE rsa = nullptr, sha = nullptr;
         BCRYPT_KEY_HANDLE key = nullptr;
@@ -82,7 +91,8 @@ namespace platform
                     !file.flush())
                     throw std::runtime_error("Cannot persist platform identity/key");
             }
-            if (!MoveFileExW(pending.c_str(), path.c_str(),
+            if (!MoveFileExW(pending.c_str(),
+                             path.c_str(),
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
                 throw std::runtime_error("Cannot publish platform identity/key");
         }
@@ -131,13 +141,21 @@ namespace platform
             return value;
         }
 
-        void availableName(const std::string &name, uint64_t own = 0)
+        void availableName(const std::string &name, uint64_t own = 0, bool machineOwned = false)
         {
             validateName(name);
             const auto match = folded(name);
-            if (identity.userId != own && folded(identity.name) == match)
-                throw std::runtime_error("Local player name already in use");
-            for (const auto &[profile, other] : profiles)
+            // Legacy manually selected fixture accounts must not reserve names
+            // against the players upgrading to machine-owned identities.
+            if (!machineOwned)
+            {
+                if (identity.userId != own && folded(identity.name) == match)
+                    throw std::runtime_error("Local player name already in use");
+                for (const auto &[profile, other] : profiles)
+                    if (other.userId != own && folded(other.name) == match)
+                        throw std::runtime_error("Local player name already in use");
+            }
+            for (const auto &[fingerprint, other] : clientProfiles)
                 if (other.userId != own && folded(other.name) == match)
                     throw std::runtime_error("Local player name already in use");
         }
@@ -240,6 +258,108 @@ namespace platform
             write(path, blob.data(), count);
             SecureZeroMemory(blob.data(), blob.size());
         }
+
+        struct ClientKey
+        {
+            BCRYPT_ALG_HANDLE algorithm = nullptr;
+            BCRYPT_KEY_HANDLE handle = nullptr;
+
+            ~ClientKey()
+            {
+                if (handle)
+                    BCryptDestroyKey(handle);
+                if (algorithm)
+                    BCryptCloseAlgorithmProvider(algorithm, 0);
+            }
+
+            void import(const uint8_t (&bytes)[72])
+            {
+                BCRYPT_ECCKEY_BLOB header{};
+                std::memcpy(&header, bytes, sizeof(header));
+                if (header.dwMagic != BCRYPT_ECDSA_PUBLIC_P256_MAGIC || header.cbKey != 32)
+                    throw std::runtime_error("Invalid machine public key format");
+                check(BCryptOpenAlgorithmProvider(
+                          &algorithm, BCRYPT_ECDSA_P256_ALGORITHM, nullptr, 0),
+                      "machine key provider");
+                check(BCryptImportKeyPair(algorithm,
+                                          nullptr,
+                                          BCRYPT_ECCPUBLIC_BLOB,
+                                          &handle,
+                                          const_cast<uint8_t *>(bytes),
+                                          sizeof(bytes),
+                                          0),
+                      "machine public key import");
+            }
+        };
+
+        std::string fingerprint(const uint8_t (&publicKey)[72])
+        {
+            const auto digest = crypto::sha256(publicKey);
+            constexpr char hex[] = "0123456789abcdef";
+            std::string result;
+            for (const auto byte : digest)
+            {
+                result += hex[byte >> 4];
+                result += hex[byte & 15];
+            }
+            return result;
+        }
+
+        bool nonzero(std::span<const uint8_t> bytes)
+        {
+            for (const auto byte : bytes)
+                if (byte)
+                    return true;
+            return false;
+        }
+
+        // Caller owns the platform mutex; both fixture and machine logins use
+        // the same native signed session ABI and rename persistence.
+        std::string issueSession(const std::string &nonce,
+                                 Identity *selected,
+                                 const std::filesystem::path &path,
+                                 const std::string &playerName,
+                                 bool machineOwned = false)
+        {
+            const auto time = now();
+            std::erase_if(issuedSessions,
+                          [time](const auto &session)
+                          {
+                              return session.payload.expires <= time;
+                          });
+            if (issuedSessions.size() >= 1024)
+                throw std::runtime_error("Platform session capacity reached");
+            if (!playerName.empty() && playerName != selected->name)
+            {
+                availableName(playerName, selected->userId, machineOwned);
+                auto renamed = *selected;
+                std::memset(renamed.name, 0, sizeof(renamed.name));
+                std::memcpy(renamed.name, playerName.data(), playerName.size());
+                write(path, &renamed, sizeof(renamed));
+                *selected = renamed;
+            }
+            DWLocalPlatformReply reply{};
+            auto &p = reply.payload;
+            p.magic = DW_LOCAL_PLATFORM_MAGIC;
+            p.version = DW_LOCAL_PLATFORM_VERSION;
+            std::memcpy(p.nonce, nonce.data(), sizeof(p.nonce));
+            p.issued = time;
+            p.expires = time + 3600;
+            p.userId = selected->userId;
+            p.gameAccountId = selected->gameAccountId;
+            p.licenses = 1;
+            p.region = 1;
+            p.age = 21;
+            p.accountPolicy = 0;
+            p.capabilities = 1;
+            std::memcpy(p.name, selected->name, sizeof(p.name));
+            token(p.sessionToken);
+            token(p.accountToken);
+            sign(&p, sizeof(p), reply.signature, 32);
+            issuedSessions.push_back({p});
+            ++loginCount;
+            return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
+        }
     } // namespace
 
     void initialize(const std::filesystem::path &directory)
@@ -311,6 +431,129 @@ namespace platform
                     throw std::runtime_error("Duplicate or excessive local profiles");
                 profiles.emplace(name, profile);
             }
+        clientProfiles.clear();
+        challenges.clear();
+        const auto clients = directory / "platform-client-profiles";
+        std::filesystem::create_directories(clients);
+        for (const auto &entry : std::filesystem::directory_iterator(clients))
+        {
+            if (!entry.is_regular_file() || entry.path().extension() != L".bin")
+                continue;
+            const auto fingerprint = entry.path().stem().string();
+            if (fingerprint.size() != 64 ||
+                fingerprint.find_first_not_of("0123456789abcdef") != std::string::npos)
+                throw std::runtime_error("Invalid machine identity fingerprint");
+            auto account = readIdentity(entry.path());
+            if (clientProfiles.size() >= 4096 || !users.insert(account.userId).second ||
+                !accounts.insert(account.gameAccountId).second)
+                throw std::runtime_error("Duplicate or excessive machine profiles");
+            clientProfiles.emplace(fingerprint, account);
+        }
+    }
+
+    std::string clientChallenge(const std::string &bytes)
+    {
+        if (bytes.size() != sizeof(DWLocalClientChallengeRequest))
+            throw std::runtime_error("Invalid machine challenge request size");
+        DWLocalClientChallengeRequest request{};
+        std::memcpy(&request, bytes.data(), sizeof(request));
+        if (!nonzero(request.nonce))
+            throw std::runtime_error("Invalid machine challenge nonce");
+        ClientKey publicKey;
+        publicKey.import(request.publicKey);
+        const auto id = fingerprint(request.publicKey);
+        const auto time = now();
+        std::lock_guard lock(mutex);
+        std::erase_if(challenges,
+                      [time](const auto &entry)
+                      {
+                          return entry.second.expires <= time;
+                      });
+        if (challenges.size() >= 1024 && !challenges.contains(id))
+            throw std::runtime_error("Machine challenge capacity reached");
+        Challenge challenge{};
+        std::memcpy(challenge.nonce.data(), request.nonce, sizeof(request.nonce));
+        const auto random = crypto::random(32);
+        std::copy(random.begin(), random.end(), challenge.value.begin());
+        challenge.expires = time + 30;
+        challenges[id] = challenge;
+        return std::string(reinterpret_cast<const char *>(challenge.value.data()), 32);
+    }
+
+    std::string clientLogin(const std::string &bytes)
+    {
+        if (bytes.size() != sizeof(DWLocalClientLoginRequest))
+            throw std::runtime_error("Invalid machine login request size");
+        DWLocalClientLoginRequest request{};
+        std::memcpy(&request, bytes.data(), sizeof(request));
+        if (request.magic != DW_LOCAL_CLIENT_MAGIC || request.version != DW_LOCAL_CLIENT_VERSION ||
+            request.name[35] || !nonzero(request.nonce))
+            throw std::runtime_error("Invalid machine login layout");
+        const std::string name(request.name);
+        for (size_t i = name.size(); i < sizeof(request.name); ++i)
+            if (request.name[i])
+                throw std::runtime_error("Invalid machine name padding");
+        if (!name.empty())
+            validateName(name);
+        ClientKey publicKey;
+        publicKey.import(request.publicKey);
+        const auto id = fingerprint(request.publicKey);
+        std::lock_guard lock(mutex);
+        const auto foundChallenge = challenges.find(id);
+        if (foundChallenge == challenges.end())
+            throw std::runtime_error("Machine challenge missing");
+        const auto challenge = foundChallenge->second;
+        challenges.erase(foundChallenge); // Every login attempt consumes the server nonce.
+        if (challenge.expires <= now() || !crypto::equal(challenge.nonce, request.nonce) ||
+            !crypto::equal(challenge.value, request.challenge))
+            throw std::runtime_error("Machine challenge invalid or expired");
+        auto digest = crypto::sha256(
+            std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(&request),
+                                     offsetof(DWLocalClientLoginRequest, signature)));
+        check(BCryptVerifySignature(publicKey.handle,
+                                    nullptr,
+                                    digest.data(),
+                                    static_cast<ULONG>(digest.size()),
+                                    request.signature,
+                                    sizeof(request.signature),
+                                    0),
+              "machine login signature");
+        const auto path = identityDirectory / "platform-client-profiles" / (id + ".bin");
+        auto existing = clientProfiles.find(id);
+        if (existing == clientProfiles.end())
+        {
+            if (clientProfiles.size() >= 4096)
+                throw std::runtime_error("Machine profile capacity reached");
+            Identity account;
+            const auto hash = crypto::sha256(request.publicKey);
+            uint32_t user = 0, game = 0;
+            std::memcpy(&user, hash.data(), sizeof(user));
+            std::memcpy(&game, hash.data() + sizeof(user), sizeof(game));
+            account.userId = uint64_t(user) | 0x110000100000000ULL;
+            account.gameAccountId = game | 1;
+            const auto collides = [&](const Identity &other)
+            {
+                return account.userId == other.userId ||
+                       account.gameAccountId == other.gameAccountId;
+            };
+            if (collides(identity))
+                throw std::runtime_error("Machine identity collision");
+            for (const auto *collection : {&profiles, &clientProfiles})
+                for (const auto &entry : *collection)
+                    if (collides(entry.second))
+                        throw std::runtime_error("Machine identity collision");
+            const auto initialName = name.empty() ? "ReplayPlayer-" + id.substr(0, 12) : name;
+            availableName(initialName, 0, true);
+            std::memset(account.name, 0, sizeof(account.name));
+            std::memcpy(account.name, initialName.data(), initialName.size());
+            write(path, &account, sizeof(account));
+            existing = clientProfiles.emplace(id, account).first;
+        }
+        return issueSession(std::string(reinterpret_cast<const char *>(request.nonce), 32),
+                            &existing->second,
+                            path,
+                            name,
+                            true);
     }
 
     void provisionProfile(const std::filesystem::path &directory,
@@ -350,6 +593,9 @@ namespace platform
         for (const auto &entry : profiles)
             if (entry.second.userId == user)
                 return std::string(entry.second.name);
+        for (const auto &entry : clientProfiles)
+            if (entry.second.userId == user)
+                return std::string(entry.second.name);
         return std::nullopt;
     }
 
@@ -363,15 +609,27 @@ namespace platform
             const auto name = folded(account.name), tag = name + "#0";
             if (prefix ? (name.starts_with(match) || tag.starts_with(match))
                        : (name == match || tag == match))
-                found.push_back({account.userId, account.name});
+                if (found.size() < 100)
+                    found.push_back({account.userId, account.name});
         };
-        append(identity);
-        for (const auto &[profile, account] : profiles)
+        std::set<std::string> machineNames;
+        for (const auto &[id, account] : clientProfiles)
+        {
+            machineNames.insert(folded(account.name));
             append(account);
+        }
+        // An upgraded name resolves only to its current machine-owned account.
+        // Legacy friends retain their original IDs and account-name lookups.
+        if (!machineNames.contains(folded(identity.name)))
+            append(identity);
+        for (const auto &[profile, account] : profiles)
+            if (!machineNames.contains(folded(account.name)))
+                append(account);
         return found;
     }
 
-    std::string login(const std::string &nonce, const std::string &profile,
+    std::string login(const std::string &nonce,
+                      const std::string &profile,
                       const std::string &playerName)
     {
         if (nonce.size() != 32)
@@ -391,47 +649,10 @@ namespace platform
                 throw std::runtime_error("Unknown local profile");
             selected = &found->second;
         }
-        const auto time = now();
-        std::erase_if(issuedSessions,
-                      [time](const auto &session)
-                      {
-                          return session.payload.expires <= time;
-                      });
-        if (issuedSessions.size() >= 64)
-            throw std::runtime_error("Platform session capacity reached");
-        if (!playerName.empty() && playerName != selected->name)
-        {
-            availableName(playerName, selected->userId);
-            auto renamed = *selected;
-            std::memset(renamed.name, 0, sizeof(renamed.name));
-            std::memcpy(renamed.name, playerName.data(), playerName.size());
-            const auto path = profile.empty()
-                                  ? identityDirectory / "platform-profile.bin"
-                                  : identityDirectory / "platform-profiles" / (profile + ".bin");
-            write(path, &renamed, sizeof(renamed));
-            *selected = renamed;
-        }
-        DWLocalPlatformReply reply{};
-        auto &p = reply.payload;
-        p.magic = DW_LOCAL_PLATFORM_MAGIC;
-        p.version = DW_LOCAL_PLATFORM_VERSION;
-        std::memcpy(p.nonce, nonce.data(), sizeof(p.nonce));
-        p.issued = time;
-        p.expires = time + 3600;
-        p.userId = selected->userId;
-        p.gameAccountId = selected->gameAccountId;
-        p.licenses = 1;
-        p.region = 1;
-        p.age = 21;
-        p.accountPolicy = 0;
-        p.capabilities = 1;
-        std::memcpy(p.name, selected->name, sizeof(p.name));
-        token(p.sessionToken);
-        token(p.accountToken);
-        sign(&p, sizeof(p), reply.signature, 32);
-        issuedSessions.push_back({p});
-        ++loginCount;
-        return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
+        const auto path = profile.empty()
+                              ? identityDirectory / "platform-profile.bin"
+                              : identityDirectory / "platform-profiles" / (profile + ".bin");
+        return issueSession(nonce, selected, path, playerName);
     }
 
     unsigned sessions()

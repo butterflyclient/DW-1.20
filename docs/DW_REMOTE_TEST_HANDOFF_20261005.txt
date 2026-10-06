@@ -1,165 +1,152 @@
 REPLAY DW REMOTE TEST HANDOFF - 2026-10-05
 
-The complete backend implementation remains paused for this host/guest test.
-The new game EXE is freshly compiled through a private frozen Replay Workstation
-snapshot. Shared compiler sources and unrelated game assets were preserved.
+Players no longer need provisioning. First launch creates a local identity for
+the Windows user, and the backend registers it after a signed challenge. Everyone
+can use the same client ZIP. Full backend work remains paused for multiplayer
+testing; this is not a complete-emulation claim.
 
-Installed game:
-E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
-SHA256: 7aac53fdb15428829d7063773ad167896f5bb218ed56741f75f272e10f7db0fd
-Compiler job: 3cfa71cfc983468c
-Backend SHA256: d52c76bc9e9fb9b76a74c1bbb92f89abc1d1284cb5284f4afef5b4b85ef05325
+CURRENT ARTIFACTS
+Installed game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Game SHA256: df4cc6cb2c9c7e47ff7ae08daf45c8a4d43f84b381dab1ac95af2e1c562e8654
+Private frozen compiler job: 3d9d0d0610ba49de
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+Backend SHA256: 3cf5546db3904957fce943aae42773dc15c97b006e54a0b8ba945839d7c0905d
+Universal ZIP: E:\DW\IW8\data\Replay-DW-Client-Test.zip
+ZIP SHA256: 4c1da99bdbaf4f045806e2e4ac2951b5ead3fd427c50863c204618352a642d90
 
-Give the guest E:\DW\IW8\data\Replay-DW-Guest-Test.zip.
-It contains the exact EXE, its executable-specific INI, a root-folder launcher
-and READ_ME.txt. No proxy DLL or backend signing keys are included.
-The guest needs their compatible 1.20 Replay game files and normal dependencies.
-Use one guest configuration on one computer at a time.
-Close the old game and replace both the EXE and INI on each client. The revised
-guest ZIP has SHA256 9fb81e45e31d1dfb8fdfa16ec3fbb12ca05807b6b7d939bc03c6133e5a5343c2.
+The ZIP contains the EXE, its INI, Run_Replay_DW_Client.cmd and READ_ME.txt.
+It contains no player identity, access key, proxy, backend signing key or assets.
+Each person needs compatible Replay 1.20 game files and normal dependencies.
+Extract all four files into the root game folder. The launcher uses that folder
+as the working directory. The old per-person Guest-Test/remote-test ZIPs are
+obsolete. Give every tester this universal ZIP. new-guest.ps1 now only packages
+the universal client, without profile arguments, provisioning or server restart.
+Packaging preserves the host INI.
 
-PLAYER NAMES AND EMPTY FRIEND LISTS
-The INI now supports player_name=YourName. It applies on a full game start,
-renames the same signed persistent identity and keeps universal/platform IDs,
-local settings and friends. Use a unique name of 1..35 printable ASCII characters,
-without #, %, or spaces at either end. Omitting it retains the last saved name.
-The default/example is player_name=DWPlayer. Keep your chosen name in the host
-INI; it applies at the next full launch. The rename test restored DWPlayer.
+LOCAL IDENTITY AND NAME
+Created automatically on first launch:
+%LOCALAPPDATA%\ReplayDW\player-identity.bin
+The private P-256 key is protected with Windows user DPAPI and stays on the
+player's machine. The backend stores metadata by public-key fingerprint under
+data\platform-client-profiles. Universal and game IDs remain stable across full
+game/backend restarts, EXE replacement and renames. Do not distribute or delete
+the identity file to change your name. A corrupt/inaccessible identity fails
+sign-in rather than replacing the account. A complete interrupted first-launch
+save is recovered.
 
-There are separate guest packages for three people:
-E:\DW\IW8\data\Replay-DW-Guest-Test.zip       (remote-test-1 / ReplayGuest)
-E:\DW\IW8\data\Replay-DW-remote-test-2.zip   (remote-test-2 / ReplayGuest2)
-E:\DW\IW8\data\Replay-DW-remote-test-3.zip   (remote-test-3 / ReplayGuest3)
-Give each person a different ZIP. Do not share one INI between simultaneous users.
-All contain the same freshly compiled EXE with their own account/key and editable
-player_name. New accounts never receive automatic friendships. The host/guests'
-existing friendships and pending requests were cleared at the owner's request;
-original stores remain privately backed up.
+Optional INI field: player_name=YourName
+Names are unique between automatic player accounts, ignoring case, with 1..35
+printable ASCII characters excluding #, % and leading/trailing spaces. Blank
+creates a unique ReplayPlayer-<fingerprint> name on first registration; later
+blank names keep the saved name. Changing player_name renames the same account
+on the next full launch. Legacy fixture names cannot block or shadow automatic
+accounts. Legacy profile/access_key fields are ignored by this EXE.
+Your host INI name remains ^3Entroph.
 
-Native Social Add Friend now uses the target Replay umbrella username-search
-route. It resolves the provisioned name or Name#0, then the original game callback
-sends the invitation. The other player accepts it through Friend Requests. The
-backend persists it and publishes the native list/push updates. Accepted friends
-remain accepted after later restarts; clearing is not a boot-time behavior.
+SETTINGS AND FRIENDS
+Native settings writers save to Documents\Call of Duty Modern Warfare\players,
+using config.cfg and settings.<game-account-id>.iw8. The game selects its native
+CODPC_NOCLOUD_SYNC opt-out before sign-in. Original engine serialization remains.
+Progression/loadouts/friends retain their existing backend storage services.
+New players have no friends or requests. Accepted friendships are not cleared
+on startup.
 
-Actual current-image validation: INI name ReplayHostTest loaded into the native
-user record with the unchanged host ID. The game initiated a name search and
-outgoing invitation, displayed the accepted friendship in its native cache,
-received an incoming request and accepted it through the native Social entry
-point. Removal cleared every native friend/request cache. A full process restart
-loaded DWPlayer with the same universal/platform IDs and saved keyboard Toggle ADS
-value. The test setting was restored by the native writer. All 27 fences passed.
-The development command marker and temporary relationships are removed.
-Native evidence: data/native-names-friends-20261005.
-Sanitized proof: validation/20261005-player-names-friends.json.
+In Multiplayer: Social > Add Friends > Activision Account. Enter the other
+player's name or Name#0. They accept in Friend Requests. Native name search,
+callbacks, requests, acceptance, removal and list refresh remain in use. The
+compiled local provider retains Online/Away/Busy/Offline for its own signed-in
+account; the backend uses the actual native presence messages.
 
-To add another tester, before anyone plays:
-E:\DW\IW8\new-guest.ps1 -Profile remote-test-4 -PlayerName "MyFriend"
-It stops the backend, provisions a unique identity/key, starts it again and builds
-that player's ZIP. Existing profiles are not overwritten. Packaging preserves
-your host INI. More details: docs/player-names-and-friends.md.
+HOST AND GUEST RETEST
+The EXE reads game_dx12_ship_replay_dw.ini beside itself, then replay-dw.ini as a
+fallback. host selects the backend IPv4 address. Host uses 127.0.0.1; the universal
+guest INI uses host=198.255.173.206. Fully restart after INI changes.
+public_address/local_address/game_port publish the host's game endpoint.
+Only DW mappings remain: TCP 8085 platform/auth/content, TCP 3075 lobby;
+UDP 3074 game, 3076 QoS, 3077 relay, 3078 bandwidth. No viewer ports reopened.
 
-ONLINE STATUS AND LOCAL SETTINGS FIX
-Both test clients were sending online:false because Replay's native status
-readers consumed an unused Battle.net launcher presence cache. The compiled
-local provider now retains Online/Away/Busy/Offline selections for its verified
-own account, preserving native Social scheduling and the LUI menu event. Signed
-out accounts still return Offline. Foreign/native launcher accounts keep their
-original SDK reads. The backend continues honoring the actual client message.
+1. Host: keep the backend running. After reboot, use E:\DW\IW8\start-server.ps1.
+   Launch the installed DW EXE from E:\IW8\Builds\1.20-replay.
+2. Guest: extract the universal ZIP into their compatible Replay root. Edit
+   player_name if desired and run Run_Replay_DW_Client.cmd. Keep any old local
+   XInput9_1_0.dll proxy out of the search path; retain normal dependency DLLs.
+   Guests need no backend process or manually created account.
+3. Both: enter Multiplayer. Add each other by name, accept the request and check
+   both show Online after a fresh list refresh.
+4. Host: create the private party/match and select Shipment. Guest joins through
+   Social. Check both load, see each other, move, shoot and finish a match.
+5. Fully restart; confirm the same account, settings and accepted friend return,
+   then rejoin. Do not use dw_leave; controlled process restarts are used.
 
-Before sign-in, the DW process selects Replay's native CODPC_NOCLOUD_SYNC opt-out.
-Its original settings/config serialization and Windows Documents save path remain
-in use. Each player's PC saves config.cfg and settings.<platformId>.iw8 under
-Documents\Call of Duty Modern Warfare\players. Cloud settings cannot overwrite
-those files. This covers native game settings/GamerProfile; account progression
-and loadouts continue through the backend's native storage services.
+VALIDATED ON THIS EXACT IMAGE
+- Fresh compilation/linking, relocation/unwind checks, source provenance and
+  deployed hashes passed with no unresolved linked symbols. Shared compiler,
+  editor revisions and unrelated game assets were preserved.
+- Native automatic account sign-in; stable identity across three processes;
+  all 27 startup fences passing; Online status and published online:true presence.
+- Keyboard Toggle ADS changed, saved and reloaded after a full restart. Its
+  original false value was restored and reloaded on the final launch.
+- Native name search produced an outgoing request. Acceptance populated the
+  native friend list and persisted across restart. Removal left accepted,
+  incoming and outgoing lists empty on the final launch.
+- 175 protocol/service checks and signed platform/auth/resource checks passed.
+  Real Windows CNG/DPAPI tests covered distinct first-launch profiles, process
+  and server-restart persistence, rename stability, replay/tamper rejection,
+  interrupted-save recovery, corrupt-file preservation and duplicate names.
+- The four package members and exact EXE hash were checked. No personalized
+  identity or credentials are packaged. Native startup requires no proxy.
 
-The root-folder game was run twice without a proxy. Its native Social status
-remained Online and it published fresh online:true presence. Keyboard Toggle ADS
-was changed through the registered profile command, saved by the engine, and
-loaded with the same value in a different game process. The original option was
-restored and saved through updateGamerProfile. All 27 startup fences passed.
-Both game processes were stopped and temporary development command files removed.
-The backend remains running; launch the game normally for the remote retest.
+Development-launch issue fixed: packaged editors redirected AppData into their
+LocalCache. launch-game.ps1 now creates the process through local WMI with the
+root game folder as CurrentDirectory. The final native launch uses the same
+physical Windows-user identity as ordinary Explorer launches.
 
-INI configuration:
-The EXE reads its own basename with .ini instead of .exe, then replay-dw.ini as
-a fallback. host selects the DW backend IPv4 address. Your host uses 127.0.0.1;
-the packaged guest uses 198.255.173.206 and the remote-test-1 profile/access key.
-public_address/local_address/game_port publish the host's native game endpoint.
-Restart the game after changing INI settings. Current transport ports are fixed:
-TCP 8085 platform/auth/content, TCP 3075 encrypted lobby; UDP 3074 game,
-3076 QoS, 3077 relay, 3078 bandwidth.
+The backend remains running. Your host name and restored option are retained.
+An owner-launched game is now running for the multiplayer retest; it is left
+untouched. Actual two-network
+party join/play remains pending. Earlier external TCP/health and router/firewall
+checks remain evidence, not a fresh remote game test. No map runs were needed
+for this identity/settings/friends pass.
 
-Host procedure:
-1. Keep the backend running. After a reboot, run E:\DW\IW8\start-server.ps1.
-2. Run Run_Replay_DW.cmd in E:\IW8\Builds\1.20-replay.
-3. Choose Multiplayer and create a private party/match. Select Shipment.
-4. Add the guest by name in Social > Add Friends > Activision Account.
-   Enter their name or Name#0. They accept in Friend Requests, then join you.
-5. Check both players load, can see one another, move, shoot and finish a match.
-6. Test a controlled full restart/rejoin. Do not use dw_leave.
+REMOTE LOGIN DIAGNOSTICS
+BLZBNTBGS7FFFFF00 is the compiled provider's generic initial-login failure.
+Read replay-dw-client.log to distinguish local-identity-file,
+server-identity-challenge, server-identity-login and later verification failures.
+tools\Test-ReplayDWClient.ps1 performs read-only image/INI/port/health/log checks
+on a tester's PC. Run it with -GameDirectory set to the root game folder.
+It never reads the private identity contents or modifies settings.
+Current remote tester reported local-identity-file, before any server request.
+The exact failing file/crypto operation is still being investigated. The startup
+auth=127.0.0.1 banner in this image is fixed text and does not report the loaded
+INI; it must not be used as evidence that the remote INI was ignored.
 
-Guest procedure:
-1. Extract all four archive files into the compatible Replay root game folder.
-2. Keep a local XInput9_1_0.dll proxy out of the DLL search path; keep normal
-   shipped dependency DLLs. Allow the game through its firewall prompt if asked.
-3. Edit player_name in your own INI if desired. Run Run_Replay_DW_Guest.cmd.
-   No friends are pre-added; add DWPlayer (or the host's chosen name) through
-   Social > Add Friends > Activision Account, then accept the request.
-4. Enter Multiplayer and join the host's private party through Social.
-5. Test Shipment with the host. A backend process is not needed on the guest PC.
-
-Confirmed validation:
-- The current native host image passed all 27 startup fences in two processes.
-  Native relay authentication reaches established state. Earlier guest native
-  startup evidence retains its original image hash; it was not replayed here.
-- Root game startup works without the local proxy. XInput loads from System32.
-- Native host common address publishes 198.255.173.206:3074, retains both local
-  addresses, uses open NAT publication and has a populated native hash.
-- 175 protocol/service checks pass, plus signed auth/resource and concurrent
-  local/public QoS, relay-credential and content-address checks.
-- Router mappings and exact-program firewall rules are configured/verified.
-- Independent external nodes connect to TCP 8085 and 3075; external /health
-  checks return HTTP 200.
-- Native startup worker retains the CRT allocation/parent cleanup contract and
-  complete original bootstrap while omitting the privileged user-mode probe.
-- Host loopback publication avoids requiring router NAT loopback. Remote
-  callers continue receiving public addresses and provisioned identities.
-
-Not yet confirmed:
-- A native host/guest party join or playable match across two networks.
-- Public UDP game/relay forwarding end-to-end with the remote player's game.
-The two-local-process test hit the game's exclusive toc1.dcache lock. Native
-guest authentication/relay succeeded before that error. Separate computers do
-not share that cache. No map runs were performed during this packaging pass.
-
-Progress of the paused complete backend:
-The current reviewed inventory contains 140 target task routes, 133 registered
-handlers and 7 reviewed target tasks without handlers. This is a scoped ledger,
-not proof of every SDK/indirect call. Implemented domains include signed platform
-identity, native/legacy auth, encrypted protocol 210, publisher variables and
-content, TU19 playlists, profiles/contextual files/object ownership, friends and
-presence, user lists/mail/clans, purchase/redemption/catalog-backed loot and
-progression, trusted leaderboard writes, QoS/bandwidth/authenticated relay,
-matchmaking selection/owned lobbies/presence joins/host updates/session expiry,
-durable matchmaking transactions and tournament publications/events/results.
+PAUSED COMPLETE BACKEND PROGRESS
+The scoped reviewed ledger has 140 target task routes, 133 registered handlers
+and seven reviewed unimplemented routes. It does not prove every indirect SDK
+call. Implemented domains include signed platform identity, native/legacy auth,
+encrypted protocol 210, publisher variables/content, TU19 playlists, profiles,
+contextual files/object ownership, friends/presence, user lists/mail/clans,
+purchase/redemption/catalog-backed loot/progression, trusted leaderboard writes,
+QoS/bandwidth/authenticated relay, matchmaking selection/owned lobbies/presence
+joins/host updates/session expiry/durable transactions and tournament
+publications/events/results.
 
 Open reviewed routes: 50/22, 58/22, 80/58, 193/9, 193/10, 193/12, 193/24.
 Other open scope: host migration, automatic public lobby fill, tournament
 scheduling, gifts/discounts/validation tokens, large-upload/listing variants,
-crossplay account linking and broader native progression/reward validation.
-Deferred gifts changes remain unapplied. No claim of complete DW emulation.
+crossplay linking and broader native progression/reward validation.
+Deferred gifts changes remain unapplied. Full implementation remains paused.
 
-Evidence:
-E:\DW\IW8\data\remote-readiness.json
-E:\DW\IW8\validation\20261005-proxy-free-host-guest.json
-E:\DW\IW8\data\backend-coverage-inventory.json
-E:\DW\IW8\data\remote-package-receipt.json
-E:\DW\IW8\data\native-settings-presence-20261005\proof.json
-E:\DW\IW8\validation\20261005-presence-local-settings.json
+EVIDENCE AND SOURCE
+validation\20261005-machine-local-player-identity.json: sanitized current proof
+data\native-machine-profile-20261005: private native observations
+data\local-player-verification.json: real CNG/DPAPI protocol proof
+data\deployment.json: compiled/deployed/runtime gates
+data\remote-package-receipt.json: universal ZIP receipt
+data\backend-coverage-inventory.json: scoped backend ledger
+docs\player-names-and-friends.md: identity/name/friend implementation
+Private repository: https://github.com/IDARETW/IW8-Replay-DW
 
-Temporary root-folder test EXEs were removed. The original proxy is retained at
-E:\DW\IW8\data\proxy-retained\XInput9_1_0.dll. Development command flags/configs
-are retained under data\remote-test-retained; normal launches do not poll them.
-No unrelated game builds, assets or compiler editor revisions were deleted.
+No identities, private keys, profile payloads or live credentials are committed.
+The original proxy remains retained under data\proxy-retained. No unrelated
+builds, assets or compiler revisions were deleted.

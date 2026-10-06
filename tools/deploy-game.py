@@ -161,6 +161,7 @@ required_private_sources = {
     "DW_LocalCachedContentCrypto.cpp",
     "DW_LocalResources.cpp",
     "DW_LocalConfig.cpp",
+    "DW_LocalIdentity.cpp",
 }
 if {
     Path(item["source"]).name for item in private_objects
@@ -317,6 +318,20 @@ if (
     raise RuntimeError(
         "Compiled native account getter verification source is stale or unavailable"
     )
+local_identity_proof = json.loads((ROOT / "data/local-player-verification.json").read_text())
+identity_source = ROOT / "integration/replay/DW_LocalIdentity.cpp"
+if not all(local_identity_proof.get(field) for field in (
+    "passed", "new_process_persistence", "distinct_players", "rename_preserves_identity",
+    "interrupted_write_recovered", "corrupt_identity_preserved_and_rejected",
+    "backend_restart_persistence",
+)) or (
+    local_identity_proof["server_sha256"] != auth_proof["server_sha256"]
+    or local_identity_proof["identity_source_sha256"]
+       != hashlib.sha256(identity_source.read_bytes()).hexdigest()
+    or local_identity_proof["client_dll_sha256"]
+       != hashlib.sha256((ROOT / "build/Release/iw8-dw-platform-client.dll").read_bytes()).hexdigest()
+):
+    raise RuntimeError("Automatic local identity verification is absent or stale")
 destination = paths["game"] / "game_dx12_ship_replay_dw.exe"
 if (
     not destination.exists()
@@ -348,6 +363,14 @@ receipt = {
     "stage": "encrypted-lobby-profiles",
     "native_auth": True,
     "platform_auth": True,
+    "local_player_identity": {
+        "automatic_registration": True,
+        "player_provisioning_required": False,
+        "local_path": "%LOCALAPPDATA%/ReplayDW/player-identity.bin",
+        "protection": "Windows user DPAPI; P-256 challenge proof of possession",
+        "protocol_verification": str(ROOT / "data/local-player-verification.json"),
+        "native_runtime_verified": False,
+    },
     "platform_sources": private_objects,
     "platform_protocol_verification": str(ROOT / "data" / "platform-verification.json"),
     "auth_protocol_verification": str(ROOT / "data" / "auth-verification.json"),

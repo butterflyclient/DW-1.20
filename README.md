@@ -48,8 +48,9 @@ read per request and can already be updated without restarting either process.
 
 The server defaults to loopback. Optional `data/network.json` configures the
 listener/public IPv4 addresses and fixed QoS, relay and bandwidth ports for an
-owner-hosted remote test. External platform login requires a provisioned profile
-and its `X-Replay-Access` key; the default host account is local-only. Native
+owner-hosted remote test. Each player creates a Windows-protected machine-local identity on first launch.
+The backend automatically registers it after a signed, single-use challenge.
+The same client package works for everyone; there are no player access keys. Native
 authentication and encrypted lobby traffic retain their signed session checks.
 External account linking and live Activision services remain outside this realm.
 Ordinary Replay, shared compiler work and game assets are preserved.
@@ -65,8 +66,8 @@ Router/firewall configuration, native startup, authenticated lobby assignment,
 and actual two-network gameplay are distinct validation gates.
 
 Set `player_name` in the executable's INI to change your name at the next full
-game start, preserving the account ID and local saves. Provision a separate
-private guest package for each person; new accounts have no initial friends.
+game start, preserving the account ID and local saves. Send the same universal
+`Replay-DW-Client-Test.zip` to every tester; new accounts have no initial friends.
 Native Social name search, requests and acceptance are documented in
 [player names and friends](docs/player-names-and-friends.md).
 
@@ -134,7 +135,7 @@ its build-specific addresses and task IDs are not blindly transferred.
 
 Friends use the game's evidenced **cod-shared** context. Presence and user lists
 retain the context requested by the client. Known local friend rows include their
-native presence snapshot. Names are supplied only for provisioned accounts.
+native presence snapshot. Names are supplied for registered local accounts.
 Friendship requires reciprocal consent. Online status/subscriptions belong to
 live connections, and old notifications are revision-checked before delivery.
 Presence unsubscribe returns HTTP 200 with `errorUsers: []`: Replay binds the
@@ -149,7 +150,9 @@ types and capacities are bounded. Opaque profile/stat payloads are preserved.
 Credentials, request bodies, headers and retry tokens are excluded from logs.
 
 - `data/platform-profile.bin`: stable default identity; never replace it to make a peer.
-- `data/platform-profiles/<key>.bin`: additional stable identities. With the backend stopped, run `build/Release/iw8-dw-server.exe data --provision-profile <key> <name>`. Existing keys cannot be overwritten. Optional `/platform/login/<key>` issues independent credentials; the current game still selects the default profile.
+- `%LOCALAPPDATA%\ReplayDW\player-identity.bin`: the player's local P-256 identity, protected with Windows user DPAPI and created on first launch.
+- `data/platform-client-profiles/<public-key-sha256>.bin`: automatically registered account metadata; no client private keys.
+- `data/platform-profiles/<key>.bin`: legacy private protocol-fixture identities. These are not used to provision players. The old loopback fixture login remains available for backend validation.
 - `data/profiles/<title>/<user>/{public,private}.bin`: opaque profiles.
 - `data/storage/<title>/<context>/<user>/<name>.dwfile`: contextual files.
 - `data/objectstore/users/<title>/<context>/uno-<user>/<name>.object.json`: native user-object content/metadata/tags. The bnet alias selects the same signed universal ID.

@@ -452,6 +452,29 @@ namespace
             }
         }
         else if (method == "POST" &&
+                 (path == "/platform/client/challenge" || path == "/platform/client/login"))
+        {
+            const bool challenge = path == "/platform/client/challenge";
+            if (!hasLength || length != (challenge ? 104U : 244U))
+            {
+                reply(socket, 400, "{\"error\":\"invalid_client_identity_request\"}");
+                return;
+            }
+            try
+            {
+                const auto body = request.substr(bodyAt, length);
+                const auto response = challenge ? platform::clientChallenge(body) : platform::clientLogin(body);
+                reply(socket, 200, response, "application/octet-stream");
+                if (!challenge)
+                    log("PLATFORM machine-owned identity verified; native DW authentication required");
+            }
+            catch (const std::exception &error)
+            {
+                log(std::string("PLATFORM machine identity rejected: ") + error.what());
+                reply(socket, 400, "{\"error\":\"client_identity_rejected\"}");
+            }
+        }
+        else if (method == "POST" &&
                  (path == "/platform/login" || path.starts_with("/platform/login/")))
         {
             if (!hasLength || length != 32 || path == "/platform/login/")

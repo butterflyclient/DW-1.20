@@ -135,8 +135,9 @@ def verify(pe, report):
         )
         header_address = run("DW_LocalConfig_Headers")
         header_text = bytes(machine.mem_read(header_address, 512)).decode("utf-16le").split("\0", 1)[0]
-        assert ("X-Replay-Player-Name: Replay INI Tester\r\n" in header_text) == remote
-        assert ("X-Replay-Access: " + "a" * 64 + "\r\n" in header_text) == remote
+        assert header_text == "Content-Type: application/octet-stream\r\n"
+        assert string(run("DW_LocalConfig_PlayerName")) == ("Replay INI Tester" if remote else "")
+        assert "DW_LocalIdentity_Login" in symbols
         if not enabled:
             assert bytes(machine.mem_read(config, len(native))) == bytes(native)
         # The private DW image must reach the native CRT constructor's caller

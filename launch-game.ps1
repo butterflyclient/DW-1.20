@@ -26,7 +26,17 @@ $log = Join-Path (Split-Path -Parent $record.executable) 'replay-dw-client.log'
 $offset = if (Test-Path -LiteralPath $log) { (Get-Item -LiteralPath $log).Length } else { 0 }
 $serverLog = Join-Path $PSScriptRoot 'data\server.log'
 $serverOffset = if (Test-Path -LiteralPath $serverLog) { (Get-Item -LiteralPath $serverLog).Length } else { 0 }
-$process = Start-Process -FilePath $record.executable -WorkingDirectory (Split-Path -Parent $record.executable) -PassThru
+# The WMI provider starts the game with the current user's normal desktop token,
+# outside packaged editors' AppData virtualization. Keep the native save identity
+# identical to an Explorer launch and explicitly retain the root game directory.
+$startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow=[uint16]1}
+$created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine=('"' + $record.executable + '"')
+    CurrentDirectory=(Split-Path -Parent $record.executable)
+    ProcessStartupInformation=$startup
+}
+if ($created.ReturnValue -ne 0) { throw "DW game creation failed with WMI result $($created.ReturnValue)." }
+$process = [pscustomobject]@{ Id=[int]$created.ProcessId }
 @{ pid=$process.Id; executable=$record.executable; sha256=$record.sha256;
    launched_utc=[DateTime]::UtcNow.ToString('o'); client_log_offset=$offset; server_log_offset=$serverOffset;
    server_baseline=$status; server_process=$serverRecord } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'data\current-runtime-launch.json') -Encoding utf8

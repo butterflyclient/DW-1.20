@@ -3,6 +3,7 @@
 extern "C"
 {
     const char *DW_LocalConfig_Host();
+    const char *DW_LocalConfig_PlayerName();
     const wchar_t *DW_LocalConfig_WideHost();
     const wchar_t *DW_LocalConfig_LoginPath();
     const wchar_t *DW_LocalConfig_Headers();
