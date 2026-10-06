@@ -32,6 +32,11 @@ Each party retains its own matchmaking ID. Explicit native num_teams values
 create the corresponding team arrays; a joining party stays together on the
 least populated team. Split-party balancing and host migration remain separate.
 
+Slot-aware capacity and platform restriction behavior is documented in
+docs/matchmaking-constraints.txt. Primary-player reservations participate in
+both capacity and team occupancy; compatible bnet cross-play settings do not
+create artificial public pool divisions.
+
 tools/public_matchmaking_fixtures.py uses two independently authenticated
 encrypted clients. It verifies shared documents, assignment events, teams,
 privacy, host flags, join-in-progress, live tokens, capacity and orphaned current

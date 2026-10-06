@@ -1,0 +1,59 @@
+REPLAY PRIMARY-PLAYER SLOTS AND PLATFORM RESTRICTIONS
+
+Target evidence
+Original 1.20 StartMatchmaking: 0x14104A450.
+Original GetClientPlatform: 0x1410AE340, returns platform 2.
+Original platform-string mapper: 0x1410AE2F0, maps 2 to bnet.
+The search writer emits only primary accounts in members/tokens. For each
+primary, player_id_to_slots is 1 when a non-primary shares its matchmaking
+token, otherwise 0. These are additional reservations, not total party sizes.
+When cross-play is disabled, the writer emits acceptable_platforms with bnet.
+Addresses describe the original image and are not compiled-image hook addresses.
+
+Domain implementation
+Task 145/18 validates reservations against the authenticated primary members.
+Values must be unsigned integers 0 or 1; booleans, negative values, fractions,
+noncanonical/nonmember keys and non-object layouts are rejected. Missing keys
+default to zero for compatibility with older clients and persisted documents.
+Occupied slots = primary member count + the sum of additional reservations.
+Both initial creation and public/presence assignment enforce maximum capacity.
+An existing primary's presence reassignment replaces its reservation rather
+than adding another primary slot. Team selection and fullest-lobby selection
+also count reservations. The joining party remains on one team.
+
+Backend documents publish player_id_to_slots. Native member retirement already
+removes those keys with teams, squads, searches and the current-lobby index.
+Persisted reservation keys must belong to retained primary members, and their
+total cannot exceed the lobby limit. Historical documents without the field
+remain compatible with zero additional reservations. Host updates cannot edit
+the backend's reservation map through the host document.
+
+acceptable_platforms must be a bounded nonempty array of unique platform
+strings. Requests excluding bnet return unavailable before publication. The
+current signed auth/player-info implementation supports Replay PC only; it
+does not grant a foreign-platform identity merely because a request names one.
+Restricted and unrestricted requests can share a lobby when both allow bnet.
+Restrictions are persisted separately from pool rules, avoiding false pool
+splits based on equivalent cross-play array ordering or optional presence.
+Presence joining uses the same compatibility check. Older documents lacking
+the constraint field retain their Replay-PC compatibility.
+
+Publication remains one recoverable lobby/search/current-index transaction.
+Join events retain the existing native host address, DTLS keys, rules and
+monotonic document clock. Rejected requests do not change durable state.
+This does not implement console authentication, split-screen transport,
+minimum-player countdown, host migration or ranked matchmaking preferences.
+
+Validation
+tools/matchmaking_constraint_fixtures.py exercises two independent encrypted
+clients: malformed/oversized reservations, incompatible platforms, public and
+presence capacity, compatible cross-play settings, published reservations and
+teams, existing-primary reservation replacement, departure cleanup and legacy
+document compatibility. The tournament participation fixture retains a valid
+reservation layout when removing a member so it continues testing access
+denial independently of corrupt-storage rejection.
+
+Native startup/reconnect is a separate current-image regression gate. These
+fixtures do not prove native split-screen gameplay or two-network party play.
+The original 1.20 slot-query writer is verified; exact target-side consumption
+of the additional-reservation field still needs a native split-screen test.

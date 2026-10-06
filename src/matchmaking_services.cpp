@@ -16,6 +16,8 @@ namespace services
     {
         using Json = nlohmann::json;
 
+        uint64_t occupiedSlots(const Json &members, const Json &slots);
+
         uint64_t now()
         {
             return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
@@ -120,6 +122,23 @@ namespace services
                     throw std::runtime_error("Invalid persisted lobby membership");
             if (!members.contains(state["owner"].get<uint64_t>()))
                 throw std::runtime_error("Persisted lobby host is not a member");
+            if (state["backend_doc"].contains("player_id_to_slots"))
+            {
+                const auto &slots = state["backend_doc"]["player_id_to_slots"];
+                if (!slots.is_object() || slots.size() > members.size())
+                    throw std::runtime_error("Invalid persisted lobby reservation layout");
+                for (const auto &entry : slots.items())
+                    if (std::none_of(members.begin(),
+                                     members.end(),
+                                     [&](uint64_t user)
+                                     {
+                                         return entry.key() == std::to_string(user);
+                                     }))
+                        throw std::runtime_error("Persisted reservation has no primary member");
+                if (occupiedSlots(state["members"], slots) >
+                    state.value("maximum_members", uint64_t{200}))
+                    throw std::runtime_error("Persisted lobby reservations exceed capacity");
+            }
             return state;
         }
 
@@ -226,7 +245,92 @@ namespace services
             return index;
         }
 
-        uint64_t requestCapacity(const Json &query, size_t members)
+        Json requestedSlots(const Json &query)
+        {
+            Json slots = Json::object();
+            for (const auto &user : query.at("members"))
+                slots[std::to_string(user.get<uint64_t>())] = uint64_t{0};
+            if (query.contains("player_id_to_slots"))
+            {
+                const auto &requested = query.at("player_id_to_slots");
+                wire::require(requested.is_object() && requested.size() <= slots.size());
+                for (const auto &entry : requested.items())
+                {
+                    // Replay StartMatchmaking 0x14104A450 emits one reservation
+                    // when a non-primary player shares this primary's token.
+                    wire::require(slots.contains(entry.key()) &&
+                                  entry.value().is_number_unsigned() &&
+                                  entry.value().get<uint64_t>() <= 1);
+                    slots[entry.key()] = entry.value();
+                }
+            }
+            return slots;
+        }
+
+        uint64_t occupiedSlots(const Json &members, const Json &slots)
+        {
+            wire::require(members.is_array() && members.size() <= 200 && slots.is_object());
+            uint64_t occupied = members.size();
+            for (const auto &user : members)
+            {
+                const auto key = std::to_string(user.get<uint64_t>());
+                if (slots.contains(key))
+                {
+                    wire::require(slots[key].is_number_unsigned() &&
+                                  slots[key].get<uint64_t>() <= 1);
+                    occupied += slots[key].get<uint64_t>();
+                }
+            }
+            return occupied;
+        }
+
+        Json lobbySlots(const Json &lobby)
+        {
+            // Older persisted documents predate reservation publication.
+            return lobby.at("backend_doc").value("player_id_to_slots", Json::object());
+        }
+
+        bool slotsAvailable(const Json &lobby, const Json &query)
+        {
+            auto members = lobby.at("members");
+            auto slots = lobbySlots(lobby);
+            const auto requested = requestedSlots(query);
+            for (const auto &entry : requested.items())
+                slots[entry.key()] = entry.value();
+            for (const auto &user : query.at("members"))
+                if (!member(lobby, user.get<uint64_t>()))
+                    members.push_back(user);
+            return occupiedSlots(members, slots) <= lobby.value("maximum_members", uint64_t{200});
+        }
+
+        bool platformAllowed(const Json &query)
+        {
+            if (!query.contains("acceptable_platforms"))
+                return true;
+            const auto &platforms = query.at("acceptable_platforms");
+            wire::require(platforms.is_array() && !platforms.empty() && platforms.size() <= 8);
+            std::set<std::string> values;
+            for (const auto &platform : platforms)
+            {
+                wire::require(platform.is_string());
+                const auto value = platform.get<std::string>();
+                wire::require(!value.empty() && value.size() <= 32 &&
+                              std::all_of(value.begin(),
+                                          value.end(),
+                                          [](char c)
+                                          {
+                                              return (c >= 'a' && c <= 'z') ||
+                                                     (c >= '0' && c <= '9') || c == '_';
+                                          }) &&
+                              values.insert(value).second);
+            }
+            // Original Replay GetClientPlatform 0x1410AE340 returns 2;
+            // platform-string mapper 0x1410AE2F0 returns "bnet" for 2.
+            // All accepted player-info/auth sessions currently belong to Replay PC.
+            return values.contains("bnet");
+        }
+
+        uint64_t requestCapacity(const Json &query)
         {
             uint64_t maximum = 200;
             if (query.contains("lobby_slots"))
@@ -235,7 +339,8 @@ namespace services
                 wire::require(slots.is_object() && slots.at("max").is_number_unsigned());
                 maximum = slots.at("max").get<uint64_t>();
             }
-            wire::require(maximum > 0 && maximum <= 200 && members <= maximum);
+            wire::require(maximum > 0 && maximum <= 200 &&
+                          occupiedSlots(query.at("members"), requestedSlots(query)) <= maximum);
             return maximum;
         }
 
@@ -378,7 +483,7 @@ namespace services
                     {"dedicated_server", query.value("dedicated_server", Json::object())},
                     {"performance", query.value("performance", Json{{"game_type", 1}})},
                     {"team_balance", query.value("team_balance", Json::object())},
-                    {"maximum_members", requestCapacity(query, query.at("members").size())}};
+                    {"maximum_members", requestCapacity(query)}};
         }
 
         Reply assignMembers(const std::filesystem::path &directory,
@@ -405,13 +510,19 @@ namespace services
                 (*document)["update_time"] = documentTime;
             }
             auto &backend = lobby["backend_doc"];
+            auto reservations = lobbySlots(lobby);
+            const auto requested = requestedSlots(query);
+            for (const auto &entry : requested.items())
+                reservations[entry.key()] = entry.value();
+            backend["player_id_to_slots"] = reservations;
             auto &teams = backend["team_balance"]["teams"];
             wire::require(teams.is_object() && !teams.empty());
             auto team = teams.begin();
             for (auto it = teams.begin(); it != teams.end(); ++it)
             {
                 wire::require(it.value().is_array());
-                if (it.value().size() < team.value().size())
+                if (occupiedSlots(it.value(), reservations) <
+                    occupiedSlots(team.value(), reservations))
                     team = it;
             }
             std::set<uint64_t> existing;
@@ -490,8 +601,8 @@ namespace services
                     candidate.value("disbanded", false) ||
                     candidate.at("expires").get<uint64_t>() <= now() ||
                     !host.value("lobby_open", false) || !hostSessionActive(candidate, id.titleId) ||
-                    candidate.at("members").size() + users.size() >
-                        pool.at("maximum_members").get<uint64_t>() ||
+                    !platformAllowed(candidate.value("query_constraints", Json::object())) ||
+                    !slotsAvailable(candidate, query) ||
                     std::any_of(users.begin(),
                                 users.end(),
                                 [&](uint64_t user)
@@ -508,8 +619,10 @@ namespace services
                       candidates.end(),
                       [](const Json &a, const Json &b)
                       {
-                          if (a.at("members").size() != b.at("members").size())
-                              return a.at("members").size() > b.at("members").size();
+                          const auto aSlots = occupiedSlots(a.at("members"), lobbySlots(a));
+                          const auto bSlots = occupiedSlots(b.at("members"), lobbySlots(b));
+                          if (aSlots != bSlots)
+                              return aSlots > bSlots;
                           return a.at("id").get<uint64_t>() < b.at("id").get<uint64_t>();
                       });
             if (candidates.empty())
@@ -564,13 +677,8 @@ namespace services
                 const auto &host = lobby.at("host_doc");
                 if (!host.value("lobby_open_for_pres_join", false))
                     continue;
-                const auto maximum = lobby.value("maximum_members", uint64_t{200});
-                std::set<uint64_t> existing;
-                for (const auto &user : lobby.at("members"))
-                    existing.insert(user.get<uint64_t>());
-                auto combined = existing;
-                combined.insert(users.begin(), users.end());
-                if (combined.size() > maximum)
+                if (!platformAllowed(lobby.value("query_constraints", Json::object())) ||
+                    !slotsAvailable(lobby, query))
                     continue;
                 // Recheck the installed-map/playlist publication. A presence
                 // join must not revive a lobby whose packages/version are gone.
@@ -636,7 +744,9 @@ namespace services
                 }
                 if (!users.contains(id.userId))
                     return Reply{101, {}, "matchmaker-request-owner-denied"};
-                const auto maximum = requestCapacity(query, users.size());
+                const auto maximum = requestCapacity(query);
+                if (!platformAllowed(query))
+                    return Reply{108, {}, "matchmaker-platform-unavailable"};
                 if (query.contains("lobby_id_to_presence_join") ||
                     query.contains("player_id_to_presence_join"))
                     return presenceJoin(directory, id, query, users);
@@ -694,6 +804,7 @@ namespace services
                                 {"players", players},
                                 {"player_id_to_mm_id", matchIds},
                                 {"player_id_to_service_level", levels},
+                                {"player_id_to_slots", requestedSlots(query)},
                                 {"ruleset_payload", rules},
                                 {"performance", query.value("performance", Json{{"game_type", 1}})},
                                 {"team_balance",
@@ -730,6 +841,9 @@ namespace services
                               {"expires", std::min(time + 3600, id.expires)},
                               {"host_doc", host},
                               {"backend_doc", backend},
+                              {"query_constraints",
+                               {{"acceptable_platforms",
+                                 query.value("acceptable_platforms", Json::array({"bnet"}))}}},
                               {"match_selection", selection->metadata}};
                 lobby["maximum_members"] = maximum;
                 if (!query.contains("private_lobby"))

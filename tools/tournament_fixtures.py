@@ -317,10 +317,16 @@ def exercise_results(
         "Replay 145/21 exact typed 256-byte JSON request, duplicate-key/type/range/terminator rejection, accepted enrollment and signed reporting-host isolation"
     )
 
+    def remove_peer(value):
+        value["members"] = [user]
+        # Preserve a valid reservation layout so this case exercises tournament
+        # participation denial rather than rejection of corrupt lobby storage.
+        value["backend_doc"]["player_id_to_slots"].pop(str(peer_user), None)
+
     for mutate, error in (
         (lambda value: value.update(expires=1), 108),
         (lambda value: value.update(disbanded=True), 108),
-        (lambda value: value.update(members=[user]), 101),
+        (remove_peer, 101),
         (lambda value: value["backend_doc"].update(lobby_id=lobby + 1), 102),
         (lambda value: value.update(title=title + 1), 102),
     ):

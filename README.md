@@ -49,8 +49,10 @@ The initial backend public-matching iteration has its own receipt at
 `validation/20261006-public-matchmaking-native-reconnect.json`; the earlier
 receipt remains unchanged. Backend rebinding clears stale native-validation
 flags until the new image is independently observed.
-The current host-membership iteration is recorded separately in
+The host-membership iteration is recorded separately in
 `validation/20261006-membership-native-reconnect.json`.
+The current primary-slot/platform iteration has its own receipt at
+`validation/20261006-constraints-native-reconnect.json`.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
@@ -112,6 +114,8 @@ they are not silently promoted to a newer build.
 | validation/20261006-public-matchmaking-native-reconnect.json | Initial public-matching image: 27 native fences, unchanged game process, renewed relay credentials and sustained authenticated keepalives |
 | validation/20261006-membership.json | Full host snapshot retirement, shared-search/newer-assignment preservation, interrupted-publication recovery, monotonic clocks and native in_game matching |
 | validation/20261006-membership-native-reconnect.json | Membership backend image: native startup/reconnect and stability, with any pre-connection retired-route rejection explicitly accounted |
+| validation/20261006-constraints.json | Primary/secondary slot capacity, presence reservation replacement, PC platform restrictions, departure cleanup and legacy compatibility |
+| validation/20261006-constraints-native-reconnect.json | Constraint backend image: focused native startup, backend restart and renewed authenticated relay stability |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -181,6 +185,12 @@ newer lobby assignments. Rapid document updates use a monotonic timestamp so
 Replay does not discard equal-second changes. See
 [the native snapshot contract](docs/matchmaking-membership.txt).
 
+Primary-player split-screen reservations now count toward lobby and team
+occupancy and are published in backend documents. Public and presence joining
+apply the same slot checks. Replay PC platform restrictions retain compatible
+cross-play settings rather than splitting equivalent pools. See
+[the slot and platform contract](docs/matchmaking-constraints.txt).
+
 Relay rejection diagnostics retain only bounded header metadata and expose
 logged/suppressed counts. A native restart proof permits only completely
 accounted packets naming the previous relay route before the new association
@@ -246,7 +256,7 @@ packages remain a deferred game-build concern.
 
 **Full emulation is not complete.** Remaining areas include:
 
-- Playable multiuser lobby joining, host migration, automatic public matchmaking fill, tournament bracket scheduling/match assignment/join pushes and remote relay deployment/migration. Explicit presence joins by lobby/player, party-token/capacity checks, shared membership/documents and event-2001/2006 delivery have independent wire proof, plus a native friend-menu session-info exchange and lobby/host assignment; see [docs/presence-lobby-joins.md](docs/presence-lobby-joins.md) for remaining gates. The published tournament lifecycle, task-21 journal and event-2010/2012 transports are described in [docs/tournaments.md](docs/tournaments.md). Native registration, persisted-state, FORMING/PLAYING bracket parsing, idle publication changes and the disband callback were verified. The update test explicitly seeded accepted recipient enrollment; native join assignment, result/ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
+- Native playable multiuser lobby joining, public-search callbacks, host migration, tournament bracket scheduling/match assignment/join pushes and remote relay deployment/migration. Automatic compatible public filling is implemented and covered by independent encrypted clients; its native menu/gameplay gate remains open. Explicit presence joins by lobby/player, party-token/capacity checks, shared membership/documents and event-2001/2006 delivery have independent wire proof, plus a native friend-menu session-info exchange and lobby/host assignment; see [docs/presence-lobby-joins.md](docs/presence-lobby-joins.md) for remaining gates. The published tournament lifecycle, task-21 journal and event-2010/2012 transports are described in [docs/tournaments.md](docs/tournaments.md). Native registration, persisted-state, FORMING/PLAYING bracket parsing, idle publication changes and the disband callback were verified. The update test explicitly seeded accepted recipient enrollment; native join assignment, result/ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
 - Remaining streaming tasks 50/22 and 58/22 live/multipart download. Whole-user post and copy are implemented, but preparation IDs 50/5, 15 and 20 are source-oracle contracts without target writer proofs, and positive native upload/copy callbacks remain unobserved. Multipart download's exact bound result reader remains unresolved.
 - Marketplace cross-account gifting, discount publication, inventory-token validation task 80/58, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Cross-account purchases remain unavailable until a multi-account transaction journal exists; a buyer is never debited before an uncommitted gift acknowledgement.
 - Object-store category/list and large-upload completion families, including 193/3, 9, 10, 12 and 24. User metadata accompanies the implemented task-6 object read; source-oracle task 3 is a separate user-object listing route and remains unimplemented. Request writers for 9/10 are recovered; their exact response bindings still need resolution.

@@ -198,7 +198,18 @@ def prepare_offline_lobby(peer, peer_user, query, helpers):
     u32, u64, text, boolean = helpers
     token = struct.unpack_from("<Q", peer.task(145, 3), 1)[0]
     peer.task(
-        145, 18, text(json.dumps({**query, "members": [peer_user], "tokens": [token]}))
+        145,
+        18,
+        text(
+            json.dumps(
+                {
+                    **query,
+                    "members": [peer_user],
+                    "tokens": [token],
+                    "player_id_to_slots": {str(peer_user): 0},
+                }
+            )
+        ),
     )
     kind, packet = peer.receive()
     assert kind == 2 and packet.startswith(u32(2005))

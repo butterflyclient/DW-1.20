@@ -2977,6 +2977,19 @@ try:
         (u32, u64, text, boolean),
         checks,
     )
+    import matchmaking_constraint_fixtures
+
+    matchmaking_constraint_fixtures.exercise(
+        client,
+        peer_client,
+        directory,
+        title,
+        user,
+        peer_user,
+        match_query,
+        (u32, u64, text, boolean),
+        checks,
+    )
     import tournament_fixtures
 
     tournament_fixture = tournament_fixtures.exercise(
@@ -3343,6 +3356,7 @@ try:
                     **match_query,
                     "members": [peer_user],
                     "tokens": [renewed_match_token],
+                    "player_id_to_slots": {str(peer_user): 0},
                 }
             )
         ),

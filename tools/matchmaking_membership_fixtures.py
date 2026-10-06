@@ -150,6 +150,7 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         **copy.deepcopy(create),
         "members": [user, peer_user],
         "tokens": [host_token, peer_token],
+        "lobby_slots": {"min": 1, "max": 4},
     }
     lobby, shared_mm, documents = created(request=party, party=True)
     path = root / "lobbies" / f"{lobby}.json"
@@ -166,6 +167,7 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         **copy.deepcopy(create),
         "members": [peer_user],
         "tokens": [peer_token],
+        "player_id_to_slots": {str(peer_user): 0},
     }
     newer_lobby, newer_mm, _ = created(peer, replacement)
     assert update(lobby, documents, {str(user): 2, str(peer_user): 4}) == boolean(True)

@@ -23,7 +23,12 @@ def exercise(
     create["ruleset_payload"].update(
         join_in_progress=False, only_join_existing_lobbies=False
     )
-    join = {**copy.deepcopy(create), "members": [peer_user], "tokens": [peer_token]}
+    join = {
+        **copy.deepcopy(create),
+        "members": [peer_user],
+        "tokens": [peer_token],
+        "player_id_to_slots": {str(peer_user): 0},
+    }
     join["ruleset_payload"]["only_join_existing_lobbies"] = True
 
     def strings(raw):
@@ -164,6 +169,7 @@ def exercise(
         **copy.deepcopy(progress),
         "members": [peer_user],
         "tokens": [peer_token],
+        "player_id_to_slots": {str(peer_user): 0},
     }
     progress_join["ruleset_payload"]["only_join_existing_lobbies"] = True
     mm = start(peer, progress_join)

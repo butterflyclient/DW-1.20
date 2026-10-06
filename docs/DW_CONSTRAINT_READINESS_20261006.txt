@@ -1,0 +1,66 @@
+REPLAY DW PRIMARY-SLOT AND PLATFORM READINESS
+2026-10-06
+
+Issue
+Lobby creation and joining counted primary account IDs only. Replay separately
+requests a secondary split-screen slot for a primary sharing its token.
+The backend also ignored acceptable_platforms when assigning a lobby.
+
+Research
+Original 1.20 StartMatchmaking 0x14104A450 emits primary IDs/tokens and a
+0-or-1 additional reservation per primary. GetClientPlatform 0x1410AE340
+returns 2, and 0x1410AE2F0 maps that value to bnet. Cross-play-disabled
+searches explicitly request bnet. The current local realm authenticates
+Replay PC; foreign-platform strings do not create foreign-platform identities.
+
+Fix
+Creation, public joins and presence joins count primary plus secondary slots.
+Existing-primary presence reassignment replaces rather than doubles its count.
+Backend documents publish the validated reservation map. Team occupancy and
+fullest-lobby selection use the same counts. Departure removes reservations
+through the existing atomic lobby/search/index transaction.
+Malformed/nonmember reservation data and oversized parties fail unchanged.
+Platform requests must be bounded unique arrays and must allow bnet. Equivalent
+restricted/unrestricted PC settings can still match. Historical documents with
+no reservation/constraint field remain compatible with zero secondary slots.
+Persisted invalid reservation ownership/capacity fails rather than circulating
+an inconsistent lobby. No engine patch, host endpoint invention or new port.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: b89557523b2ee11daaa3ee4f96694244f6917ef04ab26ffcb32a7a12d5a6a84e
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+196 grouped independent encrypted-protocol/service checks passed on this image.
+Five new groups cover request validation, excluded platforms, public/presence
+slot capacity, existing-member reservation replacement/departure and legacy
+compatibility. Existing public/member/tournament fixtures remain passing.
+The tournament denial fixture now removes a member's reservation when removing
+the member, preserving a valid storage layout for the intended access check.
+Signed platform, auth and resource gates passed. Native startup/reconnect and
+relay stability are bound separately to this exact image in the receipts below.
+All 27 fences, signed-in profile and native relay establishment passed before
+and after restarting the backend in the same game process. Stability lasted
+90.129 seconds with nine fresh keepalive replies and no new rejections.
+One pre-establishment old-route rejection is explicitly accounted in the proof.
+Machine-local identity/registration persistence passed after the server restart.
+The local test ran from the root game folder; no map or match was started.
+
+validation/20261006-constraints.json
+validation/20261006-constraints-native-reconnect.json
+data/lobby-verification.json
+data/native-constraints-final-20261006.jpg
+docs/matchmaking-constraints.txt
+
+Remaining gates
+The full backend goal remains active. Six known task routes remain missing,
+alongside indirect/REST/push gaps. Native secondary-slot consumption/split-screen
+play, public-menu joins, host migration, tournament scheduling and two-network
+gameplay remain unverified. The current native UI is stopped at the unaccepted
+Terms of Agreement; acceptance authorization was requested separately. A normal
+startup/relay regression behind that screen is not a native lobby gameplay test.
+Use controlled restarts and dw_restart. Do not use the broken dw_leave command.
