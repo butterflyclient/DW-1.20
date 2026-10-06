@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $gameRoot = (Resolve-Path -LiteralPath $GameDirectory).Path
 $image = Join-Path $gameRoot 'game_dx12_ship_replay_dw.exe'
 $iniPath = Join-Path $gameRoot 'game_dx12_ship_replay_dw.ini'
-$expectedHash = 'df4cc6cb2c9c7e47ff7ae08daf45c8a4d43f84b381dab1ac95af2e1c562e8654'
+$expectedHash = 'b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885'
 
 Write-Output 'Replay DW client diagnostics (read-only; no identity keys are read)'
 Write-Output "Game folder: $gameRoot"
@@ -21,13 +21,18 @@ if (Test-Path -LiteralPath $image) {
 $backendAddress = '127.0.0.1'
 if (Test-Path -LiteralPath $iniPath) {
     $iniBytes = [System.IO.File]::ReadAllBytes($iniPath)
-    $iniText = [System.Text.Encoding]::UTF8.GetString($iniBytes)
+    $iniText = [System.Text.Encoding]::UTF8.GetString($iniBytes).TrimStart([char]0xFEFF)
     $configured = [regex]::Match($iniText, '(?m)^host=([^\r\n]*)')
     if ($configured.Success) { $backendAddress = $configured.Groups[1].Value }
     Write-Output "INI host: $backendAddress"
     Write-Output "INI size: $($iniBytes.Length) bytes"
     Write-Output "INI contains exact host= line: $($configured.Success)"
     Write-Output "INI begins with UTF-8 BOM: $($iniBytes.Length -ge 3 -and $iniBytes[0] -eq 239 -and $iniBytes[1] -eq 187 -and $iniBytes[2] -eq 191)"
+    $nameField = [regex]::Match($iniText, '(?m)^player_name=([^\r\n]*)')
+    $playerName = $nameField.Groups[1].Value
+    $nameValid = $playerName.Length -le 35 -and $playerName -notmatch '[^\x20-\x7e]|[#%]|^ | $'
+    Write-Output "INI player_name format valid: $nameValid"
+    if (!$nameValid) { Write-Output 'Use at most 35 printable ASCII characters, no # or %, and no edge spaces.' }
 } else {
     Write-Output 'ERROR: executable-specific INI missing; fallback or loopback default may be used.'
 }

@@ -47,7 +47,13 @@ add_library(iw8-dw-platform-client SHARED integration/replay/DW_LocalPlatformCry
     integration/replay/DW_LocalIdentity.cpp)
 target_compile_features(iw8-dw-platform-client PRIVATE cxx_std_20)
 set_target_properties(iw8-dw-platform-client PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+add_executable(iw8-dw-identity-check tools/identity-file-diagnostic.cpp
+    integration/replay/DW_LocalIdentity.cpp)
+target_compile_features(iw8-dw-identity-check PRIVATE cxx_std_20)
+target_link_libraries(iw8-dw-identity-check PRIVATE bcrypt crypt32)
 if(MSVC)
   target_compile_options(iw8-dw-server PRIVATE /W4 /WX /EHsc)
   target_compile_options(iw8-dw-platform-client PRIVATE /W4 /WX /EHsc)
+  target_compile_options(iw8-dw-identity-check PRIVATE /W4 /WX /EHsc)
+  set_property(TARGET iw8-dw-identity-check PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()

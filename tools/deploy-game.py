@@ -115,11 +115,20 @@ probe_object = records.get(probe_digest)
 if not probe_object or "func_141489DA0" not in report["symbols"]:
     raise RuntimeError("Proxy-free startup source was not compiled")
 endpoint_cases = verification.get("dw_local_endpoints", [])
-if len(endpoint_cases) != 3 or not all(
-    item.get("compiled_startup_constructor_returns")
-    and item.get("compiled_startup_probe_returns")
-    and item.get("compiled_public_address_serialization")
-    for item in endpoint_cases
+if (
+    len(endpoint_cases) != 4
+    or not any(
+        item.get("enabled")
+        and item.get("ini_utf8_bom")
+        and item.get("configured_host") == "203.0.113.12"
+        for item in endpoint_cases
+    )
+    or not all(
+        item.get("compiled_startup_constructor_returns")
+        and item.get("compiled_startup_probe_returns")
+        and item.get("compiled_public_address_serialization")
+        for item in endpoint_cases
+    )
 ):
     raise RuntimeError(
         "DW startup constructor and filename selection were not verified"
@@ -318,18 +327,33 @@ if (
     raise RuntimeError(
         "Compiled native account getter verification source is stale or unavailable"
     )
-local_identity_proof = json.loads((ROOT / "data/local-player-verification.json").read_text())
+local_identity_proof = json.loads(
+    (ROOT / "data/local-player-verification.json").read_text()
+)
 identity_source = ROOT / "integration/replay/DW_LocalIdentity.cpp"
-if not all(local_identity_proof.get(field) for field in (
-    "passed", "new_process_persistence", "distinct_players", "rename_preserves_identity",
-    "interrupted_write_recovered", "corrupt_identity_preserved_and_rejected",
-    "backend_restart_persistence",
-)) or (
+if not all(
+    local_identity_proof.get(field)
+    for field in (
+        "passed",
+        "new_process_persistence",
+        "distinct_players",
+        "rename_preserves_identity",
+        "interrupted_write_recovered",
+        "corrupt_identity_preserved_and_rejected",
+        "precise_identity_failure_stages",
+        "lock_contention_preserves_identity",
+        "damaged_dpapi_preserved_and_rejected",
+        "invalid_names_preserve_identity",
+        "backend_restart_persistence",
+    )
+) or (
     local_identity_proof["server_sha256"] != auth_proof["server_sha256"]
     or local_identity_proof["identity_source_sha256"]
-       != hashlib.sha256(identity_source.read_bytes()).hexdigest()
+    != hashlib.sha256(identity_source.read_bytes()).hexdigest()
     or local_identity_proof["client_dll_sha256"]
-       != hashlib.sha256((ROOT / "build/Release/iw8-dw-platform-client.dll").read_bytes()).hexdigest()
+    != hashlib.sha256(
+        (ROOT / "build/Release/iw8-dw-platform-client.dll").read_bytes()
+    ).hexdigest()
 ):
     raise RuntimeError("Automatic local identity verification is absent or stale")
 destination = paths["game"] / "game_dx12_ship_replay_dw.exe"
@@ -510,7 +534,7 @@ readiness = {
     },
     "remaining_scope": [
         "proxy-free native-game acceptance and two-network gameplay are separate pending gates",
-        "full backend implementation paused for the owner-hosted remote test",
+        "full backend implementation continues; two-network party gameplay remains unverified",
         "see backend-coverage-inventory.json for reviewed routes and unresolved DTO methods",
         "host migration, automatic public lobby fill and tournament scheduling remain open",
         "marketplace gifts/discounts and validation-token semantics remain open",

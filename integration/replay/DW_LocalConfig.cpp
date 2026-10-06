@@ -113,7 +113,14 @@ namespace
                 if (!read || count >= sizeof(text) - 1)
                     s_host[0] = 0;
                 else
-                    for (unsigned at = 0; at < count;)
+                    // Editors commonly save UTF-8 with a BOM. It precedes the
+                    // first key and must not turn a remote host into loopback.
+                    for (unsigned at = count >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
+                                               static_cast<unsigned char>(text[1]) == 0xBB &&
+                                               static_cast<unsigned char>(text[2]) == 0xBF
+                                           ? 3U
+                                           : 0U;
+                         at < count;)
                     {
                         Field(text + at, "host", s_host, sizeof(s_host));
                         Field(text + at, "public_address", s_public, sizeof(s_public));

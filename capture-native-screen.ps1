@@ -1,17 +1,22 @@
-param([Parameter(Mandatory=$true)][string]$Output)
+param([Parameter(Mandatory=$true)][string]$Output,
+      [string]$ScreenshotDirectory)
 $ErrorActionPreference='Stop'
 $target=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot $Output))
 $dataRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'data'))+[IO.Path]::DirectorySeparatorChar
 if(-not $target.StartsWith($dataRoot,[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetExtension($target) -ne '.jpg') {
     throw 'Save native screenshot evidence to a JPG inside the backend data directory.'
 }
-$screens='C:\Users\achar\Documents\Call of Duty Modern Warfare\players\screenshots'
+$documents=[Environment]::GetFolderPath('MyDocuments')
+$screens=if($ScreenshotDirectory) { @([IO.Path]::GetFullPath($ScreenshotDirectory)) } else {
+    @((Join-Path $documents 'Call of Duty Modern Warfare Replay\players\screenshots'),
+      (Join-Path $documents 'Call of Duty Modern Warfare\players\screenshots'))
+}
 $before=@{}
-Get-ChildItem -LiteralPath $screens -Filter '*.jpg' | ForEach-Object { $before[$_.FullName]=$_.LastWriteTimeUtc.Ticks }
+Get-ChildItem -LiteralPath $screens -Filter '*.jpg' -ErrorAction SilentlyContinue | ForEach-Object { $before[$_.FullName]=$_.LastWriteTimeUtc.Ticks }
 & (Join-Path $PSScriptRoot 'invoke-game-command.ps1') -Command 'screenshotJpeg'
 $deadline=[DateTime]::UtcNow.AddSeconds(15)
 while([DateTime]::UtcNow -lt $deadline) {
-    $changed=@(Get-ChildItem -LiteralPath $screens -Filter '*.jpg' | Where-Object {
+    $changed=@(Get-ChildItem -LiteralPath $screens -Filter '*.jpg' -ErrorAction SilentlyContinue | Where-Object {
         -not $before.ContainsKey($_.FullName) -or $before[$_.FullName] -ne $_.LastWriteTimeUtc.Ticks
     })
     if($changed.Count -gt 1){throw 'More than one screenshot changed; evidence capture is ambiguous.'}

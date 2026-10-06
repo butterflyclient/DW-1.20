@@ -1,0 +1,96 @@
+REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
+
+CURRENT ARTIFACTS
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Fresh private compiler job: 436f999a3d444276
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+Backend SHA256: 7c6378f51e73ac6c34c51bc931bd043934a27cf5e5961fbea96f720bcb1f657f
+Client ZIP: E:\DW\IW8\data\Replay-DW-Client-Test.zip
+Client ZIP SHA256: a94b3abcde729198c53e5ad441d6397fe9519a5dbff45dab7ef615ecb6c7537b
+Diagnostics ZIP: E:\DW\IW8\data\Replay-DW-Diagnostics.zip
+Diagnostics SHA256: 20105098fb6b04d95ced55133211eb327fccbd8d9bc17d401c5d2977320a1a5c
+
+NEW IMPLEMENTATION
+1. Matchmaking party tokens bind their live authenticated issuing sessions.
+   Reauthentication invalidates old party tokens; task 145/3 issues replacements.
+   A former login's token cannot be reused to create a lobby after reconnect.
+2. Native dw_restart resets the cached relay result, expiry and retry timer after
+   sign-out cancels old tasks. It restores native online networking when needed.
+   This is compiled C++, linked through recovered native symbols. No fence or
+   networking-state overrides, executable patching or proxy are used.
+3. Inventory validation 80/58 has its own recovered Int64/Int64/blob result.
+   Trusted issuer publications bind title, owner, context, filename, input-token
+   hash, time window and full output. Entire publications are validated; reads
+   are bounded to 4 MiB. Unavailable tokens remain unavailable. This does not
+   implement retail signing or grant inventory from arbitrary client bytes.
+4. INI parsing accepts a UTF-8 BOM. Startup/probe logs show configured endpoints.
+   Identity/challenge/login/reply failures now identify their failing stage;
+   file/DPAPI/CNG failures include the Windows error code when available.
+5. The portable diagnostic checks an existing identity, DPAPI and P-256 import.
+   It makes no server request and never replaces an identity. It prints no key
+   bytes. The zero-byte .lock file alone does not mean a lock is held.
+
+VERIFIED ON THESE IMAGES
+- Full source compilation, linking, relocation/unwind/source gates passed;
+  zero unresolved symbols. Game was launched from the root build folder.
+- Native auth/profile/Online state and all 27 startup fences passed.
+- Accepted, incoming and outgoing native friend lists completed and were empty.
+- Backend was stopped and started in separate steps. Native dw_restart kept the
+  same game process and player identity, requested a new 145/26 token, obtained
+  a new 145/24 relay credential and completed BIND/VERIFY/ESTABLISHED.
+- Native decrypted route/relay/endpoint/verification hash matched the backend's
+  authenticated UDP event. A further 62.8 seconds retained the same association,
+  produced six keepalive replies and had zero rejected packets.
+- 182 independent encrypted-client protocol/service groups passed. Signed
+  platform/auth/resource gates and Windows DPAPI/CNG identity fault/persistence
+  checks passed, including backend restart and preservation of invalid files.
+- No map/match tests were performed in this pass.
+
+Native receipt: validation\20261006-native-reconnect.json
+Private observations: data\native-reconnect-20261006\*-b326.json
+Compiler/deployment evidence: data\deployment.json and its referenced reports
+Coverage ledger: data\backend-coverage-inventory.json
+Reviewed routes: 140; registered handlers: 134; known unhandled routes: 6.
+Missing reviewed routes: 50/22, 58/22, 193/9, 193/10, 193/12, 193/24.
+The constructor inventory does not cover every indirect task, REST or push path.
+
+REMOTE RETEST
+Distribute the refreshed universal Client ZIP to every tester. Extract into their
+compatible Replay 1.20 root game folder. The EXE and INI must remain together.
+No proxy, backend, provisioning or identity file needs to be distributed.
+Guest INI: host=198.255.173.206; player_name may be set or left blank.
+Host INI remains host=127.0.0.1, player_name=^3Entroph, with its existing game
+endpoint publication. Settings use the native Documents\Call of Duty Modern
+Warfare Replay\players save root selected by the retained side-session change.
+
+The earlier tester's BLZBNTBGS7FFFFF00 remains unconfirmed on their machine.
+Its old local-identity-file marker failed before any server request. Keep their
+player-identity.bin intact. Extract the Diagnostics ZIP into the game root and
+run Run_Replay_DW_Diagnostics.cmd as the same Windows user as the game. Share
+stage/error text only; never send identity files. The refreshed EXE also logs
+the precise failure stage and actual loaded backend endpoint.
+
+Both players: Multiplayer > Social > Add Friends > Activision Account, add the
+other player's name or Name#0, accept in Friend Requests and check Online state.
+Host a private Shipment party/match, then join through Social. Confirm both
+players move/shoot/finish and retain account/settings/friendship after restarting.
+dw_leave remains unsupported; use controlled process restarts. dw_restart is
+verified for local backend restart/auth/relay recovery, not an active-match test.
+
+LIMITS AND PRESERVED WORK
+Actual two-network party JOIN/gameplay has not been verified. Native peer DATA
+forwarding has independent wire coverage, not a two-game native proof. No new
+WAN reachability claim is made. Only existing DW router ports are retained:
+TCP 8085/3075 and UDP 3074/3076/3077/3078. No viewer ports were opened.
+
+The earlier main-menu-return failure, populated inventory validation callback,
+retail token issuance, migration and other coverage-ledger gaps remain open.
+The separate Replay save root presents the Terms screen for a fresh profile;
+no agreement was accepted or consent flag written by this test. Native online
+and relay validation used the existing developer command bridge behind it.
+
+The new game includes current private integration inputs, including existing
+side-session Con_Developer/DW_PlayerDataPath work. Those files were not edited
+or committed in this pass. Shared compiler/editor work and game assets remain.
+Full DW backend implementation continues; this is a readiness milestone.

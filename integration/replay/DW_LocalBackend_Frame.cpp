@@ -74,6 +74,18 @@ namespace
         CloseHandle(file);
     }
 
+    void WriteEndpointLog(const char *prefix, const char *suffix)
+    {
+        char message[256]{};
+        const auto *host = DW_LocalConfig_Host();
+        const char *parts[] = {prefix, *host ? host : "<invalid-config>", suffix};
+        unsigned used = 0;
+        for (const auto *part : parts)
+            for (; *part && used + 1 < sizeof(message); ++part)
+                message[used++] = *part;
+        WriteLog(message);
+    }
+
     unsigned long __stdcall ProbeThread(void *)
     {
         using Handle = void *;
@@ -165,10 +177,10 @@ namespace
             }
             FreeLibrary(library);
         }
-        WriteLog(ok ? "DW_LOCAL_PROBE_OK 127.0.0.1:8085 external server reached; native "
-                      "authentication/tasks pending"
-                    : "DW_LOCAL_PROBE_FAILED start E:\\DW\\IW8\\start-server.ps1; native "
-                      "connection flags are unchanged");
+        WriteEndpointLog(ok ? "DW_LOCAL_PROBE_OK host=" : "DW_LOCAL_PROBE_FAILED host=",
+                         ok ? ":8085 backend health reached; native authentication/tasks pending"
+                            : ":8085 backend health unavailable; check this endpoint's server "
+                              "and network access");
         __atomic_store_n(&s_probe, ok ? 2U : 3U, __ATOMIC_RELEASE);
         return 0;
     }
@@ -262,10 +274,14 @@ extern "C" void DW_LocalBackend_Frame()
         return;
     if (!s_registered)
     {
+        // DW runs before Com_DebugStates_Frame. Initialize its default once;
+        // subsequent com_debugStates commands can still enable the overlay.
+        s_comDebugStates.enabled = 0;
         Cmd_AddCommandInternal("dw_localBackendStatus", DW_LocalBackend_Status_f, &s_statusCommand);
         Cmd_AddCommandInternal("dw_localBackendProbe", DW_LocalBackend_Probe_f, &s_probeCommand);
-        WriteLog("DW_LOCAL_BUILD_INIT workstation-compiled source active; auth=127.0.0.1:8443 "
-                 "lobby=127.0.0.1:3075");
+        WriteEndpointLog("DW_LOCAL_BUILD_INIT host=",
+                         "; platform/auth HTTP=8085 native-auth=8443 lobby=3075; "
+                         "workstation-compiled source active");
         s_registered = true;
         DW_LocalBackend_Probe_f();
     }

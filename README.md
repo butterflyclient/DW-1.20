@@ -39,10 +39,14 @@ invalidates its session.
 
 `refresh-game-connection.ps1` records dispatch of `dw_restart`; dispatch and
 `DW_RESTART_CONNECTED` alone do not prove that native networking, permissions
-and menu initialization recovered. The live cold-server-restart test reached
-DW connected state but left native networking/permission fences failed. A
-separate reconnect/menu-return experiment exited the game. Use controlled
-game/server restarts for binary updates until the engine lifecycle is resolved.
+and relay initialization recovered. The private integration now restores the
+native online network lifecycle and resets its cached relay credential after
+native sign-out cancels outstanding tasks. The focused 2026-10-06 run verified
+all 27 fences, profile/Online/friend lists, a fresh relay-token task and native
+BIND/VERIFY/ESTABLISHED after restarting the backend in the same game process.
+The exact image-bound receipt is `validation/20261006-native-reconnect.json`.
+Two-network party gameplay and the earlier main-menu-return issue still need
+separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
 read per request and can already be updated without restarting either process.
 
@@ -71,6 +75,14 @@ game start, preserving the account ID and local saves. Send the same universal
 Native Social name search, requests and acceptance are documented in
 [player names and friends](docs/player-names-and-friends.md).
 
+`Replay-DW-Diagnostics.zip` contains a portable existing-identity checker and
+read-only client/INI/network/log checks. It reports the precise failed Win32,
+DPAPI or P-256 import stage without deleting or replacing an identity. The game
+also logs granular identity/challenge/login/reply failures and its configured
+backend endpoints. UTF-8 BOM-prefixed INI files are accepted. The earlier remote
+tester failure has not been reproduced on that machine; keep the identity file
+and use the diagnostic output to identify its cause.
+
 ## Native game evidence
 
 Evidence lives under `data/`. Observations verify the live process/image hash,
@@ -89,6 +101,7 @@ they are not silently promoted to a newer build.
 | runtime-scheduled-services-login.json | Fresh successful login after scheduled/performance integration |
 | runtime-clan-role-accepted.json | Native invitation acceptance task completed after resolving the role-zero default; activation permission issue recorded separately |
 | lobby-verification.json | Latest independent wire checks, backend/KDF hash and fixture directory |
+| validation/20261006-native-reconnect.json | Hash-bound native startup, same-process backend restart, new relay token and authenticated UDP relay completion |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -184,9 +197,9 @@ Credentials, request bodies, headers and retry tokens are excluded from logs.
 - `data/event-log/<title>/<user>/batches`: immutable accepted telemetry batches; the recent window is bounded separately.
 - `data/scheduled-matches/<title>/matches.json`: schema 1 and matches array. Each row supplies id, start, end, status, affinity, base64 metadata and users with userID/accountType. Absent publication means no schedules. Member events persist in events.json.
 - `data/performance/<title>/<context>/<user>.json`: game-type sample counts and bounded recent values; NAN is null.
-- `data/qos/local-provider.json`: actual loopback UDP QoS provider and expiring issued security IDs.
+- `data/qos/local-provider.json`: actual UDP QoS provider and expiring issued security IDs. `network.json` selects its listener and request-local endpoint publication.
 - `data/relay/issuer-key.bin`: persistent local relay client credential issuer. Keep this private and preserve it across restarts; a damaged key is rejected rather than replaced. Task 145/26 returns Replay's exact 77-byte blob: version 1, 56 opaque bytes, 16-byte client secret and little-endian expiry delta, capped at one hour and the signed login expiry. The opaque payload encrypts owner/title/absolute expiry and authenticates the session digest and delta. `data/relay/<title>/clients/<user>.json` contains only the latest issued token hashes/expiry for native verification, without raw credentials. The local credential verifier is separate from active-login validation and UDP transport. `--inspect-relay-client-token <base64>` is an offline diagnostic; it deliberately reports `active_session_checked: false` and does not log secrets.
-- `data/relay/local-provider.json`: `{"enabled":true}` starts the actual loopback UDP relay before task 145/24 advertises it. The native nested `server_info` string contains an 83-byte server credential, independently owner/title/expiry/current-relay-ID bound through AES-GCM. An unexpired client credential must also match a live signed lobby session. Server restart revokes old sessions and uses a fresh relay ID. BIND, JOIN, VERIFY, ESTABLISHED, client-origin ping echo, DATA forwarding, BIND_UPGRADE and DISCONNECT use Replay's exact headers, SHA256 HKDF labels including NUL, directional MAC keys and 32-packet replay window. DATA has a 5-byte MAC; control packets have 16. The ping byte is the ORIGIN (client=1/server=0), not a request/reply flag. Only authenticated loopback peers of the same title can forward traffic. Associations are bounded to 256 and expire on credential/session expiry, idle timeout or disconnect. `data/relay/transport-events.jsonl` records route/owner/time and verification hashes, without raw tokens or transport keys. If issuer state exists but its key is absent, initialization refuses to silently rotate the realm.
+- `data/relay/local-provider.json`: `{"enabled":true}` starts the actual UDP relay before task 145/24 advertises it. `network.json` selects the listener; authenticated loopback clients receive a loopback endpoint, while remote clients receive the configured public endpoint. The native nested `server_info` string contains an 83-byte server credential, independently owner/title/expiry/current-relay-ID bound through AES-GCM. An unexpired client credential must also match a live signed lobby session. Server restart revokes old sessions and uses a fresh relay ID. BIND, JOIN, VERIFY, ESTABLISHED, client-origin ping echo, DATA forwarding, BIND_UPGRADE and DISCONNECT use Replay's exact headers, SHA256 HKDF labels including NUL, directional MAC keys and 32-packet replay window. DATA has a 5-byte MAC; control packets have 16. The ping byte is the ORIGIN (client=1/server=0), not a request/reply flag. Only authenticated permitted peers of the same title can forward traffic. Associations are bounded to 256 and expire on credential/session expiry, idle timeout or disconnect. `data/relay/transport-events.jsonl` records route/owner/time and verification hashes, without raw tokens or transport keys. If issuer state exists but its key is absent, initialization refuses to silently rotate the realm. Native two-network JOIN/gameplay validation remains pending.
 - `data/geography.json`: configured local geography, not real IP-derived location.
 - `data/rest/<title>/<service>/<resource>/<operation>.json`: GET-only publication with status/body; mutations need domain handlers.
 

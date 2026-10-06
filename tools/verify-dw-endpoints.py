@@ -10,10 +10,11 @@ def verify(pe, report):
     if "DW_LocalBackend_IsEnabled" not in report["symbols"]:
         raise ValueError("DW integration was not linked")
     cases = []
-    for executable, enabled, host in (
-        ("game_dx12_ship_replay.exe", False, "127.0.0.1"),
-        ("game_dx12_ship_replay_dw.exe", True, "127.0.0.1"),
-        ("game_dx12_ship_replay_dw.exe", True, "203.0.113.12"),
+    for executable, enabled, host, bom in (
+        ("game_dx12_ship_replay.exe", False, "127.0.0.1", False),
+        ("game_dx12_ship_replay_dw.exe", True, "127.0.0.1", False),
+        ("game_dx12_ship_replay_dw.exe", True, "203.0.113.12", False),
+        ("game_dx12_ship_replay_dw.exe", True, "203.0.113.12", True),
     ):
         machine = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_64)
         base = pe.OPTIONAL_HEADER.ImageBase
@@ -55,6 +56,8 @@ def verify(pe, report):
             f"public_address={host}\nlocal_address=192.168.1.124\ngame_port=3074\n"
             "player_name=Replay INI Tester\n"
         ).encode()
+        if bom:
+            ini = b"\xef\xbb\xbf" + ini
         native = bytearray(2088)
         native[:36] = bytes(range(36))
         auth, lobby = b"native.auth.invalid\0", b"native.lobby.invalid\0"
@@ -869,6 +872,7 @@ def verify(pe, report):
                 "executable": executable,
                 "enabled": enabled,
                 "configured_host": host,
+                "ini_utf8_bom": bom,
                 "compiled_public_address_serialization": True,
                 "compiled_startup_probe_returns": True,
                 "auth_address": auth_address,

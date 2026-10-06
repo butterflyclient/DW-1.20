@@ -57,7 +57,8 @@ New automatic accounts begin with empty native friend/request lists. Neither
 client nor server clears friendships on startup. Existing accepted friends and
 requests persist through game and server restarts.
 
-Native settings remain in `Documents\Call of Duty Modern Warfare\players`, using
+The current private integration selects
+`Documents\Call of Duty Modern Warfare Replay\players` for native settings, using
 the stable game account ID for `settings.<id>.iw8`. The game selects its native
 `CODPC_NOCLOUD_SYNC` opt-out before sign-in. Settings serialization stays inside
 the original engine; progression, loadouts and friendships retain backend storage.
@@ -67,9 +68,15 @@ with the root game folder as its working directory. This avoids packaged editors
 AppData virtualization, so developer and ordinary Explorer launches select the
 same Windows user's identity. The distributed CMD starts the EXE normally.
 
-The current compiled image was validated in the native game: stable automatic
+The 2026-10-05 image was validated in the native game: stable automatic
 account across three processes, all 27 startup fences passing, Online publication,
 native setting save/reload/restore, and name-based invitation, acceptance,
 friendship persistence and removal. The final friend/request lists are empty.
 See `validation/20261005-machine-local-player-identity.json` for scoped evidence.
 Two-network party gameplay still needs the host/guest retest.
+
+The 2026-10-06 image has separate startup and same-process backend-restart
+evidence in `validation/20261006-native-reconnect.json`, including fresh native
+relay authentication. That pass did not repeat the setting or invitation UI
+interactions. The current package and non-destructive tester diagnostics are
+listed in `docs/DW_MULTIPLAYER_READINESS_20261006.txt`.

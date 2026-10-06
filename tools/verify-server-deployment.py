@@ -99,11 +99,23 @@ if (
     raise RuntimeError(
         "Server trust/crypto verification does not match the compiled game integration"
     )
+previous_server_hash = record["server_sha256"]
+if previous_server_hash != server_hash:
+    # Wire/crypto gates do not promote an earlier server's native observation
+    # to this revision. Retain the historical proof path but clear current status.
+    record["native_game_verified"] = False
+    if "local_player_identity" in record:
+        record["local_player_identity"]["native_runtime_verified"] = False
+    record["runtime_test"] = (
+        "Backend revision changed; fresh native observation pending. "
+        "Historical native receipts retain their original server hashes."
+    )
 record["server_sha256"] = server_hash
 record["server_rebinding"] = {
     "verified_utc": datetime.now(timezone.utc).isoformat(),
     "unchanged_game_sha256": game_hash,
     "server_sha256": server_hash,
+    "previous_server_sha256": previous_server_hash,
     "method": "retained successful game deployment, matching build/object/relocation evidence and fresh server wire/crypto fixtures",
     "game_source_snapshot_present": Path(record["compiler_source_root"]).is_dir(),
     "current_integration_source_status": source_status,

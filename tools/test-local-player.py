@@ -3,6 +3,7 @@
 No test identity or private key is included in a distributable. Fixture local
 profiles live under ignored data and separate processes check persistence.
 """
+
 import argparse
 import ctypes
 import hashlib
@@ -19,13 +20,16 @@ import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-DLL = ROOT / 'build/Release/iw8-dw-platform-client.dll'
+DLL = ROOT / "build/Release/iw8-dw-platform-client.dll"
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--probe', type=Path)
-parser.add_argument('--name', default='')
-parser.add_argument('--public-only', action='store_true')
-parser.add_argument('--resume', type=Path)
-parser.add_argument('--legacy-name', help='A private legacy fixture name to verify upgrade compatibility')
+parser.add_argument("--probe", type=Path)
+parser.add_argument("--name", default="")
+parser.add_argument("--public-only", action="store_true")
+parser.add_argument("--resume", type=Path)
+parser.add_argument(
+    "--legacy-name",
+    help="A private legacy fixture name to verify upgrade compatibility",
+)
 args = parser.parse_args()
 
 
@@ -35,7 +39,7 @@ def digest(path):
 
 def probe(directory, name, public_only=False):
     directory.mkdir(parents=True, exist_ok=True)
-    os.environ['LOCALAPPDATA'] = str(directory.resolve())
+    os.environ["LOCALAPPDATA"] = str(directory.resolve())
     dll = ctypes.CDLL(str(DLL))
     public = dll.DW_LocalIdentity_PublicKey
     public.argtypes = (ctypes.c_void_p,)
@@ -44,21 +48,36 @@ def probe(directory, name, public_only=False):
     error = dll.DW_LocalIdentity_Error
     error.restype = ctypes.c_char_p
     if not public(out):
-        return {'passed': False, 'error': error().decode()}
+        return {"passed": False, "error": error().decode()}
     fingerprint = hashlib.sha256(out.raw).hexdigest()
-    record = directory / 'ReplayDW/player-identity.bin'
+    record = directory / "ReplayDW/player-identity.bin"
     if public_only:
-        return {'passed': True, 'fingerprint': fingerprint, 'file_sha256': digest(record)}
-    post_type = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_wchar_p, ctypes.c_void_p,
-                                ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint)
+        return {
+            "passed": True,
+            "fingerprint": fingerprint,
+            "file_sha256": digest(record),
+        }
+    post_type = ctypes.CFUNCTYPE(
+        ctypes.c_bool,
+        ctypes.c_wchar_p,
+        ctypes.c_void_p,
+        ctypes.c_uint,
+        ctypes.c_void_p,
+        ctypes.c_uint,
+    )
     captured = {}
 
     def post(path, source, length, output, capacity):
         data = ctypes.string_at(source, length)
         try:
-            with urllib.request.urlopen(urllib.request.Request(
-                    'http://127.0.0.1:8085' + path, data,
-                    {'Content-Type': 'application/octet-stream'}), timeout=10) as response:
+            with urllib.request.urlopen(
+                urllib.request.Request(
+                    "http://127.0.0.1:8085" + path,
+                    data,
+                    {"Content-Type": "application/octet-stream"},
+                ),
+                timeout=10,
+            ) as response:
                 value = response.read()
             if len(value) != capacity:
                 return False
@@ -74,46 +93,70 @@ def probe(directory, name, public_only=False):
     login.restype = ctypes.c_bool
     nonce = os.urandom(32)
     reply = ctypes.create_string_buffer(512)
-    if not login(name.encode('ascii'), nonce, reply, callback):
-        return {'passed': False, 'error': error().decode()}
+    if not login(name.encode("ascii"), nonce, reply, callback):
+        return {"passed": False, "error": error().decode()}
     verify = dll.DW_LocalPlatform_VerifyReply
     verify.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64)
     verify.restype = ctypes.c_bool
-    assert verify(reply, nonce, int(time.time())), 'Native reply signature verification failed'
-    request = captured['/platform/client/login']
+    assert verify(
+        reply, nonce, int(time.time())
+    ), "Native reply signature verification failed"
+    request = captured["/platform/client/login"]
 
     def rejected(body):
         try:
-            urllib.request.urlopen(urllib.request.Request(
-                'http://127.0.0.1:8085/platform/client/login', body), timeout=10)
+            urllib.request.urlopen(
+                urllib.request.Request(
+                    "http://127.0.0.1:8085/platform/client/login", body
+                ),
+                timeout=10,
+            )
         except urllib.error.HTTPError as failure:
             assert failure.code == 400
             return
-        raise AssertionError('Invalid/replayed login accepted')
+        raise AssertionError("Invalid/replayed login accepted")
 
     rejected(request)
     # A fresh challenge followed by a changed signed name cannot rename a player.
-    challenge_request = captured['/platform/client/challenge']
-    with urllib.request.urlopen(urllib.request.Request(
-            'http://127.0.0.1:8085/platform/client/challenge', challenge_request), timeout=10) as response:
+    challenge_request = captured["/platform/client/challenge"]
+    with urllib.request.urlopen(
+        urllib.request.Request(
+            "http://127.0.0.1:8085/platform/client/challenge", challenge_request
+        ),
+        timeout=10,
+    ) as response:
         challenge = response.read()
     changed = bytearray(request)
     changed[40:72] = challenge
-    changed[144] = ord('A')
+    changed[144] = ord("A")
     rejected(bytes(changed))
     data = reply.raw
-    uid, game_id = struct.unpack_from('<QI', data, 56)
-    return {'passed': True, 'fingerprint': fingerprint, 'file_sha256': digest(record),
-            'user_id': uid, 'game_account_id': game_id,
-            'name': data[72:108].split(b'\0')[0].decode('ascii'),
-            'signed_reply': True, 'replay_rejected': True, 'changed_request_rejected': True}
+    uid, game_id = struct.unpack_from("<QI", data, 56)
+    return {
+        "passed": True,
+        "fingerprint": fingerprint,
+        "file_sha256": digest(record),
+        "user_id": uid,
+        "game_account_id": game_id,
+        "name": data[72:108].split(b"\0")[0].decode("ascii"),
+        "signed_reply": True,
+        "replay_rejected": True,
+        "changed_request_rejected": True,
+    }
 
 
-def child(directory, name='', public_only=False):
-    command = [sys.executable, '-B', str(Path(__file__).resolve()), '--probe', str(directory),
-               '--name', name]
+def child(directory, name="", public_only=False):
+    command = [
+        sys.executable,
+        "-B",
+        str(Path(__file__).resolve()),
+        "--probe",
+        str(directory),
+        "--name",
+        name,
+    ]
     if public_only:
-        command.append('--public-only')
+        command.append("--public-only")
     return json.loads(subprocess.check_output(command, text=True))
 
 
@@ -123,58 +166,135 @@ else:
     if args.resume:
         receipt_path = args.resume
         evidence = json.loads(receipt_path.read_text())
-        resumed = child(Path(evidence['directory']) / 'player-a', evidence['renamed']['name'])
-        assert resumed == evidence['renamed'], 'Identity changed across backend restart'
-        evidence['backend_restart_persistence'] = True
+        resumed = child(
+            Path(evidence["directory"]) / "player-a", evidence["renamed"]["name"]
+        )
+        assert resumed == evidence["renamed"], "Identity changed across backend restart"
+        evidence["backend_restart_persistence"] = True
     else:
-        directory = ROOT / 'data' / ('local-player-validation-' + uuid.uuid4().hex[:12])
+        directory = ROOT / "data" / ("local-player-validation-" + uuid.uuid4().hex[:12])
         directory.mkdir()
-        first = child(directory / 'player-a')
-        assert first['passed'], first
-        second = child(directory / 'player-a')
-        assert second == first, 'Local player changed between processes'
-        other = child(directory / 'player-b')
-        assert other['passed'] and other['user_id'] != first['user_id']
-        assert other['game_account_id'] != first['game_account_id']
-        assert other['name'] != first['name']
-        renamed = child(directory / 'player-a', 'LocalTest-' + uuid.uuid4().hex[:12])
-        assert renamed['passed']
-        for field in ('user_id', 'game_account_id', 'fingerprint', 'file_sha256'):
-            assert renamed[field] == first[field], 'Rename changed player identity'
-        pending = directory / 'pending-recovery/ReplayDW'
+        first = child(directory / "player-a")
+        assert first["passed"], first
+        second = child(directory / "player-a")
+        assert second == first, "Local player changed between processes"
+        other = child(directory / "player-b")
+        assert other["passed"] and other["user_id"] != first["user_id"]
+        assert other["game_account_id"] != first["game_account_id"]
+        assert other["name"] != first["name"]
+        renamed = child(directory / "player-a", "LocalTest-" + uuid.uuid4().hex[:12])
+        assert renamed["passed"]
+        for field in ("user_id", "game_account_id", "fingerprint", "file_sha256"):
+            assert renamed[field] == first[field], "Rename changed player identity"
+        pending = directory / "pending-recovery/ReplayDW"
         pending.mkdir(parents=True)
-        shutil.copy2(directory / 'player-a/ReplayDW/player-identity.bin',
-                     pending / 'player-identity.creating')
+        shutil.copy2(
+            directory / "player-a/ReplayDW/player-identity.bin",
+            pending / "player-identity.creating",
+        )
         recovered = child(pending.parent, public_only=True)
-        assert recovered['passed'] and recovered['fingerprint'] == first['fingerprint']
-        assert recovered['file_sha256'] == first['file_sha256']
-        corrupt = directory / 'corrupt/ReplayDW'
+        assert recovered["passed"] and recovered["fingerprint"] == first["fingerprint"]
+        assert recovered["file_sha256"] == first["file_sha256"]
+        corrupt = directory / "corrupt/ReplayDW"
         corrupt.mkdir(parents=True)
-        bad = corrupt / 'player-identity.bin'
-        bad.write_bytes(b'invalid-local-profile')
+        bad = corrupt / "player-identity.bin"
+        bad.write_bytes(b"invalid-local-profile")
         original = digest(bad)
         refused = child(corrupt.parent, public_only=True)
-        assert not refused['passed'] and digest(bad) == original
-        evidence = {'schema': 1, 'passed': True, 'directory': str(directory),
-                    'first': first, 'other': other, 'renamed': renamed,
-                    'new_process_persistence': True, 'distinct_players': True,
-                    'rename_preserves_identity': True, 'interrupted_write_recovered': True,
-                    'corrupt_identity_preserved_and_rejected': True,
-                    'backend_restart_persistence': False}
-        receipt_path = directory / 'proof.json'
+        assert not refused["passed"] and digest(bad) == original
+        assert refused["error"] == "local-identity-record-format", refused
+        locked = directory / "player-a/ReplayDW/player-identity.lock"
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = (
+            ctypes.c_wchar_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+        )
+        kernel.CreateFileW.restype = ctypes.c_void_p
+        kernel.CloseHandle.argtypes = (ctypes.c_void_p,)
+        lock = kernel.CreateFileW(str(locked), 0x40000000, 0, None, 4, 0x80, None)
+        assert lock != ctypes.c_void_p(-1).value
+        try:
+            busy = child(directory / "player-a", public_only=True)
+            assert (
+                not busy["passed"] and busy["error"] == "local-identity-lock:0x00000020"
+            ), busy
+            assert (
+                digest(directory / "player-a/ReplayDW/player-identity.bin")
+                == first["file_sha256"]
+            )
+        finally:
+            kernel.CloseHandle(lock)
+        assert child(directory / "player-a", public_only=True)["passed"]
+        # Valid record framing, damaged DPAPI ciphertext: do not regenerate it.
+        damaged = directory / "damaged-dpapi/ReplayDW"
+        damaged.mkdir(parents=True)
+        protected = bytearray(
+            (directory / "player-a/ReplayDW/player-identity.bin").read_bytes()
+        )
+        protected[-1] ^= 1
+        damaged_file = damaged / "player-identity.bin"
+        damaged_file.write_bytes(protected)
+        dpapi = child(damaged.parent, public_only=True)
+        assert not dpapi["passed"] and dpapi["error"].startswith(
+            "local-identity-dpapi-decrypt:"
+        ), dpapi
+        assert damaged_file.read_bytes() == protected
+        for invalid in ("#bad", "%bad", " leading", "trailing ", "x" * 36):
+            invalid_name = child(directory / "player-a", invalid)
+            assert (
+                not invalid_name["passed"]
+                and invalid_name["error"] == "local-identity-player-name"
+            ), invalid_name
+            assert (
+                digest(directory / "player-a/ReplayDW/player-identity.bin")
+                == first["file_sha256"]
+            )
+        evidence = {
+            "schema": 1,
+            "passed": True,
+            "directory": str(directory),
+            "first": first,
+            "other": other,
+            "renamed": renamed,
+            "new_process_persistence": True,
+            "distinct_players": True,
+            "rename_preserves_identity": True,
+            "interrupted_write_recovered": True,
+            "corrupt_identity_preserved_and_rejected": True,
+            "precise_identity_failure_stages": True,
+            "lock_contention_preserves_identity": True,
+            "damaged_dpapi_preserved_and_rejected": True,
+            "invalid_names_preserve_identity": True,
+            "backend_restart_persistence": False,
+        }
+        receipt_path = directory / "proof.json"
     if args.legacy_name:
-        directory = Path(evidence['directory'])
-        migrated = child(directory / 'player-b', args.legacy_name)
-        assert migrated['passed'] and migrated['user_id'] == evidence['other']['user_id']
-        duplicate = child(directory / 'player-a', args.legacy_name)
-        assert not duplicate['passed'], 'Duplicate machine-owned name accepted'
-        restored = child(directory / 'player-b', evidence['other']['name'])
-        assert restored == evidence['other']
-        evidence['legacy_names_do_not_block_machine_players'] = True
-        evidence['duplicate_machine_names_rejected'] = True
-    evidence['server_sha256'] = digest(ROOT / 'build/Release/iw8-dw-server.exe')
-    evidence['client_dll_sha256'] = digest(DLL)
-    evidence['identity_source_sha256'] = digest(ROOT / 'integration/replay/DW_LocalIdentity.cpp')
-    receipt_path.write_text(json.dumps(evidence, indent=2) + '\n')
-    (ROOT / 'data/local-player-verification.json').write_text(json.dumps(evidence, indent=2) + '\n')
-    print('PASS: local identity, registration, persistence and rejection checks; proof:', receipt_path)
+        directory = Path(evidence["directory"])
+        migrated = child(directory / "player-b", args.legacy_name)
+        assert (
+            migrated["passed"] and migrated["user_id"] == evidence["other"]["user_id"]
+        )
+        duplicate = child(directory / "player-a", args.legacy_name)
+        assert not duplicate["passed"], "Duplicate machine-owned name accepted"
+        restored = child(directory / "player-b", evidence["other"]["name"])
+        assert restored == evidence["other"]
+        evidence["legacy_names_do_not_block_machine_players"] = True
+        evidence["duplicate_machine_names_rejected"] = True
+    evidence["server_sha256"] = digest(ROOT / "build/Release/iw8-dw-server.exe")
+    evidence["client_dll_sha256"] = digest(DLL)
+    evidence["identity_source_sha256"] = digest(
+        ROOT / "integration/replay/DW_LocalIdentity.cpp"
+    )
+    receipt_path.write_text(json.dumps(evidence, indent=2) + "\n")
+    (ROOT / "data/local-player-verification.json").write_text(
+        json.dumps(evidence, indent=2) + "\n"
+    )
+    print(
+        "PASS: local identity, registration, persistence and rejection checks; proof:",
+        receipt_path,
+    )

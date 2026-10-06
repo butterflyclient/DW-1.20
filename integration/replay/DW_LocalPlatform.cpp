@@ -23,6 +23,12 @@ extern "C"
     void func_141614830(void *);                     // dwLogOnHSM_base::HSM_Update (event queue)
     void func_1417EC990(unsigned);                   // native retry/backoff-aware logon request
     int func_1417EC930(unsigned);                    // dwGetLogOnStatus
+    void func_1412BD8F0();                           // NET_OnlineTransition
+    bool func_1412BD840();                           // NET_IsOffline
+    bool func_1412BD890();                           // NET_IsStartFailed
+    bool func_1412BD8A0();                           // NET_IsStarted
+    void func_1412C0140(void *);                     // same-Replay NetRelay::Reset (one argument)
+    extern void *s_instance_1;                       // native NetRelay singleton
     extern unsigned char gl_14C3851A0[], g_dwLogonHSMs[];
     extern dvar_t *DVARBOOL_online_signout_on_dw_disconnect_cleanup;
     DWPlatformAuth *func_141660280();
@@ -39,7 +45,7 @@ extern "C"
     unsigned Sys_Milliseconds();
     void func_1410C88F0(unsigned char, bool); // native Com_GameMode_SetDesiredGameMode
     void func_140D66AC0(int, int); // native CL_Mgr_ActivateClient, including notifications
-    void *func_141B371E0(); // Online_Friends::GetInstance
+    void *func_141B371E0();        // Online_Friends::GetInstance
     uint8_t func_140F54AE0(void *, unsigned, const char *, uint8_t);
     DWPlatformString *func_14038BAD0(DWPlatformString *, const char *, uint64_t);
     void func_1420F9380(void *, const char *);
@@ -54,7 +60,7 @@ extern "C"
     void func_141B95F20(int, unsigned); // native Social online-status change/delay
     uint8_t LUI_BeginEvent(unsigned, const char *, void *);
     uint64_t func_1419CE4F0(const char *, uint64_t, void *); // LuaShared_SetTableInt
-    uint64_t func_1419BDA00(void *); // native LUI_EndEvent
+    uint64_t func_1419BDA00(void *);                         // native LUI_EndEvent
     extern void *gl_151868880;
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
     __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
@@ -78,7 +84,7 @@ namespace
         0; // 0 idle, 1 pending, 2 signed provider response verified, 3 failed/expired
     DWLocalPlatformReply s_reply{};
     bool s_registered = false;
-    unsigned s_onlineStatus = 2; // Same-Replay: 1 Away, 2 Online, 3 Busy, 4 Offline.
+    unsigned s_onlineStatus = 2;    // Same-Replay: 1 Away, 2 Online, 3 Busy, 4 Offline.
     bool s_identityApplied = false; // engine thread only; native auth state alone is insufficient
     bool s_refreshIdentityHeld = false; // DW refresh must not sign out the local platform user
     cmd_function_s s_statusCommand{};
@@ -356,16 +362,28 @@ namespace
     {
         uint8_t nonce[32]{};
         DWLocalPlatformReply reply{};
-        const bool ok =
-            DW_LocalPlatform_MakeNonce(nonce) &&
-            DW_LocalIdentity_Login(
-                DW_LocalConfig_PlayerName(), nonce, &reply, DW_LocalPlatform_Post) &&
-            DW_LocalPlatform_VerifyReply(&reply, nonce, DW_LocalPlatform_Time()) &&
-            DW_LocalResource_Fetch();
+        bool ok = DW_LocalPlatform_MakeNonce(nonce);
+        const char *failure = "windows-platform-nonce";
+        if (ok)
+        {
+            ok = DW_LocalIdentity_Login(
+                DW_LocalConfig_PlayerName(), nonce, &reply, DW_LocalPlatform_Post);
+            failure = DW_LocalIdentity_Error();
+        }
+        if (ok)
+        {
+            ok = DW_LocalPlatform_VerifyReply(&reply, nonce, DW_LocalPlatform_Time());
+            failure = "server-platform-reply-signature-or-expiry";
+        }
+        if (ok)
+        {
+            ok = DW_LocalResource_Fetch();
+            failure = "server-platform-resource";
+        }
         if (ok)
             s_reply = reply;
         else
-            Log(DW_LocalIdentity_Error());
+            Log(failure);
         // The worker publishes data only. Native game objects are touched on the
         // engine thread after this release/acquire boundary.
         __atomic_store_n(&s_state, ok ? 2U : 3U, __ATOMIC_RELEASE);
@@ -390,12 +408,10 @@ namespace
         // Set it before the profile callbacks; this affects only this process.
         using SetEnvironment = int(__stdcall *)(const char *, const char *);
         auto library = LoadLibraryA("kernel32.dll");
-        auto setEnvironment = library
-                                  ? reinterpret_cast<SetEnvironment>(
-                                        GetProcAddress(library, "SetEnvironmentVariableA"))
-                                  : nullptr;
-        const bool localProfile =
-            setEnvironment && setEnvironment("CODPC_NOCLOUD_SYNC", "1");
+        auto setEnvironment = library ? reinterpret_cast<SetEnvironment>(
+                                            GetProcAddress(library, "SetEnvironmentVariableA"))
+                                      : nullptr;
+        const bool localProfile = setEnvironment && setEnvironment("CODPC_NOCLOUD_SYNC", "1");
         if (library)
             FreeLibrary(library);
         if (!localProfile)
@@ -586,10 +602,20 @@ extern "C" bool DW_LocalPlatform_RestartFrame()
         // (offline); drain both before another frame can submit a login task.
         func_1417ECE20(g_dwLogonHSMs);
         func_141614830(g_dwLogonHSMs);
-        // Live_DemonwareDisconnected also calls NET_OfflineTransition. This
-        // operation restarts DW, not the platform/network or active UI client.
+        // A server-side disconnect can already have queued NET_OfflineTransition.
+        // Restore networking through its native lifecycle after fresh credentials
+        // are ready; retaining the platform identity does not retain NET mode.
         func_1414F2FB0(0);
         func_141051630(gl_14C3851A0, 0);
+        // Relay credentials belong to the old DW session, even while native NET
+        // remains online. Same-Replay Reset clears the SDK result through its
+        // virtual assignment, auth state/expiry and retry timer. Native sign-out
+        // above has cancelled the old tasks before this main-thread reset.
+        if (s_instance_1)
+        {
+            func_1412C0140(s_instance_1);
+            Log("DW_RESTART_RELAY_RESET native cached relay credential and retry state reset");
+        }
         DW_LocalResource_Reset();
         s_reply = {};
         auto *auth = func_141660280();
@@ -635,19 +661,34 @@ extern "C" bool DW_LocalPlatform_RestartFrame()
     else if (s_restartPhase == RestartPhase::Authenticate && Valid() && s_identityApplied)
     {
         s_restartPhase = RestartPhase::Reconnect;
+        // Same operation as Live_OnlineServicesFence_Activate. The native routine
+        // is a no-op when already online, otherwise it owns socket reset/start,
+        // local-address initialization, relay/QoS and fence reevaluation.
+        func_1412BD8F0();
         if (func_1417EC930(0) == 0)
             func_1417EC990(0);
         Log("DW_RESTART_RECONNECT fresh identity applied; waiting for native DW lobby "
             "authentication");
     }
-    else if (s_restartPhase == RestartPhase::Reconnect && func_1417EC930(0) == 2)
+    else if (s_restartPhase == RestartPhase::Reconnect && func_1412BD890())
+    {
+        Log("DW_RESTART_FAILED native network startup failed; native failure state retained");
+        Com_Printf(25,
+                   "[DW RESTART] Network startup failed. Check network/backend availability, "
+                   "then retry dw_restart.\n");
+        s_restartPhase = RestartPhase::Idle;
+    }
+    else if (s_restartPhase == RestartPhase::Reconnect && func_1417EC930(0) == 2 &&
+             func_1412BD8A0() && !func_1412BD840())
     {
         s_refreshIdentityHeld = false;
         s_restartPhase = RestartPhase::Idle;
-        Log("DW_RESTART_CONNECTED native DW login/lobby reconnected; online domains continue their "
+        Log("DW_RESTART_CONNECTED native DW login/lobby and online networking reconnected; online "
+            "domains continue their "
             "native initialization");
         Com_Printf(25,
-                   "[DW RESTART] Native DW lobby reconnected. Online services are reinitializing "
+                   "[DW RESTART] Native DW lobby and networking reconnected. Online services are "
+                   "reinitializing "
                    "normally.\n");
     }
     return false;
@@ -972,7 +1013,7 @@ namespace
             return 4;
         return values[2] ? 1 : values[3] ? 3 : 2;
     }
-}
+} // namespace
 
 // Keep the native UI and rich-presence callers; replace their first-party
 // boundary because the launcher cache is not populated by the local provider.
@@ -999,8 +1040,11 @@ extern "C" uint8_t func_140C88C10(unsigned status)
     {
         const uint32_t fields[]{5, 7, 8};
         for (unsigned index = 0; index < 3; ++index)
-            func_14166F3D0(func_141670560(), &fields[index],
-                          status == (index == 0 ? 1U : index == 1 ? 3U : 4U));
+            func_14166F3D0(func_141670560(),
+                           &fields[index],
+                           status == (index == 0   ? 1U
+                                      : index == 1 ? 3U
+                                                   : 4U));
     }
     // Preserve both native effects of the setter: schedule Social's normal
     // update and notify the menu. Its next presence update reads the same state.

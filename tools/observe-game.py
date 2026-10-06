@@ -1202,6 +1202,14 @@ try:
                 read(symbols["s_clientControllerMap"], 4 * client_map_count),
             ),
         },
+        # Replay's NET_IsOffline/IsStarted/IsStartFailed getters read these
+        # linked globals. Mode 1 is online, mode 2 offline; states 2..4
+        # are started and state 5/error 3 is terminal startup failure.
+        "native_network": {
+            "mode": struct.unpack("<I", read(symbols["g_dwNetMode"], 4))[0],
+            "state": struct.unpack("<I", read(symbols["gl_14E6BDA40"], 4))[0],
+            "error": struct.unpack("<I", read(symbols["g_dwNetError"], 4))[0],
+        },
         "native_dcqos": {
             "state": struct.unpack("<I", read(symbols["gl_14B7B57A0"], 4))[0],
             "requested": read(symbols["gl_14B7B57A4"], 1)[0],
