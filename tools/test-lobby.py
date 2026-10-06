@@ -2965,6 +2965,11 @@ try:
             base64.b64decode(peer_auth["client_ticket"])[97:121],
         )
     )
+    import username_fixtures
+
+    username_fixtures.exercise(
+        client, title, user, peer_user, native_rest, rest_response, blob, checks
+    )
     peer_client.task(58, 6, content_fixture["post"], error=101)
     import lobby_join_fixtures
 

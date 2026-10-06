@@ -6,6 +6,7 @@
 #include "regulation_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
+#include <set>
 
 namespace services
 {
@@ -98,16 +99,23 @@ namespace services
             proto::Field f;
             bool parameters = false;
             unsigned headers = 0, accepts = 0;
+            std::set<uint32_t> scalars;
             while (reader.next(f))
             {
+                if (f.tag == 2 || f.tag == 10 || f.tag == 11 || f.tag == 101 || f.tag == 302)
+                    wire::require(scalars.insert(f.tag).second);
                 if (f.tag == 1)
                 {
                     wire::require(f.type == 2 && !parameters);
                     parameters = true;
                     proto::Reader nested{f.bytes};
                     proto::Field n;
+                    std::set<uint32_t> fields;
                     while (nested.next(n))
                     {
+                        if (n.tag == 1 || n.tag == 2 || n.tag == 3 || n.tag == 100 ||
+                            n.tag == 200 || n.tag == 300 || n.tag == 301)
+                            wire::require(fields.insert(n.tag).second);
                         if (n.tag == 1 || n.tag == 2)
                             wire::require(n.type == 0 && n.value <= 1);
                         else if (n.tag == 3 || n.tag == 100)
@@ -142,9 +150,13 @@ namespace services
                     wire::require(f.type == 2 && ++headers <= 32);
                     proto::Reader header{f.bytes};
                     proto::Field h;
+                    std::set<uint32_t> fields;
                     while (header.next(h))
                         if (h.tag == 1 || h.tag == 2)
+                        {
+                            wire::require(fields.insert(h.tag).second);
                             (void)textField(h, h.tag == 1 ? 64 : 4096);
+                        }
                 }
             }
             wire::require(parameters && !out.uri.empty() && out.accept >= 1 && out.accept <= 3);

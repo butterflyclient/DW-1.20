@@ -117,6 +117,68 @@ GAPS["145"] += (
     "disconnect timeouts remain unverified/unimplemented."
 )
 
+GAPS["255"] += (
+    " Bulk username hydration has a target-bound 200-record reader, exact numeric-title "
+    "query contract and registered UNO/Battle.net aliases; malformed/oversized requests "
+    "and duplicate REST singleton fields are rejected. Repeated SDK fields remain valid. "
+    "Native username-resolver task completion is still a separate unverified scope."
+)
+
+
+# Dedicated domain handlers only. A configured GET publication is not equivalent
+# to an implemented authenticated account/objectstore mutation.
+REST_HANDLERS = {
+    ("umbrella", "UserResource", "usernamesearch"): "social_services.cpp",
+    ("presence", "UserPresence", "set_user_presence"): "social_services.cpp",
+    ("social-service", "UsersPresence", "get_users_presence"): "social_services.cpp",
+    ("presence", "UsersPresence", "subscribe_to_users"): "social_services.cpp",
+    ("presence", "UsersPresence", "unsubscribe_from_users"): "social_services.cpp",
+    ("friends", "Friends", "invite_friend"): "social_services.cpp",
+    ("social-service", "Friends", "get_pending_friend_requests"): "social_services.cpp",
+    ("friends", "Friends", "reject_friend_request"): "social_services.cpp",
+    ("social-service", "Friends", "get_friends"): "social_services.cpp",
+    ("userlists", "UserLists", "create_user_list"): "social_services.cpp",
+    (
+        "userlists",
+        "UserLists",
+        "add_or_update_users_in_user_list",
+    ): "social_services.cpp",
+    ("userlists", "UserLists", "remove_users_from_user_list"): "social_services.cpp",
+    ("social-service", "UserLists", "get_user_list"): "social_services.cpp",
+    ("umbrella", "Regulations", "fetchRegulations"): "regulation_services.cpp",
+    ("umbrella", "Regulations", "setUserPreference"): "regulation_services.cpp",
+    ("umbrella", "Regulations", "getUserPreference"): "regulation_services.cpp",
+    ("social-service", "Users", "get_usernames"): "social_services.cpp",
+}
+
+
+def rest_coverage(inventory):
+    requests = []
+    for original in inventory["requests"]:
+        row = dict(original)
+        bound = (
+            row["service_operation_binding_resolved"]
+            and len(row["services"]) == 1
+            and len(row["resource_operations"]) == 1
+        )
+        handler = (
+            REST_HANDLERS.get((row["services"][0], *row["resource_operations"][0]))
+            if bound
+            else None
+        )
+        row.update(
+            dedicated_domain_handler=(bool(handler) if bound else None),
+            handler_source=("src/" + handler if handler else None),
+            current_native_method_completion_verified=False,
+            coverage_scope=(
+                "Dedicated handler registration; native callback evidence is separate"
+                if bound
+                else "Dynamic/helper service binding remains unresolved"
+            ),
+        )
+        requests.append(row)
+    return requests
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -277,6 +339,7 @@ def main():
             channel_path, channel_proof = path, proof
     rest_path = DATA / "native-rest-callgraph.json"
     rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
+    rest_requests = rest_coverage(rest_inventory) if rest_inventory else []
     if rest_inventory:
         if rest_inventory["inventory_tool_sha256"] != digest(
             ROOT / "tools/inventory-native-rest.py"
@@ -406,7 +469,20 @@ def main():
                 sha256=digest(rest_path),
                 target_image_sha256=rest_inventory["target_image_sha256"],
                 exported_functions=rest_inventory["exported_functions"],
-                requests=rest_inventory["requests"],
+                requests=rest_requests,
+                counts=dict(
+                    containing_functions=len(rest_requests),
+                    dedicated_domain_handlers=sum(
+                        row["dedicated_domain_handler"] is True for row in rest_requests
+                    ),
+                    known_literal_bindings_without_handler=sum(
+                        row["dedicated_domain_handler"] is False
+                        for row in rest_requests
+                    ),
+                    unresolved_dynamic_or_helper_bindings=sum(
+                        row["dedicated_domain_handler"] is None for row in rest_requests
+                    ),
+                ),
                 unresolved=rest_inventory["unresolved"],
                 full_rest_audit_complete=False,
                 native_response_verified=False,
@@ -449,7 +525,8 @@ def main():
             dict(
                 domain="REST friends, presence and user lists",
                 sources=["src/social_services.cpp", "src/rest_services.cpp"],
-                gaps="Other native REST resources must be recovered individually",
+                gaps="Bulk username hydration now implements the exact Replay DTO, 200-user capacity, registered-provider aliases and signed title scope. Its response vtable was verified from native resolver allocation; per-method live username-resolver completion remains open. Other native REST resources must be recovered individually",
+                target_layout_receipt="validation/20261006-username-target-layout.json",
             ),
             dict(
                 domain="REST regulation publications and owned preferences",
@@ -517,11 +594,13 @@ def main():
             "",
             "Exact-target direct REST request inventory (response semantics remain separate):",
         ]
-        for request in rest_inventory["requests"]:
+        for request in rest_requests:
             text.append(
                 f'  0x{request["function_address"]:X} {request["function"]}: '
                 f'services={request["services"]}; resource/operations={request["resource_operations"]}; '
-                f'literal binding resolved={request["service_operation_binding_resolved"]}'
+                f'literal binding resolved={request["service_operation_binding_resolved"]}; '
+                f'dedicated handler={request["dedicated_domain_handler"]}; '
+                f'current native method completion={request["current_native_method_completion_verified"]}'
             )
     (DATA / "backend-coverage-inventory.txt").write_text("\n".join(text) + "\n")
     print(json.dumps(inventory["counts"]))

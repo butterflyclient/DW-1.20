@@ -464,6 +464,52 @@ namespace services
             return response(r, "cross-platform-username-search", 200, Json{{"users", users}});
         }
 
+        Reply usernames(const platform::LobbyIdentity &id, const RESTRequest &r, const URI &route)
+        {
+            // Replay 0x1421479B0 emits GET /v1/users/ with four query fields.
+            // Its real response vtable at 0x1424256B0 selects 0x142147CC0,
+            // which reads at most 200 userID/accountType/username records.
+            wire::require(r.method == get && !r.hasBody &&
+                          route.path == std::vector<std::string>{"v1", "users"} &&
+                          route.query.size() == 4 && route.query.contains("users") &&
+                          !query(route, "client").empty() && query(route, "client").size() < 64 &&
+                          decimal(query(route, "context"), UINT32_MAX) == id.titleId &&
+                          decimal(query(route, "titleID"), UINT32_MAX) == id.titleId);
+            const auto requestedUsers = query(route, "users");
+            wire::require(!requestedUsers.empty() && requestedUsers.size() < 4096);
+            Json users = Json::array();
+            size_t position = 0, count = 0;
+            while (position < requestedUsers.size())
+            {
+                const auto end = requestedUsers.find(',', position);
+                const auto entry = requestedUsers.substr(
+                    position, end == std::string::npos ? end : end - position);
+                const auto separator = entry.find('-');
+                wire::require(++count <= 200 && separator != std::string::npos && separator > 0 &&
+                              separator < 10);
+                const auto type = entry.substr(0, separator);
+                for (const char c : type)
+                    wire::require((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_');
+                const auto user = decimal(entry.substr(separator + 1));
+                wire::require(user > 0 && user != UINT64_MAX);
+                // Both registered providers carry the same machine-owned universal ID.
+                // Preserve the requested provider and order so native resolvers can
+                // match the result. Unknown accounts/providers do not invent names.
+                if (type == "uno" || type == "bnet")
+                    if (const auto name = platform::accountName(user))
+                    {
+                        wire::require(!name->empty() && name->size() < 64);
+                        users.push_back(Json{
+                            {"userID", user}, {"accountType", type}, {"username", *name + "#0"}});
+                    }
+                if (end == std::string::npos)
+                    break;
+                position = end + 1;
+                wire::require(position < requestedUsers.size());
+            }
+            return response(r, "cross-platform-usernames", 200, Json{{"users", users}});
+        }
+
         Reply friends(const std::filesystem::path &root,
                       const platform::LobbyIdentity &id,
                       const RESTRequest &r,
@@ -978,11 +1024,15 @@ namespace services
                r.operation == "unsubscribe_from_users")));
         const bool isSearch = r.service == "umbrella" && r.resource == "UserResource" &&
                               r.operation == "usernamesearch";
-        if (!isList && !isFriend && !isPresence && !isSearch)
+        const bool isUsernames = r.service == "social-service" && r.resource == "Users" &&
+                                 r.operation == "get_usernames";
+        if (!isList && !isFriend && !isPresence && !isSearch && !isUsernames)
             return std::nullopt;
         const auto route = uri(r.uri);
         if (isSearch)
             return usernameSearch(r, route);
+        if (isUsernames)
+            return usernames(id, r, route);
         const auto context = query(route, "context", "iw8");
         wire::require(!context.empty() && context.size() < 16);
         if (const auto title = query(route, "titleID"); !title.empty())

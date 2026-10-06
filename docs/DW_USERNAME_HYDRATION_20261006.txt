@@ -1,0 +1,96 @@
+REPLAY DW BULK USERNAME HYDRATION - 2026-10-06
+
+Issue
+Replay's Users/get_usernames REST operation had no domain handler. The existing
+UserResource/usernamesearch handler uses a different request and response DTO.
+REST singleton fields could also be duplicated to replace routing values.
+
+Exact target research
+Untouched Replay SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+Request constructor 0x142147870 installs vtable 0x1426A3CF8. Its slot 1 selects
+0x1421479B0, which emits GET /v1/users/ for social-service / Users / get_usernames.
+Query fields: context (numeric authenticated title), client, titleID and users.
+0x142152290 encodes each account as accountType-ID, with comma separators.
+The encoded list has a 4096-byte buffer; the whole REST URI is separately bounded.
+
+Native engine resolvers 0x14107E460 and 0x141B37DE0 allocate 28848-byte responses,
+install vtable 0x1424256B0 and initialize 200 user-details records. Slot 1 selects
+0x142147CC0. Its JSON reader requires users[], UInt64 userID, accountType (capacity
+10 including NUL) and username (capacity 97). Records start at +40, stride 144;
+the count is at +28840 and must remain <=200. 0x141B375F0 feeds the bulk resolver
+for native platform-friend names. The UI single-user resolver shares this DTO.
+
+The SQLite alias for the response deleting destructor at 0x14217C2A0 was rejected:
+its actual table is 0x1426AA938 and its deletion size is 0x240. It cannot define
+this response. The proof records original byte hashes, bound vtable slots and
+request/reader literals; database display names remain candidate aliases.
+
+Implementation
+src/social_services.cpp returns only registered machine/legacy diagnostic
+accounts, with their current display name and native #0 suffix. Requested UNO
+and Battle.net provider labels and request order, including repeated accounts,
+are preserved. Unknown accounts or unregistered providers return no invented
+names. Reads create no profile, relationship or state file.
+
+Method/body/path, exact query fields, title/context, printable URI encoding,
+account IDs, provider size, 200-user count and the native URI limit are checked.
+The existing encrypted REST response wrapper carries the complete DTO.
+
+src/rest_services.cpp now rejects duplicate recognized scalar routing/parameter
+fields and duplicate key/value fields inside one header record. Repeated Accept
+and header records, plus unknown extension fields, retain their SDK semantics.
+
+Boundary finding
+200 full-length player IDs cannot fit in Replay's 4 KiB whole-URI budget. The
+initial new fixture incorrectly expected that request to succeed; the backend
+correctly returned malformed parameters. The corrected cases separately cover
+a large positive result, 200 short unknown IDs, 201 short IDs and URI overflow.
+
+Proof scope
+validation/20261006-username-target-layout.json proves exact target bindings.
+tools/research-username-target.py reproduces the audit without modifying the
+original EXE or continuously growing database.
+tools/username_fixtures.py adds encrypted-client DTO/scope/envelope coverage.
+The live username-resolver task/callback remains a separate, unverified gate;
+native startup/chat/reconnect evidence must not be called bulk-name proof.
+Full backend and two-network multiplayer completion remain open.
+
+Build and protocol result
+Release backend compiled with MSVC /W4 /WX; all 78 C++ files passed formatting.
+Current backend SHA256:
+74ccca38c956651299a44c7e4b05365319de6cd1ef5c58885f80e0fec0c7dfa1
+The unchanged root-folder game SHA256 is:
+b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+260 independent encrypted protocol/service groups and signed platform/auth/
+resource verification passed. The new three groups are retained in
+validation/20261006-username-wire.json, with source/target hashes.
+
+An existing tournament failure fixture exposed a second race: it published a
+map policy before creating its pending-file blocker, allowing an idle backend
+reader to legitimately persist the revision first. The fixture now installs
+the blocker before publication and cleans its own blocker on failure. Backend
+persistence code did not change for this fixture correction.
+
+The coverage ledger now lists dedicated handlers for the recovered REST route
+bindings. Generic configured GET responses do not count as domain handlers;
+dynamic/helper bindings stay unknown, and native method completion is separate.
+
+Focused native compatibility result
+Native root-folder startup reached profile/Online state and all 27 passing
+fences, with three completed empty friend lists. The game's own private-party
+chat received the peer's first incoming message and cleaned only its membership.
+Separate backend stop/start and dw_restart retained the same game process and
+account, renewed relay credentials and established a native relay matched to
+the backend UDP event. The first-message check passed after reconnect as well.
+The relay remained stable for 95.5 seconds, with ten keepalives and no rejected
+packets. These checks prove compatibility with existing native consumers; they
+do not promote the bulk-name endpoint to a live resolver callback proof.
+
+Native receipts:
+validation/20261006-username-channel-native-message.json
+validation/20261006-username-channel-native-message-after-restart.json
+validation/20261006-username-native-reconnect.json
+The game closed normally. EXE, INI and existing machine identity hashes matched
+their pre-launch values. Owned test controls were removed. The verified server
+remains running. No map/match test, new external port or game rebuild was needed.

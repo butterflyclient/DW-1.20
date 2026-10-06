@@ -116,7 +116,14 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             assert index["lobbies"][str(member)] == lobby_id
         return state
 
+    blocker = revision_path.with_suffix(revision_path.suffix + ".pending")
+    blocker_created = False
     try:
+        # Install the fault before making the policy visible to idle readers.
+        # Publishing first races the backend's legitimate revision commit.
+        root.mkdir(parents=True, exist_ok=True)
+        blocker.mkdir()
+        blocker_created = True
         publish(map_path, map_policy)
         publish(policy_path, enabled_policy)
         publish(
@@ -132,13 +139,12 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
                     ).read_bytes()
                 )
                 # No response is published until the revision receipt is durable.
-                blocker = revision_path.with_suffix(revision_path.suffix + ".pending")
-                blocker.mkdir()
                 try:
                     connection.task(95, 1, text("") + text("general"), error=102)
                     assert not revision_path.exists()
                 finally:
                     blocker.rmdir()
+                    blocker_created = False
                 variables = connection.task(95, 1, text("") + text("general"))
                 assert variables[:6] == b"\x06\x01\0\x06\x49\0"
                 assert variables[6:16] == text("general") + b"\x10"
@@ -369,6 +375,8 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             directory, title, clients, publication, bracket, helpers, publish, checks
         )
     finally:
+        if blocker_created:
+            blocker.rmdir()
         for _, connection in clients:
             connection.close()
         for path, content in originals.items():

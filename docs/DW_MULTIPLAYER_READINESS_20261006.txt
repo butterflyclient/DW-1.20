@@ -1,6 +1,47 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - NATIVE CHANNEL MEMBERSHIP
+CURRENT BACKEND - BULK USERNAME HYDRATION AND REST ROUTING
+Backend SHA256: 74ccca38c956651299a44c7e4b05365319de6cd1ef5c58885f80e0fec0c7dfa1
+Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+This backend-only pass requires no game recompile or new client package.
+
+Implemented social-service / Users / get_usernames from Replay's actual request
+and engine-created response vtables. It returns registered names, preserves
+requested account providers/order, enforces title/context and native count/URI
+limits, and creates no identities or friendships. Recognized REST singleton
+fields reject duplicates; SDK repeated accepts/headers remain compatible.
+The exact target bindings and 260 passing encrypted protocol/service groups
+are retained in validation/20261006-username-target-layout.json and
+validation/20261006-username-wire.json. Release /W4 /WX, formatting and signed
+platform/auth/resource checks passed. Existing test-boundary/race defects were
+corrected in fixtures; they required no backend persistence workaround.
+
+Actual root-folder game validation passed profile/Online state, all 27 fences
+and three completed empty friend lists. Its private-party channel retained the
+diagnostic peer's first incoming message before and after separate backend
+stop/start plus dw_restart. The same game process and account recovered a fresh
+relay whose native verification data matched the backend's real UDP event.
+Stability after reconnect: 95.5 seconds, ten keepalive replies, zero rejected
+packets. No map/match test was run. The game closed normally, owned test controls
+were removed, and game/INI/existing identity hashes were preserved. The verified
+backend remains running; no new external ports or human profiles were created.
+
+Current native receipts:
+validation/20261006-username-channel-native-message.json
+validation/20261006-username-channel-native-message-after-restart.json
+validation/20261006-username-native-reconnect.json
+Implementation/provenance: docs/DW_USERNAME_HYDRATION_20261006.txt.
+
+Coverage remains incomplete: 140 reviewed binary routes, 134 handlers and six
+known missing result bindings. The direct REST inventory now separately records
+17 dedicated handlers, five known literal bindings without handlers, and seven
+unresolved dynamic/helper bindings. Indirect/inlined REST paths are not a full
+inventory. Bulk-name and regulation native task completion, native multiparty
+JOIN/DATA/gameplay, profile-isolated two-game validation and other ledger gates
+remain open. Passing startup/chat/reconnect is not a complete backend claim.
+Earlier sections below retain evidence for their original artifact hashes.
+
+RETAINED BACKEND ADDENDUM - NATIVE CHANNEL MEMBERSHIP
 Backend SHA256: 0348f5747a4b48ef0167b70269bfb9bc885f5f715e7a6746e64fcb91e14dd111
 Game SHA256 remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
 This is backend-only; the unchanged game/client package needs no redistribution.
