@@ -1,0 +1,87 @@
+REPLAY DW SAME-SERVER RELAY RESTART - 2026-10-06
+
+Observed issue
+Two controlled dw_restart runs against a still-running backend completed native
+DW lobby login and profile/social initialization, but left relay auth state zero
+and relay transport idle. Eighteen fences passed; RELAY and its dependents waited.
+Stopping and starting the backend before dw_restart recovered all 27 fences and
+a fresh authenticated UDP association. This occurred with the unchanged b326981a
+game while the AB backend was validated; the experiment was not required to
+recover the relay.
+
+Exact target research
+Original Reset at 0x1412C0140 calls dwRelayStop, clears state at +20, replaces the
+native auth result, clears auth state/expiry and initializes its retry timer.
+The dependency callback at 0x1412BF930 enforces native enablement, NetInit state,
+the active controller and DW network-state gates before calling Request.
+Request at 0x1412C0090 enters state 2, requests native QoS and submits the existing
+relay-token task through 0x1412BF9A0 when its cached credential is absent/expired.
+The native frame at 0x1412BFBB0 also reaches Request through retry expiry.
+Reset alone does not replay an already-met fence dependency notification.
+More importantly, original dwRelayStop at 0x1414EFC90 is XOR AL,AL / RET: it
+does not close the bound association. The callback refuses networking states
+3 (DW_NET_RELAY_STARTING) and 4 (DW_NET_RELAY_STARTED). These are not menu or
+game modes. The read-only native snapshot showed relay enabled, dependencies
+met and NetRelay idle while the DW network status remained 4.
+Native bdSocketRouter::bindToRelay at 0x14218C910 establishes the routing-layer
+offset +184. The owner/getter chain 0x1414EEBA0 -> 0x14217A520 -> 0x142196200
+leads to its borrowed bound-reference owner. SDK disconnect at 0x14219F1C0
+takes its own association mutex and established sessions call 0x1421A0AA0 to
+send authenticated packet type 10. The normal network pump handles the reply
+or bounded timeout; dwRelayDisconnected at 0x1414EFAE0 returns DW status to 2
+(DW_NET_STARTED) and notifies the existing native relay override.
+Exact original bytes and call/store evidence are recorded separately in
+validation/20261006-relay-restart-target-layout.json.
+
+Targeted client change
+Before task cancellation and credential reset, controlled restart requests an
+SDK disconnect of the old bound association under the game's NET critical
+section. It yields ordinary engine frames until the actual network-state
+callback retires the old relay. The existing drain timeout remains in effect.
+The existing controlled restart integration resumes the native dependency
+callback after actual native login and network startup. It does so only for an
+idle relay, controller-zero's actual RELAY fence and an actual dependencies-met
+value. It never writes fence flags, auth success or transport state.
+The callback keeps native enablement/controller/network checks authoritative;
+the original request, SDK task, completion callback and UDP handshake still run.
+An already-started relay receives no extra callback dispatch.
+The restart phase remains active while an idle relay's actual dependencies wait.
+It returns control to the normal engine frame, then checks again on later frames;
+the existing bounded restart timeout remains authoritative. The first compiled
+iteration checked only once at lobby-login completion and reproduced the pending
+relay, because QoS dependencies became ready later. That failed native run is
+retained under data/native-same-server-reconnect-20261006 and is not a success proof.
+The second iteration waited for dependencies but still encountered stale DW
+network status 4. It is also retained privately and not credited as a success.
+The SDK disconnect correction follows those two observations.
+
+Two explicitly named read-only headers describe the fields consumed by this
+guard. Fence header: vtable +0, controller +8, dependencies/passing/failed bytes
++12/+13/+14; 16 bytes. Relay header: vtable +0, NetInit pointer +8, callback
+registration byte +16 and state +20; 24 bytes. These are headers, not claims that
+the complete engine allocations are only 16/24 bytes. All symbols and the native
+callback are resolved by the compiler/linker; no compiled EXE patch is used.
+
+Private compilation
+build-frozen-workstation.py accepts an explicit --integration-root. The owned
+test input directory selects committed integration files plus the single
+DW_LocalPlatform.cpp restart edit. Unrelated dirty Con_Developer.cpp and the
+untracked DW_PlayerDataPath.cpp are excluded, left untouched in the owner tree.
+The existing source/object, relocation, unwind and image-verification gates
+remain required before deploy-game.ps1 installs the root-folder DW executable.
+
+Validation scopes
+The source/layout audit is static evidence. Compilation and image verification
+are a separate gate. tools/record-native-same-server-reconnect.py requires the
+same live server and game PIDs, an authenticated disconnect correlated to the
+old native association before the new establishment, one idle-relay callback
+resumption only if the native lifecycle has not already requested it, fresh native
+auth/token/association, all 27 fences, empty completed friend lists and at least
+60 seconds of authenticated relay keepalives without rejected packets.
+The proof records whether the fallback was needed, rather than assuming it ran.
+Backend verified_associations counts cumulative handshakes; active_associations
+is the live count. A successful same-server reconnect advances the former once
+and leaves the latter at one throughout the subsequent stability interval.
+No map test or claim of two-network gameplay is implied by that focused pass.
+The current multiplayer readiness addendum records actual native results and
+artifact hashes once those gates pass.

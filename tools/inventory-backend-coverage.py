@@ -99,7 +99,7 @@ GAPS = {
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
     "193": "Verified user-object PUT/read and publisher metadata/content retain native envelopes. Complete multi-object upload windows use flushed per-title/account intents, full namespace/content/tag preflight and blocked-read/process-restart recovery; native profile-window recovery still needs a targeted client failure run. Tasks 3/9/10/12/24 category/list/large-upload families remain open; response binding is unresolved for some recovered writers.",
-    "194": "Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch are verified on the current proof-bound artifact. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes.",
+    "194": "Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch have a hash-bound receipt; current-image completion is evaluated separately. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes.",
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
@@ -409,6 +409,32 @@ def main():
         ):
             for task in (24, 26):
                 relay_proofs[task] = (path.relative_to(ROOT).as_posix(), proof)
+    same_server_path = ROOT / "validation/20261006-same-server-native-reconnect.json"
+    if same_server_path.is_file():
+        proof = json.loads(same_server_path.read_bytes())
+        expected_sources = {
+            "integration/replay/DW_LocalPlatform.cpp",
+            "tools/observe-game.py",
+            "tools/record-native-same-server-reconnect.py",
+        }
+        if (
+            proof.get("passed") is True
+            and proof.get("server_sha256") == current_hash
+            and proof.get("game_sha256") == deployment["sha256"]
+            and proof.get("same_server_and_game_process_preserved")
+            and proof.get("old_native_relay_authenticated_disconnect_verified")
+            and proof.get("fresh_native_relay_token_and_udp_association_verified")
+            and proof.get("native_relay_stability_verified")
+            and proof.get("native_fences_passing") == 27
+            and set(proof.get("sources", {})) == expected_sources
+            and all(
+                proof["sources"][source] == digest(ROOT / source)
+                for source in expected_sources
+            )
+        ):
+            # This pass proves client-auth completion (26), not that a newly
+            # fetched server-info response (24) replaced the retained cache.
+            relay_proofs[26] = (same_server_path.relative_to(ROOT).as_posix(), proof)
     for filename in (
         "relay_provider.cpp",
         "crypto.cpp",

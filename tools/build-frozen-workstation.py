@@ -1,6 +1,7 @@
 """Compile a frozen copy of saved workstation inputs while shared recovery runs."""
 
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import os
@@ -9,6 +10,13 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--integration-root",
+    type=Path,
+    help="Explicit frozen DW integration inputs, keeping unrelated working-tree edits out of a private test build",
+)
+args = parser.parse_args()
 ORIGINAL = Path(r"E:\replay-compiler")
 snapshot = ROOT / "data" / ("compiler-snapshot-" + str(time.time_ns()))
 snapshot.mkdir(parents=True)
@@ -133,10 +141,16 @@ copy_file(ORIGINAL / "source-units.json", snapshot / "source-units.json")
 private_overrides = []
 user_path = snapshot / "source-workstation/user-functions.json"
 user_document = json.loads(user_path.read_text())
-frame_id, frame_unit = next((key, value) for key, value in user_document["functions"].items() if value.get("name") == "DW_LocalBackend_Frame")
+frame_id, frame_unit = next(
+    (key, value)
+    for key, value in user_document["functions"].items()
+    if value.get("name") == "DW_LocalBackend_Frame"
+)
 frame_source = ROOT / "integration/replay/DW_LocalBackend_Frame.cpp"
 frame_destination = snapshot / frame_unit["path"]
-frame_record = next(item for item in records if Path(item["snapshot"]) == frame_destination)
+frame_record = next(
+    item for item in records if Path(item["snapshot"]) == frame_destination
+)
 frame_record["original_sha256"] = frame_record["sha256"]
 frame_destination.write_bytes(frame_source.read_bytes())
 frame_record["sha256"] = hashlib.sha256(frame_destination.read_bytes()).hexdigest()
@@ -145,11 +159,19 @@ unit_record = next(item for item in records if Path(item["snapshot"]) == user_pa
 unit_record["original_sha256"] = unit_record["sha256"]
 user_path.write_text(json.dumps(user_document, indent=2) + "\n")
 unit_record["sha256"] = hashlib.sha256(user_path.read_bytes()).hexdigest()
-private_overrides.append({"id": frame_id, "content_sha256": frame_record["sha256"], "source": str(frame_source)})
+private_overrides.append(
+    {
+        "id": frame_id,
+        "content_sha256": frame_record["sha256"],
+        "source": str(frame_source),
+    }
+)
 
 # DW-only startup source stays outside the shared compiler/editor revisions.
 # Its native function ownership and placement are derived by the usual linker.
-private_sources = ROOT / "integration" / "replay"
+private_sources = (args.integration_root or ROOT / "integration" / "replay").resolve()
+if not private_sources.is_dir():
+    raise RuntimeError("Private DW integration source directory is unavailable")
 for source in sorted(private_sources.iterdir()):
     # This existing unit is supplied by its saved editor revision above.
     if source.name == "DW_LocalBackend_Frame.cpp" or source.suffix not in (
@@ -195,9 +217,8 @@ configuration["publication_root"] = str(ROOT / "data" / "workstation-output")
     json.dumps(configuration, indent=2) + "\n"
 )
 for item in records:
-    if (
-        hashlib.sha256(Path(item["original"]).read_bytes()).hexdigest()
-        != item.get("original_sha256", item["sha256"])
+    if hashlib.sha256(Path(item["original"]).read_bytes()).hexdigest() != item.get(
+        "original_sha256", item["sha256"]
     ):
         raise RuntimeError(
             "Workstation source changed before snapshot completion: " + item["original"]

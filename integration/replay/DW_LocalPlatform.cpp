@@ -28,6 +28,15 @@ extern "C"
     bool func_1412BD890();                           // NET_IsStartFailed
     bool func_1412BD8A0();                           // NET_IsStarted
     void func_1412C0140(void *);                     // same-Replay NetRelay::Reset (one argument)
+    void func_1412BF930(unsigned, bool);             // native NetRelay fence-dependency callback
+    bool func_1414EFBA0();                           // dwNetIsRelayStarted
+    bool func_1414EFBB0();                           // dwNetIsRelayStarting
+    void func_1412BD540();                           // NET critical section enter
+    void func_1412BD550();                           // NET critical section leave
+    void *func_1414EEBA0();                          // native bdNetImpl singleton
+    void *func_14217A520(void *);                    // native bdNetImpl socket-router getter
+    void **func_142196200(void *);                   // native bound-relay reference getter
+    bool func_14219F1C0(void *);                     // SDK relay disconnect (owns mutex/packet)
     extern void *s_instance_1;                       // native NetRelay singleton
     extern unsigned char gl_14C3851A0[], g_dwLogonHSMs[];
     extern dvar_t *DVARBOOL_online_signout_on_dw_disconnect_cleanup;
@@ -99,6 +108,7 @@ namespace
     RestartPhase s_restartPhase = RestartPhase::Idle; // main thread only
     uint64_t s_restartStarted = 0;
     bool s_restartDisconnectIssued = false;
+    bool s_restartRelayStopIssued = false;
     void *s_loginThread = nullptr; // joined non-blockingly before credentials are reset
     cmd_function_s s_testKeyCommand{}, s_testMenuCommand{}, s_testFriendCommand{};
     unsigned s_testMode = 0;
@@ -112,6 +122,36 @@ namespace
     unsigned State()
     {
         return __atomic_load_n(&s_state, __ATOMIC_ACQUIRE);
+    }
+
+    // Original bdSocketRouter::bindToRelay forwards its embedded routing layer
+    // at +184. The native getter returns its owning bdReference, not a newly
+    // acquired reference. Hold the game's NET lock while borrowing that owner;
+    // the SDK disconnect also takes the association's own mutex. No credential,
+    // SDK object state or DW network status is written here.
+    constexpr size_t NativeSocketRouterRoutingLayerOffset = 184;
+
+    bool DrainOldRelay()
+    {
+        if (!func_1414EFBA0() && !func_1414EFBB0())
+            return true;
+        if (!s_restartRelayStopIssued)
+        {
+            func_1412BD540();
+            auto *router = static_cast<unsigned char *>(func_14217A520(func_1414EEBA0()));
+            if (router)
+            {
+                auto **bound = func_142196200(router + NativeSocketRouterRoutingLayerOffset);
+                if (bound && *bound)
+                    func_14219F1C0(*bound);
+            }
+            func_1412BD550();
+            s_restartRelayStopIssued = true;
+        }
+        // The normal network pump receives the authenticated disconnect reply
+        // (or the SDK's bounded timeout) and calls dwRelayDisconnected. Yield
+        // normal engine frames until that callback retires the old DW state.
+        return false;
     }
 
     void Log(const char *message)
@@ -534,6 +574,7 @@ extern "C" void DW_LocalPlatform_Restart_f()
     s_refreshIdentityHeld =
         s_identityApplied && func_141660280()->state == 2 && gl_14E5C0730[0].signInState == 2;
     s_restartDisconnectIssued = false;
+    s_restartRelayStopIssued = false;
     s_restartPhase = RestartPhase::Drain;
     Log("DW_RESTART_QUEUED waiting for frontend and existing provider worker");
     Com_Printf(
@@ -591,6 +632,15 @@ extern "C" bool DW_LocalPlatform_RestartFrame()
             s_restartPhase = RestartPhase::Idle;
             return false;
         }
+        // Replay's original dwRelayStop is an XOR/RET stub. Clearing NetRelay
+        // first leaves the old bound association alive and DW_NET_RELAY_STARTED
+        // latched, so the native dependency callback refuses the new request.
+        // Retire the old association through its native authenticated lifecycle
+        // before cancelling tasks or resetting the credential owner.
+        if (!DrainOldRelay())
+            return false;
+        if (s_restartRelayStopIssued)
+            Log("DW_RESTART_RELAY_DRAINED old native relay association disconnected");
         // Complete outstanding SDK credential callbacks before native owners
         // are destroyed. Drain blocks new/reentrant requests and old tokens.
         WebCredentialFrame();
@@ -681,6 +731,47 @@ extern "C" bool DW_LocalPlatform_RestartFrame()
     else if (s_restartPhase == RestartPhase::Reconnect && func_1417EC930(0) == 2 &&
              func_1412BD8A0() && !func_1412BD840())
     {
+        // A fast same-server reconnect can retain the dependencies-met value
+        // across Reset, so FenceManager has no false-to-true edge to dispatch.
+        // Resume only the idle native relay through its own callback, with the
+        // actual dependency value. That callback keeps relay enablement,
+        // controller ownership and DW network-state gates authoritative.
+        struct NativeFenceHeader
+        {
+            const void *vtable;
+            unsigned controller;
+            bool dependenciesMet;
+            bool passing;
+            bool failed;
+            unsigned char reserved;
+        };
+
+        struct NativeRelayHeader
+        {
+            const void *vtable;
+            void *netInit;
+            bool callbackRegistered;
+            unsigned char reserved[3];
+            unsigned state;
+        };
+
+        static_assert(sizeof(NativeFenceHeader) == 16);
+        static_assert(offsetof(NativeFenceHeader, dependenciesMet) == 12);
+        static_assert(sizeof(NativeRelayHeader) == 24);
+        static_assert(offsetof(NativeRelayHeader, state) == 20);
+        const auto *fence = static_cast<const NativeFenceHeader *>(s_fenceObjects[5]);
+        const auto *relay = static_cast<const NativeRelayHeader *>(s_instance_1);
+        // Login can complete before QoS/publisher dependencies. Keep this phase
+        // alive across normal engine frames instead of losing a one-shot check.
+        // Returning false allows the native online domains to keep initializing.
+        if (fence && relay && fence->controller == 0 && relay->state == 0 &&
+            !fence->dependenciesMet)
+            return false;
+        if (fence && relay && fence->controller == 0 && fence->dependenciesMet && relay->state == 0)
+        {
+            func_1412BF930(0, fence->dependenciesMet);
+            Log("DW_RESTART_RELAY_RESUME idle native relay dependency callback resumed");
+        }
         s_refreshIdentityHeld = false;
         s_restartPhase = RestartPhase::Idle;
         Log("DW_RESTART_CONNECTED native DW login/lobby and online networking reconnected; online "

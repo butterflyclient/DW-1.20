@@ -1,6 +1,51 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND - POPULATED AB ENROLLMENT AND NATIVE TREATMENT
+CURRENT CLIENT - AUTHENTICATED SAME-SERVER RELAY RESTART
+Game SHA256: bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
+Backend SHA256: 612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400
+Private compiler job: 2bf03fc2aca04d16.
+
+Replay's original dwRelayStop is a no-op. Resetting credentials alone leaves
+the old bound UDP association and DW_NET_RELAY_STARTED state in place; the
+native dependency callback then refuses a new relay request. Exact original
+instructions and a read-only native policy snapshot identified this blocker.
+The controlled restart integration now disconnects the old association through
+the SDK's authenticated packet/callback lifecycle before resetting credentials.
+It holds the native NET lock while borrowing the bound reference, yields normal
+frames while the SDK completes, and keeps existing timeout/error behavior.
+The native callback resumes normally; an idle/dependencies-ready fallback is
+retained for missed dependency edges. Neither tested cycle needed that fallback.
+No native success flag, auth result or network status is fabricated.
+
+The freshly compiled root-folder game passed native startup and two dw_restart
+cycles against the same still-running server and game process. Each cycle sent
+an authenticated disconnect correlated to the old native route/token, fetched
+fresh credentials, established a new route/join, preserved the account/profile
+and Online state, and completed all 27 fences with empty accepted/incoming/
+outgoing friend lists. Stability intervals: 95.6 seconds/10 keepalive replies
+and 74.6 seconds/8 replies; zero rejected packets. No map test was performed.
+The backend's cumulative verification counter advanced once per reconnect;
+the live association count remained one during each stability interval.
+
+Private input selection excluded and preserved unrelated Con_Developer.cpp and
+DW_PlayerDataPath.cpp edits. Source/object provenance, image mapping, unwind and
+relocation checks passed before deployment. The remote universal client package
+was refreshed at data/Replay-DW-Client-Test.zip: EXE, endpoint/name INI, launcher
+and readme only; no proxy, identity or private key. Client identities remain
+generated and protected on each player's machine; no friendship was pre-added.
+
+Receipts:
+validation/20261006-relay-restart-target-layout.json
+validation/20261006-same-server-native-reconnect.json
+validation/20261006-same-server-native-reconnect-repeat.json
+Implementation details: docs/DW_RELAY_RESTART_20261006.txt.
+
+This fixes the observed same-server relay lifecycle failure. Actual two-network
+party JOIN/DATA/gameplay remains unverified, as do the remaining binary/REST
+bindings and several individual native domain callbacks. The complete backend
+goal remains active. Historical proofs below retain their original image hashes.
+
+RETAINED BACKEND - POPULATED AB ENROLLMENT AND NATIVE TREATMENT
 Backend SHA256: 612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 Backend-only update; no game recompile or new client package is needed.
