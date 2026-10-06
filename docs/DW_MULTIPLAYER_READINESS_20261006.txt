@@ -1,15 +1,19 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - TOURNAMENT JOIN PASS
-Backend SHA256: e3275fd3ca2412f74f55e8aff759997d3ed1051ffd77e8f6a7b1144dd8b4401e
+CURRENT BACKEND ADDENDUM - AUTOMATIC TOURNAMENT FORMATION
+Backend SHA256: 13f9f3441bb8f99519b5a3c79a19e08281ae4bd2ee20d6785c3ce5caab07bb12
 Game is unchanged from the baseline below; no new client package is required.
-231 encrypted protocol/service groups passed on the current backend image.
-Tournament formation searches and exact event-2009 joins now use normal party
-tokens and owned registration, without seeding acceptance. Native tournament
-join callbacks, automatic formation and playable round assignment remain open.
-Current native startup/reconnect: validation/20261006-tournament-join-native-reconnect.json.
-Current join protocol proof: validation/20261006-tournament-join.json.
-Details: docs/DW_TOURNAMENT_JOIN_20261006.txt and docs/tournaments.md.
+236 encrypted protocol/service groups passed on the current backend image.
+Capacity publications now allocate complete authenticated parties to teams and
+generate the native bracket. Every slot and live-session acknowledgement must
+be present before PLAYING; no player IDs or acceptance are seeded. A forming
+party withdrawal releases its slots, preserves peer registration, resets their
+acceptance and sends event 2011. Coupled snapshots recover interrupted writes.
+Native tournament join/formation callbacks, playable round assignment and
+forfeits remain open. No two-network gameplay or map test claim is made.
+Current native startup/reconnect: validation/20261006-tournament-formation-native-reconnect.json.
+Current formation protocol proof: validation/20261006-tournament-formation.json.
+Details: docs/DW_TOURNAMENT_FORMATION_20261006.txt and docs/tournaments.md.
 The artifact hashes and native evidence below are the retained baseline pass.
 
 BASELINE ARTIFACTS

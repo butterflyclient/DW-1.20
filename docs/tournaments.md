@@ -77,9 +77,10 @@ narrowing them for native indices; large UInt64 values cannot wrap into a valid
 team, team-size or winner index.
 
 Registration only enrolls the authenticated user when the named datacenter and
-tournament are open, unexpired, and the bracket actually assigns that user to a
-team. Publication therefore grants membership explicitly; it never trusts a
-request's player ID. A second enrollment cannot replace an active tournament.
+tournament are open and unexpired. A publication with an explicit `state` must
+already assign that user to a team. Automatic `formation` publications accept
+registration before assignment; the authenticated party search allocates its
+real members as described below. A second enrollment cannot replace an active tournament.
 Retries return the same registration response without rewriting enrollment.
 
 `enrollments.json` stores up to 4,096 players for that title in a single atomic
@@ -165,7 +166,8 @@ derived bracket SHA256. Leaving revokes queued updates; a newer readiness/result
 snapshot suppresses older queued documents. Exact idempotent task retries do
 not generate duplicate updates. Each current, authenticated connection for an
 eligible account can receive the update; offline accounts recover through task
-145/20. This is an update transport, not an automatic team-formation scheduler.
+145/20. This event carries derived state; the capacity allocator described below
+owns automatic formation.
 
 ## Native tournament search and join
 
@@ -173,8 +175,9 @@ Replay `OnlineMatchmakerOmniscient::StartMatchmaking` at `0x14104A450` emits
 `"tournament":{"team_size":N}` in its ordinary task-145/18 search document.
 The backend intercepts that exact search form after validating every party
 member's matchmaking token and live issuing session. All members must have
-registered for the same unexpired publication, belong to the same published
-team, and fit its team size. Private-lobby/presence-join instructions cannot be
+registered for the same unexpired publication and fit its team size. Legacy
+bracket publications require the same published team; automatic publications
+reserve capacity for the whole authenticated party. Private-lobby/presence-join instructions cannot be
 combined with a tournament formation search. Ordinary multiplayer searches
 retain their existing map/rules/host assignment path.
 
@@ -210,9 +213,67 @@ encrypted clients, exact returned search identity, registration before acceptanc
 subsequent acknowledgement/readiness, idempotent retries, cancellation and
 shutdown, replacement, malformed state and expiry. These protocol checks do
 not establish that the native UI accepted a join or that a tournament is playable.
-Automatic team allocation, bracket formation and round-to-lobby scheduling
-remain to be implemented. Current formation searches still use an explicitly
-published bracket containing the actual players.
+Automatic team allocation and completed bracket formation are implemented by
+the capacity publication below. Round-to-lobby scheduling remains open.
+
+## Automatic formation from authenticated parties
+
+Publish `formation` instead of `state` to let the backend allocate the players
+and generate all native teams/rounds. Its complete definition is
+`{"team_size":2,"num_teams":8}`: team size is 1 through 4, team count is 8 or 16.
+The surrounding row retains `id`, `name`, `data_center`, `expires`,
+`registration_open` and `start_search_offset_seconds`. The name must match
+Replay's scheduled tournament request. Do not include player IDs, teams, rounds
+or a `state` object in this mode. `live_updates` defaults to true; specifying false
+disables idle bracket edits but retains explicit lifecycle notifications.
+
+Registration creates only the authenticated account's enrollment. A task-145/18
+party search validates every live matchmaking token and every member's
+registration before taking a team with enough capacity for the whole party.
+Parties are never split. Searches append only their authenticated member IDs;
+no filler opponents or automatic acceptance are created. Existing reservations
+cannot be taken over by a different party. Native event-2009 documents describe
+the actual partial allocation while its status remains `FORMING`.
+
+The server moves the bracket to `PLAYING` only when every team is full and every
+allocated user has acknowledged with an authenticated session which is still
+live. The final acknowledgement commits that state and notifies all accepted
+participants through event 2010. The idle publisher can also finish formation
+when a temporarily disconnected issuing session returns. Automatic readiness
+requires that user's accepted session and the completed bracket; formation does
+not automatically ready a player or allocate a playable lobby.
+
+`matchmaking/<title>/tournaments/<id>.json` stores the complete bounded formation
+layout: schema/title/ID/expiry, immutable competition definition, party-to-team
+reservations and derived native state. Its validators check every native bound,
+party ownership, uniqueness and exact equality between reserved members and
+bracket players. Changing name/datacenter/expiry/capacity under an existing ID
+fails closed; use a new ID for a different competition. Publisher files are
+never rewritten by registration or allocation.
+
+Formation changes, search/index changes and enrollment use the existing flushed
+matchmaking transaction. Its one cross-domain name `tournament-enrollments.json`
+maps only to `tournaments/<title>/enrollments.json`; arbitrary parent paths are
+not accepted. Complete snapshots are validated before any recovery write. A
+failure after writing enrollment rolls forward the same formation snapshot
+before any service reads it, and task retries retain their normal identity.
+
+An owned leave or decline while `FORMING` releases the whole party reservation
+and removes only the caller's registration. Other party members retain their
+registrations but lose acceptance/readiness for the changed allocation. The
+backend publishes exact native event **2011**, typed tournament ID, to those
+members. A persisted disband marker permits idle/reconnect catch-up. New valid
+party searches clear that marker in the allocation transaction; queued obsolete
+disbands are suppressed when the user is assigned again. Once `PLAYING`, team
+membership stays fixed; match forfeits and playable round scheduling remain
+separate unfinished work.
+
+`tools/tournament_formation_fixtures.py` uses eight separately authenticated
+clients; six enter through signed machine registration without provisioning.
+It checks partial/full formation, native array generation, acceptance gating,
+readiness, immutable competition identity, interrupted cross-domain writes,
+party withdrawal, event 2011, slot reuse and owned decline. These are protocol
+fixtures, not native game bracket UI or playable tournament evidence.
 
 ## Live publication changes and disband
 
@@ -233,8 +294,8 @@ Corrupt publication data suppresses delivery and remains a task-level storage
 error. It is never converted into a synthetic tournament disband. A removed
 publication leaves enrollment available for diagnosis or an authenticated leave.
 The same missing/expired snapshot is sent once per connection; a restored
-publication can send a fresh bracket. Native join callback validation and automatic
-team formation remain separate work.
+publication can send a fresh bracket. Native join/formation callback validation
+and playable round assignment remain separate work.
 
 Native validation changed a PLAYING publication from 16 players in teams of two
 to eight players in teams of one. The same running game parsed the changed

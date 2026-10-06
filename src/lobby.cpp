@@ -38,6 +38,7 @@ namespace lobby
             uint64_t lastTournament = 0;
             uint64_t lastTournamentSearch = 0;
             bool lastTournamentJoin = false;
+            bool lastTournamentFormationDisband = false;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
         };
@@ -184,6 +185,8 @@ namespace lobby
                     endpoint->lastTournament == delivery.tournamentId &&
                     endpoint->lastTournamentSearch == delivery.searchId &&
                     endpoint->lastTournamentJoin == delivery.tournamentJoin &&
+                    endpoint->lastTournamentFormationDisband ==
+                        delivery.tournamentFormationDisband &&
                     endpoint->lastTournamentHash == delivery.tournamentStateHash)
                     continue;
                 try
@@ -199,6 +202,8 @@ namespace lobby
                             endpoint->lastTournament = delivery.tournamentId;
                             endpoint->lastTournamentSearch = delivery.searchId;
                             endpoint->lastTournamentJoin = delivery.tournamentJoin;
+                            endpoint->lastTournamentFormationDisband =
+                                delivery.tournamentFormationDisband;
                             endpoint->lastTournamentHash = delivery.tournamentStateHash;
                         }
                     }

@@ -3042,6 +3042,45 @@ try:
         (u64, text, boolean), checks,
     )
 
+    import tournament_formation_fixtures
+
+    def new_tournament_client(index):
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+        # Use the production machine-owned registration flow. No development
+        # profile provisioning, copied identity, credentials or seeded account ID.
+        signer = ec.generate_private_key(ec.SECP256R1())
+        numbers = signer.public_key().public_numbers()
+        public_key = struct.pack("<II", 0x31534345, 32) + numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
+        nonce = os.urandom(32)
+        with post("/platform/client/challenge", public_key + nonce) as response:
+            challenge = response.read()
+        assert len(challenge) == 32
+        name = ("Tournament Fixture " + str(index)).encode().ljust(36, b"\0")
+        prefix = struct.pack("<II", 0x31494452, 1) + nonce + challenge + public_key + name
+        assert len(prefix) == 180
+        r, s = utils.decode_dss_signature(signer.sign(prefix, ec.ECDSA(hashes.SHA256())))
+        signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        with post("/platform/client/login", prefix + signature) as response:
+            issued = response.read()
+        assert len(issued) == 512 and issued[8:40] == nonce
+        identity = struct.unpack_from("<Q", issued, 56)[0]
+        credentials = {
+            "session_token": issued[112:176].decode(),
+            "account_token": issued[177:241].decode(),
+        }
+        with post("/auth/", dict(request, extra_data=json.dumps(credentials))) as response:
+            auth = json.load(response)
+        return identity, Client(auth_identity=(
+            base64.b64decode(auth["server_ticket"]),
+            base64.b64decode(auth["client_ticket"])[97:121],
+        ))
+
+    tournament_formation_fixtures.exercise(
+        client, peer_client, directory, title, user, peer_user, player_info,
+        new_tournament_client, (u64, text, boolean), checks,
+    )
+
     copy_fixture = copy_content_fixtures.exercise(
         client,
         peer_client,

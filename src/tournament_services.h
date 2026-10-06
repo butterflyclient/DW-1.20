@@ -4,6 +4,9 @@
 
 namespace services
 {
+    // Pure snapshot validators shared with matchmaking transaction recovery.
+    void validateTournamentFormation(const nlohmann::json &state, uint32_t title, uint64_t id);
+    void validateTournamentEnrollments(const nlohmann::json &state, uint32_t title);
     // Called only after matchmaking validates the request's authenticated party tokens.
     std::optional<Reply> startTournamentSearch(const std::filesystem::path &directory,
                                                const platform::LobbyIdentity &identity,

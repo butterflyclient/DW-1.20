@@ -5,6 +5,7 @@
 #include "matchmaking_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <fstream>
 #include <iterator>
@@ -215,6 +216,131 @@ namespace services
             return members;
         }
 
+        std::string stateHash(const Json &state);
+
+        Json formationDefinition(const Json &row)
+        {
+            return {{"id", row.at("id")},
+                    {"name", row.at("name")},
+                    {"data_center", row.at("data_center")},
+                    {"expires", row.at("expires")},
+                    {"formation", row.at("formation")}};
+        }
+
+        Json emptyBracket(const Json &row)
+        {
+            const auto &definition = row.at("formation");
+            persisted(definition.is_object() && definition.size() == 2 &&
+                      definition.at("team_size").is_number_unsigned() &&
+                      definition["team_size"].get<uint64_t>() >= 1 &&
+                      definition["team_size"].get<uint64_t>() <= 4 &&
+                      definition.at("num_teams").is_number_unsigned() &&
+                      (definition["num_teams"] == 8 || definition["num_teams"] == 16));
+            const auto teamCount = definition["num_teams"].get<unsigned>();
+            Json state = {{"tournamentID", row["id"]},
+                          {"tournamentStatus", "FORMING"},
+                          {"tournamentDefinition",
+                           {{"teamSize", definition["team_size"]},
+                            {"numTeams", teamCount},
+                            {"numPlayers", teamCount * definition["team_size"].get<unsigned>()}}},
+                          {"teams", Json::array()},
+                          {"players", Json::array()},
+                          {"rounds", Json::array()}};
+            for (unsigned team = 0; team < teamCount; ++team)
+                state["teams"].push_back({{"teamID", team}, {"playerIDs", Json::array()}});
+            for (unsigned round = 0; (teamCount >> (round + 1)) != 0; ++round)
+            {
+                Json matches = Json::array();
+                for (unsigned index = 0; index < (teamCount >> (round + 1)); ++index)
+                    matches.push_back(
+                        {{"teamIDs",
+                          round ? Json::array() : Json::array({2 * index, 2 * index + 1})},
+                         {"readyPlayerIDs", Json::array()},
+                         {"lobbyID", uint64_t{0}},
+                         {"expired", false},
+                         {"winningTeamID", -1}});
+                state["rounds"].push_back({{"roundID", round}, {"matches", std::move(matches)}});
+            }
+            validateBracket(state, row["id"].get<uint64_t>());
+            return state;
+        }
+
+        void validateFormation(const Json &record, uint32_t title, uint64_t id)
+        {
+            persisted(record.is_object() && record.size() == 7 && record.at("schema") == 1 &&
+                      record.at("title") == title && record.at("id") == id && id &&
+                      record.at("expires").is_number_unsigned() &&
+                      record.at("definition").is_object() && record["definition"].size() == 5 &&
+                      record["definition"].at("id") == id &&
+                      record["definition"].at("expires") == record["expires"] &&
+                      boundedText(record["definition"].at("name"), 128) &&
+                      boundedText(record["definition"].at("data_center"), 64) &&
+                      record.at("parties").is_object() && record["parties"].size() <= 64);
+            const auto expected = emptyBracket(record["definition"]);
+            const auto &state = record.at("state");
+            const auto members = validateBracket(state, id);
+            persisted(state["tournamentDefinition"] == expected["tournamentDefinition"]);
+            std::set<uint64_t> assigned;
+            for (const auto &party : record["parties"].items())
+            {
+                uint64_t owner = 0;
+                const auto parsed = std::from_chars(
+                    party.key().data(), party.key().data() + party.key().size(), owner);
+                persisted(parsed.ec == std::errc{} &&
+                          parsed.ptr == party.key().data() + party.key().size() && owner &&
+                          std::to_string(owner) == party.key());
+                const auto &entry = party.value();
+                persisted(entry.is_object() && entry.size() == 2 &&
+                          entry.at("team").is_number_unsigned() &&
+                          entry["team"].get<uint64_t>() < state["teams"].size() &&
+                          entry.at("members").is_array() && !entry["members"].empty() &&
+                          entry["members"].size() <=
+                              state["tournamentDefinition"]["teamSize"].get<size_t>());
+                bool ownerPresent = false;
+                const auto &team = state["teams"][entry["team"].get<size_t>()]["playerIDs"];
+                for (const auto &user : entry["members"])
+                {
+                    persisted(user.is_number_unsigned() && members.contains(user.get<uint64_t>()) &&
+                              assigned.insert(user.get<uint64_t>()).second &&
+                              std::find(team.begin(), team.end(), user) != team.end());
+                    ownerPresent = ownerPresent || user == owner;
+                }
+                persisted(ownerPresent);
+            }
+            persisted(assigned == members);
+            if (state["tournamentStatus"] == "PLAYING")
+                for (const auto &team : state["teams"])
+                    persisted(team["playerIDs"].size() ==
+                              state["tournamentDefinition"]["teamSize"].get<size_t>());
+        }
+
+        std::filesystem::path formationPath(const std::filesystem::path &tournamentRoot,
+                                            uint32_t title,
+                                            uint64_t id)
+        {
+            return tournamentRoot.parent_path().parent_path() / "matchmaking" /
+                   std::to_string(title) / "tournaments" / (std::to_string(id) + ".json");
+        }
+
+        Json formationRecord(const std::filesystem::path &root, uint32_t title, const Json &row)
+        {
+            const auto path = formationPath(root, title, row["id"].get<uint64_t>());
+            Json record;
+            if (std::filesystem::exists(path))
+                record = read(path, 128 * 1024);
+            else
+                record = {{"schema", 1},
+                          {"title", title},
+                          {"id", row["id"]},
+                          {"expires", row["expires"]},
+                          {"definition", formationDefinition(row)},
+                          {"parties", Json::object()},
+                          {"state", emptyBracket(row)}};
+            validateFormation(record, title, row["id"].get<uint64_t>());
+            persisted(record["definition"] == formationDefinition(row));
+            return record;
+        }
+
         Json catalog(const std::filesystem::path &path, uint32_t title)
         {
             if (!std::filesystem::exists(path))
@@ -224,7 +350,10 @@ namespace services
                       result.at("tournaments").is_array() && result["tournaments"].size() <= 128);
             std::set<uint64_t> ids;
             std::set<std::pair<std::string, std::string>> names;
-            for (const auto &row : result["tournaments"])
+            matchmaking_store::recover(path.parent_path().parent_path().parent_path() /
+                                           "matchmaking" / std::to_string(title),
+                                       title);
+            for (auto &row : result["tournaments"])
             {
                 persisted(
                     row.is_object() && row.at("id").is_number_unsigned() &&
@@ -239,6 +368,15 @@ namespace services
                               .emplace(row["name"].get<std::string>(),
                                        row["data_center"].get<std::string>())
                               .second);
+                if (row.contains("formation"))
+                {
+                    // A formation publication specifies capacity, never player IDs
+                    // or native bracket arrays. Those come from authenticated searches.
+                    persisted(!row.contains("state"));
+                    row["state"] = formationRecord(path.parent_path(), title, row)["state"];
+                    if (!row.contains("live_updates"))
+                        row["live_updates"] = true;
+                }
                 validateBracket(row.at("state"), row["id"].get<uint64_t>());
                 if (row.contains("live_updates"))
                     persisted(row["live_updates"].is_boolean());
@@ -246,13 +384,11 @@ namespace services
             return result["tournaments"];
         }
 
-        Json enrollments(const std::filesystem::path &path, uint32_t title)
+        void validateEnrollments(const Json &result, uint32_t title)
         {
-            Json result = {{"schema", 1}, {"title", title}, {"players", Json::object()}};
-            if (std::filesystem::exists(path))
-                result = read(path, maxCatalog);
-            persisted(result.at("schema") == 1 && result.at("title") == title &&
-                      result.at("players").is_object() && result["players"].size() <= 4096);
+            persisted(result.is_object() && result.at("schema") == 1 &&
+                      result.at("title") == title && result.at("players").is_object() &&
+                      result["players"].size() <= 4096);
             for (const auto &row : result["players"].items())
             {
                 const auto &value = row.value();
@@ -274,8 +410,161 @@ namespace services
                               value["ready_match"].get<uint64_t>() < 8);
                 if (value.contains("live_updates"))
                     persisted(value["live_updates"].is_boolean());
+                if (value.contains("accepted_session"))
+                    persisted(value["accepted_session"].is_string() &&
+                              value["accepted_session"].get_ref<const std::string &>().size() ==
+                                  44 &&
+                              value["accepted"] == true);
+                if (value.contains("formation_disbanded"))
+                    persisted(
+                        value["formation_disbanded"].is_boolean() &&
+                        (!value["formation_disbanded"].get<bool>() || value["accepted"] == false));
             }
+        }
+
+        Json enrollments(const std::filesystem::path &path, uint32_t title)
+        {
+            Json result = {{"schema", 1}, {"title", title}, {"players", Json::object()}};
+            if (std::filesystem::exists(path))
+                result = read(path, maxCatalog);
+            validateEnrollments(result, title);
             return result;
+        }
+
+        Json reserveParty(Json record, uint64_t owner, const Json &members)
+        {
+            std::set<uint64_t> requested;
+            for (const auto &user : members)
+                requested.insert(user.get<uint64_t>());
+            const auto key = std::to_string(owner);
+            if (record["parties"].contains(key))
+            {
+                std::set<uint64_t> assigned;
+                for (const auto &user : record["parties"][key]["members"])
+                    assigned.insert(user.get<uint64_t>());
+                return assigned == requested ? record : Json();
+            }
+            for (const auto &player : record["state"]["players"])
+                if (requested.contains(player["playerID"].get<uint64_t>()))
+                    return Json();
+            if (record["state"]["tournamentStatus"] != "FORMING")
+                return Json();
+            const auto size = record["state"]["tournamentDefinition"]["teamSize"].get<size_t>();
+            for (auto &team : record["state"]["teams"])
+                if (team["playerIDs"].size() + members.size() <= size)
+                {
+                    record["parties"][key] = {{"team", team["teamID"]}, {"members", members}};
+                    for (const auto &user : members)
+                    {
+                        team["playerIDs"].push_back(user);
+                        record["state"]["players"].push_back({{"playerID", user}});
+                    }
+                    return record;
+                }
+            return Json();
+        }
+
+        void commitEnrollment(const std::filesystem::path &directory,
+                              uint32_t title,
+                              const Json &enrollment,
+                              const std::optional<Json> &formation = std::nullopt)
+        {
+            std::vector<matchmaking_store::Write> writes = {
+                {"tournament-enrollments.json", enrollment}};
+            if (formation)
+                writes.push_back(
+                    {"tournaments/" + std::to_string(formation->at("id").get<uint64_t>()) + ".json",
+                     *formation});
+            matchmaking_store::commit(
+                directory / "matchmaking" / std::to_string(title), title, writes);
+        }
+
+        bool formationAccepted(const Json &record, uint32_t title, const Json &players)
+        {
+            const auto &state = record["state"];
+            for (const auto &team : state["teams"])
+                if (team["playerIDs"].size() !=
+                    state["tournamentDefinition"]["teamSize"].get<size_t>())
+                    return false;
+            for (const auto &player : state["players"])
+            {
+                const auto user = player["playerID"].get<uint64_t>();
+                const auto key = std::to_string(user);
+                if (!players.contains(key) || players[key]["id"] != record["id"] ||
+                    players[key]["accepted"] != true ||
+                    !players[key].contains("accepted_session") ||
+                    !lobby::sessionOnline(
+                        title, user, players[key]["accepted_session"].get<std::string>()))
+                    return false;
+            }
+            return true;
+        }
+
+        bool releaseFormingParty(Json &record, uint64_t user, Json &players, Reply &reply)
+        {
+            if (record["state"]["tournamentStatus"] != "FORMING")
+                return false;
+            std::set<uint64_t> released;
+            for (auto party = record["parties"].begin(); party != record["parties"].end(); ++party)
+                if (std::find(party.value()["members"].begin(),
+                              party.value()["members"].end(),
+                              Json(user)) != party.value()["members"].end())
+                {
+                    for (const auto &member : party.value()["members"])
+                        released.insert(member.get<uint64_t>());
+                    record["parties"].erase(party);
+                    break;
+                }
+            if (released.empty())
+                return false;
+            for (auto &team : record["state"]["teams"])
+            {
+                auto &members = team["playerIDs"];
+                members.erase(std::remove_if(members.begin(),
+                                             members.end(),
+                                             [&](const Json &member)
+                                             {
+                                                 return released.contains(member.get<uint64_t>());
+                                             }),
+                              members.end());
+            }
+            auto &members = record["state"]["players"];
+            members.erase(std::remove_if(members.begin(),
+                                         members.end(),
+                                         [&](const Json &member)
+                                         {
+                                             return released.contains(
+                                                 member["playerID"].get<uint64_t>());
+                                         }),
+                          members.end());
+            // A broken formation party cannot retain acceptance for a changed
+            // assignment. Preserve its other registrations, and use the native
+            // formation-disband event; no PLAYER/PLAYING bracket is fabricated.
+            for (const auto member : released)
+            {
+                const auto key = std::to_string(member);
+                if (!players.contains(key) || players[key]["id"] != record["id"])
+                    continue;
+                players[key]["accepted"] = false;
+                players[key]["ready"] = false;
+                players[key]["formation_disbanded"] = true;
+                for (const auto *field : {"accepted_session", "ready_round", "ready_match"})
+                    players[key].erase(field);
+                if (member == user)
+                    continue;
+                wire::Writer push;
+                push.u32(2011);
+                push.u64(record["id"]);
+                Delivery delivery;
+                delivery.user = member;
+                delivery.tournamentId = record["id"].get<uint64_t>();
+                delivery.tournamentStateHash = stateHash(record["state"]);
+                delivery.tournamentFormationDisband = true;
+                delivery.delayMs = 250;
+                delivery.payload = std::move(push.data);
+                reply.deliveries.push_back(std::move(delivery));
+            }
+            return true;
         }
 
         const Json *published(const Json &rows, uint64_t tournament, uint64_t user)
@@ -663,6 +952,16 @@ namespace services
         }
     } // namespace
 
+    void validateTournamentFormation(const Json &state, uint32_t title, uint64_t id)
+    {
+        validateFormation(state, title, id);
+    }
+
+    void validateTournamentEnrollments(const Json &state, uint32_t title)
+    {
+        validateEnrollments(state, title);
+    }
+
     std::optional<Reply> startTournamentSearch(const std::filesystem::path &directory,
                                                const platform::LobbyIdentity &id,
                                                const Json &query)
@@ -681,21 +980,51 @@ namespace services
                       !query.contains("lobby_id_to_presence_join") &&
                       !query.contains("player_id_to_presence_join"));
         const auto tournamentRoot = directory / "tournaments" / std::to_string(id.titleId);
-        const auto enrolled = enrollments(tournamentRoot / "enrollments.json", id.titleId);
+        auto enrolled = enrollments(tournamentRoot / "enrollments.json", id.titleId);
         const auto key = std::to_string(id.userId);
         if (!enrolled["players"].contains(key))
             return Reply{14526, {}, "tournament-search-player-not-enrolled"};
         const auto tournament = enrolled["players"][key]["id"].get<uint64_t>();
         const auto rows = catalog(tournamentRoot / "catalog.json", id.titleId);
-        const auto *row = published(rows, tournament, id.userId);
-        if (!row || row->at("state")["tournamentDefinition"]["teamSize"] != request["team_size"])
+        const Json *publication = nullptr;
+        for (const auto &candidate : rows)
+            if (candidate["id"] == tournament && candidate["expires"].get<uint64_t>() > now() &&
+                (candidate.contains("formation") || published(rows, tournament, id.userId)))
+                publication = &candidate;
+        if (!publication ||
+            publication->at("state")["tournamentDefinition"]["teamSize"] != request["team_size"])
             return Reply{108, {}, "tournament-search-publication-unavailable"};
+        Json row = *publication;
+        std::optional<Json> formation;
+        bool formationChanged = false, enrollmentChanged = false;
+        if (row.contains("formation"))
+        {
+            for (const auto &member : query["members"])
+            {
+                const auto memberKey = std::to_string(member.get<uint64_t>());
+                if (!enrolled["players"].contains(memberKey) ||
+                    enrolled["players"][memberKey]["id"] != tournament)
+                    return Reply{101, {}, "tournament-search-party-not-registered"};
+            }
+            const auto original = formationRecord(tournamentRoot, id.titleId, row);
+            auto reserved = reserveParty(original, id.userId, query["members"]);
+            if (reserved.is_null())
+                return Reply{108, {}, "tournament-formation-party-capacity-or-conflict"};
+            row["state"] = reserved["state"];
+            formationChanged = reserved != original;
+            formation = std::move(reserved);
+            for (const auto &member : query["members"])
+                enrollmentChanged =
+                    (enrolled["players"][std::to_string(member.get<uint64_t>())].erase(
+                         "formation_disbanded") != 0) ||
+                    enrollmentChanged;
+        }
         const auto journal =
             results(tournamentRoot / "results" / (std::to_string(tournament) + ".json"),
                     id.titleId,
                     tournament);
         const auto bracket =
-            stateWithReadiness(stateWithResults(*row, journal), tournament, enrolled["players"]);
+            stateWithReadiness(stateWithResults(row, journal), tournament, enrolled["players"]);
         const Json *partyTeam = nullptr;
         for (const auto &team : bracket["teams"])
             if (std::find(team["playerIDs"].begin(), team["playerIDs"].end(), Json(id.userId)) !=
@@ -717,8 +1046,8 @@ namespace services
         const auto fingerprint = wire::base64Encode(crypto::sha256(id.key));
         Json search;
         if (const auto previous = formationSearch(directory, id.titleId, id.userId);
-            previous && previous->at("user") == id.userId && previous->at("query") == query &&
-            previous->at("tournament_id") == tournament &&
+            previous && !formationChanged && previous->at("user") == id.userId &&
+            previous->at("query") == query && previous->at("tournament_id") == tournament &&
             previous->at("owner_session") == fingerprint)
             search = *previous;
         else
@@ -739,7 +1068,7 @@ namespace services
                       {"tournament_id", tournament},
                       {"query", query},
                       {"expires",
-                       std::min({now() + 3600, id.expires, row->at("expires").get<uint64_t>()})},
+                       std::min({now() + 3600, id.expires, row.at("expires").get<uint64_t>()})},
                       {"active", true},
                       {"owner_session", fingerprint},
                       {"member_sessions", Json::object()}};
@@ -765,6 +1094,11 @@ namespace services
             }
             writes.push_back({"searches/" + std::to_string(searchId) + ".json", search});
             writes.push_back({"tournament-searches.json", index});
+            if (formation)
+                writes.push_back(
+                    {"tournaments/" + std::to_string(tournament) + ".json", *formation});
+            if (enrollmentChanged)
+                writes.push_back({"tournament-enrollments.json", enrolled});
             matchmaking_store::commit(root, id.titleId, writes);
         }
         wire::Writer result;
@@ -780,6 +1114,7 @@ namespace services
                                                       uint32_t title,
                                                       uint64_t user)
     {
+        matchmaking_store::recover(directory / "matchmaking" / std::to_string(title), title);
         const auto root = directory / "tournaments" / std::to_string(title);
         const auto enrollmentPath = root / "enrollments.json";
         if (!std::filesystem::exists(enrollmentPath))
@@ -791,8 +1126,43 @@ namespace services
         const auto tournament = enrollment["players"][key]["id"].get<uint64_t>();
         const auto rows = catalog(root / "catalog.json", title);
         const auto *row = published(rows, tournament, user);
+        Json activeRow;
+        if (row && row->contains("formation") && row->at("state")["tournamentStatus"] == "FORMING")
+        {
+            auto formation = formationRecord(root, title, *row);
+            if (formationAccepted(formation, title, enrollment["players"]))
+            {
+                formation["state"]["tournamentStatus"] = "PLAYING";
+                const std::array<matchmaking_store::Write, 1> writes = {matchmaking_store::Write{
+                    "tournaments/" + std::to_string(tournament) + ".json", formation}};
+                matchmaking_store::commit(
+                    directory / "matchmaking" / std::to_string(title), title, writes);
+                activeRow = *row;
+                activeRow["state"] = formation["state"];
+                row = &activeRow;
+            }
+        }
         if (enrollment["players"][key]["accepted"] != true)
         {
+            if (!row && enrollment["players"][key].value("formation_disbanded", false))
+                for (const auto &publication : rows)
+                    if (publication["id"] == tournament && publication.contains("formation") &&
+                        publication["expires"].get<uint64_t>() > now() &&
+                        publication["state"]["tournamentStatus"] == "FORMING")
+                    {
+                        wire::Writer push;
+                        push.u32(2011);
+                        push.u64(tournament);
+                        Delivery delivery;
+                        delivery.user = user;
+                        delivery.tournamentId = tournament;
+                        delivery.tournamentStateHash = stateHash(publication["state"]);
+                        delivery.tournamentFormationDisband = true;
+                        delivery.tournamentRefresh = true;
+                        delivery.delayMs = 500;
+                        delivery.payload = std::move(push.data);
+                        return delivery;
+                    }
             const auto search = formationSearch(directory, title, user);
             if (!row || !search || search->at("tournament_id") != tournament)
                 return std::nullopt;
@@ -846,12 +1216,27 @@ namespace services
     {
         if (!delivery.tournamentId)
             return true;
+        matchmaking_store::recover(directory / "matchmaking" / std::to_string(title), title);
         const auto root = directory / "tournaments" / std::to_string(title);
         const auto state = enrollments(root / "enrollments.json", title);
         const auto key = std::to_string(delivery.user);
         if (!state["players"].contains(key))
             return false;
         const auto &player = state["players"][key];
+        if (delivery.tournamentFormationDisband)
+        {
+            if (player["id"] != delivery.tournamentId || player["accepted"] != false ||
+                !player.value("formation_disbanded", false))
+                return false;
+            for (const auto &row : catalog(root / "catalog.json", title))
+                if (row["id"] == delivery.tournamentId && row.contains("formation") &&
+                    row["expires"].get<uint64_t>() > now() &&
+                    row["state"]["tournamentStatus"] == "FORMING")
+                    return !validateBracket(row["state"], delivery.tournamentId)
+                                .contains(delivery.user) &&
+                           stateHash(row["state"]) == delivery.tournamentStateHash;
+            return false;
+        }
         if (player["id"] != delivery.tournamentId || player["accepted"] == delivery.tournamentJoin)
             return false;
         if (delivery.tournamentRefresh && !delivery.tournamentJoin &&
@@ -945,6 +1330,8 @@ namespace services
             tournament = query["tournamentID"].get<uint64_t>();
         }
         params.end();
+        matchmaking_store::recover(directory / "matchmaking" / std::to_string(id.titleId),
+                                   id.titleId);
         const auto root = directory / "tournaments" / std::to_string(id.titleId);
         const auto path = root / "enrollments.json";
         auto state = enrollments(path, id.titleId);
@@ -956,13 +1343,30 @@ namespace services
             const auto tournamentLeft =
                 players.contains(key) ? players[key]["id"].get<uint64_t>() : 0;
             Reply reply{0, {}, "tournament-owner-left-all"};
+            std::optional<Json> leaveFormation;
             // Leave must still succeed when publication is unavailable. A malformed
             // notification source cannot undo the authenticated enrollment removal.
             try
             {
                 const auto rows = catalog(root / "catalog.json", id.titleId);
                 const auto *row = published(rows, tournamentLeft, id.userId);
-                if (row)
+                if (row && row->contains("formation"))
+                {
+                    auto formation = formationRecord(root, id.titleId, *row);
+                    releaseFormingParty(formation, id.userId, players, reply);
+                    players.erase(key);
+                    Json updated = *row;
+                    updated["state"] = formation["state"];
+                    // Notification data can be unavailable independently of a
+                    // valid release. Keep its coupled snapshot for the commit.
+                    leaveFormation = formation;
+                    const auto journal =
+                        results(root / "results" / (std::to_string(tournamentLeft) + ".json"),
+                                id.titleId,
+                                tournamentLeft);
+                    notifyUpdate(reply, updated, journal, players);
+                }
+                else if (row)
                 {
                     auto remaining = players;
                     remaining.erase(key);
@@ -976,6 +1380,11 @@ namespace services
             catch (const std::exception &)
             {
                 reply.detail = "tournament leave notification source unavailable";
+            }
+            if (leaveFormation)
+            {
+                commitEnrollment(directory, id.titleId, state, leaveFormation);
+                return reply;
             }
             if (players.erase(key))
                 write(path, state);
@@ -993,8 +1402,12 @@ namespace services
             if (!selected)
                 return Reply{108, {}, "tournament-registration-unpublished"};
             tournament = (*selected)["id"].get<uint64_t>();
-            if (!published(rows, tournament, id.userId))
+            if (!selected->contains("formation") && !published(rows, tournament, id.userId))
                 return Reply{101, {}, "tournament-participant-not-authorized"};
+            if (selected->contains("formation") &&
+                (*selected)["state"]["tournamentStatus"] == "PLAYING" &&
+                !published(rows, tournament, id.userId))
+                return Reply{108, {}, "tournament-registration-already-formed"};
             if (players.contains(key) && players[key]["id"] != tournament)
                 return Reply{101, {}, "tournament-conflicting-enrollment"};
             if (!players.contains(key))
@@ -1004,7 +1417,10 @@ namespace services
                 players[key] = {{"id", tournament}, {"accepted", false}, {"ready", false}};
                 if (selected->value("live_updates", false))
                     players[key]["live_updates"] = true;
-                write(path, state);
+                if (selected->contains("formation"))
+                    commitEnrollment(directory, id.titleId, state);
+                else
+                    write(path, state);
             }
             wire::Writer result;
             result.text(
@@ -1042,9 +1458,18 @@ namespace services
         if (task == 23 && !accepted)
             players.erase(key);
         else if (task == 23 || task == 28)
+        {
             entry["accepted"] = true;
+            if (row->contains("formation"))
+                entry["accepted_session"] = wire::base64Encode(crypto::sha256(id.key));
+        }
         else if (task == 19)
         {
+            if (row->contains("formation") &&
+                (bracket["tournamentStatus"] != "PLAYING" || entry["accepted"] != true ||
+                 entry.value("accepted_session", std::string{}) !=
+                     wire::base64Encode(crypto::sha256(id.key))))
+                return Reply{101, {}, "tournament-ready-formation-not-accepted"};
             bool assigned = false;
             for (const auto &round : bracket["rounds"])
                 for (size_t index = 0; index < round["matches"].size(); ++index)
@@ -1075,8 +1500,24 @@ namespace services
                                  : "tournament-owner-join-declined"};
         if (state != previous)
         {
-            notifyUpdate(reply, *row, journal, players);
-            write(path, state);
+            if (row->contains("formation"))
+            {
+                auto formation = formationRecord(root, id.titleId, *row);
+                if (task == 23 && !accepted)
+                    releaseFormingParty(formation, id.userId, players, reply);
+                else if (formation["state"]["tournamentStatus"] == "FORMING" &&
+                         formationAccepted(formation, id.titleId, players))
+                    formation["state"]["tournamentStatus"] = "PLAYING";
+                Json updated = *row;
+                updated["state"] = formation["state"];
+                notifyUpdate(reply, updated, journal, players);
+                commitEnrollment(directory, id.titleId, state, formation);
+            }
+            else
+            {
+                notifyUpdate(reply, *row, journal, players);
+                write(path, state);
+            }
         }
         return reply;
     }

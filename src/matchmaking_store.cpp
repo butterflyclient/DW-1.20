@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "matchmaking_store.h"
+#include "tournament_services.h"
 #include <algorithm>
 #include <charconv>
 #include <memory>
@@ -111,7 +112,14 @@ namespace matchmaking_store
         {
             const auto &state = entry.document;
             require(state.is_object() && state.at("schema") == 1 && state.at("title") == title &&
-                    state.dump().size() <= documentLimit);
+                    state.dump().size() <= (entry.path == "tournament-enrollments.json"
+                                                ? 2 * 1024 * 1024
+                                                : documentLimit));
+            if (entry.path == "tournament-enrollments.json")
+            {
+                services::validateTournamentEnrollments(state, title);
+                return;
+            }
             if (entry.path == "current-lobbies.json" || entry.path == "tournament-searches.json")
             {
                 const auto field = entry.path == "current-lobbies.json" ? "lobbies" : "searches";
@@ -129,9 +137,14 @@ namespace matchmaking_store
             require(slash != std::string::npos && entry.path.ends_with(".json"));
             const auto kind = entry.path.substr(0, slash);
             const auto id = number(entry.path.substr(slash + 1, entry.path.size() - slash - 6));
-            require((kind == "lobbies" || kind == "searches") &&
+            require((kind == "lobbies" || kind == "searches" || kind == "tournaments") &&
                     state.at("id").is_number_unsigned() && state["id"] == id &&
                     state.at("expires").is_number_unsigned());
+            if (kind == "tournaments")
+            {
+                services::validateTournamentFormation(state, title, id);
+                return;
+            }
             if (kind == "searches")
             {
                 require(state.at("user").is_number_unsigned() && state["user"].get<uint64_t>() &&
@@ -248,7 +261,15 @@ namespace matchmaking_store
                 // All paths and complete snapshots were validated first. No reader
                 // under the store mutex can observe a partially applied transaction.
                 for (const auto &entry : entries)
-                    write(root / entry.path, entry.document);
+                {
+                    // This one named cross-domain document has a fixed target.
+                    // Journal paths cannot select arbitrary parents or files.
+                    const auto target = entry.path == "tournament-enrollments.json"
+                                            ? root.parent_path().parent_path() / "tournaments" /
+                                                  std::to_string(title) / "enrollments.json"
+                                            : root / entry.path;
+                    write(target, entry.document);
+                }
                 journal["phase"] = "applied";
                 journal["writes"] = Json::array();
                 // Retain a flushed completion marker. Deleting the journal could

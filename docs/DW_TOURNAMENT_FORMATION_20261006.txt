@@ -1,0 +1,74 @@
+REPLAY DW AUTOMATIC TOURNAMENT FORMATION
+Date: 2026-10-06
+
+Issue
+- Formation searches previously required a publication listing the actual players.
+- The server could send joins but could not allocate teams or complete formation.
+- A party withdrawal could not release its team slot for another real party.
+
+Target-build research
+- Original Replay StartMatchmaking 0x14104A450 writes tournament.team_size.
+- Original decoder 0x14213F1C0 reads event 2009 as typed UInt64 search ID and
+  bracket string; event 2010 is one bracket string; event 2011 is typed UInt64
+  tournament ID. No extra synthetic fields or lengths are used.
+- Native bracket parser 0x141074530 consumes bounded indexed team/round arrays.
+  FORMING leaves native counts unset; PLAYING processes the complete bracket.
+- The IW8 source behavior oracle treats event 2011 as a formation disband. Its
+  callback is not claimed as a newly verified native positive completion here.
+- Wire IDs/layouts come from original Replay evidence, not another build's RVAs.
+
+Changes
+- Capacity publications specify team size and team count, without player IDs,
+  team arrays, rounds or acceptance. Normal signed machine registration supplies
+  the player identity; no development provisioning or seed friendship is needed.
+- Authenticated party searches reserve the first team with capacity for the
+  entire party. Parties are never split, and assigned slots cannot be taken over.
+- The backend generates native teams/rounds from those reservations and remains
+  FORMING until every team is full and every user has acknowledged through a
+  still-live authenticated session. The final acknowledgement commits PLAYING
+  and sends exact event-2010 documents to accepted participants.
+- Readiness requires that player's accepted session and the completed bracket.
+- A forming leave/decline releases the whole party allocation, removes only
+  the caller's enrollment and resets peer acceptance/readiness. Event 2011 and
+  a durable catch-up marker notify the peers. A fresh search clears the marker.
+- Immutable competition identity/capacity is checked against the durable record.
+  Publish a new tournament ID to change it. Publisher files are not rewritten.
+- Enrollment, formation and search/index changes use the existing flushed
+  matchmaking transaction. One fixed cross-domain enrollment filename maps to
+  its known path. Whole snapshots are validated before recovery writes.
+- An interrupted acknowledgement rolls forward enrollment and formation together.
+  Notification source failure cannot uncouple a valid forming-party release.
+- No game recompile, proxy, additional thread, listener or external port added.
+
+Compilation and protocol evidence
+- Server SHA256:
+  13f9f3441bb8f99519b5a3c79a19e08281ae4bd2ee20d6785c3ce5caab07bb12
+- Unchanged game SHA256:
+  b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+- Release build passed: data/tournament-formation-build-final-20261006.log.
+- All 236 encrypted protocol/service groups passed on this final image:
+  data/tournament-formation-suite-final-20261006.log.
+- Five new groups use eight separate authenticated clients; six are created
+  through the real nonce/challenge/P-256 machine-registration path. No player
+  IDs or accepted enrollments are seeded by the tournament fixture.
+- Checks cover partial/full formation, native arrays, live-session acceptance,
+  ready gating, immutable identity, interrupted cross-domain writes, event 2011,
+  whole-party withdrawal, retained peer registration, slot reuse and decline.
+- Signed platform, native auth and signed resource checks passed after deployment.
+- Protocol receipt: validation/20261006-tournament-formation.json.
+
+Native validation and limits
+- Focused root-folder startup/backend restart/dw_restart validation is recorded
+  separately in validation/20261006-tournament-formation-native-reconnect.json.
+- All 27 startup fences passed. The same PID/account recovered after backend
+  restart with fresh native auth and relay credentials. BIND/VERIFY/ESTABLISHED
+  matched the backend event. Another 75.9 seconds produced eight keepalive
+  replies, retained the association and had zero rejected packets.
+- The owned test game closed normally; the backend remains running. Temporary
+  root game test-command/opt-in files were removed. Owner identity/INI preserved.
+- This protocol pass does not prove the native tournament join/formation UI.
+  Native join/ack/ready/results/leave/rejoin callbacks remain separate gates.
+- The generated bracket currently has lobbyID zero. Automatic round-to-playable
+  lobby scheduling and match forfeits are not implemented by this change.
+- No map/match test, two-network gameplay claim or Terms acceptance is made.
+- Full backend development continues; this is an allocation/readiness milestone.
