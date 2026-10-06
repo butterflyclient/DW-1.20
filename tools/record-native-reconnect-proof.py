@@ -11,6 +11,12 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("before", type=Path)
 parser.add_argument("after", type=Path)
 parser.add_argument(
+    "--output",
+    type=Path,
+    default=ROOT / "validation/20261006-native-reconnect.json",
+    help="Receipt inside validation; use a new filename to retain historical image proofs",
+)
+parser.add_argument(
     "--stability",
     type=Path,
     help="Later observation proving at least 60 seconds of relay keepalives",
@@ -171,7 +177,8 @@ if args.stability:
     receipt["observations"][str(args.stability.resolve().relative_to(ROOT))] = digest(
         args.stability
     )
-output = ROOT / "validation/20261006-native-reconnect.json"
+output = args.output.resolve()
+assert output.is_relative_to((ROOT / "validation").resolve())
 output.write_text(json.dumps(receipt, indent=2) + "\n")
 deployment["local_player_identity"]["native_runtime_verified"] = True
 deployment["local_player_identity"]["native_proof"] = str(output)

@@ -44,7 +44,11 @@ native online network lifecycle and resets its cached relay credential after
 native sign-out cancels outstanding tasks. The focused 2026-10-06 run verified
 all 27 fences, profile/Online/friend lists, a fresh relay-token task and native
 BIND/VERIFY/ESTABLISHED after restarting the backend in the same game process.
-The exact image-bound receipt is `validation/20261006-native-reconnect.json`.
+The original image-bound receipt is `validation/20261006-native-reconnect.json`.
+The backend public-matching iteration has its own current-image receipt at
+`validation/20261006-public-matchmaking-native-reconnect.json`; the earlier
+receipt remains unchanged. Backend rebinding clears stale native-validation
+flags until the new image is independently observed.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
@@ -102,6 +106,8 @@ they are not silently promoted to a newer build.
 | runtime-clan-role-accepted.json | Native invitation acceptance task completed after resolving the role-zero default; activation permission issue recorded separately |
 | lobby-verification.json | Latest independent wire checks, backend/KDF hash and fixture directory |
 | validation/20261006-native-reconnect.json | Hash-bound native startup, same-process backend restart, new relay token and authenticated UDP relay completion |
+| validation/20261006-public-matchmaking.json | Two independent encrypted clients fill one compatible public lobby; privacy, capacity, live-host assignment and join-in-progress checks |
+| validation/20261006-public-matchmaking-native-reconnect.json | Current backend image: 27 native fences, unchanged game process, renewed relay credentials and sustained authenticated keepalives |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -155,6 +161,15 @@ Presence unsubscribe returns HTTP 200 with `errorUsers: []`: Replay binds the
 complete native response even though its request is a DELETE. An empty HTTP 204
 response left the native removal queue pending and caused retries every frame.
 The native completion queue now clears after actual unsubscribe requests.
+
+Public matchmaking fills compatible live lobbies before creating another,
+retaining the existing host address, DTLS keys and match rules. Private, closed,
+expired and orphaned host assignments cannot enter this pool. Parties receive
+their own matchmaking IDs, native join/update pushes, and one atomic shared
+lobby assignment. See [the public-matching contract](docs/public-matchmaking.txt)
+and [the current handoff](docs/DW_PUBLIC_MATCHMAKING_READINESS_20261006.txt).
+Native public-menu callbacks and two-network party gameplay remain separate
+validation gates.
 
 ## Persistent data and configuration
 

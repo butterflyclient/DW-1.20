@@ -1,0 +1,73 @@
+REPLAY DW PUBLIC MATCHMAKING AND MULTIPLAYER READINESS
+2026-10-06
+
+Implementation
+Public task 145/18 previously created separate lobbies for compatible players.
+It now fills a live compatible public lobby first, using the bounded current
+assignment index. The host must still own that assignment and have a live
+authenticated session. Playlist/catalog data, native rules and versions,
+capacity, privacy, host state and join-in-progress policy must match.
+
+Public and explicit presence joins share one assignment implementation. It
+preserves the existing host address and DTLS material, updates the documents,
+publishes lobby/search/current-index snapshots atomically, keeps a joining
+party on one least-populated team, and sends recovered event 2001 to joiners
+and event 2006 to existing members. Each joining party has its own search ID.
+Join-existing-only searches fail unavailable rather than creating a new game.
+
+Malformed capacities, invalid live-party tokens, private/closed/full lobbies,
+stale owner assignments and incompatible publications fail before any lobby,
+search or assignment index changes. Historical unmarked lobbies are never
+implicitly reclassified as public.
+
+Build and deployment
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: b3ba9db6dc475c5f5091a49815e54aed8573e109dc9aa6669439324dcb7137ec
+Game unchanged: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Backend-only rebinding preserves the compiled integration source hashes and
+clears outdated native-validation flags when the backend image changes.
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work is not included.
+
+Validation
+186 grouped encrypted-protocol checks passed on this exact backend image.
+Two independent authenticated clients verified public fill, identical shared
+documents, host/DTLS preservation, native push layouts, teams and exclusions.
+Rejected requests verified unchanged lobby/search/current-index bytes.
+Signed platform login, native auth, platform resources and the separate test
+identity's persistence across backend restart passed.
+
+The native game was launched from the root game folder. All 27 startup fences,
+native profile/Online state and completed empty friend lists were observed.
+The backend was stopped and started separately, then dw_restart was issued in
+the same game process. A new relay credential and authenticated native UDP
+association completed, followed by a timed keepalive stability observation.
+The hash-bound receipt contains the exact duration and keepalive count.
+No map or match was launched; no Terms or legal prompt was accepted.
+
+Receipts and source
+validation/20261006-public-matchmaking.json
+validation/20261006-public-matchmaking-native-reconnect.json
+data/lobby-verification.json
+data/local-player-verification.json
+data/backend-coverage-inventory.json
+docs/public-matchmaking.txt
+src/matchmaking_services.cpp
+tools/public_matchmaking_fixtures.py
+
+Remaining gates
+The full backend is not complete. The constructor-ledger audit has 140 known
+task routes, 134 registered handlers and six missing known routes, alongside
+indirect/virtual dispatch, REST and push coverage that still needs research.
+Native public-search menu callbacks, party host migration, peer traversal,
+two-game relay JOIN/forwarding and actual two-network gameplay remain open.
+The earlier remote tester's platform identity failure still requires output
+from that machine; local success does not resolve its cause.
+
+Use the existing universal client package and each player's persistent local
+identity. Do not replace player-identity.bin or seed friendships. No proxy DLL
+is required. Existing server/relay/QoS ports and INI endpoints are retained.
+Do not use the broken dw_leave command. Backend-only changes can be followed
+by a controlled server restart and refresh-game-connection.ps1; executable
+replacement still requires closing the verified game process first.

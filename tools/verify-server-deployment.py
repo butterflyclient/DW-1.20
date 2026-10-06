@@ -100,6 +100,23 @@ if (
         "Server trust/crypto verification does not match the compiled game integration"
     )
 previous_server_hash = record["server_sha256"]
+readiness_path = ROOT / "data/auth-profile-readiness.json"
+readiness = load(readiness_path)
+if readiness["executable_sha256"] != game_hash:
+    raise RuntimeError("Readiness evidence belongs to another compiled game image")
+if readiness["server_sha256"] != server_hash:
+    # A backend-only build must invalidate the companion readiness receipt too.
+    # Retain historical proof paths, but never carry their native flags forward.
+    readiness["native_game_verified"] = False
+    readiness["native_startup_reconnect_verified"] = False
+    readiness["native_relay_restart_verified"] = False
+    readiness["native_verified_scopes"] = []
+readiness["server_sha256"] = server_hash
+readiness["checks"] = proofs["lobby-verification.json"]["checks"]
+readiness["backend_rebound_utc"] = datetime.now(timezone.utc).isoformat()
+for path in sorted((ROOT / "src").iterdir()):
+    if path.is_file() and path.suffix in (".cpp", ".h"):
+        readiness["source_hashes"][str(path.relative_to(ROOT))] = digest(path)
 if previous_server_hash != server_hash:
     # Wire/crypto gates do not promote an earlier server's native observation
     # to this revision. Retain the historical proof path but clear current status.
@@ -125,4 +142,7 @@ record["server_rebinding"] = {
 pending = record_path.with_suffix(".pending")
 pending.write_text(json.dumps(record, indent=2) + "\n")
 os.replace(pending, record_path)
+pending = readiness_path.with_suffix(".pending")
+pending.write_text(json.dumps(readiness, indent=2) + "\n")
+os.replace(pending, readiness_path)
 print("Verified server " + server_hash + " for unchanged game " + game_hash)

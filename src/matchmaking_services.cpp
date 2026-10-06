@@ -226,6 +226,172 @@ namespace services
             return index;
         }
 
+        uint64_t requestCapacity(const Json &query, size_t members)
+        {
+            uint64_t maximum = 200;
+            if (query.contains("lobby_slots"))
+            {
+                const auto &slots = query.at("lobby_slots");
+                wire::require(slots.is_object() && slots.at("max").is_number_unsigned());
+                maximum = slots.at("max").get<uint64_t>();
+            }
+            wire::require(maximum > 0 && maximum <= 200 && members <= maximum);
+            return maximum;
+        }
+
+        Json publicPool(const Json &query, const PlaylistSelection &selection)
+        {
+            auto rules = selection.rules;
+            // This is a search instruction, not a different match ruleset.
+            rules.erase("only_join_existing_lobbies");
+            return {{"rules", rules},
+                    {"dedicated_server", query.value("dedicated_server", Json::object())},
+                    {"performance", query.value("performance", Json{{"game_type", 1}})},
+                    {"team_balance", query.value("team_balance", Json::object())},
+                    {"maximum_members", requestCapacity(query, query.at("members").size())}};
+        }
+
+        Reply assignMembers(const std::filesystem::path &directory,
+                            const platform::LobbyIdentity &id,
+                            const Json &query,
+                            const std::set<uint64_t> &users,
+                            Json lobby,
+                            const char *operation)
+        {
+            const auto root = directory / "matchmaking" / std::to_string(id.titleId);
+            uint64_t mmId = 0;
+            do
+            {
+                mmId = randomId();
+            } while (std::filesystem::exists(root / "searches" / (std::to_string(mmId) + ".json")));
+            const auto revision = lobby.at("update_id").get<uint64_t>();
+            wire::require(revision != UINT64_MAX);
+            const auto time = now();
+            lobby["expires"] = std::min(lobby.at("expires").get<uint64_t>(), id.expires);
+            lobby["update_id"] = revision + 1;
+            for (auto *document : {&lobby["host_doc"], &lobby["backend_doc"]})
+            {
+                (*document)["update_id"] = revision + 1;
+                (*document)["update_time"] = time;
+            }
+            auto &backend = lobby["backend_doc"];
+            auto &teams = backend["team_balance"]["teams"];
+            wire::require(teams.is_object() && !teams.empty());
+            auto team = teams.begin();
+            for (auto it = teams.begin(); it != teams.end(); ++it)
+            {
+                wire::require(it.value().is_array());
+                if (it.value().size() < team.value().size())
+                    team = it;
+            }
+            std::set<uint64_t> existing;
+            for (const auto &user : lobby.at("members"))
+                existing.insert(user.get<uint64_t>());
+            for (const auto user : users)
+            {
+                const auto key = std::to_string(user);
+                if (existing.insert(user).second)
+                {
+                    lobby["members"].push_back(user);
+                    lobby["host_doc"]["player_state"][key] = 2;
+                    backend["players"][key] = "connected";
+                    backend["player_id_to_service_level"][key] = "paid";
+                    backend["listen_server"]["lobby_host_order"].push_back(user);
+                    // Keep a joining party together on the least populated team.
+                    team.value().push_back(user);
+                }
+                backend["player_id_to_mm_id"][key] = mmId;
+            }
+            wire::require(lobby["host_doc"].dump().size() < 16384 && backend.dump().size() < 16384);
+            const auto lobbyId = lobby.at("id").get<uint64_t>();
+            const auto assignments =
+                prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
+            const std::array<matchmaking_store::Write, 3> writes = {
+                matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", lobby},
+                matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
+                                         searchState(id, query, lobby, mmId)},
+                matchmaking_store::Write{"current-lobbies.json", assignments}};
+            matchmaking_store::commit(root, id.titleId, writes);
+            wire::Writer result;
+            result.text(Json{{"mm_id", mmId}}.dump());
+            Reply reply{0, {std::move(result.data)}, operation};
+            notify(reply, lobby, 2001, mmId, &users);
+            std::set<uint64_t> observers;
+            for (const auto user : existing)
+                if (!users.contains(user))
+                    observers.insert(user);
+            notify(reply, lobby, 2006, 0, &observers);
+            return reply;
+        }
+
+        std::optional<Reply> publicJoin(const std::filesystem::path &directory,
+                                        const platform::LobbyIdentity &id,
+                                        const Json &query,
+                                        const std::set<uint64_t> &users,
+                                        const PlaylistSelection &selection)
+        {
+            if (query.contains("private_lobby"))
+                return std::nullopt;
+            const auto root = directory / "matchmaking" / std::to_string(id.titleId);
+            const auto index = currentLobbies(root, id);
+            const auto pool = publicPool(query, selection);
+            const auto &rules = query.at("ruleset_payload");
+            const bool inProgress = rules.value("join_in_progress", false);
+            std::set<uint64_t> ids;
+            std::vector<Json> candidates;
+            // The bounded current-assignment index excludes abandoned historical
+            // files and duplicates. No directory-wide scan grows with every search.
+            for (const auto &value : index.at("lobbies"))
+            {
+                const auto lobbyId = value.get<uint64_t>();
+                if (!ids.insert(lobbyId).second)
+                    continue;
+                const auto path = root / "lobbies" / (std::to_string(lobbyId) + ".json");
+                if (!std::filesystem::exists(path))
+                    continue;
+                auto candidate = loadLobby(path, id);
+                const auto ownerKey = std::to_string(candidate.at("owner").get<uint64_t>());
+                const auto &host = candidate.at("host_doc");
+                const auto &backend = candidate.at("backend_doc");
+                if (!candidate.contains("public_pool") || candidate["public_pool"] != pool ||
+                    backend.contains("private_lobby") || !index.at("lobbies").contains(ownerKey) ||
+                    index.at("lobbies").at(ownerKey) != lobbyId ||
+                    candidate.at("match_selection") != selection.metadata ||
+                    candidate.value("disbanded", false) ||
+                    candidate.at("expires").get<uint64_t>() <= now() ||
+                    !host.value("lobby_open", false) || !hostSessionActive(candidate, id.titleId) ||
+                    candidate.at("members").size() + users.size() >
+                        pool.at("maximum_members").get<uint64_t>() ||
+                    std::any_of(users.begin(),
+                                users.end(),
+                                [&](uint64_t user)
+                                {
+                                    return member(candidate, user);
+                                }))
+                    continue;
+                const auto state = host.at("game_state").value("state", std::string{});
+                if (state != "intermission" && !(inProgress && state == "playing"))
+                    continue;
+                candidates.push_back(std::move(candidate));
+            }
+            std::sort(candidates.begin(),
+                      candidates.end(),
+                      [](const Json &a, const Json &b)
+                      {
+                          if (a.at("members").size() != b.at("members").size())
+                              return a.at("members").size() > b.at("members").size();
+                          return a.at("id").get<uint64_t>() < b.at("id").get<uint64_t>();
+                      });
+            if (candidates.empty())
+                return std::nullopt;
+            return assignMembers(directory,
+                                 id,
+                                 query,
+                                 users,
+                                 std::move(candidates.front()),
+                                 "matchmaker-public-join-assigned");
+        }
+
         Reply presenceJoin(const std::filesystem::path &directory,
                            const platform::LobbyIdentity &id,
                            const Json &query,
@@ -285,66 +451,12 @@ namespace services
                 if (!selection || selection->metadata.at("eligible_entries") !=
                                       lobby.at("match_selection").at("eligible_entries"))
                     continue;
-                uint64_t mmId = 0;
-                do
-                {
-                    mmId = randomId();
-                } while (
-                    std::filesystem::exists(root / "searches" / (std::to_string(mmId) + ".json")));
-                const auto revision = lobby.at("update_id").get<uint64_t>();
-                wire::require(revision != UINT64_MAX);
-                const auto time = now();
-                lobby["expires"] = std::min(lobby.at("expires").get<uint64_t>(), id.expires);
-                lobby["update_id"] = revision + 1;
-                for (auto *document : {&lobby["host_doc"], &lobby["backend_doc"]})
-                {
-                    (*document)["update_id"] = revision + 1;
-                    (*document)["update_time"] = time;
-                }
-                auto &backend = lobby["backend_doc"];
-                auto &teams = backend["team_balance"]["teams"];
-                wire::require(teams.is_object() && !teams.empty());
-                auto team = teams.begin();
-                for (auto it = teams.begin(); it != teams.end(); ++it)
-                {
-                    wire::require(it.value().is_array());
-                    if (it.value().size() < team.value().size())
-                        team = it;
-                }
-                for (const auto user : users)
-                {
-                    const auto key = std::to_string(user);
-                    if (existing.insert(user).second)
-                    {
-                        lobby["members"].push_back(user);
-                        lobby["host_doc"]["player_state"][key] = 2;
-                        backend["players"][key] = "connected";
-                        backend["player_id_to_service_level"][key] = "paid";
-                        backend["listen_server"]["lobby_host_order"].push_back(user);
-                        team.value().push_back(user);
-                    }
-                    backend["player_id_to_mm_id"][key] = mmId;
-                }
-                wire::require(lobby["host_doc"].dump().size() < 16384 &&
-                              backend.dump().size() < 16384);
-                const auto assignments = prepareLobbyAssignments(
-                    root, id, lobby.at("members"), lobby.at("id").get<uint64_t>());
-                const std::array<matchmaking_store::Write, 3> writes = {
-                    matchmaking_store::Write{"lobbies/" + path.filename().string(), lobby},
-                    matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
-                                             searchState(id, query, lobby, mmId)},
-                    matchmaking_store::Write{"current-lobbies.json", assignments}};
-                matchmaking_store::commit(root, id.titleId, writes);
-                wire::Writer result;
-                result.text(Json{{"mm_id", mmId}}.dump());
-                Reply reply{0, {std::move(result.data)}, "matchmaker-presence-join-assigned"};
-                notify(reply, lobby, 2001, mmId, &users);
-                std::set<uint64_t> observers;
-                for (const auto user : combined)
-                    if (!users.contains(user))
-                        observers.insert(user);
-                notify(reply, lobby, 2006, 0, &observers);
-                return reply;
+                return assignMembers(directory,
+                                     id,
+                                     query,
+                                     users,
+                                     std::move(lobby),
+                                     "matchmaker-presence-join-assigned");
             }
             return {108, {}, "matchmaker-presence-lobby-unavailable"};
         }
@@ -394,6 +506,7 @@ namespace services
                 }
                 if (!users.contains(id.userId))
                     return Reply{101, {}, "matchmaker-request-owner-denied"};
+                const auto maximum = requestCapacity(query, users.size());
                 if (query.contains("lobby_id_to_presence_join") ||
                     query.contains("player_id_to_presence_join"))
                     return presenceJoin(directory, id, query, users);
@@ -411,16 +524,25 @@ namespace services
                     wire::base64(listen["local_address"].get<std::string>(), 84).size() == 84 &&
                     wire::base64(listen["security_id"].get<std::string>(), 8).size() == 8 &&
                     wire::base64(listen["security_key"].get<std::string>(), 16).size() == 16);
-                const auto mmId = randomId();
+                const auto selection = selectPlaylist(directory, id.titleId, query);
+                if (!selection)
+                    return Reply{108, {}, "matchmaker-playlist-or-map-unavailable"};
+                if (auto joined = publicJoin(directory, id, query, users, *selection))
+                    return joined;
+                if (query.at("ruleset_payload").value("only_join_existing_lobbies", false))
+                    return Reply{108, {}, "matchmaker-public-lobby-unavailable"};
+                uint64_t mmId = 0;
+                do
+                {
+                    mmId = randomId();
+                } while (
+                    std::filesystem::exists(root / "searches" / (std::to_string(mmId) + ".json")));
                 uint64_t lobbyId = 0;
                 do
                 {
                     lobbyId = randomId();
                 } while (std::filesystem::exists(root / "lobbies" /
                                                  (std::to_string(lobbyId) + ".json")));
-                const auto selection = selectPlaylist(directory, id.titleId, query);
-                if (!selection)
-                    return Reply{108, {}, "matchmaker-playlist-or-map-unavailable"};
                 Json rules = selection->rules;
                 Json players = Json::object(), states = Json::object(), matchIds = Json::object(),
                      levels = Json::object();
@@ -448,6 +570,13 @@ namespace services
                                  {{"teams", {{"0", query["members"]}}},
                                   {"squad_size", 1},
                                   {"squads", Json::object()}}}};
+                if (query.contains("team_balance") && query["team_balance"].contains("num_teams"))
+                {
+                    const auto &count = query["team_balance"]["num_teams"];
+                    wire::require(count.is_number_unsigned() && count.get<uint64_t>() <= 200);
+                    for (uint64_t team = 1; team < count.get<uint64_t>(); ++team)
+                        backend["team_balance"]["teams"][std::to_string(team)] = Json::array();
+                }
                 if (query.contains("private_lobby"))
                     backend["private_lobby"] = query["private_lobby"];
                 Json host = {
@@ -470,14 +599,9 @@ namespace services
                               {"host_doc", host},
                               {"backend_doc", backend},
                               {"match_selection", selection->metadata}};
-                if (query.contains("lobby_slots"))
-                {
-                    const auto &slots = query.at("lobby_slots");
-                    wire::require(slots.is_object() && slots.at("max").is_number_unsigned());
-                    const auto maximum = slots.at("max").get<uint64_t>();
-                    wire::require(maximum > 0 && maximum <= 200 && users.size() <= maximum);
-                    lobby["maximum_members"] = maximum;
-                }
+                lobby["maximum_members"] = maximum;
+                if (!query.contains("private_lobby"))
+                    lobby["public_pool"] = publicPool(query, *selection);
                 wire::require(host.dump().size() < 16384 && backend.dump().size() < 16384);
                 const auto assignments =
                     prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);

@@ -2958,6 +2958,12 @@ try:
     matchmaking_transaction_fixture = matchmaking_transaction_fixtures.exercise(
         client, directory, title, user, match_query, (u32, u64, text, boolean), checks
     )
+    import public_matchmaking_fixtures
+
+    public_matchmaking_fixtures.exercise(
+        client, peer_client, directory, title, user, peer_user, player_info,
+        match_query, (u32, u64, text, boolean), checks,
+    )
     import tournament_fixtures
 
     tournament_fixture = tournament_fixtures.exercise(

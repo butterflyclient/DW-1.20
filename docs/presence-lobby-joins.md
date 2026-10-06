@@ -78,5 +78,7 @@ the native session-info exchange and backend lobby assignment, not two-game
 network connectivity or a playable map. The test peer disbands its lobby at the
 end; remove its temporary relationship with `native-social-test.py remove`.
 
-Host migration, cross-lobby merging, automatic public matchmaking fill and
-tournament match scheduling remain separate work.
+Host migration, cross-lobby merging and tournament match scheduling remain
+separate work. Automatic public matchmaking fill now has its own
+[implementation and protocol checks](public-matchmaking.txt); native public-menu
+callback validation remains open.

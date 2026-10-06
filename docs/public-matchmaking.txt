@@ -1,0 +1,41 @@
+REPLAY PUBLIC MATCHMAKING
+
+Task 145/18 now fills a compatible live public lobby before creating another.
+The request and typed events retain the recovered Replay transport contracts:
+StartMatchmaking 0x14104A450; SDK async event reader 0x14213F1C0;
+event 2001 = matchmaking ID, lobby ID, host document, backend document;
+event 2006 = lobby ID, update ID, host document, backend document.
+
+Public matching uses the bounded current-lobby index, deduplicated by lobby ID.
+It does not scan every historical search/lobby file. A candidate must have its
+host's current assignment, a live authenticated host session, available capacity,
+an open host document and an unexpired, non-disbanded lobby. Historic documents
+without the new public_pool publication are not silently adopted as public.
+
+The public pool binds selected playlist/rules, netcode and matchmaking versions,
+available map entries, dedicated-server context, performance type, team policy
+and maximum slots. The latest playlist/map publication must still match. The
+only_join_existing_lobbies instruction is excluded from rules comparison; if
+true and no candidate exists, the request returns unavailable without creating
+a different lobby. A private_lobby field excludes a query/lobby from public
+filling. Explicit by-player/by-lobby presence joins retain their native path.
+
+Intermission is eligible. A playing lobby requires join_in_progress. Countdown
+and unclassified host states are not implicitly considered safe to join. The
+fullest eligible lobby is chosen first, with lobby ID as a deterministic tie
+breaker. An overlapping party does not get added a second time by public fill.
+
+Assignment reuses the same atomic lobby/search/current-index transaction as
+presence joining. The existing host address, DTLS keys and rules are retained.
+The joining party receives event 2001 and existing members receive event 2006.
+Each party retains its own matchmaking ID. Explicit native num_teams values
+create the corresponding team arrays; a joining party stays together on the
+least populated team. Split-party balancing and host migration remain separate.
+
+tools/public_matchmaking_fixtures.py uses two independently authenticated
+encrypted clients. It verifies shared documents, assignment events, teams,
+privacy, host flags, join-in-progress, live tokens, capacity and orphaned current
+assignments. Every rejected request checks that lobby/search/index bytes remain
+unchanged. These are protocol/domain proofs, not native public-menu callbacks or
+two-network gameplay proof. The existing local native startup/relay test remains
+a separately hash-bound validation step.

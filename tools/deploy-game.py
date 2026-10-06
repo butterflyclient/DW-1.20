@@ -536,7 +536,7 @@ readiness = {
         "proxy-free native-game acceptance and two-network gameplay are separate pending gates",
         "full backend implementation continues; two-network party gameplay remains unverified",
         "see backend-coverage-inventory.json for reviewed routes and unresolved DTO methods",
-        "host migration, automatic public lobby fill and tournament scheduling remain open",
+        "public lobby fill has encrypted-client coverage; native public-search callbacks, host migration and tournament scheduling remain open",
         "marketplace gifts/discounts and validation-token semantics remain open",
         "object-store listing and large-upload variants remain open",
         "crossplay/Uno account linking and broader native progression/reward validation remain open",
