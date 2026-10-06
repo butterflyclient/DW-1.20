@@ -1,0 +1,88 @@
+REPLAY CHANNEL MEMBERSHIP - 2026-10-06
+
+Issue
+The category channel tasks persisted subscriptions and routed messages, but
+joining, unsubscribing and the last account socket closing did not notify peers.
+The native chat list could retain departed members or omit new members.
+The channel dataVersion field also used creation time rather than a revision.
+
+Target evidence
+Untouched Replay 1.20 bdLobbyService push dispatch: 0x142122970.
+Member-subscription V2 reader: 0x142120A80. Events 24 and 25 mean join and leave.
+Typed channel-info-with-category reader: 0x1420FE9A0.
+DW event forwarding: 0x1414F4A50; chat membership consumer: 0x140F3D690.
+The push contains actor UInt64, bounded name, category, channel UInt64, member
+UInt32 flags, then category/ID/subscriber count/maximum/admin/password/public/
+UInt32 dataVersion. Native AddMemberToChat ignores duplicate joins; it does not
+rename an existing member. Name changes update queried metadata and appear in
+the native member record on its next real join, without a spurious join event.
+OpenIW8 is a behavior oracle; the addresses and typed readers above are Replay.
+
+Implementation
+src/channel_store.cpp defines and validates the entire schema-1 title layout:
+title-bound channels, canonical category/ID keys, positive owner/channel/member
+UInt64 IDs, bounded names and member counts, expiry, UInt32 revision and each
+member's subscription generation. Strict parsing rejects duplicate keys,
+trailing documents and non-integer fields. Reads take bounded immutable file
+snapshots; writes flush a pending file before atomic replacement.
+Legacy creation-time dataVersion is retained when upgrading an existing file.
+New channels start at zero and real membership changes increment dataVersion.
+UInt32 overflow fails before publication; there is no version wrap.
+Restart validates/prepares every title before clearing disconnected membership.
+The shared 200-member limit matches Replay's AddMemberToChat pool, rather than
+advertising 256 and allowing entries the native client cannot store.
+
+Event 24 goes to existing peers after an authenticated new subscription commits.
+Event 25 goes to remaining peers after owned unsubscribe, category unsubscribe,
+expired offline cleanup or the last valid account connection closes.
+Another valid socket for the same account keeps its membership alive.
+Queued updates bind both actor and recipient subscription generations. An old
+leave cannot remove an already rejoined actor; a recipient who unsubscribes and
+rejoins cannot receive updates queued for its previous subscription. Independent
+member joins survive changes to the aggregate channel revision.
+Message/whisper deliveries now have the same membership authority checks.
+A failed save returns storage error 102 and emits no membership notification.
+Social and channel disconnect cleanup are independent, so malformed storage in
+one domain cannot suppress an already prepared valid notification in the other.
+
+Validation and artifact scope
+Release builds use /W4 /WX. The game EXE is unchanged; no proxy is needed.
+Backend-only changes do not require another client package.
+tools/channel_membership_fixtures.py uses three independently signed accounts
+inside an isolated backend realm. No owner identity, friendship or production
+channel is seeded by those fixtures. The full suite also restarts its child
+backend and verifies existing persistent domains.
+tools/record-channel-membership-proof.py records exact source/backend hashes
+and the five new channel groups in validation/20261006-channel-membership.json.
+Local native startup/reconnect evidence is recorded separately; passing wire
+fixtures alone is not proof of the native member callback or two-game chat.
+See the current readiness addendum for artifact hashes and native test results.
+
+The focused native test now verifies a real private-party create completion and
+member callbacks. Replay uses category chat for this private-party channel;
+the diagnostic discovers its category and ID from the native/stored match.
+tools/observe-game.py --channels follows linked/ASLR-adjusted pool symbols and
+reads 38 slots, 20856 bytes per slot, count at +16, ID +24, controller +32, and
+200 member records at +48 with 56-byte stride. Those offsets come from the
+exact Replay GetJoinedChats/AddMemberToChat/GetMemberFromChatById routines.
+Snapshots retry changing records and never modify memory.
+tools/native-channel-test.py uses the existing DWBackendValidation test peer,
+without creating profiles or friendships. A native host channel appears with
+the same server ID; peer subscribe adds its actual ID/name, owned unsubscribe
+removes it, rejoin restores it and the last peer socket closing removes it.
+Evidence: validation/20261006-channel-native-membership.json, with observation
+hashes and the exact unchanged game/current backend hashes. This verifies the
+host's create task and native push consumers; the peer's task requests are wire
+client requests and do not establish a second game's subscribe task callback.
+The same native membership test passed after backend restart/dw_restart on a
+newly created channel. All 27 fences, owner identity and empty native friend
+lists recovered in the same game process. A fresh authenticated relay remained
+stable for 110.4 seconds with 11 keepalive replies and zero rejected packets.
+The test game then closed normally; owned root command files were removed,
+game/INI hashes were preserved and the backend was left running.
+
+Remaining
+Native channel-message callbacks, a second game's subscribe/unsubscribe task
+callbacks and two-game chat need their own observation.
+Actual two-network JOIN/DATA/gameplay remains unverified.
+The broader DW implementation and indirect/REST/push inventory are incomplete.

@@ -1,6 +1,45 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - MANAGED TOURNAMENT WITHDRAWAL
+CURRENT BACKEND ADDENDUM - NATIVE CHANNEL MEMBERSHIP
+Backend SHA256: 0348f5747a4b48ef0167b70269bfb9bc885f5f715e7a6746e64fcb91e14dd111
+Game SHA256 remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
+This is backend-only; the unchanged game/client package needs no redistribution.
+251 encrypted protocol/service groups, signed platform/auth/resources and clean
+Release compilation/formatting passed. Five new channel groups cover complete
+native event-24/25 DTOs, monotonic UInt32 dataVersion, owned unsubscribe, last
+live socket departure, rapid rejoin revocation, concurrent joins and actual
+failed atomic publication. The shared 200-member limit matches Replay's native
+pool. Full persisted layouts are bounded/validated before publishing changes.
+Queued message and membership updates bind both subscription generations.
+
+Root-folder native startup passed all 27 fences, profile/Online and all three
+completed empty friend lists. The game's existing private-party command created
+its own category-chat channel and installed the actual server ID/host member.
+The existing labelled diagnostic peer joined through an authenticated task;
+read-only native pool observations verified its real ID/name appearing, owned
+unsubscribe removing it, rejoin restoring it and last-socket close removing it.
+No profile or friendship was created. The peer's task requests were wire-client
+requests; this proves the game's push callbacks, not a second game's task/UI.
+Separate backend stop/start plus dw_restart recovered the same game process
+and owner identity, all 27 fences and a fresh authenticated relay association.
+The old native chat cleared; a new private-party create and the full peer
+membership test passed again. Relay stability: 110.4 seconds, 11 keepalive
+replies and zero rejected packets. No map/match test was performed.
+The test game closed normally. Owned root command files were removed; EXE and
+INI hashes are unchanged. The backend is left running, without new ports.
+
+Current wire: validation/20261006-channel-membership.json.
+Current native channel: validation/20261006-channel-native-membership.json.
+Post-restart channel: validation/20261006-channel-native-membership-after-restart.json.
+Current reconnect: validation/20261006-channel-membership-native-reconnect.json.
+Details and layout provenance: docs/DW_CHANNEL_MEMBERSHIP_20261006.txt.
+Native channel-message callbacks, a second game's subscribe/unsubscribe tasks,
+two-network JOIN/DATA/gameplay, native migration/tournament callbacks and the
+six unresolved reviewed result bindings remain open. Full backend completion
+and indirect/REST/push coverage remain incomplete.
+Older evidence below is retained by its original artifact hash.
+
+RETAINED BACKEND ADDENDUM - MANAGED TOURNAMENT WITHDRAWAL
 Backend SHA256: c34afab4a5d05f058fe498209e8b0dac4d819194ed5e31e71f7e8d19725c8d51
 Game SHA256 remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
 No game recompile or new client package is required for this backend-only change.

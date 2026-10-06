@@ -496,8 +496,25 @@ namespace services
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user)
     {
         std::lock_guard lock(storeMutex);
-        auto deliveries = socialDisconnected(directory, title, user);
-        disconnectChannels(directory, title, user);
+        std::vector<Delivery> deliveries;
+        try
+        {
+            deliveries = socialDisconnected(directory, title, user);
+        }
+        catch (const std::exception &)
+        {
+            // Corrupt social storage cannot suppress an independent channel leave.
+        }
+        try
+        {
+            const auto updates = disconnectChannels(directory, title, user);
+            deliveries.insert(deliveries.end(), updates.begin(), updates.end());
+        }
+        catch (const std::exception &)
+        {
+            // Channel source errors remain task-level storage errors. They must
+            // not discard already prepared native offline presence notifications.
+        }
         return deliveries;
     }
 
@@ -524,7 +541,8 @@ namespace services
         std::lock_guard lock(storeMutex);
         try
         {
-            return socialDeliveryValid(title, delivery) &&
+            return channelDeliveryValid(directory, title, delivery) &&
+                   socialDeliveryValid(title, delivery) &&
                    mailDeliveryValid(directory, title, delivery) &&
                    clanDeliveryValid(directory, title, delivery) &&
                    tournamentDeliveryValid(directory, title, delivery) &&

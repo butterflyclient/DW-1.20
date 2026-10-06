@@ -31,6 +31,9 @@ namespace services
         bool tournamentRoundLobby = false;
         std::string mailContext;
         uint64_t mailId = 0;
+        std::string channelCategory;
+        uint64_t channelId = 0, channelMember = 0;
+        uint32_t channelEvent = 0, channelMemberGeneration = 0, channelRecipientGeneration = 0;
     };
 
     struct Reply

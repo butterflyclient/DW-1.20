@@ -1205,7 +1205,7 @@ try:
     channel_id = channel_fields[2]
     assert channel_fields[1] == b"party" and channel_id > 0 and channel_fields[3] == 1
     assert (
-        channel_fields[4] == 256
+        channel_fields[4] == 200
         and channel_fields[5] == user
         and channel_fields[6] == 0
         and channel_fields[7] == 0
@@ -3087,6 +3087,13 @@ try:
     tournament_round_fixtures.exercise(
         directory, title, player_info, match_query, new_tournament_client,
         (u64, text, boolean), checks,
+    )
+
+    import channel_membership_fixtures
+
+    channel_membership_fixtures.exercise(
+        directory, title, new_tournament_client,
+        (u64, text, structure, pb_text, pb_integer, pb_bytes, pb_fields), checks,
     )
 
     copy_fixture = copy_content_fixtures.exercise(

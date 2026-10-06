@@ -47,6 +47,11 @@ parser.add_argument(
     action="store_true",
     help="Read native mail manager state and bounded body hashes without changing it",
 )
+parser.add_argument(
+    "--channels",
+    action="store_true",
+    help="Read the exact Replay chat pool and bounded member records without changing them",
+)
 args = parser.parse_args()
 deployment = json.loads(args.deployment.read_text())
 launch = (
@@ -206,6 +211,63 @@ try:
                 raise RuntimeError("Verified native getter encoding changed: " + symbol)
             return rva + 7 + struct.unpack_from("<i", code, 3)[0]
         raise RuntimeError("Native getter has an unexpected gateway chain")
+
+    def native_channels():
+        # Exact target GetJoinedChats 140F3C160 walks 38 slots of 20856 bytes.
+        # AddMemberToChat 141B31530 and GetMemberFromChatById 141B31E40
+        # establish count +16, ID +24, controller +32 and 200 members at +48.
+        pool = symbols["gl_14B6D19E0"]
+        if symbols["gl_14B6D6B70"] - pool != 20880:
+            raise RuntimeError("Linked native chat pool anchors changed")
+        chats = []
+        for slot in range(38):
+            address = pool + slot * 20856
+            for attempt in range(3):
+                header = read(address, 36)
+                chat_type, state = struct.unpack_from("<II", header)
+                if state != 1:
+                    break
+                count = struct.unpack_from("<I", header, 16)[0]
+                channel = struct.unpack_from("<Q", header, 24)[0]
+                controller = struct.unpack_from("<I", header, 32)[0]
+                if not channel or count > 200 or controller >= 8:
+                    raise RuntimeError("Native active channel layout is invalid")
+                records = read(address + 48, count * 56) if count else b""
+                if header != read(address, 36) or (
+                    count and records != read(address + 48, count * 56)
+                ):
+                    continue
+                members = []
+                for index in range(count):
+                    record = records[index * 56 : (index + 1) * 56]
+                    user = struct.unpack_from("<Q", record)[0]
+                    name = record[8:44]
+                    if not user or b"\0" not in name or record[48] > 1:
+                        raise RuntimeError("Native channel member layout is invalid")
+                    members.append(
+                        {
+                            "user": user,
+                            "name": name.split(b"\0", 1)[0].decode(errors="replace"),
+                            "host": bool(record[48]),
+                        }
+                    )
+                if len({member["user"] for member in members}) != count:
+                    raise RuntimeError("Native channel contains duplicate members")
+                chats.append(
+                    {
+                        "slot": slot,
+                        "type": chat_type,
+                        "state": state,
+                        "channel": channel,
+                        "controller": controller,
+                        "member_count": count,
+                        "members": members,
+                    }
+                )
+                break
+            else:
+                raise RuntimeError("Native channel changed during bounded observation")
+        return {"slots": 38, "member_limit": 200, "chats": chats}
 
     def native_marketing():
         getter = "q_MarketingCommsManager::GetInstance"
@@ -1305,6 +1367,7 @@ try:
         "server_log_since_launch": server_lines,
         "server_log_file_size": server_log_file_size,
         "server_log_reset_detected": server_log_reset,
+        "native_channels": native_channels() if args.channels else None,
         "native_encrypted_lobby_task_completion": "not observed by this state reader",
         "connection_receipt": connection,
         "launch_correlation": (

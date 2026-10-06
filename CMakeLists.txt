@@ -29,6 +29,7 @@ add_executable(iw8-dw-server
     src/tournament_map_policy.cpp
     src/playlist_catalog.cpp
     src/channel_services.cpp
+    src/channel_store.cpp
     src/clan_services.cpp
     src/mail_services.cpp
     src/identity_services.cpp

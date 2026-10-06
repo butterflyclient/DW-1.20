@@ -1,10 +1,11 @@
-#include <windows.h>
 #include "channel_services.h"
+#include "channel_store.h"
 #include "lobby.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <chrono>
-#include <fstream>
+#include <algorithm>
+#include <charconv>
 
 namespace services
 {
@@ -30,23 +31,73 @@ namespace services
             return value;
         }
 
-        void save(const std::filesystem::path &path, const Json &state)
+        Delivery context(const Json &channel,
+                         uint64_t recipient,
+                         uint64_t actor,
+                         uint32_t event,
+                         uint32_t generation)
         {
-            const auto bytes = state.dump();
-            wire::require(bytes.size() <= 4 * 1024 * 1024);
-            std::filesystem::create_directories(path.parent_path());
-            auto pending = path;
-            pending += ".pending";
+            Delivery delivery;
+            delivery.user = recipient;
+            delivery.channelCategory = channel["category"];
+            delivery.channelId = channel["id"].get<uint64_t>();
+            delivery.channelMember = actor;
+            delivery.channelEvent = event;
+            delivery.channelMemberGeneration = generation;
+            delivery.channelRecipientGeneration =
+                channel["members"].at(std::to_string(recipient)).at("generation").get<uint32_t>();
+            return delivery;
+        }
+
+        void notifyMembership(std::vector<Delivery> &deliveries,
+                              const Json &channel,
+                              uint64_t actor,
+                              const Json &member,
+                              bool joined)
+        {
+            // Exact Replay 0x142120A80 selects subscribed for event 24, then
+            // 0x1420FE9A0 reads the complete typed channel-info-with-category DTO.
+            wire::Writer push;
+            push.u32(joined ? 24 : 25);
+            push.u64(actor);
+            push.text(member.at("name"));
+            push.text(channel.at("category"));
+            push.u64(channel.at("id"));
+            push.u32(0); // Native bdChannelMember flags.
+            push.text(channel.at("category"));
+            push.u64(channel.at("id"));
+            push.u32(static_cast<uint32_t>(channel["members"].size()));
+            push.u32(channel_store::memberLimit);
+            push.u64(channel.at("owner"));
+            push.boolean(false);
+            push.boolean(false);
+            push.u32(channel.at("revision"));
+            for (const auto &recipient : channel["members"].items())
             {
-                std::ofstream out(pending, std::ios::binary | std::ios::trunc);
-                if (!out.write(bytes.data(), static_cast<std::streamsize>(bytes.size())) ||
-                    !out.flush())
-                    throw std::runtime_error("Channel persistence failed");
+                const auto user = std::stoull(recipient.key()); // Validated canonical UInt64.
+                if (user == actor)
+                    continue;
+                auto delivery = context(channel,
+                                        user,
+                                        actor,
+                                        joined ? 24 : 25,
+                                        member.at("generation").get<uint32_t>());
+                delivery.payload = push.data;
+                delivery.delayMs = 250;
+                deliveries.push_back(std::move(delivery));
             }
-            if (!MoveFileExW(pending.c_str(),
-                             path.c_str(),
-                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-                throw std::runtime_error("Channel publication failed");
+        }
+
+        bool removeMember(Json &channel, uint64_t user, std::vector<Delivery> &deliveries)
+        {
+            const auto key = std::to_string(user);
+            if (!channel["members"].contains(key))
+                return false;
+            const auto member = channel["members"][key];
+            channel_store::advance(channel);
+            channel["members"].erase(key);
+            notifyMembership(deliveries, channel, user, member, false);
+            return true;
         }
 
         wire::Bytes info(const Json &channel)
@@ -56,11 +107,11 @@ namespace services
             proto::text(out, 1, channel.at("category"));
             proto::integer(out, 2, channel.at("id"));
             proto::integer(out, 3, channel.at("members").size());
-            proto::integer(out, 4, 256);
+            proto::integer(out, 4, channel_store::memberLimit);
             proto::integer(out, 5, channel.at("owner"));
             proto::integer(out, 6, 0);
             proto::integer(out, 7, 0);
-            proto::integer(out, 8, channel.at("created"));
+            proto::integer(out, 8, channel.at("revision"));
             return out;
         }
     } // namespace
@@ -70,51 +121,80 @@ namespace services
         const auto root = directory / "channels";
         if (!std::filesystem::exists(root))
             return;
+        std::vector<std::pair<std::filesystem::path, Json>> snapshots;
         for (const auto &entry : std::filesystem::directory_iterator(root))
         {
             if (!entry.is_regular_file() || entry.path().extension() != L".json")
                 continue;
-            wire::require(entry.file_size() <= 4 * 1024 * 1024);
-            std::ifstream stream(entry.path());
-            Json state;
-            stream >> state;
-            stream.close();
-            wire::require(state.at("schema") == 1 && state.at("channels").is_object());
-            bool changed = false;
+            uint32_t title = 0;
+            const auto stem = entry.path().stem().string();
+            const auto parsed = std::from_chars(stem.data(), stem.data() + stem.size(), title);
+            if (parsed.ec != std::errc{} || parsed.ptr != stem.data() + stem.size() || !title ||
+                std::to_string(title) != stem || snapshots.size() >= 1024)
+                throw std::runtime_error("Invalid channel title directory");
+            snapshots.emplace_back(entry.path(), channel_store::load(entry.path(), title));
+        }
+        // Validate and prepare every title before publishing restart cleanup.
+        // A later revision overflow must not leave earlier titles cleared.
+        for (auto &[path, state] : snapshots)
+        {
             for (auto &channel : state["channels"])
             {
-                wire::require(channel.at("members").is_object());
                 if (!channel["members"].empty())
                 {
+                    channel_store::advance(channel);
                     channel["members"] = Json::object();
-                    changed = true;
                 }
             }
-            if (changed)
-                save(entry.path(), state);
         }
+        for (const auto &[path, state] : snapshots)
+            channel_store::save(path, state["title"].get<uint32_t>(), state);
     }
 
-    void disconnectChannels(const std::filesystem::path &directory, uint32_t title, uint64_t user)
+    std::vector<Delivery> disconnectChannels(const std::filesystem::path &directory,
+                                             uint32_t title,
+                                             uint64_t user)
     {
         const auto path = directory / "channels" / (std::to_string(title) + ".json");
         if (!std::filesystem::exists(path))
-            return;
-        wire::require(std::filesystem::file_size(path) <= 4 * 1024 * 1024);
-        std::ifstream stream(path);
-        Json state;
-        stream >> state;
-        stream.close();
-        wire::require(state.at("schema") == 1 && state.at("title") == title &&
-                      state.at("channels").is_object());
+            return {};
+        auto state = channel_store::load(path, title);
+        std::vector<Delivery> deliveries;
         bool changed = false;
         for (auto &channel : state["channels"])
         {
-            wire::require(channel.at("members").is_object());
-            changed = channel["members"].erase(std::to_string(user)) != 0 || changed;
+            changed = removeMember(channel, user, deliveries) || changed;
         }
         if (changed)
-            save(path, state);
+            channel_store::save(path, title, state);
+        return deliveries;
+    }
+
+    bool channelDeliveryValid(const std::filesystem::path &directory,
+                              uint32_t title,
+                              const Delivery &delivery)
+    {
+        if (!delivery.channelId)
+            return true;
+        const auto state =
+            channel_store::load(directory / "channels" / (std::to_string(title) + ".json"), title);
+        const auto key = delivery.channelCategory + ":" + std::to_string(delivery.channelId);
+        if (!state["channels"].contains(key))
+            return false;
+        const auto &members = state["channels"][key]["members"];
+        const auto recipient = std::to_string(delivery.user),
+                   actor = std::to_string(delivery.channelMember);
+        if (!members.contains(recipient) ||
+            members[recipient]["generation"] != delivery.channelRecipientGeneration)
+            return false;
+        // Per-member generations preserve concurrent joins by other members.
+        // Requiring the whole channel revision would incorrectly discard them.
+        if (delivery.channelEvent == 25)
+            return !members.contains(actor);
+        return (delivery.channelEvent == 22 || delivery.channelEvent == 23 ||
+                delivery.channelEvent == 24) &&
+               members.contains(actor) &&
+               members[actor]["generation"] == delivery.channelMemberGeneration;
     }
 
     std::optional<Reply> channelServices(const std::filesystem::path &directory,
@@ -184,7 +264,7 @@ namespace services
                             wire::require(part.value == 0);
                     }
                 }
-                wire::require(fields == 14 && channel != 0);
+                wire::require(fields == 14 && channel != 0 && channel != UINT64_MAX);
                 queries.emplace_back(name, channel);
                 continue;
             }
@@ -222,43 +302,39 @@ namespace services
             wire::require(user <= 256);
         else if (task != 4 && user && user != id.userId)
             return Reply{101, {}, "channel-subscriber-owner-denied"};
-        wire::require(task == 6 || task == 7 || task == 12 || channelId != 0);
+        wire::require(channelId != UINT64_MAX &&
+                      (task == 6 || task == 7 || task == 12 || channelId != 0));
         const auto path = directory / "channels" / (std::to_string(id.titleId) + ".json");
-        Json state = {{"schema", 1}, {"title", id.titleId}, {"channels", Json::object()}};
-        if (std::filesystem::exists(path))
-        {
-            wire::require(std::filesystem::file_size(path) <= 4 * 1024 * 1024);
-            std::ifstream stream(path);
-            if (!stream)
-                throw std::runtime_error("Channel read failed");
-            stream >> state;
-            wire::require(state.is_object() && state.at("schema") == 1 &&
-                          state.at("title") == id.titleId && state.at("channels").is_object());
-        }
+        auto state = channel_store::load(path, id.titleId);
         auto &channels = state["channels"];
         wire::require(channels.size() <= 4096);
         const auto time = now();
         const auto member = std::to_string(id.userId);
         bool changed = false;
+        Reply reply{0, {}, "channel-category-unsubscribed", true, {}};
         for (auto &channel : channels)
         {
             wire::require(channel.is_object() && channel.at("members").is_object() &&
-                          channel.at("members").size() <= 256);
+                          channel.at("members").size() <= channel_store::memberLimit);
             auto &members = channel["members"];
             for (auto it = members.begin(); it != members.end();)
             {
-                if (it.value().at("expires").get<uint64_t>() <= time)
+                const auto expired = it.value().at("expires").get<uint64_t>() <= time;
+                const auto userId = std::stoull(it.key());
+                if (expired && !lobby::online(id.titleId, userId))
                 {
+                    const auto record = it.value();
+                    channel_store::advance(channel);
                     it = members.erase(it);
+                    notifyMembership(reply.deliveries, channel, userId, record, false);
                     changed = true;
                 }
                 else
                     ++it;
             }
-            if (task == 12 && channel.at("category") == cat && members.erase(member))
-                changed = true;
+            if (task == 12 && channel.at("category") == cat)
+                changed = removeMember(channel, id.userId, reply.deliveries) || changed;
         }
-        Reply reply{0, {}, "channel-category-unsubscribed", true, {}};
         if (task == 7)
         {
             for (const auto &query : queries)
@@ -280,7 +356,8 @@ namespace services
                 {
                     const auto bytes = crypto::random(8);
                     channelId = wire::at<uint64_t>(bytes, 0);
-                } while (!channelId || channels.contains(cat + ":" + std::to_string(channelId)));
+                } while (!channelId || channelId == UINT64_MAX ||
+                         channels.contains(cat + ":" + std::to_string(channelId)));
             }
             const auto key = cat + ":" + std::to_string(channelId);
             if (task == 6 && !channels.contains(key))
@@ -290,6 +367,7 @@ namespace services
                                  {"id", channelId},
                                  {"owner", id.userId},
                                  {"created", time},
+                                 {"revision", uint32_t{0}},
                                  {"members", Json::object()}};
                 changed = true;
             }
@@ -316,7 +394,15 @@ namespace services
                 {
                     const auto target = std::stoull(it.key());
                     if (task == 3 || target == user)
-                        reply.deliveries.push_back({target, push.data});
+                    {
+                        auto delivery = context(channel,
+                                                target,
+                                                id.userId,
+                                                task == 3 ? 22 : 23,
+                                                members[member]["generation"].get<uint32_t>());
+                        delivery.payload = push.data;
+                        reply.deliveries.push_back(std::move(delivery));
+                    }
                 }
                 reply.operation = task == 3 ? "channel-message-routed" : "channel-whisper-routed";
             }
@@ -337,20 +423,34 @@ namespace services
             }
             else if (task == 2)
             {
-                if (members.erase(member))
-                    changed = true;
+                changed = removeMember(channel, id.userId, reply.deliveries) || changed;
                 reply.operation = "channel-unsubscribed";
             }
             else
             {
-                if (!members.contains(member) && members.size() >= 256)
+                if (!members.contains(member) && members.size() >= channel_store::memberLimit)
                     return Reply{108, {}, "channel-full"};
-                const Json entry = {{"name", id.name}, {"expires", id.expires}};
+                const bool joined = !members.contains(member);
+                const bool renamed = !joined && members[member]["name"] != id.name;
+                const auto generation = joined ? channel_store::advance(channel)
+                                               : members[member]["generation"].get<uint32_t>();
+                if (renamed)
+                    channel_store::advance(channel);
+                const auto expires =
+                    joined ? id.expires
+                           : std::max(id.expires, members[member]["expires"].get<uint64_t>());
+                const Json entry = {
+                    {"name", id.name}, {"expires", expires}, {"generation", generation}};
                 if (!members.contains(member) || members[member] != entry)
                 {
                     members[member] = entry;
                     changed = true;
                 }
+                // Native AddMemberToChat ignores duplicate joins rather than
+                // updating a member's name. Renames update queried metadata;
+                // the existing native member refreshes on its next real join.
+                if (joined)
+                    notifyMembership(reply.deliveries, channel, id.userId, entry, true);
                 reply.operation = task == 6 ? "channel-created-or-joined" : "channel-subscribed";
                 // 0x1420FF500 is the bound create-channel response. It reads
                 // one nested field-1 bdChannelInfo at this+32, not flat fields.
@@ -359,7 +459,7 @@ namespace services
             }
         }
         if (changed)
-            save(path, state);
+            channel_store::save(path, id.titleId, state);
         return reply;
     }
 } // namespace services
