@@ -100,7 +100,10 @@ def literal(pointer):
     )
 
 
-calls, unresolved = [], []
+calls, unresolved, shared_calls = [], [], []
+# A negative sentinel cannot be confused with a PE literal address. Track the
+# incoming writer's RDX builder only through complete 64-bit register copies.
+BUILDER_ARGUMENT = -1
 for function_index, sites in candidates.items():
     if function_index < 0:
         unresolved.append({"sites": sorted(sites), "reason": "No exported owner"})
@@ -137,7 +140,7 @@ for function_index, sites in candidates.items():
                 "reason": "Call bytes not on a confirmed instruction boundary",
             }
         )
-    work, visited = deque([(start, {})]), set()
+    work, visited = deque([(start, {"rdx": BUILDER_ARGUMENT})]), set()
     while work and len(visited) < 8192:
         address, facts = work.popleft()
         state = (address, tuple(sorted(facts.items())))
@@ -148,6 +151,18 @@ for function_index, sites in candidates.items():
         operands = instruction.operands
         following = address + instruction.size
         if instruction.mnemonic == "call":
+            if (
+                operands
+                and operands[0].type == X86_OP_IMM
+                and facts.get("rdx") == BUILDER_ARGUMENT
+            ):
+                shared_calls.append(
+                    dict(
+                        function_address=start,
+                        call_address=address,
+                        target=operands[0].imm,
+                    )
+                )
             if address in confirmed:
                 target = operands[0].imm
                 arguments = ("rdx",) if TARGETS[target] == "service" else ("rdx", "r8")
@@ -163,6 +178,8 @@ for function_index, sites in candidates.items():
                         "literal_arguments_resolved": all(
                             value is not None for value in values
                         ),
+                        "incoming_builder_verified": facts.get("rcx")
+                        == BUILDER_ARGUMENT,
                     }
                 )
             facts = {key: value for key, value in facts.items() if key not in VOLATILE}
@@ -223,6 +240,46 @@ for function_index, sites in candidates.items():
             }
         )
 calls = list({json.dumps(row, sort_keys=True): row for row in calls}.values())
+shared_calls = list(
+    {json.dumps(row, sort_keys=True): row for row in shared_calls}.values()
+)
+by_owner = {
+    owner: [row for row in calls if row["function_address"] == owner]
+    for owner in {row["function_address"] for row in calls}
+}
+
+
+def shared_service_paths(owner, visited=()):
+    if owner in visited or len(visited) >= 4:
+        return []
+    paths = []
+    for edge in shared_calls:
+        if edge["function_address"] != owner or edge["target"] not in by_owner:
+            continue
+        for row in by_owner[edge["target"]]:
+            if (
+                row["builder"] == "service"
+                and row["literal_arguments_resolved"]
+                and row["incoming_builder_verified"]
+            ):
+                paths.append(
+                    dict(
+                        service=row["arguments"][0],
+                        call_sites=[edge["call_address"], row["call_address"]],
+                        functions=[owner, edge["target"]],
+                    )
+                )
+        for inherited in shared_service_paths(edge["target"], visited + (owner,)):
+            paths.append(
+                dict(
+                    inherited,
+                    call_sites=[edge["call_address"]] + inherited["call_sites"],
+                    functions=[owner] + inherited["functions"],
+                )
+            )
+    return paths
+
+
 requests = []
 for address in sorted({row["function_address"] for row in calls}):
     owned = [row for row in calls if row["function_address"] == address]
@@ -241,6 +298,9 @@ for address in sorted({row["function_address"] for row in calls}):
             and row["literal_arguments_resolved"]
         }
     )
+    inherited = shared_service_paths(address) if operations and not services else []
+    if inherited:
+        services = sorted({row["service"] for row in inherited})
     requests.append(
         {
             "function": owned[0]["function"],
@@ -251,8 +311,19 @@ for address in sorted({row["function_address"] for row in calls}):
             and len(operations) == 1
             and all(row["literal_arguments_resolved"] for row in owned),
             "builder_calls": sorted({row["call_address"] for row in owned}),
+            "shared_service_paths": inherited,
             "native_response_verified": False,
         }
+    )
+helper_owners = {
+    owner
+    for row in requests
+    for path in row["shared_service_paths"]
+    for owner in path["functions"][1:]
+}
+for row in requests:
+    row["shared_service_helper_only"] = (
+        row["function_address"] in helper_owners and not row["resource_operations"]
     )
 result = {
     "schema": 1,
@@ -263,10 +334,11 @@ result = {
     "target_database_changed": DATABASE.stat().st_size != stat.st_size
     or DATABASE.stat().st_mtime_ns != stat.st_mtime_ns,
     "exported_functions": len(functions),
-    "scope": "Direct compiled REST service/resource builder calls with bounded entry CFG; indirect/inlined builders and native consumption remain open",
+    "scope": "Direct compiled REST builder calls with bounded entry CFG and shared service setters preserving the same RDX builder through full 64-bit register copies; indirect/inlined builders and native consumption remain open",
     "full_rest_audit_complete": False,
     "calls": calls,
     "requests": requests,
+    "shared_builder_calls": shared_calls,
     "unresolved": unresolved,
 }
 output.write_text(json.dumps(result, indent=2) + "\n")

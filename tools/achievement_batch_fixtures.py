@@ -89,7 +89,7 @@ def exercise(
         "report_user_events_batch",
         0x504F5354,
         body,
-        uri=f"/v2/user-events/$batch/?context={title}",
+        uri=f"/v2/user-events/$batch/?context={title}&client=replaylocal&titleID={title}",
     )
     client.task(255, 10, rest(body))
     assert path.read_bytes() == snapshot

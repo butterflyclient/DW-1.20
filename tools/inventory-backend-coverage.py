@@ -138,6 +138,11 @@ GAPS["194"] += (
 # Dedicated domain handlers only. A configured GET publication is not equivalent
 # to an implemented authenticated account/objectstore mutation.
 REST_HANDLERS = {
+    (
+        "ae.demonware.net",
+        "user_events",
+        "report_user_events_batch",
+    ): "achievement_services.cpp",
     ("uno", "UserResource", "renameUsername"): "identity_rest_services.cpp",
     ("uno", "UnoRes", "updatesecuredfields"): "identity_rest_services.cpp",
     ("uno", "UserResource", "authenticateUser"): "identity_rest_services.cpp",
@@ -246,7 +251,41 @@ def abtesting_native_evidence(server_hash, game_hash):
     return path.relative_to(ROOT).as_posix(), proof
 
 
-def rest_coverage(inventory, friend_evidence):
+def rest_coverage(inventory, friend_evidence, server_hash):
+    event_receipt = ROOT / "validation/20261006-achievement-rest-layout.json"
+    event_proof = (
+        json.loads(event_receipt.read_bytes()) if event_receipt.exists() else None
+    )
+    if event_proof and (
+        event_proof["target_image_sha256"] != inventory["target_image_sha256"]
+        or event_proof["audit_tool_sha256"]
+        != digest(ROOT / "tools/research-achievement-rest-target.py")
+        or not event_proof["callback_vm"]["passed"]
+    ):
+        raise ValueError("Refresh the exact achievement REST callback proof")
+    event_native_path = (
+        ROOT / "validation/20261006-achievement-rest-native-readiness.json"
+    )
+    event_native = (
+        json.loads(event_native_path.read_bytes())
+        if event_native_path.exists()
+        else None
+    )
+    if event_native:
+        valid = bool(
+            event_native.get("passed")
+            and event_native.get("backend_sha256") == server_hash
+            and event_native.get("achievement_rest", {}).get(
+                "native_single_user_callback_verified"
+            )
+        )
+        for item in event_native.get("achievement_rest", {}).get(
+            "native_callback_evidence", []
+        ):
+            path = ROOT / item["path"]
+            valid = valid and path.is_file() and digest(path) == item["sha256"]
+        if not valid:
+            event_native = None
     receipt_path = ROOT / "validation/20261006-objectstore-rest-target-layout.json"
     proof = json.loads(receipt_path.read_bytes())
     if proof["target_image_sha256"] != inventory["target_image_sha256"] or proof[
@@ -317,6 +356,32 @@ def rest_coverage(inventory, friend_evidence):
                 else "Dynamic/helper service binding remains unresolved"
             ),
         )
+        if row.get("shared_service_helper_only"):
+            row["coverage_scope"] = (
+                "Shared service parameter helper; not an independent REST request"
+            )
+        if row["function_address"] in (0x142102A60, 0x14216A100) and event_proof:
+            if (
+                row["services"] != ["ae.demonware.net"]
+                or not row["shared_service_paths"]
+            ):
+                raise ValueError("Shared achievement REST service binding changed")
+            row["target_response_layout_receipt"] = event_receipt.relative_to(
+                ROOT
+            ).as_posix()
+            row["original_callback_vm_verified"] = True
+            if row["function_address"] == 0x142102A60 and event_native:
+                row.update(
+                    current_native_method_completion_verified=True,
+                    native_completion_evidence=event_native_path.relative_to(
+                        ROOT
+                    ).as_posix(),
+                    native_completion_scope="Private root-folder Replay process sent owned single-user event batches; the original success callback completed with native response status 2 and no error",
+                    native_completion_game_sha256=event_native["native_startup"][
+                        "game_sha256"
+                    ],
+                    shipping_executable_native_completion_inherited=False,
+                )
         if row["function_address"] == 0x1420FFE50:
             if row["services"] or row["resource_operations"] != [
                 ["abtesting", "enroll"]
@@ -549,7 +614,9 @@ def main():
     friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
     ab_evidence = abtesting_native_evidence(current_hash, deployment["sha256"])
     rest_requests = (
-        rest_coverage(rest_inventory, friend_evidence) if rest_inventory else []
+        rest_coverage(rest_inventory, friend_evidence, current_hash)
+        if rest_inventory
+        else []
     )
     if rest_inventory:
         if rest_inventory["inventory_tool_sha256"] != digest(
@@ -689,6 +756,14 @@ def main():
                 requests=rest_requests,
                 counts=dict(
                     containing_functions=len(rest_requests),
+                    request_functions=sum(
+                        not row.get("shared_service_helper_only")
+                        for row in rest_requests
+                    ),
+                    shared_parameter_helpers=sum(
+                        bool(row.get("shared_service_helper_only"))
+                        for row in rest_requests
+                    ),
                     dedicated_domain_handlers=sum(
                         row["dedicated_domain_handler"] is True for row in rest_requests
                     ),
@@ -699,6 +774,7 @@ def main():
                     unresolved_dynamic_or_helper_bindings=sum(
                         row["dedicated_domain_handler"] is None
                         and not row.get("native_pre_transport_blocked")
+                        and not row.get("shared_service_helper_only")
                         for row in rest_requests
                     ),
                     confirmed_native_pre_transport_blockers=sum(

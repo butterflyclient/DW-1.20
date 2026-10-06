@@ -2635,7 +2635,11 @@ try:
         )
         for name, value in (headers or {}).items():
             message += pb_bytes(14, pb_text(1, name) + pb_text(2, value))
-        payload = b"" if body is None else json.dumps(body).encode()
+        payload = (
+            b""
+            if body is None
+            else body if isinstance(body, bytes) else json.dumps(body).encode()
+        )
         return u32(713) + blob(message) + boolean(body is not None) + blob(payload)
 
     import regulation_fixtures
@@ -2696,18 +2700,26 @@ try:
         "report_user_events_batch",
         0x504F5354,
         body,
-        uri=f"/v2/user-events/$batch/?context={title}",
+        uri=f"/v2/user-events/$batch/?context={title}&client=replaylocal&titleID={title}",
     )
-    raw = client.task(255, 10, event_rest(event_body))
-    assert raw[-8:] == boolean(False) + blob(b"")
-    assert client.task(255, 10, event_rest(event_body))[-8:] == boolean(False) + blob(
-        b""
+    assert rest_response(client.task(255, 10, event_rest(event_body))) == (
+        200,
+        {"allSucceeded": True},
+    )
+    assert rest_response(client.task(255, 10, event_rest(event_body))) == (
+        200,
+        {"allSucceeded": True},
     )
     assert len(json.loads(event_store.read_text())["events"]) == 2
     event_body["userEvents"][0]["userID"] = user + 1
     client.task(255, 10, event_rest(event_body), error=101)
     checks.append(
         "native achievement REST event batching, durable retry deduplication and account ownership"
+    )
+    import achievement_rest_fixtures
+
+    achievement_rest_fixtures.exercise(
+        client, event_store, title, user, native_rest, rest_response, checks
     )
     import achievement_batch_fixtures
 

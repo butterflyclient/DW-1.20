@@ -1001,8 +1001,23 @@ namespace services
         const char *stage = "json";
         try
         {
-            const auto body = Json::parse(bytes.begin(), bytes.end());
-            wire::require(body.is_object() && integer(body, "titleID", UINT32_MAX) == id.titleId);
+            std::vector<std::set<std::string>> keys;
+            bool unique = true;
+            const auto callback =
+                [&keys, &unique](int depth, Json::parse_event_t event, Json &value)
+            {
+                wire::require(depth <= 7);
+                if (event == Json::parse_event_t::object_start)
+                    keys.emplace_back();
+                else if (event == Json::parse_event_t::key)
+                    unique = keys.back().insert(value.get<std::string>()).second && unique;
+                else if (event == Json::parse_event_t::object_end)
+                    keys.pop_back();
+                return true;
+            };
+            const auto body = Json::parse(bytes.begin(), bytes.end(), callback);
+            wire::require(unique && body.is_object() && body.size() == 3 &&
+                          integer(body, "titleID", UINT32_MAX) == id.titleId);
             stage = "request-id";
             const auto request = string(body, "idempotentRequestID", 36);
             wire::require(request.size() == 36);
@@ -1028,6 +1043,7 @@ namespace services
                 const bool hasIdentity = batch.contains("firstPartyUserID") ||
                                          batch.contains("firstPartyAccountType") ||
                                          batch.contains("platform");
+                wire::require(batch.size() == (hasIdentity ? 6u : 3u));
                 if (hasIdentity)
                 {
                     stage = "first-party";
@@ -1050,6 +1066,7 @@ namespace services
                 {
                     stage = "event";
                     wire::require(events.size() < 128);
+                    wire::require(event.size() == 3);
                     validateEvent(event);
                     events.push_back(event);
                 }

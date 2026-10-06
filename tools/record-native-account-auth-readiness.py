@@ -1,12 +1,28 @@
 """Bind account protocol tests and a separate native startup to the final build."""
 
 from datetime import datetime, timezone
+import argparse
 import hashlib
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-STATE = ROOT / "data/native-pair-accounts-20261006"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--state-root", type=Path, default=ROOT / "data/native-pair-accounts-20261006"
+)
+parser.add_argument(
+    "--output",
+    type=Path,
+    default=ROOT / "validation/20261006-account-auth-native-readiness.json",
+)
+parser.add_argument("--achievement-contract", action="store_true")
+args = parser.parse_args()
+STATE = args.state_root.resolve()
+destination = args.output.resolve()
+assert STATE.is_relative_to(ROOT / "data") and destination.is_relative_to(
+    ROOT / "validation"
+)
 
 
 def load(path):
@@ -142,7 +158,61 @@ receipt = dict(
     cross_network_gameplay_verified=False,
     full_backend_complete=False,
 )
-destination = ROOT / "validation/20261006-account-auth-native-readiness.json"
+if args.achievement_contract:
+    achievement_path = ROOT / "validation/20261006-achievement-rest-layout.json"
+    achievement = load(achievement_path)
+    assert achievement["audit_tool_sha256"] == digest(
+        ROOT / "tools/research-achievement-rest-target.py"
+    )
+    assert (
+        achievement["callback_vm"]["passed"]
+        and len(achievement["callback_vm"]["cases"]) == 10
+    )
+    assert achievement["response"] == {"status": 200, "body": {"allSucceeded": True}}
+    event_checks = [
+        value
+        for value in protocol["checks"]
+        if value.startswith(
+            ("Shared Replay achievement REST envelope", "Achievement REST root")
+        )
+    ]
+    assert len(event_checks) == 2
+    completion_path = STATE / "alpha/event-completion.json"
+    completion = load(completion_path)
+    assert completion["observer_sha256"] == digest(
+        ROOT / "tools/observe-native-achievement.py"
+    )
+    assert (
+        completion["pid"] == stable["pid"]
+        and completion["game_sha256"] == stable["sha256"]
+    )
+    assert completion["backend_sha256"] == build["sha256"]
+    assert completion["original_image_sha256"] == achievement["target_image_sha256"]
+    assert completion["native_single_callback_success"]
+    event_observation_path = STATE / "alpha/after-event.json"
+    event_observation = load(event_observation_path)
+    assert event_observation["pid"] == stable["pid"]
+    assert event_observation["server_process_verified"]["sha256"] == build["sha256"]
+    assert event_observation["server_process_verified"]["connection_receipt_matches"]
+    event_requests = sum(
+        "operation=achievement-events-recorded error=0" in line
+        and "operation_name=report_user_events_batch" in line
+        for line in event_observation["server_log_since_launch"]
+    )
+    assert event_requests >= 1
+    receipt["achievement_rest"] = dict(
+        target_contract_evidence=reference(achievement_path),
+        protocol_checks=event_checks,
+        original_callbacks_vm_passed=True,
+        native_game_event_callback_verified=True,
+        native_single_user_callback_verified=True,
+        native_multi_user_callback_verified=False,
+        native_event_requests=event_requests,
+        native_callback_evidence=[
+            reference(completion_path),
+            reference(event_observation_path),
+        ],
+    )
 destination.write_text(json.dumps(receipt, indent=2) + "\n")
 (ROOT / "data/backend-readiness-latest.json").write_text(
     json.dumps(reference(destination), indent=2) + "\n"

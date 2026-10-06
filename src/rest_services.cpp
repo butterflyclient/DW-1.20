@@ -10,6 +10,7 @@
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <set>
+#include <map>
 
 namespace services
 {
@@ -89,6 +90,64 @@ namespace services
         }
 
         using Request = RESTRequest;
+
+        std::string achievementContext(const Request &request, const platform::LobbyIdentity &id)
+        {
+            // Replay 142102A60 / 14216A100 share 142155570: the exact batch
+            // path and context/client/titleID query accompany the JSON title.
+            constexpr std::string_view prefix = "/v2/user-events/$batch/?";
+            wire::require(request.uri.starts_with(prefix) &&
+                          request.uri.find('#') == std::string::npos);
+            std::map<std::string, std::string> fields;
+            auto position = prefix.size();
+            while (position < request.uri.size())
+            {
+                const auto end = request.uri.find('&', position);
+                const auto pair =
+                    request.uri.substr(position, end == std::string::npos ? end : end - position);
+                const auto equal = pair.find('=');
+                wire::require(equal != std::string::npos);
+                const auto key = pair.substr(0, equal);
+                wire::require(key == "context" || key == "client" || key == "titleID");
+                std::string value;
+                const auto encoded = pair.substr(equal + 1);
+                for (size_t i = 0; i < encoded.size(); ++i)
+                {
+                    auto c = static_cast<unsigned char>(encoded[i]);
+                    if (c == '%')
+                    {
+                        wire::require(i + 2 < encoded.size());
+                        const auto digit = [](char x) -> unsigned
+                        {
+                            if (x >= '0' && x <= '9')
+                                return x - '0';
+                            if (x >= 'a' && x <= 'f')
+                                return x - 'a' + 10;
+                            if (x >= 'A' && x <= 'F')
+                                return x - 'A' + 10;
+                            wire::require(false);
+                            return 0;
+                        };
+                        c = static_cast<unsigned char>((digit(encoded[i + 1]) << 4) |
+                                                       digit(encoded[i + 2]));
+                        i += 2;
+                    }
+                    wire::require(c >= 32 && c < 127 && value.size() < 63);
+                    value.push_back(static_cast<char>(c));
+                }
+                wire::require(fields.emplace(key, value).second);
+                if (end == std::string::npos)
+                    break;
+                wire::require(end + 1 < request.uri.size());
+                position = end + 1;
+            }
+            wire::require(fields.size() == 3 &&
+                          fields.at("titleID") == std::to_string(id.titleId) &&
+                          (fields.at("client") == "replaylocal" || fields.at("client") == "iw8") &&
+                          (fields.at("context") == std::to_string(id.titleId) ||
+                           fields.at("context") == "iw8"));
+            return fields.at("context");
+        }
 
         void request(wire::Reader &p, Request &out)
         {
@@ -250,20 +309,23 @@ namespace services
                              {"msg", "This local service operation is not configured"}}}}
                           .dump();
         if (r.service == "ae.demonware.net" && r.resource == "user_events" &&
-            r.operation == "report_user_events_batch" && r.method == 0x504F5354)
+            r.operation == "report_user_events_batch")
         {
             try
             {
-                wire::require(r.hasBody && r.content == 1 && !r.body.empty() &&
-                              r.uri.starts_with("/v2/user-events/$batch/"));
-                auto domain = achievementEventsRest(directory, id, friendsContext(r.uri), r.body);
+                wire::require(r.method == 0x504F5354 && r.accept == 1 && r.hasBody &&
+                              r.content == 1 && !r.body.empty());
+                auto domain =
+                    achievementEventsRest(directory, id, achievementContext(r, id), r.body);
                 if (domain.error)
                 {
                     domain.detail += reply.detail;
                     return domain;
                 }
-                result.status = 204;
-                result.body.clear();
+                // Both original success readers (142158070 / 142169760)
+                // require JSON allSucceeded. An empty 204 cannot complete them.
+                result.status = 200;
+                result.body = Json{{"allSucceeded", true}}.dump();
                 reply.operation = domain.operation;
             }
             catch (const std::runtime_error &e)

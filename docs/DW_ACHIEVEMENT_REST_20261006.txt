@@ -1,0 +1,118 @@
+REPLAY DW ACHIEVEMENT REST CONTRACT AND RESPONSE REPAIR
+2026-10-06
+
+ISSUE AND TARGET RESEARCH
+The event REST domain previously returned HTTP 204 with no JSON after saving an
+owned event batch. That outer protocol reply does not satisfy either original
+Replay success callback. Both read allSucceeded from a JSON object.
+
+Original single-user writer: 0x142102A60.
+Original multi-user writer: 0x14216A100.
+Shared service/query helper: 0x142155570.
+Service/resource/operation: ae.demonware.net / user_events / report_user_events_batch.
+Method/path: POST /v2/user-events/$batch/.
+Native query fields: context, client and titleID. Optional DW-ABToken remains a
+header; ingestion does not infer treatment, progression or rewards from it.
+
+Single-user response constructor 0x142157FF0 writes vtable 0x1426A59C0.
+Its success slot is 0x142158070. Multi-user constructor 0x1421696C0 writes
+vtable 0x1426A7E78, success slot 0x142169760. The latter retains a boolean at
++300 and an error count at +296, with space for 64 per-user errors at +40.
+The exact writers, constructors, tables, callback keys and original byte hashes
+are recorded in validation/20261006-achievement-rest-layout.json.
+
+The original event serializer emits name, timestamp and values. The single
+writer emits accountType, userID and events. The multi-user serializer also
+emits firstPartyAccountType, firstPartyUserID and platform. These shapes use
+the existing signed owner and existing supported Battle.net/UNO aliases.
+
+FIX
+After the entire batch passes ownership/schema checks and durable publication
+succeeds, the backend returns HTTP 200 with {"allSucceeded":true}. Failed
+ownership, malformed layouts or persistence never receive that success body.
+Existing event journals, binary/REST retry identity normalization, cross-transport
+deduplication and first-party attribution remain in the same domain implementation.
+This acknowledgement does not fabricate achievement unlocks or reward grants.
+
+The handler now binds the exact native path, POST method, JSON Accept/Content,
+all three query fields and both query/body titles to the authenticated title.
+It accepts the supported title/iw8 contexts and replaylocal/iw8 client labels.
+Encoded values and reordered query fields work. Duplicate/unknown query keys,
+foreign titles, prefix aliases, trailing separators, fragments and invalid
+percent encoding fail before event publication.
+
+Root, account/batch, event and value JSON objects reject duplicate keys.
+Unknown root/batch/event layout fields and excessive nesting also fail before
+publication. Complete single-user and first-party multi-user bodies retain their
+original supported layouts. Persistence failures retain the existing error path.
+
+INVENTORY IMPROVEMENT
+The REST inventory now tracks the incoming RDX builder only through full
+64-bit register copies. It follows shared service calls only when the same
+builder reaches the helper and the helper's actual setter. This resolves both
+event writers to ae.demonware.net without relying on their SQLite names.
+Partial writes, volatile-call clobbers, indirect branches and ambiguous services
+cannot inherit a proven pointer. Call sites and helper paths remain in the ledger.
+The shared parameter helper is classified separately from independent requests.
+
+Current direct-builder inventory: 29 containing functions, 28 independent
+request functions, one shared parameter helper, 26 dedicated domain bindings,
+one unresolved category-list binding and one confirmed pre-transport AB blocker.
+This does not prove all indirect/inlined REST paths or native callback completion.
+
+VALIDATION SCOPE
+The original constructors and both success callbacks execute in a focused VM.
+Ten cases cover the emitted success JSON, old empty 204, missing success key,
+numeric boolean and false-without-results. Both original callbacks reject the
+old empty reply and accept the new body. JSON operations, base-constructor and
+diagnostic boundaries are modeled; the original callback control flow and its
+security-cookie check execute unchanged. This is not a live engine callback.
+
+New encrypted fixture groups check the complete envelope and rejected JSON
+layouts against real owned fixture storage, asserting no mutation on failure.
+The full 291-group encrypted suite passed on the freshly compiled backend. It
+also checks event ownership, complete multi-user batches, binary-to-REST retry
+deduplication, altered retries and restart persistence.
+
+NATIVE GAME VALIDATION
+A reused private test image ran from the root game folder with its independent,
+already accepted test profile. Online status remained 2, all 27 native fences
+passed, native profile login completed, network error was 0 and the authenticated
+relay association reached state 3. Friend lists and subscriptions stayed empty.
+
+The game submitted two owned single-user event batches over the native REST
+route. Backend publication completed with error 0. A new read-only observer
+followed the linked DW getter, wrapper/login/lobby chain and achievement service
+to its actual single-user response. Its success slot points to the linked
+original reader 0x142158070. The response completed with native status 2, no
+handler error latch and error 0. Original 0x142168B90 establishes this completion
+state after the success handler returns. No callback was called externally and
+no response field or task/fence state was written by the observer.
+
+The multi-user batch client was idle. Its live-game callback is not claimed;
+the complete multi-user protocol fixtures and original callback VM remain its
+current evidence. Native account-menu callbacks and two-network gameplay are
+also separate, unfinished scopes.
+
+Read-only observer: tools/observe-native-achievement.py.
+Combined readiness: validation/20261006-achievement-rest-native-readiness.json.
+Private image SHA256:
+  73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+No game recompilation or map test was performed. The owned temporary Alpha and
+Bravo root-folder images, INIs and control files were removed after the test.
+The normal game EXE, INI and owner's identity retained their baseline hashes.
+The normal launcher also validated the unchanged game against the current live
+backend and hash-bound readiness receipt, without launching another game.
+
+PRIVATE BUILD
+The Release backend is frozen from committed revision 5dc544a plus only these
+owned overlays: src/rest_services.cpp and src/achievement_services.cpp.
+Unrelated matchmaking, host-migration and game changes are excluded.
+Build receipt: data/backend-snapshot-1791318129923847500/build-receipt.json.
+Backend SHA256:
+  c614ff0b5340442ff2540343cc16de82ed3c3a7530f103db288e5f4b597b3e55
+
+The six unresolved binary storage routes remain 50/22, 58/22, 193/9, 193/10,
+193/12 and 193/24. This audit reconfirmed that the multipart reader consumes
+the extended result beyond ordinary metadata. No guessed ordinary-metadata
+handler was substituted for that layout. Full backend completion remains open.
