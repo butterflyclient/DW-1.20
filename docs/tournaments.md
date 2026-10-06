@@ -398,6 +398,45 @@ does not establish those gates.
 
 ## Live publication changes and disband
 
+Backend-managed competitions (formation plus pinned round rules) now cancel when
+an authenticated participant who is still competing explicitly leaves (145/22)
+or declines (145/23 false). The local realm deliberately publishes disband rather
+than inventing a retail forfeit score or winner. Eliminated participants and the
+champion after a completed final may leave without cancelling the competition.
+Departure from a finished final retires its old matchmaking assignments; an
+eliminated team's departure releases its completed lobbies and searches while
+preserving winning-team searches needed for subsequent rounds.
+Connection loss alone remains recoverable; no disconnect timeout is imposed.
+
+The complete terminal record lives at
+`matchmaking/<title>/tournament-terminations/<id>.json`. Its schema-1 fields are
+`title`, `id`, `expires`, `actor`, `action` (`leave` or `decline`), `recorded`, and
+the actual derived `state`, including its full native bracket. Actor membership
+and continuing participation, every bracket index and the entire record are
+validated. Cancellation, enrollment, lobby retirement, search deactivation and
+both account assignment indexes share one flushed recoverable transaction.
+A failed terminal publication must roll forward before further requests can
+observe the store. Notification-source fallback cannot swallow a retirement
+transaction failure. Completed match results remain intact; no result is
+fabricated. Assignments to unrelated lobby/search IDs are retained.
+
+Remaining accepted participants receive native event 2012 through the existing
+idle publisher, including when live updates were disabled or a round had not
+yet been allocated. Their registrations remain for authenticated leave and
+diagnostics, with readiness cleared. Queued bracket/join deliveries revalidate
+against the terminal snapshot; result, readiness, acceptance and registration
+cannot reopen a cancelled ID. An operator must publish a new tournament ID.
+Legacy explicitly supplied brackets retain their existing lifecycle behavior.
+
+`tools/tournament_withdrawal_fixtures.py` adds encrypted signed-client checks for
+both explicit tasks, pre-allocation and allocated-round cancellation, completed
+participant departure, malformed-source rejection, a blocked terminal write and
+owned retry, same-session reconnect, stale task rejection and complete terminal
+schema rejection. `record-tournament-withdrawal-proof.py` binds those groups and
+the records retained after fixture server restart to the exact backend image.
+These checks do not establish native positive withdrawal callbacks, a playable
+tournament or retail forfeit/disconnect policy.
+
 Set `live_updates: true` on a publication before players register to opt those
 enrollments into the idle watcher. It samples connected accepted accounts once
 per second. Bracket edits produce event 2010 without a client state request or

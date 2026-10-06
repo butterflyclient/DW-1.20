@@ -1,6 +1,35 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - NATIVE TOURNAMENT MAP POLICY
+CURRENT BACKEND ADDENDUM - MANAGED TOURNAMENT WITHDRAWAL
+Backend SHA256: c34afab4a5d05f058fe498209e8b0dac4d819194ed5e31e71f7e8d19725c8d51
+Game SHA256 remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
+No game recompile or new client package is required for this backend-only change.
+246 encrypted protocol/service groups, signed platform/auth/resources and clean
+Release compilation/formatting passed. Four new managed-withdrawal groups verify
+explicit leave/decline cancellation, durable full terminal layout, all assignment
+retirement, failed-write recovery/owned retry and stale-task denial. Completed
+final departure releases old matchmaking bindings without discarding results;
+eliminated team departure preserves the winner's search for future rounds.
+Temporary connection loss remains recoverable. No retail forfeit is fabricated.
+Root-folder native startup passed all 27 fences, profile/Online and completed
+empty friend lists. Separate backend stop/start plus dw_restart recovered the
+same game process/account with a fresh authenticated relay association, stable
+for more than 60 seconds with keepalives and zero rejected packets.
+Test game closed normally; temporary root command files were removed. Backend
+is left running. No production tournament/friendship was seeded or removed.
+Current protocol: validation/20261006-tournament-withdrawal.json.
+Current native startup/reconnect:
+validation/20261006-tournament-withdrawal-native-reconnect.json.
+Details: docs/DW_TOURNAMENT_WITHDRAWAL_20261006.txt and docs/tournaments.md.
+Native positive withdrawal callbacks, playable tournaments, retail forfeits,
+disconnect timeouts, two-network JOIN/DATA/gameplay and native migration remain
+open. Full backend completion and indirect/REST/push auditing remain incomplete.
+Reviewed routes: 140; registered handlers: 134; unresolved: 50/22, 58/22 and
+193/9,10,12,24. Native multipart URL/count offsets were recovered, but complete
+response bindings were not; no guessed response format was added.
+Older evidence below is retained by its original artifact hash.
+
+RETAINED BACKEND ADDENDUM - NATIVE TOURNAMENT MAP POLICY
 Backend SHA256: 87855532543586649d6f42e1da8111841816719ed4b559b8d1f2840ecaa1de88
 Game remains unchanged; no new client package is required for this integration.
 242 encrypted protocol/service groups passed on the current backend image.

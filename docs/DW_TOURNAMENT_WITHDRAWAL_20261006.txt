@@ -1,0 +1,62 @@
+REPLAY DW BACKEND - MANAGED TOURNAMENT WITHDRAWAL
+
+Backend-only implementation. Replay game executable, INI, private identity,
+client package, unrelated compiler changes and external port mappings are unchanged.
+
+ISSUES AND FIX
+An active participant could leave a PLAYING competition without retiring its
+round lobbies or party searches. Completed competitions also retained old lobby
+assignments, which blocked later competitions from allocating their first round.
+
+The local realm now cancels an unfinished backend-managed tournament when a
+still-competing participant explicitly leaves (145/22) or declines (145/23 false).
+Cancellation retains a complete validated terminal record and commits enrollment,
+lobby/search retirement and account indexes through one recoverable transaction.
+Remaining accepted participants receive Replay's native event 2012, including
+when live_updates is disabled or no round has been allocated.
+
+Eliminated participants can leave without cancelling other teams. Their completed
+transport is retired while the winner's party search remains usable. Departure
+after a finished final releases stale assignments without discarding actual results.
+Retirement validates every lobby-to-player/search binding before changing state.
+Malformed sources do not silently remove enrollment during a failed cancellation.
+An interrupted publication rolls forward the same cancellation on owned retry.
+Newer unrelated assignments are preserved by matching exact lobby/search IDs.
+
+Temporary connection loss is not withdrawal. Cancellation does not synthesize a
+retail forfeit winner, score or timeout rule. Legacy manually supplied brackets
+retain their existing behavior. Cancelled IDs cannot be reopened; publish a new ID.
+
+ARTIFACTS
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: c34afab4a5d05f058fe498209e8b0dac4d819194ed5e31e71f7e8d19725c8d51
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Unchanged SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+
+VALIDATION
+Release C++ build and formatting checks passed.
+Signed platform/auth/resource checks and 246 encrypted protocol/service groups passed.
+Four new lifecycle groups cover both native task envelopes, pre-allocation and
+allocated-round withdrawal, completed departure, elimination/result preservation,
+winner-search preservation, temporary reconnect, complete terminal schema bounds,
+malformed-source rejection, a real blocked terminal publication, recovery/owned
+retry and stale readiness/accept/result/registration denial.
+Protocol proof: validation/20261006-tournament-withdrawal.json
+
+Focused native startup/reconnect proof:
+validation/20261006-tournament-withdrawal-native-reconnect.json
+The unchanged game runs from its root game folder. The proof separately requires
+27 passing native fences, profile/Online state, all three completed empty friend
+lists, unchanged game PID/player identity across separate backend stop/start and
+dw_restart, fresh relay credential/association and at least 60 seconds of stable
+authenticated keepalives with zero rejected relay packets.
+No map/match or remote two-game test is part of this pass.
+
+OPEN GATES
+Native positive withdrawal callbacks and playable tournaments remain unverified.
+Retail forfeits and disconnect timeouts are not implemented by this local policy.
+Native two-network JOIN/DATA/gameplay and native migration remain open.
+Known task result bindings 50/22, 58/22 and 193/9,10,12,24 remain unresolved; the
+live multipart consumers expose URL/count offsets, but their complete native
+result serializers have not been recovered. No wire format was invented.
+The full backend and full indirect/REST/push audit remain incomplete.

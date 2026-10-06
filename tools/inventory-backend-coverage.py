@@ -106,6 +106,17 @@ GAPS = {
     "255": "Friends/user lists/presence/event ingestion implemented. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; other REST mutations need explicit request/result/domain contracts.",
 }
 
+GAPS["145"] += (
+    " Managed unfinished tournament withdrawal now has a complete persistent cancellation layout "
+    "and shared enrollment/lobby/search/account-index transaction. Native tasks 145/22 and "
+    "145/23 false cancel a still-competing participant's tournament; idle event-2012 retires "
+    "peer state. Eliminated and completed-final departures release old matchmaking assignments "
+    "while preserving actual results and winning-team searches. Signed encrypted fixtures cover "
+    "both tasks, allocation, reconnect, source validation, interrupted terminal publication, "
+    "retry and stale-task denial. Native positive withdrawal callbacks, retail forfeits and "
+    "disconnect timeouts remain unverified/unimplemented."
+)
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()

@@ -363,6 +363,11 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         checks.append(
             "Backend rounds follow Replay's 16-bit tournament-ID map slices and repeat-avoidance fallback; an active competition pins the full policy and rejects changed pools without changing its bracket"
         )
+        import tournament_withdrawal_fixtures
+
+        tournament_withdrawal_fixtures.exercise(
+            directory, title, clients, publication, bracket, helpers, publish, checks
+        )
     finally:
         for _, connection in clients:
             connection.close()

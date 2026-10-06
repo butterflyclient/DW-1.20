@@ -137,12 +137,18 @@ namespace matchmaking_store
             require(slash != std::string::npos && entry.path.ends_with(".json"));
             const auto kind = entry.path.substr(0, slash);
             const auto id = number(entry.path.substr(slash + 1, entry.path.size() - slash - 6));
-            require((kind == "lobbies" || kind == "searches" || kind == "tournaments") &&
+            require((kind == "lobbies" || kind == "searches" || kind == "tournaments" ||
+                     kind == "tournament-terminations") &&
                     state.at("id").is_number_unsigned() && state["id"] == id &&
                     state.at("expires").is_number_unsigned());
             if (kind == "tournaments")
             {
                 services::validateTournamentFormation(state, title, id);
+                return;
+            }
+            if (kind == "tournament-terminations")
+            {
+                services::validateTournamentTermination(state, title, id);
                 return;
             }
             if (kind == "searches")

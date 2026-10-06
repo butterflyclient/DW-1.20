@@ -7,6 +7,7 @@ namespace services
     // Pure snapshot validators shared with matchmaking transaction recovery.
     void validateTournamentFormation(const nlohmann::json &state, uint32_t title, uint64_t id);
     void validateTournamentEnrollments(const nlohmann::json &state, uint32_t title);
+    void validateTournamentTermination(const nlohmann::json &state, uint32_t title, uint64_t id);
     std::optional<Delivery> currentTournamentRoundDelivery(const std::filesystem::path &directory,
                                                            uint32_t title,
                                                            uint64_t user);

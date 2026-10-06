@@ -398,6 +398,23 @@ namespace services
             return record;
         }
 
+        std::filesystem::path terminationPath(const std::filesystem::path &directory,
+                                              uint32_t title,
+                                              uint64_t tournament)
+        {
+            return directory / "matchmaking" / std::to_string(title) / "tournament-terminations" /
+                   (std::to_string(tournament) + ".json");
+        }
+
+        bool terminated(const std::filesystem::path &directory, uint32_t title, uint64_t tournament)
+        {
+            const auto path = terminationPath(directory, title, tournament);
+            if (!std::filesystem::exists(path))
+                return false;
+            validateTournamentTermination(read(path, 128 * 1024), title, tournament);
+            return true;
+        }
+
         Json catalog(const std::filesystem::path &path, uint32_t title)
         {
             if (!std::filesystem::exists(path))
@@ -450,6 +467,10 @@ namespace services
                 }
                 persisted(!row.contains("round_rules") || row.contains("formation"));
                 validateBracket(row.at("state"), row["id"].get<uint64_t>());
+                if (terminated(path.parent_path().parent_path().parent_path(),
+                               title,
+                               row["id"].get<uint64_t>()))
+                    continue;
                 if (row.contains("live_updates"))
                     persisted(row["live_updates"].is_boolean());
                 available.push_back(std::move(row));
@@ -941,6 +962,215 @@ namespace services
             return state;
         }
 
+        bool participantStillCompeting(const Json &state, uint64_t user)
+        {
+            if (state["tournamentStatus"] != "PLAYING")
+                return false;
+            for (const auto &team : state["teams"])
+                if (std::find(team["playerIDs"].begin(), team["playerIDs"].end(), Json(user)) !=
+                    team["playerIDs"].end())
+                {
+                    const auto id = team["teamID"].get<int>();
+                    for (size_t round = 0; round < state["rounds"].size(); ++round)
+                        for (const auto &match : state["rounds"][round]["matches"])
+                            if (std::find(match["teamIDs"].begin(),
+                                          match["teamIDs"].end(),
+                                          Json(id)) != match["teamIDs"].end())
+                            {
+                                const auto winner = match.value("winningTeamID", -1);
+                                if (winner >= 0 && winner != id)
+                                    return false;
+                                if (round + 1 == state["rounds"].size() && winner == id)
+                                    return false;
+                            }
+                    return true;
+                }
+            return false;
+        }
+
+        std::vector<matchmaking_store::Write> retireTournamentAssignments(
+            const std::filesystem::path &directory,
+            uint32_t title,
+            uint64_t tournament,
+            const Json &bracket,
+            std::optional<size_t> eliminatedTeam = std::nullopt)
+        {
+            const auto root = directory / "matchmaking" / std::to_string(title);
+            std::vector<matchmaking_store::Write> writes;
+            std::set<uint64_t> lobbies, searches;
+            std::set<uint64_t> departing;
+            for (const auto &team : bracket["teams"])
+                if (!eliminatedTeam || team["teamID"] == *eliminatedTeam)
+                    for (const auto &user : team["playerIDs"])
+                        departing.insert(user.get<uint64_t>());
+            for (const auto &round : bracket["rounds"])
+                for (const auto &match : round["matches"])
+                    if ((!eliminatedTeam ||
+                         (match.value("winningTeamID", -1) >= 0 &&
+                          std::find(match["teamIDs"].begin(),
+                                    match["teamIDs"].end(),
+                                    Json(*eliminatedTeam)) != match["teamIDs"].end())) &&
+                        match["lobbyID"].get<uint64_t>())
+                    {
+                        const auto lobby = match["lobbyID"].get<uint64_t>();
+                        lobbies.insert(lobby);
+                    }
+            for (const auto lobby : lobbies)
+            {
+                const auto name = "lobbies/" + std::to_string(lobby) + ".json";
+                auto state = read(root / name, 128 * 1024);
+                matchmaking_store::validateWrite({name, state}, title);
+                persisted(state.at("backend_doc").at("tournament").at("tournament_id") ==
+                          tournament);
+                const auto &bindings = state["backend_doc"].at("player_id_to_mm_id");
+                persisted(bindings.is_object() && bindings.size() == state["members"].size());
+                for (const auto &member : state["members"])
+                {
+                    const auto user = member.get<uint64_t>();
+                    const auto key = std::to_string(user);
+                    persisted(bindings.contains(key) && bindings[key].is_number_unsigned() &&
+                              bindings[key].get<uint64_t>());
+                    if (departing.contains(user))
+                        searches.insert(bindings[key].get<uint64_t>());
+                }
+                if (!state.value("disbanded", false))
+                {
+                    state["disbanded"] = true;
+                    writes.push_back({name, std::move(state)});
+                }
+            }
+            auto index = searchIndex(root, title);
+            for (const auto &player : bracket["players"])
+            {
+                const auto key = std::to_string(player["playerID"].get<uint64_t>());
+                if (!departing.contains(player["playerID"].get<uint64_t>()))
+                    continue;
+                if (index["searches"].contains(key))
+                {
+                    const auto search =
+                        searchDocument(root, title, index["searches"][key].get<uint64_t>());
+                    if (search.at("tournament_id") == tournament)
+                        searches.insert(search["id"].get<uint64_t>());
+                }
+            }
+            for (const auto search : searches)
+            {
+                auto state = searchDocument(root, title, search);
+                persisted(state.at("tournament_id") == tournament);
+                if (state["active"] != false)
+                {
+                    state["active"] = false;
+                    writes.push_back(
+                        {"searches/" + std::to_string(search) + ".json", std::move(state)});
+                }
+            }
+            bool changed = false;
+            for (auto item = index["searches"].begin(); item != index["searches"].end();)
+                if (searches.contains(item.value().get<uint64_t>()))
+                {
+                    item = index["searches"].erase(item);
+                    changed = true;
+                }
+                else
+                    ++item;
+            if (changed)
+            {
+                persisted(index["revision"].get<uint64_t>() != UINT64_MAX);
+                index["revision"] = index["revision"].get<uint64_t>() + 1;
+                writes.push_back({"tournament-searches.json", std::move(index)});
+            }
+            const auto assignmentPath = root / "current-lobbies.json";
+            if (std::filesystem::exists(assignmentPath))
+            {
+                auto assignments = read(assignmentPath, 128 * 1024);
+                matchmaking_store::validateWrite({"current-lobbies.json", assignments}, title);
+                changed = false;
+                for (auto item = assignments["lobbies"].begin();
+                     item != assignments["lobbies"].end();)
+                    if (lobbies.contains(item.value().get<uint64_t>()))
+                    {
+                        item = assignments["lobbies"].erase(item);
+                        changed = true;
+                    }
+                    else
+                        ++item;
+                if (changed)
+                {
+                    persisted(assignments["revision"].get<uint64_t>() != UINT64_MAX);
+                    assignments["revision"] = assignments["revision"].get<uint64_t>() + 1;
+                    writes.push_back({"current-lobbies.json", std::move(assignments)});
+                }
+            }
+            return writes;
+        }
+
+        std::optional<Reply> withdrawManagedParticipant(const std::filesystem::path &directory,
+                                                        const platform::LobbyIdentity &identity,
+                                                        const Json &row,
+                                                        Json &enrollment,
+                                                        const char *action)
+        {
+            // Local realm policy: cancel an unfinished managed competition. Do not
+            // fabricate a host result, score or a retail forfeit reason. Eliminated
+            // players and players in a finished final may leave normally.
+            if (!row.contains("round_rules"))
+                return std::nullopt;
+            const auto tournament = row["id"].get<uint64_t>();
+            const auto root = directory / "tournaments" / std::to_string(identity.titleId);
+            const auto journal = results(root / "results" / (std::to_string(tournament) + ".json"),
+                                         identity.titleId,
+                                         tournament);
+            const auto bracket = stateWithReadiness(
+                stateWithResults(row, journal), tournament, enrollment["players"]);
+            if (bracket["tournamentStatus"] != "PLAYING")
+                return std::nullopt;
+            if (!participantStillCompeting(bracket, identity.userId))
+            {
+                std::optional<size_t> eliminatedTeam;
+                if (bracket["rounds"].back()["matches"][0].value("winningTeamID", -1) < 0)
+                    for (const auto &team : bracket["teams"])
+                        if (std::find(team["playerIDs"].begin(),
+                                      team["playerIDs"].end(),
+                                      Json(identity.userId)) != team["playerIDs"].end())
+                            eliminatedTeam = team["teamID"].get<size_t>();
+                const auto writes = retireTournamentAssignments(
+                    directory, identity.titleId, tournament, bracket, eliminatedTeam);
+                enrollment["players"].erase(std::to_string(identity.userId));
+                Reply reply{0, {}, "tournament-completed-participant-left"};
+                notifyUpdate(reply, row, journal, enrollment["players"]);
+                commitEnrollment(directory, identity.titleId, enrollment, std::nullopt, writes);
+                return reply;
+            }
+            Json termination = {{"schema", 1},
+                                {"title", identity.titleId},
+                                {"id", tournament},
+                                {"expires", row["expires"]},
+                                {"actor", identity.userId},
+                                {"action", action},
+                                {"recorded", now()},
+                                {"state", bracket}};
+            validateTournamentTermination(termination, identity.titleId, tournament);
+            auto writes =
+                retireTournamentAssignments(directory, identity.titleId, tournament, bracket);
+            writes.push_back({"tournament-terminations/" + std::to_string(tournament) + ".json",
+                              std::move(termination)});
+            auto &players = enrollment["players"];
+            players.erase(std::to_string(identity.userId));
+            for (auto &player : players)
+                if (player["id"] == tournament)
+                {
+                    // Idle event-2012 must be delivered even when live_updates was
+                    // off or no round was allocated yet. Keep peer registrations
+                    // for authenticated leave and diagnostics, but retire readiness.
+                    player["live_updates"] = true;
+                    player["ready"] = false;
+                    player.erase("ready_round");
+                    player.erase("ready_match");
+                }
+            commitEnrollment(directory, identity.titleId, enrollment, std::nullopt, writes);
+            return Reply{0, {}, "tournament-playing-withdrawal-cancelled"};
+        }
+
         std::optional<Json> formationSearch(const std::filesystem::path &directory,
                                             uint32_t title,
                                             uint64_t user)
@@ -1117,6 +1347,22 @@ namespace services
     void validateTournamentEnrollments(const Json &state, uint32_t title)
     {
         validateEnrollments(state, title);
+    }
+
+    void validateTournamentTermination(const Json &record, uint32_t title, uint64_t id)
+    {
+        persisted(record.is_object() && record.size() == 8 && record.at("schema") == 1 &&
+                  record.at("title") == title && record.at("id") == id && id &&
+                  record.at("expires").is_number_unsigned() &&
+                  record.at("actor").is_number_unsigned() && record["actor"].get<uint64_t>() &&
+                  record.at("recorded").is_number_unsigned() &&
+                  record["recorded"].get<uint64_t>() &&
+                  record["recorded"].get<uint64_t>() <= record["expires"].get<uint64_t>() &&
+                  record.at("action").is_string() &&
+                  (record["action"] == "leave" || record["action"] == "decline"));
+        const auto members = validateBracket(record.at("state"), id);
+        persisted(members.contains(record["actor"].get<uint64_t>()) &&
+                  participantStillCompeting(record["state"], record["actor"].get<uint64_t>()));
     }
 
     std::optional<Reply> startTournamentSearch(const std::filesystem::path &directory,
@@ -1578,12 +1824,30 @@ namespace services
                 players.contains(key) ? players[key]["id"].get<uint64_t>() : 0;
             Reply reply{0, {}, "tournament-owner-left-all"};
             std::optional<Json> leaveFormation;
+            std::optional<Json> leaveRow;
             // Leave must still succeed when publication is unavailable. A malformed
             // notification source cannot undo the authenticated enrollment removal.
             try
             {
                 const auto rows = catalog(root / "catalog.json", id.titleId);
                 const auto *row = published(rows, tournamentLeft, id.userId);
+                if (row)
+                    leaveRow = *row;
+            }
+            catch (const std::exception &)
+            {
+                reply.detail = "tournament leave notification source unavailable";
+            }
+            // Fail closed on retirement/transaction errors. The fallback below
+            // applies to notification-source failures, never a half-committed
+            // cancellation whose active lobbies could otherwise survive the leave.
+            if (leaveRow)
+                if (auto withdrawal =
+                        withdrawManagedParticipant(directory, id, *leaveRow, state, "leave"))
+                    return withdrawal;
+            try
+            {
+                const auto *row = leaveRow ? &*leaveRow : nullptr;
                 if (row && row->contains("formation"))
                 {
                     auto formation = formationRecord(root, id.titleId, *row);
@@ -1689,6 +1953,9 @@ namespace services
             result.text(stateWithReadiness(bracket, tournament, players).dump());
             return Reply{0, {std::move(result.data)}, "tournament-owner-state"};
         }
+        if (task == 23 && !accepted)
+            if (auto withdrawal = withdrawManagedParticipant(directory, id, *row, state, "decline"))
+                return withdrawal;
         if (task == 23 && !accepted)
             players.erase(key);
         else if (task == 23 || task == 28)
