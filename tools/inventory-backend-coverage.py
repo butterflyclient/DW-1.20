@@ -84,7 +84,7 @@ GAPS = {
     "12": "Native utility methods outside the recovered request set remain unclassified.",
     "23": "Full native positive signed increment/read roundtrip still needs observation.",
     "27": "Configured geography is local metadata, not real IP geolocation.",
-    "29": "Native tasks 2 and categorized/status variants; dynamic send-duration branch remains unresolved in CFG inventory.",
+    "29": "Native task 2 and categorized/status variants remain open. Original sendMailWithDuration 0x14212D9D0 selects task 7 for an explicit sender and task 9 otherwise. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. Native game mail callback/body consumers remain unverified.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",

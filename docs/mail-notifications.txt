@@ -1,0 +1,68 @@
+REPLAY NATIVE NEW-MAIL DELIVERY
+
+Target evidence
+Original Replay bdLobbyService::handlePushMessage: 0x142122970.
+Its UInt32 event 18 branch calls the registered event handler at virtual slot
++128 without consuming any further payload, then returns successful dispatch.
+The exact retained decoder is data/native-mail-push-dispatch-20261006.json.
+The source oracle calls that slot onNewMail; the Replay opcode and signature
+come from the original target rather than from the other build's enum labels.
+Original sendMailWithDuration 0x14212D9D0 chooses task 29/7 when an explicit
+sender is supplied and 29/9 otherwise; its full request includes duration and
+return-on-expiration. Its body is retained in data/native-mail-window-20261006.json.
+These are original-image research addresses, not shifted game call addresses.
+
+Behavior
+The existing mail send tasks persist a message before queuing the native bare
+event 18 for its recipient. The event contains no invented context, account,
+message ID or message body. A task reply precedes the push. Context and message
+ID are server-side delivery metadata only.
+
+Normal expiration returns publish new, unread, undelivered rows for the original
+sender. A return has duration zero and return-on-expiration false, so it cannot
+bounce recursively. The same notification applies after that publication.
+
+The existing idle publication worker also visits mail for authenticated online
+accounts. It processes expiration without needing a mailbox task and catches
+up unread mail after login/reconnect. It selects the highest unread ID in each
+context, since one callback prompts a mailbox fetch rather than delivering one
+body. Each native connection has independent context/ID watermarks; duplicate
+sockets each receive their own catch-up, while established sockets suppress
+duplicate queued/idle notifications. Session teardown discards those marks.
+No new worker, external listener, game patch or proxy is introduced.
+
+The server revalidates the context, current row, recipient, unread status and
+expiration under the existing serialized service store before writing the
+encrypted native frame. A message read/deleted/expired before the queued event
+does not notify. Watermarks advance only after a successful write. Failed disk
+publication cannot produce an accepted push or advance its watermark.
+
+Mailbox shape/content bounds remain those of the existing native implementation:
+4,096 rows and 8 MiB per context, 1,024-byte bodies, UInt16 categories, UInt32
+timestamps/durations and owned read/delete/send operations. Idle scans and each
+connection's watermark map are bounded to 128 contexts. New mailbox writes
+enforce that bound before creating their directory; existing contexts remain
+available at capacity. Expiration returns use the original recipient's persisted
+display name, rather than a polling account's identity. A malformed mailbox
+cannot notify; the corresponding task reports storage error 102. Context scans
+isolate malformed entries so another valid context can continue.
+
+Persistent IDs must remain monotonic. Restoring a mailbox to an older ID sequence
+while keeping the same connection alive is outside that persistence contract;
+normal reconnect establishes a fresh watermark. Notifications are wakeups, not
+delivery acknowledgments. Unread mail remains durable until the native read or
+delete task changes it. There is no fabricated inventory grant or mail command.
+
+Validation
+tools/mail_notification_fixtures.py uses separate authenticated encrypted clients
+and real durable mailbox writes. It covers exact recipient-only event framing,
+idle deduplication, read/delete suppression, actual pending-file failure and
+successful retry, offline catch-up, independent sockets, idle expiration/return
+and malformed-publication recovery. The independent fixture client records bare
+mail events asynchronously while preserving strict order for other result/push
+types; dedicated mail checks consume the recorded raw events explicitly.
+
+Actual native startup/reconnect is a separate current-image regression gate.
+The in-game mail callback and its body-processing consumer remain unverified
+until a controlled native mail test can reach that flow. No protocol fixture
+or ordinary startup fence is treated as proof of that consumer.

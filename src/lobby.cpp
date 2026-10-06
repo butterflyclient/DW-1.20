@@ -37,6 +37,7 @@ namespace lobby
             std::function<bool(std::span<const uint8_t>)> writer;
             uint64_t lastTournament = 0;
             std::string lastTournamentHash;
+            std::map<std::string, uint64_t> lastMail;
         };
 
         std::mutex endpointMutex;
@@ -53,7 +54,7 @@ namespace lobby
 
         std::map<std::pair<uint32_t, uint64_t>, std::map<std::string, OnlineSession>> onlineUsers;
         void route(uint32_t title, const services::Delivery &delivery);
-        void startTournamentUpdates();
+        void startPublicationUpdates();
 
         struct PushLease
         {
@@ -69,7 +70,7 @@ namespace lobby
                 endpoint->identity = identity;
                 endpoint->sessionFingerprint = wire::base64Encode(crypto::sha256(identity.key));
                 endpoint->writer = std::move(writer);
-                startTournamentUpdates();
+                startPublicationUpdates();
                 std::lock_guard lock(endpointMutex);
                 wire::require(!endpoints.contains(connection));
                 // Routing holds this same lock when selecting recipients. Publish the
@@ -167,6 +168,14 @@ namespace lobby
                 std::lock_guard lock(endpoint->mutex);
                 // Validate after taking the serialized writer lock. A newer presence
                 // cannot overtake a previously validated push waiting for this lock.
+                if (delivery.mailId)
+                {
+                    const auto previous = endpoint->lastMail.find(delivery.mailContext);
+                    if (previous != endpoint->lastMail.end() && previous->second >= delivery.mailId)
+                        continue;
+                    if (previous == endpoint->lastMail.end() && endpoint->lastMail.size() >= 128)
+                        continue;
+                }
                 if (!services::deliveryValid(title, delivery))
                     return;
                 if (delivery.tournamentRefresh &&
@@ -179,6 +188,8 @@ namespace lobby
                     {
                         if (!endpoint->writer(delivery.payload))
                             endpoint->writer = {};
+                        else if (delivery.mailId)
+                            endpoint->lastMail[delivery.mailContext] = delivery.mailId;
                         else if (delivery.tournamentId)
                         {
                             endpoint->lastTournament = delivery.tournamentId;
@@ -271,7 +282,7 @@ namespace lobby
             return queue;
         }
 
-        void startTournamentUpdates()
+        void startPublicationUpdates()
         {
             // Construct the writer queue first so the idle publisher is joined
             // before that queue is destroyed during orderly process shutdown.
@@ -307,6 +318,7 @@ namespace lobby
                                                            entry.second->identity.userId);
                                   }
                                   for (const auto &[title, user] : accounts)
+                                  {
                                       try
                                       {
                                           const auto update =
@@ -319,6 +331,18 @@ namespace lobby
                                           // A malformed publication is not a disband.
                                           // The task reader still reports its storage error.
                                       }
+                                      try
+                                      {
+                                          for (const auto &delivery :
+                                               services::mailUpdates(title, user))
+                                              route(title, delivery);
+                                      }
+                                      catch (const std::exception &)
+                                      {
+                                          // A malformed mailbox cannot notify or prevent
+                                          // another account's publication from progressing.
+                                      }
+                                  }
                                   lock.lock();
                               }
                           })

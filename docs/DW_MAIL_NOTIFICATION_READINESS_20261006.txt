@@ -1,0 +1,74 @@
+REPLAY DW MAIL-NOTIFICATION READINESS
+2026-10-06
+
+Issue
+Mail tasks stored and retrieved messages, but online recipients received no
+native new-mail callback. Unread offline mail and timed expiration returns
+also needed an idle publication path rather than waiting for a mailbox task.
+
+Research
+Original Replay bdLobbyService::handlePushMessage 0x142122970 dispatches
+UInt32 event 18 to handler slot +128 without consuming additional payload.
+Original sendMailWithDuration 0x14212D9D0 selects task 29/7 for an explicit
+sender and 29/9 otherwise, including duration and return-on-expiration.
+Exact decoder and request evidence were retained in the private data directory.
+No other build's numeric enum or misleading exported name was used as proof.
+
+Fix
+Native send/expiration tasks persist before queuing the bare event 18 for the
+recipient. The existing idle publication worker catches up unread messages
+on login/reconnect and processes expiration without another mailbox task.
+Each native connection tracks independent bounded context/ID watermarks.
+Rows are revalidated before encrypted delivery; read, deleted, expired or
+unpublished messages cannot notify. Successful writes alone advance marks.
+Expiration returns retain the recipient's persisted display name and cannot
+bounce recursively. Malformed contexts are isolated, and new mailbox writes
+enforce the 128-context bound while existing contexts remain usable at capacity.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: af43d46e2638504bc022c208142592eb6edeb2ac63b435a8d1febf3b20862567
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+226 grouped encrypted protocol/service checks passed on this backend image.
+Seven mail groups cover exact recipient-only framing, duplicate suppression,
+read/delete cancellation, actual pending-file failure and accepted retry,
+offline and independent-socket catch-up, idle expiration return, malformed
+context recovery, and context capacity with continued existing-context writes.
+Current-image platform/auth/resource checks and resumed local identity
+persistence passed. C++ and added Python formatting checks passed.
+
+The root-folder game reached native profile sign-in, Online state, all 27
+startup fences, completed empty friend lists and authenticated relay setup.
+Separate backend stop/start followed by dw_restart reconnected the same game
+process/account with a fresh relay credential. The final connection remained
+healthy for 82.282 seconds with nine fresh keepalive replies, zero new relay
+rejections and all 27 fences passing. The owned game closed normally; temporary
+test/command markers were removed. The current backend remains running.
+No game rebuild, proxy, map/match test, new friendship, owner identity change,
+new public port or two-network gameplay claim.
+
+validation/20261006-mail-notifications.json
+validation/20261006-mail-notifications-native-reconnect.json
+data/lobby-verification.json
+data/mail-notifications-build-20261006.log
+data/mail-notifications-suite-20261006.log
+data/native-mail-push-dispatch-20261006.json
+data/native-mail-window-20261006.json
+data/native-mail-notifications-final-20261006.jpg
+docs/mail-notifications.txt
+
+Remaining
+The full backend goal remains active: 134 of 140 inventoried constructor task
+routes are registered. Six exact live-download/category/large-upload response
+bindings remain open, plus indirect/REST/push and native consumer coverage.
+The mail wire contract and lifecycle are fixture-verified; in-game onNewMail
+and body consumption remain unverified. Ordinary native startup/reconnect is
+not evidence of that consumer. The Terms of Agreement remained unaccepted,
+limiting menu-driven tests. Actual two-network party gameplay still needs
+validation. Controlled restarts and dw_restart are supported; dw_leave is
+excluded. Mail IDs must remain monotonic during a live connection.

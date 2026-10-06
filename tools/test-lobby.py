@@ -195,6 +195,7 @@ try:
             )
             self.s = socket.create_connection(("127.0.0.1", 3075 + offset), timeout=5)
             self.outgoing = self.incoming = 1
+            self.mail_notifications = []
             hello = struct.pack("<5I", 200, 200, 210, 220, 1024 * 1024) + os.urandom(8)
             send_fragments(self.s, hello)
             ack = read_frame(self.s)
@@ -272,7 +273,7 @@ try:
             )
             return record + hmac.digest(self.material[:20], record, "sha1")[:8]
 
-        def receive(self):
+        def receive_record(self):
             packet = read_frame(self.s)
             assert packet[4:6] == b"\xab\x85"
             assert struct.unpack_from("<I", packet, 6)[0] == self.incoming
@@ -287,6 +288,25 @@ try:
             size = struct.unpack_from("<I", plain)[0]
             assert plain[5 + size :] == bytes(len(plain) - 5 - size)
             return plain[4], plain[5 : 5 + size]
+
+        def receive(self):
+            # Native onNewMail is asynchronous and may precede a later task's
+            # result. Keep its exact bare event for the dedicated mail checks;
+            # all other unsolicited records retain their existing strict order.
+            for _ in range(64):
+                record = self.receive_record()
+                if record == (2, u32(18)):
+                    self.mail_notifications.append(record)
+                    continue
+                return record
+            raise AssertionError("Unexpected native-mail notification flood")
+
+        def receive_mail(self):
+            if self.mail_notifications:
+                return self.mail_notifications.pop(0)
+            record = self.receive_record()
+            assert record == (2, u32(18))
+            return record
 
         def task(
             self, service, task, params=b"", error=0, structured=False, terminator=True
@@ -3412,6 +3432,20 @@ try:
         native_rest,
         rest_response,
         (u32, u64, text, boolean),
+        checks,
+    )
+    from mail_notification_fixtures import exercise as test_mail_notifications
+
+    renewed_peer = test_mail_notifications(
+        client,
+        renewed_peer,
+        renewed_peer_auth,
+        Client,
+        directory,
+        title,
+        user,
+        peer_user,
+        (u32, u64, text, boolean, blob),
         checks,
     )
     from session_presence_fixtures import exercise as test_session_presence

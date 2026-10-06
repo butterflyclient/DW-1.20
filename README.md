@@ -59,11 +59,16 @@ The recipient-purchase iteration has its own receipt at
 `validation/20261006-gifts-native-reconnect.json`.
 The lobby-session lifetime iteration has its own receipt at
 `validation/20261006-session-presence-native-reconnect.json`.
-The current party-elected host-claim iteration is recorded in
+The party-elected host-claim iteration is recorded in
 `validation/20261006-host-migration-native-reconnect.json`; its exact contract,
 membership/session checks and interrupted-publication behavior are described in
 [matchmaking-host-migration.txt](docs/matchmaking-host-migration.txt).
 Its protocol checks do not establish an in-game migration callback.
+The current native-mail iteration has its own scoped startup/reconnect receipt at
+`validation/20261006-mail-notifications-native-reconnect.json`. Recipient event 18,
+idle expiration returns and per-connection unread catch-up are described in
+[mail-notifications.txt](docs/mail-notifications.txt); the in-game mail callback
+and body consumer still require their own validation.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are

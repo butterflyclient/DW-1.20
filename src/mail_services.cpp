@@ -175,7 +175,9 @@ namespace services
                     returned["id"] = nextId(data);
                     returned["recipient"] = row.at("sender");
                     returned["sender"] = row.at("recipient");
-                    returned["name"] = row.at("recipient") == id.userId ? id.name : "";
+                    returned["name"] =
+                        platform::accountName(row.at("recipient").get<uint64_t>())
+                            .value_or(row.at("recipient") == id.userId ? id.name : "");
                     returned["account"] = "uno";
                     returned["read"] = false;
                     returned["undelivered"] = true;
@@ -212,7 +214,83 @@ namespace services
             out.u32(duration && end > stamp ? static_cast<uint32_t>(end - stamp) : 0);
             return std::move(out.data);
         }
+
+        Delivery notification(const std::string &name, const Json &row)
+        {
+            // Original Replay bdLobbyService::handlePushMessage 0x142122970:
+            // event 18 invokes the registered event-handler slot +128 directly.
+            // It consumes no context, account, message ID or body from the wire.
+            wire::Writer push;
+            push.u32(18);
+            Delivery out{row.at("recipient").get<uint64_t>(), std::move(push.data), 250};
+            out.mailContext = name;
+            out.mailId = row.at("id").get<uint64_t>();
+            return out;
+        }
     } // namespace
+
+    std::vector<Delivery> currentMailDeliveries(const std::filesystem::path &root,
+                                                uint32_t title,
+                                                uint64_t user)
+    {
+        const auto directory = root / "mail" / std::to_string(title);
+        std::vector<Delivery> deliveries;
+        if (!std::filesystem::exists(directory))
+            return deliveries;
+        platform::LobbyIdentity identity;
+        identity.titleId = title;
+        identity.userId = user;
+        size_t contexts = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(directory))
+        {
+            if (!entry.is_directory())
+                continue;
+            wire::require(++contexts <= 128);
+            try
+            {
+                const auto name = context(entry.path().filename().string());
+                const auto path = entry.path() / "messages.json";
+                auto data = load(path);
+                if (expire(data, identity))
+                    save(path, data);
+                const Json *latest = nullptr;
+                for (const auto &row : data.at("messages"))
+                    if (row.at("recipient") == user && !row.at("read").get<bool>() &&
+                        (!latest || row.at("id") > latest->at("id")))
+                        latest = &row;
+                if (latest)
+                    deliveries.push_back(notification(name, *latest));
+            }
+            catch (const std::exception &)
+            {
+                // Domain tasks report the storage error. One invalid context
+                // cannot notify or starve other valid mailboxes on this account.
+            }
+        }
+        return deliveries;
+    }
+
+    bool mailDeliveryValid(const std::filesystem::path &root,
+                           uint32_t title,
+                           const Delivery &delivery)
+    {
+        if (!delivery.mailId)
+            return true;
+        const auto name = context(delivery.mailContext);
+        const auto path = root / "mail" / std::to_string(title) / name / "messages.json";
+        const auto data = load(path);
+        return std::any_of(
+            data.at("messages").begin(),
+            data.at("messages").end(),
+            [&](const Json &row)
+            {
+                const auto duration = row.at("duration").get<uint32_t>();
+                return row.at("id") == delivery.mailId && row.at("recipient") == delivery.user &&
+                       !row.at("read").get<bool>() &&
+                       (!duration ||
+                        uint64_t(row.at("created").get<uint32_t>()) + duration > now());
+            });
+    }
 
     std::optional<Reply> mailServices(const std::filesystem::path &root,
                                       const platform::LobbyIdentity &id,
@@ -227,7 +305,17 @@ namespace services
             sender = account(p, id);
         const auto name = context(p.text(16));
         const auto path = root / "mail" / std::to_string(id.titleId) / name / "messages.json";
+        if ((task == 7 || task == 9) && !std::filesystem::exists(path.parent_path()) &&
+            std::filesystem::exists(path.parent_path().parent_path()))
+        {
+            size_t contexts = 0;
+            for (const auto &entry :
+                 std::filesystem::directory_iterator(path.parent_path().parent_path()))
+                if (entry.is_directory())
+                    wire::require(++contexts < 128);
+        }
         auto data = load(path);
+        const auto firstNewId = data.at("next_id").get<uint64_t>();
         bool changed = expire(data, id);
         Reply reply{0, {}, "mail"};
         if (task == 7 || task == 9)
@@ -329,7 +417,14 @@ namespace services
             reply.operation = task == 5 ? "mail-deleted" : "mail-bodies-read";
         }
         if (changed)
+        {
             save(path, data);
+            // The task reply is written before routing. Revalidation and per-lease
+            // watermarks suppress a stale/deleted row or a concurrent idle scan.
+            for (const auto &row : data.at("messages"))
+                if (row.at("id").get<uint64_t>() >= firstNewId && !row.at("read").get<bool>())
+                    reply.deliveries.push_back(notification(name, row));
+        }
         return reply;
     }
 } // namespace services

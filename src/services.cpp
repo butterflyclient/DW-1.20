@@ -490,12 +490,19 @@ namespace services
         return currentTournamentDelivery(directory, title, user);
     }
 
+    std::vector<Delivery> mailUpdates(uint32_t title, uint64_t user)
+    {
+        std::lock_guard lock(storeMutex);
+        return currentMailDeliveries(directory, title, user);
+    }
+
     bool deliveryValid(uint32_t title, const Delivery &delivery)
     {
         std::lock_guard lock(storeMutex);
         try
         {
             return socialDeliveryValid(title, delivery) &&
+                   mailDeliveryValid(directory, title, delivery) &&
                    clanDeliveryValid(directory, title, delivery) &&
                    tournamentDeliveryValid(directory, title, delivery) &&
                    (!delivery.lobbyId || matchmakingDeliveryValid(directory, title, delivery));

@@ -26,6 +26,8 @@ namespace services
         std::string tournamentStateHash;
         bool tournamentUnavailable = false;
         bool tournamentRefresh = false;
+        std::string mailContext;
+        uint64_t mailId = 0;
     };
 
     struct Reply
@@ -45,6 +47,7 @@ namespace services
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user);
     bool deliveryValid(uint32_t title, const Delivery &delivery);
     std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user);
+    std::vector<Delivery> mailUpdates(uint32_t title, uint64_t user);
     Reply dispatch(const platform::LobbyIdentity &identity,
                    uint8_t service,
                    uint8_t task,
