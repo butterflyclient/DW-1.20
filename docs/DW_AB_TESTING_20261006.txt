@@ -1,0 +1,86 @@
+REPLAY DW AB TESTING - 2026-10-06
+
+Implementation
+Native task 194/1 now supports explicit published experiments, deterministic
+weighted cohorts and active treatments. An absent publication keeps the default
+empty enrollment. This uses the existing native HTTP-proxy response envelope;
+no game EXE modification, invented player profile or initial friendship is needed.
+
+Exact Replay ABI and behavior
+The original response reader at 0x1420FF850 reads expiresIn, ABToken and
+enrollments. 0x1420FFB10 reads testID, cohortID and clientTreatments;
+0x1420FFA60 reads startsIn, endsIn and modifiers. Engine initialization at
+0x140F28810 allocates eight enrollment records, one treatment per record and
+a 1024-byte modifier buffer including the terminator. The generic SDK array
+capacity alone does not describe the game's actual storage.
+
+0x140F290A0 applies returned modifiers immediately. The backend withholds future
+and expired treatments; token lifetime stops at the next selected activation or
+expiration boundary, at most one hour. Native schedule polling and automatic
+reversion of a previously applied modifier are separate engine behaviors;
+an empty enrollment does not undo a dvar already applied in the same process.
+Operators must publish a restoring treatment or restore the native dvar explicitly.
+
+Publication
+Path: data/ab-testing/<title>/<context>/catalog.json
+Replay's current native title and context are both 5800. The old fixture/default
+context iw8 remains supported, with its original token-file location retained.
+Use exact registered engine dvar names. ui_serverFrameDuration is registered as
+MKQQKMRORQ in this target; its human alias alone creates a different string dvar.
+
+Example (absolute UTC seconds; replace starts/ends with intended active dates):
+{
+  "schema": 1,
+  "title": 5800,
+  "context": "5800",
+  "revision": 1,
+  "tests": [{
+    "testID": 1706001,
+    "enabled": true,
+    "cohorts": [{
+      "cohortID": 3106001,
+      "weight": 1,
+      "clientTreatments": [{
+        "starts": 1791298800,
+        "ends": 1791302400,
+        "modifiers": "{\"type\":\"dvar\",\"data\":[{\"key\":\"MKQQKMRORQ\",\"value\":\"17\"}]}"
+      }]
+    }]
+  }]
+}
+
+Cohort selection hashes the canonical JSON array [title,user,context,testID],
+reads the first eight SHA256 bytes little-endian and takes modulo total weight.
+Published cohort order defines the cumulative buckets. Unchanged publication,
+owner and test select the same cohort across login and backend process restart.
+Changing weights/order can change assignment and requires a newer revision.
+
+Complete schemas validate every published row, including disabled tests and
+unselected cohorts. Up to 256 tests and 128 cohorts per test are allowed in the
+catalog, with at most eight selected active enrollments in the native reply.
+Each cohort has at most one treatment; modifiers are an opaque nonempty string
+of at most 1023 bytes with no NUL. Duplicate JSON keys/IDs, zero/overflowed
+weights, malformed schedules, cross-title/context state and unknown fields fail
+before state publication. The exact native reply is bounded below 16000 bytes.
+
+Enrollment state is account/title/context owned. Revision rollback and changed
+content reusing a revision fail. To retire a published experiment, publish a
+newer revision with tests: []; removing its catalog alone is a rollback.
+Legacy three-field empty iw8 states migrate without changing a still-valid token.
+Response preflight precedes flushed atomic state publication. Failed publication
+acknowledges no success and preserves the last committed enrollment.
+
+Validation
+validation/20261006-abtesting-target-layout.json binds original PE bytes and
+SQLite provenance to the response fields, engine capacities and immediate apply.
+validation/20261006-abtesting-wire.json records 275 encrypted service groups,
+including six AB groups: positive treatment, full-layout rejection, revision and
+real atomic-write failure, time filtering, context isolation and process restart.
+Native proof and current readiness details are recorded separately. The fixture
+result does not establish future native schedule polling or other modifier types.
+
+The native run temporarily publishes one harmless ui_serverFrameDuration change
+from 16 to 17. It verifies decoded IDs/modifier hash and the actual registered
+dvar before/after backend restart and dw_restart, then restores empty enrollment
+and 16. Private token states/backups remain ignored and never enter receipts.
+Two-network party join/data/gameplay and the broader backend remain open.

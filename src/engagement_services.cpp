@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "engagement_services.h"
+#include "abtesting_services.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <chrono>
@@ -604,41 +605,10 @@ namespace services
         {
             // Replay 0x142139AD0 starts 194/1 using the full HTTP-proxy envelope.
             // 0x1420FF850 requires expiresIn, ABToken and enrollments JSON, and updates
-            // the native lobby token lifetime itself. This local server offers no tests.
+            // the native lobby token lifetime itself.
             const auto request = proxyRequest(p);
             wire::require(request.body.empty());
-            const auto &url = request.url;
-            const auto account = "/v2/users/bnet-" + std::to_string(id.userId) + "/enrollments/";
-            const auto universal = "/v2/users/uno-" + std::to_string(id.userId) + "/enrollments/";
-            auto route = url.find("/v2/users/");
-            wire::require(route != std::string::npos);
-            auto query = url.find('?', route);
-            const auto path =
-                url.substr(route, query == std::string::npos ? url.size() - route : query - route);
-            if (path != account && path != universal)
-                return {101, {}, "ab-enrollment-owner-denied"};
-            const auto target = directory / "ab-enrollments" / std::to_string(id.titleId) /
-                                (std::to_string(id.userId) + ".json");
-            auto state = load(target, Json::object());
-            if (!state.contains("expires") || state.at("expires").get<uint64_t>() <= now())
-            {
-                const auto token = crypto::random(32);
-                constexpr char digits[] = "0123456789abcdef";
-                std::string encoded;
-                for (auto b : token)
-                {
-                    encoded.push_back(digits[b >> 4]);
-                    encoded.push_back(digits[b & 15]);
-                }
-                state = {
-                    {"token", encoded}, {"expires", now() + 3600}, {"enrollments", Json::array()}};
-                save(target, state);
-            }
-            wire::require(state.at("enrollments").is_array() && state.at("enrollments").empty());
-            return proxyResponse(Json{{"expiresIn", state.at("expires").get<uint64_t>() - now()},
-                                      {"ABToken", state.at("token")},
-                                      {"enrollments", state.at("enrollments")}},
-                                 "ab-enrollment-read");
+            return abTestingEnroll(directory, id, request.url);
         }
 
         Reply events(const std::filesystem::path &directory,

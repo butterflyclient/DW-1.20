@@ -68,7 +68,7 @@ ROUTES = [
     (151, "esports registration", "startup_services.cpp", [1]),
     (152, "performance samples", "scheduled_services.cpp", [1]),
     (193, "object store", "objectstore_services.cpp", [6, 7, 8, 16]),
-    (194, "AB enrollment", "engagement_services.cpp", [1]),
+    (194, "AB enrollment", "abtesting_services.cpp", [1]),
     (195, "scripted loot", "engagement_services.cpp", [1]),
     (197, "account aliases and clans", "identity_services.cpp", [10, 11]),
     (197, "account aliases and clans", "clan_services.cpp", list(range(20, 33)) + [37]),
@@ -99,7 +99,7 @@ GAPS = {
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
     "193": "Verified user-object PUT/read and publisher metadata/content retain native envelopes. Complete multi-object upload windows use flushed per-title/account intents, full namespace/content/tag preflight and blocked-read/process-restart recovery; native profile-window recovery still needs a targeted client failure run. Tasks 3/9/10/12/24 category/list/large-upload families remain open; response binding is unresolved for some recovered writers.",
-    "194": "Signed empty local enrollment; populated experiments need explicit treatment rules.",
+    "194": "Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch are verified on the current proof-bound artifact. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes.",
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
@@ -194,6 +194,36 @@ def friend_native_evidence(server_hash, game_hash):
         and reconnect.get("path", "").replace("\\", "/")
         == reconnect_path.relative_to(ROOT).as_posix()
         and reconnect.get("sha256") == digest(reconnect_path)
+    ):
+        return None
+    return path.relative_to(ROOT).as_posix(), proof
+
+
+def abtesting_native_evidence(server_hash, game_hash):
+    path = ROOT / "validation/20261006-abtesting-native.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    expected_sources = {
+        "src/abtesting_services.cpp",
+        "src/abtesting_services.h",
+        "src/engagement_services.cpp",
+        "tools/observe-game.py",
+        "tools/record-native-abtesting-proof.py",
+    }
+    if not (
+        proof.get("passed") is True
+        and proof.get("server_sha256") == server_hash
+        and proof.get("game_sha256") == game_hash
+        and set(proof.get("sources", {})) == expected_sources
+        and all(
+            proof["sources"][source] == digest(ROOT / source)
+            for source in expected_sources
+        )
+        and proof.get("native_ab_enrollment_completion_verified")
+        and proof.get("native_populated_treatment_and_registered_dvar_verified")
+        and proof.get("same_process_backend_restart_and_native_ab_refetch_verified")
+        and proof.get("empty_default_enrollment_verified_after_cleanup")
     ):
         return None
     return path.relative_to(ROOT).as_posix(), proof
@@ -424,6 +454,7 @@ def main():
     rest_path = DATA / "native-rest-callgraph.json"
     rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
     friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
+    ab_evidence = abtesting_native_evidence(current_hash, deployment["sha256"])
     rest_requests = (
         rest_coverage(rest_inventory, friend_evidence) if rest_inventory else []
     )
@@ -456,8 +487,12 @@ def main():
         if (service, task) == (198, 6) and channel_proof:
             proof_filename = channel_path.relative_to(ROOT).as_posix()
             relay_proof = channel_proof
+        if (service, task) == (194, 1) and ab_evidence:
+            proof_filename, relay_proof = ab_evidence
         completion = bool(relay_proof and relay_proof.get("passed"))
         scope = None
+        if (service, task) == (194, 1) and ab_evidence:
+            scope = "Native populated enrollment decoded exact test/cohort/modifier and applied its registered dvar before and after backend restart/dw_restart; cleanup restored the empty enrollment and value 16. Future native polling and other modifier types remain unverified"
         if (service, task) == (198, 6) and channel_proof:
             completion = bool(
                 completion

@@ -19,6 +19,7 @@ add_executable(iw8-dw-server
     src/account_services.cpp
     src/leaderboard_services.cpp
     src/engagement_services.cpp
+    src/abtesting_services.cpp
     src/qos_services.cpp
     src/qos_provider.cpp
     src/marketplace_services.cpp

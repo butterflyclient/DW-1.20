@@ -1,6 +1,53 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND - COMPLETE FRIEND-STORE VALIDATION AND NATIVE LIFECYCLE
+CURRENT BACKEND - POPULATED AB ENROLLMENT AND NATIVE TREATMENT
+Backend SHA256: 612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400
+Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Backend-only update; no game recompile or new client package is needed.
+
+Native task 194/1 now supplies explicitly published weighted cohorts and active
+treatments. Complete catalog/enrollment schemas, owner/title/context isolation,
+revision/hash protection and flushed atomic persistence follow the actual engine
+allocation: eight enrollments, one treatment each and 1024 modifier bytes.
+The engine applies modifiers immediately, so future/expired treatments are
+withheld and token lifetime ends at the next selected schedule boundary.
+Release /W4 /WX, 80 formatted C++ files, signed platform/auth/resources and
+275 encrypted service groups passed for this exact backend.
+
+The actual root-folder game decoded test 1706001/cohort 3106001 and the expected
+modifier hash. The registered ui_serverFrameDuration dvar MKQQKMRORQ changed
+from 16 to 17. The same process refetched that populated enrollment after
+separate backend stop/start and dw_restart. All 27 fences passed and a refreshed
+native relay stayed established for 106.2 seconds with ten keepalive replies.
+One retired-route packet was rejected before the fresh association established;
+the established association had no new rejected packets during that interval.
+
+Both temporary catalogs were removed and the prior enrollment states restored
+before native refresh. A final backend stop/start plus dw_restart confirmed
+the empty default, dvar 16, all 27 fences and native relay connection. The game
+closed normally, owned test controls were removed and game/INI/machine-identity
+hashes were preserved. No temporary experiment, friendship or new port remains.
+The backend is left running.
+
+Observed lifecycle edge: two dw_restart refreshes against the same still-running
+backend left relay authentication pending. Separate backend stop/start recovered
+it. The unchanged client restart lifecycle needs a focused audit; the successful
+backend-restart proof does not establish same-server reconnect readiness.
+
+Receipts:
+validation/20261006-abtesting-target-layout.json
+validation/20261006-abtesting-wire.json
+validation/20261006-abtesting-native.json
+validation/20261006-abtesting-native-reconnect.json
+Publication/layout details: docs/DW_AB_TESTING_20261006.txt.
+
+The broader implementation remains incomplete. Six known binary result bindings,
+five literal REST routes and five dynamic/helper bindings remain open, as do
+native positive callbacks for several implemented domains. Actual two-network
+party JOIN/DATA/gameplay is unverified. Earlier native proofs below retain their
+original image hashes and are not inherited by this newly linked backend.
+
+RETAINED BACKEND - COMPLETE FRIEND-STORE VALIDATION AND NATIVE LIFECYCLE
 Backend SHA256: 0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 Backend-only update; no game recompile or new client package is needed.

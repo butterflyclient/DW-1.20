@@ -777,11 +777,11 @@ try:
         checks,
     )
 
-    def enroll_params(owner):
+    def enroll_params(owner, context="iw8"):
         return structure(
             pb_text(1, "POST")
             + pb_text(
-                2, f"/v2/users/bnet-{owner}/enrollments/?client=replaylocal&context=iw8"
+                2, f"/v2/users/bnet-{owner}/enrollments/?client=replaylocal&context={context}"
             )
         )
 
@@ -804,6 +804,11 @@ try:
     )
     checks.append(
         "native A/B enrollment HTTP envelope, owned token lifetime and no experimental treatments"
+    )
+    import abtesting_fixtures
+
+    ab_fixture = abtesting_fixtures.exercise(
+        client, directory, title, user, enroll_params, pb_fields, checks
     )
     event_params = (
         u32(2)
@@ -4399,6 +4404,7 @@ try:
         resumed["ABToken"] == enrollment_json["ABToken"]
         and resumed["enrollments"] == []
     )
+    abtesting_fixtures.after_restart(client, ab_fixture, pb_fields, checks)
     assert client.task(145, 4, qos_report) == []
     native_host = json.loads(client.task(145, 25, qos_query)[1:-1])["hosts"][0]
     host_address = base64.b64decode(native_host["address"], validate=True)

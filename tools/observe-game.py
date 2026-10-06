@@ -52,6 +52,11 @@ parser.add_argument(
     action="store_true",
     help="Read the exact Replay chat pool and bounded member records without changing them",
 )
+parser.add_argument(
+    "--ab-testing",
+    action="store_true",
+    help="Read native AB completion and bounded enrollment/treatment records",
+)
 args = parser.parse_args()
 deployment = json.loads(args.deployment.read_text())
 launch = (
@@ -318,6 +323,56 @@ try:
             else:
                 raise RuntimeError("Native channel changed during bounded observation")
         return {"slots": 38, "member_limit": 200, "chats": chats}
+
+    def native_ab_testing():
+        # Original 140F28810/28BA0/28E60: controller-zero flag bytes,
+        # 88-byte response, eight 32-byte enrollments and one 24-byte treatment.
+        instance = symbols["gl_14411CFE0"]
+        response = instance + 8712
+        for _ in range(3):
+            header = read(response, 88)
+            pointer, count, capacity = struct.unpack_from("<QII", header, 56)
+            if capacity != 8 or count > capacity or not pointer:
+                raise RuntimeError("Native AB enrollment allocation changed")
+            enrollments = []
+            for index in range(count):
+                row = read(pointer - base + index * 32, 32)
+                test, cohort, treatments, used, limit = struct.unpack("<QQQII", row)
+                if limit != 1 or used > limit or not treatments:
+                    raise RuntimeError("Native AB treatment allocation changed")
+                records = []
+                for slot in range(used):
+                    treatment = read(treatments - base + slot * 24, 24)
+                    modifiers, starts, ends, length = struct.unpack_from(
+                        "<QIII", treatment
+                    )
+                    if length != 1024 or not modifiers:
+                        raise RuntimeError("Native AB modifier allocation changed")
+                    text = read(modifiers - base, length)
+                    if b"\0" not in text:
+                        raise RuntimeError("Native AB modifier has no terminator")
+                    text = text.split(b"\0", 1)[0]
+                    records.append(
+                        dict(
+                            starts_in=starts,
+                            ends_in=ends,
+                            modifiers_length=len(text),
+                            modifiers_sha256=hashlib.sha256(text).hexdigest(),
+                        )
+                    )
+                enrollments.append(
+                    dict(test_id=test, cohort_id=cohort, treatments=records)
+                )
+            if header == read(response, 88):
+                flags = read(instance + 64, 2)
+                return dict(
+                    controller=0,
+                    completed=bool(flags[0]),
+                    failed=bool(flags[1]),
+                    enrollment_count=count,
+                    enrollments=enrollments,
+                )
+        raise RuntimeError("Native AB response changed during bounded observation")
 
     def native_marketing():
         getter = "q_MarketingCommsManager::GetInstance"
@@ -1418,6 +1473,7 @@ try:
         "server_log_file_size": server_log_file_size,
         "server_log_reset_detected": server_log_reset,
         "native_channels": native_channels() if args.channels else None,
+        "native_ab_testing": native_ab_testing() if args.ab_testing else None,
         "native_encrypted_lobby_task_completion": "not observed by this state reader",
         "connection_receipt": connection,
         "launch_correlation": (

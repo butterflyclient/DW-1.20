@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_utc": "2026-10-06T14:34:58.148305+00:00",
+  "generated_utc": "2026-10-06T15:11:33.430784+00:00",
   "full_backend_complete": false,
   "full_native_method_audit_complete": false,
   "scope": "Known target constructors plus explicitly reviewed local handler routes; indirect/virtual and unclassified REST call sites remain audit gaps",
@@ -51,7 +51,7 @@
     "xmodelhasmaterialswithstreamedimages"
   ],
   "target_database_changed_during_inventory": false,
-  "server_sha256": "0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09",
+  "server_sha256": "612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400",
   "game_sha256": "b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885",
   "source_sha256": {
     "src\\team_services.cpp": "8dffc1ad59322e6001754e9ed6d4f0439c256e7ffee82baf3a72023e2df8ffc8",
@@ -64,7 +64,7 @@
     "src\\mail_services.cpp": "dca6fe881865ea3a5d6c26b6d1ec37fcd4cf2a6d50022b5d38e43e70d5facb85",
     "src\\anticheat_services.cpp": "6bfe8edcef1a3972fb872eaf3960ae4ac9401594c6cc709c8f9c1dcd1b89070e",
     "src\\content_services.cpp": "4c1e1bd3304b13c6e20e6bc07de8ea79678fb2034d389654fd99a5d573df65ca",
-    "src\\engagement_services.cpp": "d079cba9e524cca0dd5bc79496b182bc3f796b56ee295fce6ef4cc614a658952",
+    "src\\engagement_services.cpp": "2248b4e10629422e80665189f5d6e659641acb28f8ffca0a932a40368f4c6466",
     "src\\marketplace_services.cpp": "6a8c31cfd3e3cd07391586739a2b8e827cee9e418bc73495f8d0cebdba9d6f79",
     "src\\inventory_validation_services.cpp": "120f2109f8ac9bf2f1c6ad22b4b6a164a08d39cc7f383348aab070f717def3e2",
     "src\\achievement_services.cpp": "0a08d338529b81aa7545244e2f31793699192ffa2a87ed42ce66450d787541c5",
@@ -74,6 +74,7 @@
     "src\\tournament_services.cpp": "4cf0efc07422c93bc212b795dd99644116bf3c349c4d72d103f67d75a3db89a8",
     "src\\scheduled_services.cpp": "c7d3c72e8522f0a707e67493861ff99e10876dbd77da0194e57ad772843178d4",
     "src\\objectstore_services.cpp": "bf2c39feff9d4f938fb74c592df3c2a10881d20937149cb896cbd8895406f540",
+    "src\\abtesting_services.cpp": "e7b82418fe0c15ccb498fdb3af16cce2c3a9d0f604f9ce6b641252108d78f1b7",
     "src\\identity_services.cpp": "d8103ab4eb85c344ab2f4c3f713b4e52e54be4c0573685dd1914ec97433f27b6",
     "src\\clan_services.cpp": "59761b8b4557a9e7c862186942199d4baac56c953d147a8f3d6985d9c37e68fb",
     "src\\rest_services.cpp": "82ce04c03a4550f8918bc0cbbefa837c73d9e8c52096c52b78b52364ddc4bea5",
@@ -98,7 +99,7 @@
   },
   "validation": {
     "independent_suite_matches_binary": true,
-    "grouped_checks": 269,
+    "grouped_checks": 275,
     "receipt": "data/lobby-verification.json",
     "native_method_completion_is_separate": true
   },
@@ -130,7 +131,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4258,
+          "line": 4263,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -162,49 +163,49 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2038,
+          "line": 2043,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2045,
+          "line": 2050,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2047,
+          "line": 2052,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2051,
+          "line": 2056,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2024,
+          "line": 2029,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2026,
+          "line": 2031,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2027,
+          "line": 2032,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2049,
+          "line": 2054,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -248,13 +249,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2143,
+          "line": 2148,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2149,
+          "line": 2154,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -286,13 +287,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2141,
+          "line": 2146,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2131,
+          "line": 2136,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -324,19 +325,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2140,
+          "line": 2145,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2118,
+          "line": 2123,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2129,
+          "line": 2134,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -508,7 +509,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2154,
+          "line": 2159,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -540,31 +541,31 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2139,
+          "line": 2144,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2124,
+          "line": 2129,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2126,
+          "line": 2131,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2128,
+          "line": 2133,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2151,
+          "line": 2156,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -596,32 +597,26 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3187,
+          "line": 3192,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3188,
+          "line": 3193,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3189,
+          "line": 3194,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3393,
+          "line": 3398,
           "expected_error": 108,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3175,
-          "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
@@ -633,6 +628,12 @@
         {
           "file": "tools\\test-lobby.py",
           "line": 3185,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3190,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -670,13 +671,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4364,
+          "line": 4369,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4481,
+          "line": 4487,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -704,7 +705,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4365,
+          "line": 4370,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -780,7 +781,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4481,
+          "line": 4487,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -894,7 +895,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4479,
+          "line": 4485,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -940,13 +941,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4366,
+          "line": 4371,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4480,
+          "line": 4486,
           "expected_error": 1000,
           "evidence": "static fixture call site"
         }
@@ -1008,13 +1009,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3765,
+          "line": 3770,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3766,
+          "line": 3771,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1052,67 +1053,67 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1128,
+          "line": 1133,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1137,
+          "line": 1142,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3190,
+          "line": 3195,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3238,
+          "line": 3243,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3351,
+          "line": 3356,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3434,
+          "line": 3439,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4105,
+          "line": 4110,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4285,
+          "line": 4290,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3269,
+          "line": 3274,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3754,
+          "line": 3759,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3754,
+          "line": 3759,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1239,7 +1240,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3166,
+          "line": 3171,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1295,13 +1296,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3167,
+          "line": 3172,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4286,
+          "line": 4291,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1339,13 +1340,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2174,
+          "line": 2179,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2165,
+          "line": 2170,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1377,7 +1378,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1470,
+          "line": 1475,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1409,13 +1410,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1521,
+          "line": 1526,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4313,
+          "line": 4318,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1477,67 +1478,67 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1392,
+          "line": 1397,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1398,
+          "line": 1403,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1383,
+          "line": 1388,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1385,
+          "line": 1390,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1485,
+          "line": 1490,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1503,
+          "line": 1508,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1530,
+          "line": 1535,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1539,
+          "line": 1544,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1555,
+          "line": 1560,
           "expected_error": 102,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4298,
+          "line": 4303,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4314,
+          "line": 4319,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1569,7 +1570,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4248,
+          "line": 4253,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1639,13 +1640,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4121,
+          "line": 4126,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4122,
+          "line": 4127,
           "expected_error": 101,
           "evidence": "static fixture call site"
         }
@@ -1692,7 +1693,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2227,
+          "line": 2232,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1935,7 +1936,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4254,
+          "line": 4259,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -2319,13 +2320,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2984,
+          "line": 2989,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4197,
+          "line": 4202,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -2645,37 +2646,37 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 818,
+          "line": 823,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 824,
+          "line": 829,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 817,
+          "line": 822,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 840,
+          "line": 845,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 871,
+          "line": 876,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4386,
+          "line": 4391,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -2716,13 +2717,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2175,
+          "line": 2180,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2178,
+          "line": 2183,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -2888,31 +2889,31 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1765,
+          "line": 1770,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1797,
+          "line": 1802,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1798,
+          "line": 1803,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1779,
+          "line": 1784,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1782,
+          "line": 1787,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -3317,19 +3318,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1747,
+          "line": 1752,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1732,
+          "line": 1737,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1735,
+          "line": 1740,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3361,7 +3362,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1789,
+          "line": 1794,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3685,13 +3686,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3149,
+          "line": 3154,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4270,
+          "line": 4275,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3723,7 +3724,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4274,
+          "line": 4279,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3755,19 +3756,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1975,
+          "line": 1980,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1970,
+          "line": 1975,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1971,
+          "line": 1976,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -3939,43 +3940,43 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1869,
+          "line": 1874,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1877,
+          "line": 1882,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1880,
+          "line": 1885,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1834,
+          "line": 1839,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1857,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 1861,
+          "line": 1862,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
           "line": 1866,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 1871,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4007,13 +4008,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1835,
+          "line": 1840,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1948,
+          "line": 1953,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4045,13 +4046,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1909,
+          "line": 1914,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1884,
+          "line": 1889,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4083,7 +4084,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1900,
+          "line": 1905,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4115,37 +4116,37 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1717,
+          "line": 1722,
           "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 1723,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 1697,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 1698,
+          "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
           "line": 1718,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 1692,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1693,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 1713,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 4379,
+          "line": 4384,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4177,31 +4178,31 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 935,
+          "line": 940,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3450,
+          "line": 3455,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 923,
+          "line": 928,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 933,
+          "line": 938,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 929,
+          "line": 934,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4263,43 +4264,43 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 911,
+          "line": 916,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 937,
+          "line": 942,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4358,
+          "line": 4363,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4360,
+          "line": 4365,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 940,
+          "line": 945,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3451,
+          "line": 3456,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3388,
+          "line": 3393,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4439,20 +4440,8 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 907,
+          "line": 912,
           "expected_error": 101,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 1370,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 1371,
-          "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
@@ -4463,25 +4452,37 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 901,
+          "line": 1376,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 1380,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 906,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4402,
+          "line": 4408,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1373,
+          "line": 1378,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1373,
+          "line": 1378,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4513,25 +4514,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1101,
+          "line": 1106,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1098,
+          "line": 1103,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1126,
+          "line": 1131,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1138,
+          "line": 1143,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4575,7 +4576,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1099,
+          "line": 1104,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4613,43 +4614,43 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1106,
+          "line": 1111,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1107,
+          "line": 1112,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1102,
+          "line": 1107,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1104,
+          "line": 1109,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3470,
+          "line": 3475,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3501,
+          "line": 3506,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1187,
+          "line": 1192,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4729,25 +4730,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1100,
-          "expected_error": 108,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
           "line": 1105,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3500,
+          "line": 1110,
+          "expected_error": 108,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3505,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1065,
+          "line": 1070,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4851,19 +4852,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3490,
+          "line": 3495,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1068,
+          "line": 1073,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1075,
+          "line": 1080,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4943,19 +4944,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 906,
+          "line": 911,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 902,
+          "line": 907,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1377,
+          "line": 1382,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4987,73 +4988,73 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1025,
+          "line": 1030,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1043,
+          "line": 1048,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1078,
+          "line": 1083,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1084,
+          "line": 1089,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3392,
+          "line": 3397,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3435,
+          "line": 3440,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3436,
+          "line": 3441,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3453,
+          "line": 3458,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 983,
+          "line": 988,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1124,
+          "line": 1129,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1132,
+          "line": 1137,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1160,
+          "line": 1165,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -5273,7 +5274,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 936,
+          "line": 941,
           "expected_error": 14526,
           "evidence": "static fixture call site"
         },
@@ -5815,13 +5816,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4475,
+          "line": 4481,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4473,
+          "line": 4479,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -5833,7 +5834,7 @@
         }
       ],
       "native_positive_completion_verified_current_binary": true,
-      "native_completion_evidence": "validation/20261006-friend-store-native-reconnect.json",
+      "native_completion_evidence": "validation/20261006-abtesting-native-reconnect.json",
       "native_completion_scope": null,
       "native_fence_completion_is_not_per_method_proof": true
     },
@@ -5859,25 +5860,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 893,
+          "line": 898,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 905,
+          "line": 910,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1353,
+          "line": 1358,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4403,
+          "line": 4409,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -5939,7 +5940,7 @@
         }
       ],
       "native_positive_completion_verified_current_binary": true,
-      "native_completion_evidence": "validation/20261006-friend-store-native-reconnect.json",
+      "native_completion_evidence": "validation/20261006-abtesting-native-reconnect.json",
       "native_completion_scope": null,
       "native_fence_completion_is_not_per_method_proof": true
     },
@@ -6173,25 +6174,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1614,
+          "line": 1619,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1619,
+          "line": 1624,
           "expected_error": 102,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1560,
+          "line": 1565,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1600,
+          "line": 1605,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6223,25 +6224,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1603,
+          "line": 1608,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1604,
+          "line": 1609,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1600,
+          "line": 1605,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4302,
+          "line": 4307,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6273,13 +6274,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1612,
+          "line": 1617,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1605,
+          "line": 1610,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6311,19 +6312,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1606,
+          "line": 1611,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1624,
+          "line": 1629,
           "expected_error": 102,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4303,
+          "line": 4308,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6411,55 +6412,55 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1640,
+          "line": 1645,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1659,
+          "line": 1664,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1668,
+          "line": 1673,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1685,
+          "line": 1690,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1686,
+          "line": 1691,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1631,
+          "line": 1636,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1653,
+          "line": 1658,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1678,
+          "line": 1683,
           "expected_error": 102,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1687,
+          "line": 1692,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6491,7 +6492,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4084,
+          "line": 4089,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -6547,25 +6548,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4051,
+          "line": 4056,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4067,
+          "line": 4072,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4083,
+          "line": 4088,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4087,
+          "line": 4092,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -6621,31 +6622,31 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3923,
+          "line": 3928,
           "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3925,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3848,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3920,
-          "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
           "line": 3930,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3853,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3925,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3935,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6761,25 +6762,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3799,
+          "line": 3804,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3821,
+          "line": 3826,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3824,
+          "line": 3829,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3914,
+          "line": 3919,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6819,7 +6820,7 @@
       "task": 1,
       "domain": "AB enrollment",
       "handler_registered": true,
-      "handler_source": "src\\engagement_services.cpp",
+      "handler_source": "src\\abtesting_services.cpp",
       "exact_target_constructor_proofs": [
         {
           "name": "sub_142139AD0",
@@ -6854,14 +6855,62 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4393,
+          "line": 4398,
           "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 93,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 115,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 130,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 176,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 38,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 87,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 105,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\abtesting_fixtures.py",
+          "line": 123,
+          "expected_error": 102,
           "evidence": "static fixture call site"
         }
       ],
-      "native_positive_completion_verified_current_binary": false,
-      "native_completion_evidence": null,
-      "native_completion_scope": null,
+      "native_positive_completion_verified_current_binary": true,
+      "native_completion_evidence": "validation/20261006-abtesting-native.json",
+      "native_completion_scope": "Native populated enrollment decoded exact test/cohort/modifier and applied its registered dvar before and after backend restart/dw_restart; cleanup restored the empty enrollment and value 16. Future native polling and other modifier types remain unverified",
       "native_fence_completion_is_not_per_method_proof": true
     },
     {
@@ -7014,13 +7063,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3584,
+          "line": 3589,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3588,
+          "line": 3593,
           "expected_error": 106,
           "evidence": "static fixture call site"
         }
@@ -7077,19 +7126,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2270,
+          "line": 2275,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2256,
+          "line": 2261,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2269,
+          "line": 2274,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7121,43 +7170,43 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1992,
+          "line": 1997,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1998,
+          "line": 2003,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1990,
+          "line": 1995,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1991,
+          "line": 1996,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2284,
+          "line": 2289,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4319,
+          "line": 4324,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4352,
+          "line": 4357,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7189,7 +7238,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2483,
+          "line": 2488,
           "expected_error": 101,
           "evidence": "static fixture call site"
         }
@@ -7221,13 +7270,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2486,
+          "line": 2491,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2473,
+          "line": 2478,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7259,13 +7308,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4343,
+          "line": 4348,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4349,
+          "line": 4354,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7297,25 +7346,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2330,
+          "line": 2335,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2337,
+          "line": 2342,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4323,
+          "line": 4328,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2320,
+          "line": 2325,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7347,7 +7396,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2382,
+          "line": 2387,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7379,13 +7428,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2357,
+          "line": 2362,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2366,
+          "line": 2371,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7417,49 +7466,49 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2355,
+          "line": 2360,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2384,
+          "line": 2389,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2188,
+          "line": 2193,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2205,
+          "line": 2210,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2211,
+          "line": 2216,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2348,
+          "line": 2353,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2351,
+          "line": 2356,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2390,
+          "line": 2395,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7516,49 +7565,49 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2190,
+          "line": 2195,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2196,
+          "line": 2201,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2218,
+          "line": 2223,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2476,
+          "line": 2481,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2501,
+          "line": 2506,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4339,
+          "line": 4344,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4354,
+          "line": 4359,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2289,
+          "line": 2294,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7590,19 +7639,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2403,
+          "line": 2408,
           "expected_error": 19734,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2431,
+          "line": 2436,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4331,
+          "line": 4336,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7634,19 +7683,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2426,
+          "line": 2431,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2411,
+          "line": 2416,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2420,
+          "line": 2425,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7678,7 +7727,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2495,
+          "line": 2500,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7710,25 +7759,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1323,
+          "line": 1328,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1324,
+          "line": 1329,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1325,
+          "line": 1330,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1314,
+          "line": 1319,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -7814,7 +7863,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1306,
+          "line": 1311,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -7894,13 +7943,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1279,
+          "line": 1284,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1249,
+          "line": 1254,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -7938,13 +7987,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1290,
+          "line": 1295,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1267,
+          "line": 1272,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7976,13 +8025,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1225,
+          "line": 1230,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1235,
+          "line": 1240,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -8014,13 +8063,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1326,
+          "line": 1331,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1200,
+          "line": 1205,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8064,7 +8113,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 1219,
+          "line": 1224,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8102,19 +8151,19 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2185,
+          "line": 2190,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 1327,
+          "line": 1332,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2184,
+          "line": 2189,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8152,265 +8201,265 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2578,
+          "line": 2583,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2579,
+          "line": 2584,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2635,
+          "line": 2640,
           "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2647,
+          "expected_error": 101,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2690,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2698,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2747,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2779,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2796,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2798,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2799,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2812,
+          "expected_error": 101,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2824,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2835,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2837,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2890,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3263,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3282,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3339,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3650,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3663,
+          "expected_error": 101,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3705,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2574,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2581,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2668,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 2904,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3226,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3312,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3609,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3636,
+          "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
           "line": 2642,
-          "expected_error": 101,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2685,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2693,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2742,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2774,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2791,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2793,
+          "line": 2678,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2794,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2807,
-          "expected_error": 101,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2819,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2830,
+          "line": 2715,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2832,
+          "line": 2738,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2885,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3258,
+          "line": 2760,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3277,
+          "line": 3413,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3334,
+          "line": 3746,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3645,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3658,
-          "expected_error": 101,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3700,
+          "line": 2781,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2569,
+          "line": 2856,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2576,
+          "line": 2878,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2663,
+          "line": 2937,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 2899,
+          "line": 3677,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3221,
+          "line": 3295,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3307,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3604,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3631,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2637,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2673,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2710,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2733,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2755,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3408,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3741,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2776,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2851,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2873,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 2932,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3672,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3290,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3322,
+          "line": 3327,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8699,9 +8748,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": true,
-        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
-        "native_completion_scope": "The game's native name-search and invitation tasks produced the diagnostic peer in its completed outgoing list",
+        "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8918,9 +8967,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": true,
-        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
-        "native_completion_scope": "The game's native name-search and invitation tasks produced the diagnostic peer in its completed outgoing list",
+        "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8993,9 +9042,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": true,
-        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
-        "native_completion_scope": "The same game process refetched its accepted diagnostic peer after backend restart and dw_restart",
+        "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9399,7 +9448,7 @@
       "dedicated_domain_handlers": 19,
       "known_literal_bindings_without_handler": 5,
       "unresolved_dynamic_or_helper_bindings": 5,
-      "current_native_method_completions": 3
+      "current_native_method_completions": 0
     },
     "unresolved": [],
     "full_rest_audit_complete": false,
@@ -9429,7 +9478,7 @@
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
     "152": "Positive native performance write completion.",
     "193": "Verified user-object PUT/read and publisher metadata/content retain native envelopes. Complete multi-object upload windows use flushed per-title/account intents, full namespace/content/tag preflight and blocked-read/process-restart recovery; native profile-window recovery still needs a targeted client failure run. Tasks 3/9/10/12/24 category/list/large-upload families remain open; response binding is unresolved for some recovered writers. The same native REST vector GET/PUT routes now share the struct-buffer domain, complete account-owned storage and journal recovery. Matching cache version/checksum hints use the target NotModified reader; REST body windows retain their 256 KiB cap. Native REST method callbacks remain unverified.",
-    "194": "Signed empty local enrollment; populated experiments need explicit treatment rules.",
+    "194": "Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch are verified on the current proof-bound artifact. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes.",
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
@@ -9490,7 +9539,7 @@
         "src/rest_services.cpp"
       ],
       "gaps": "Bulk username hydration now implements the exact Replay DTO, 200-user capacity, registered-provider aliases and signed title scope. Its response vtable was verified from native resolver allocation; per-method live username-resolver completion remains open. Other native REST resources must be recovered individually",
-      "native_friend_lifecycle_evidence": "validation/20261006-friend-store-native-lifecycle.json",
+      "native_friend_lifecycle_evidence": null,
       "target_layout_receipt": "validation/20261006-username-target-layout.json"
     },
     {
