@@ -220,6 +220,24 @@ def verify(pe, report):
             "freed": 0,
             "errors": [],
         }
+        presence = {
+            "active": False,
+            "fields": {15: 1, 8: 0, 5: 0, 7: 0},
+            "social": [],
+            "events": [],
+            "sdk_writes": [],
+            "local_storage": 0,
+        }
+        environment_thunk = arena + 0xF740
+        library_thunk, procedure_thunk, free_library_thunk = (
+            arena + 0xF750,
+            arena + 0xF760,
+            arena + 0xF770,
+        )
+        for name, thunk in (("LoadLibraryA", library_thunk),
+                            ("GetProcAddress", procedure_thunk),
+                            ("FreeLibrary", free_library_thunk)):
+            machine.mem_write(symbols["__imp_" + name], struct.pack("<Q", thunk))
 
         def return_native(uc, value=0):
             stack = uc.reg_read(x.UC_X86_REG_RSP)
@@ -242,6 +260,55 @@ def verify(pe, report):
                 "func_141051630": "disconnected",
                 "func_1417EC990": "logon",
             }
+            if address == environment_thunk:
+                assert string(args[0]) == "CODPC_NOCLOUD_SYNC" and string(args[1]) == "1"
+                presence["local_storage"] += 1
+                return_native(uc, 1)
+                return
+            if address == library_thunk:
+                assert string(args[0]) == "kernel32.dll"
+                return_native(uc, 0xABCDEF)
+                return
+            if address == procedure_thunk:
+                assert args[0] == 0xABCDEF and string(args[1]) == "SetEnvironmentVariableA"
+                return_native(uc, environment_thunk)
+                return
+            if address == free_library_thunk:
+                assert args[0] == 0xABCDEF
+                return_native(uc, 1)
+                return
+            if presence["active"]:
+                if address == symbols["func_141670560"]:
+                    return_native(uc, arena + 0x9000)
+                    return
+                if address in (symbols["func_14166D610"], symbols["func_14166D6C0"]):
+                    field = struct.unpack("<I", uc.mem_read(args[2], 4))[0]
+                    output = uc.reg_read(x.UC_X86_REG_R9)
+                    uc.mem_write(output, bytes([presence["fields"][field]]))
+                    return_native(uc, 1)
+                    return
+                if address == symbols["func_14166F3D0"]:
+                    field = struct.unpack("<I", uc.mem_read(args[1], 4))[0]
+                    presence["fields"][field] = args[2] & 255
+                    presence["sdk_writes"].append((field, args[2] & 255))
+                    return_native(uc)
+                    return
+                if address == symbols["func_141B95F20"]:
+                    presence["social"].append((args[0], args[1]))
+                    return_native(uc)
+                    return
+                if address == symbols["LUI_BeginEvent"]:
+                    assert args[0] == 0 and string(args[1]) == "bnet_online_status_set"
+                    return_native(uc, 1)
+                    return
+                if address == symbols["func_1419CE4F0"]:
+                    assert string(args[0]) == "onlineStatus"
+                    presence["events"].append(args[1])
+                    return_native(uc)
+                    return
+                if address == symbols["func_1419BDA00"]:
+                    return_native(uc, 1)
+                    return
             if restart["active"] and address in (
                 symbols["func_141526CE0"],
                 symbols["func_1412BD8E0"],
@@ -814,4 +881,36 @@ def verify(pe, report):
         cases[-1]["compiled_web_credential_queue_and_callback"] = enabled
         cases[-1]["compiled_dw_restart_lifecycle"] = enabled
         cases[-1]["compiled_dw_restart_preserves_platform_identity"] = enabled
+        # Execute both compiled status readers and the real setter. Repeat the
+        # reads after every selection: a missing launcher cache must not undo it.
+        presence["active"] = True
+        local = symbols["gl_14E5C0730"]
+        local_user, local_platform = 0x110000100000001, 1
+        machine.mem_write(local + 144, struct.pack("<Q", local_user))
+        machine.mem_write(local + 184, struct.pack("<Q", local_platform))
+        for status in (2, 1, 3, 4, 2):
+            assert invoke("func_140C88C10", status, 0, 0) & 255 == 1
+            for _ in range(3):
+                assert invoke("func_140C88A30", local_user, 0, 0) == status
+                assert invoke("func_140C88B20", local_platform, 0, 0) == status
+        assert presence["social"] == [(0, n) for n in (2, 1, 3, 4, 2)]
+        assert presence["events"] == [2, 1, 3, 4, 2]
+        assert invoke("func_140C88C10", 99, 0, 0) & 255 == 0
+        assert len(presence["social"]) == 5
+        if enabled:
+            assert not presence["sdk_writes"]
+            # Exercise the compiled eligibility check, including when optimized
+            # into its caller. Only the actual native auth singleton changes.
+            machine.mem_write(native_auth, struct.pack("<I", 0))
+            assert invoke("func_140C88A30", local_user, 0, 0) == 4
+            assert invoke("func_140C88B20", local_platform, 0, 0) == 4
+            machine.mem_write(native_auth, struct.pack("<I", 2))
+        for bits, expected in (((1, 0, 0, 0), 2), ((1, 0, 1, 0), 1),
+                               ((1, 0, 0, 1), 3), ((1, 1, 0, 0), 4),
+                               ((0, 0, 0, 0), 4), ((1, 0, 1, 1), 4)):
+            presence["fields"] = dict(zip((15, 8, 5, 7), bits))
+            assert invoke("func_140C88A30", local_user + 1, 0, 0) == expected
+            assert invoke("func_140C88B20", local_platform + 1, 0, 0) == expected
+        cases[-1]["compiled_platform_online_status_persistence"] = True
+        cases[-1]["compiled_native_local_profile_selection"] = presence["local_storage"] > 0
     return cases

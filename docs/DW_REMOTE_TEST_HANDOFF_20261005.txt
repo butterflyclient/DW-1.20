@@ -6,8 +6,8 @@ snapshot. Shared compiler sources and unrelated game assets were preserved.
 
 Installed game:
 E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
-SHA256: 9429d3f1db31e780b6a721fcfd8db2384468b8039f767997fcb953c73279d81c
-Compiler job: 1a530b481d2a4f82
+SHA256: 82005de3b87725296b9d16b3880c1ab3a0dd89c0f98aa3fa757df789f9a55440
+Compiler job: 9e68daf606294557
 Backend SHA256: 1d88793755cbdb20fc1e35b42c25987c09e884cd8673de79a9a9305d051ef239
 
 Give the guest E:\DW\IW8\data\Replay-DW-Guest-Test.zip.
@@ -15,6 +15,31 @@ It contains the exact EXE, its executable-specific INI, a root-folder launcher
 and READ_ME.txt. No proxy DLL or backend signing keys are included.
 The guest needs their compatible 1.20 Replay game files and normal dependencies.
 Use one guest configuration on one computer at a time.
+Close the old game and replace both the EXE and INI on each client. The revised
+guest ZIP has SHA256 cd8ed5087b2399f6f5873824c8b831b6d7eb0e68cede12d765c6b49353d54dc5.
+
+ONLINE STATUS AND LOCAL SETTINGS FIX
+Both test clients were sending online:false because Replay's native status
+readers consumed an unused Battle.net launcher presence cache. The compiled
+local provider now retains Online/Away/Busy/Offline selections for its verified
+own account, preserving native Social scheduling and the LUI menu event. Signed
+out accounts still return Offline. Foreign/native launcher accounts keep their
+original SDK reads. The backend continues honoring the actual client message.
+
+Before sign-in, the DW process selects Replay's native CODPC_NOCLOUD_SYNC opt-out.
+Its original settings/config serialization and Windows Documents save path remain
+in use. Each player's PC saves config.cfg and settings.<platformId>.iw8 under
+Documents\Call of Duty Modern Warfare\players. Cloud settings cannot overwrite
+those files. This covers native game settings/GamerProfile; account progression
+and loadouts continue through the backend's native storage services.
+
+The root-folder game was run twice without a proxy. Its native Social status
+remained Online and it published fresh online:true presence. Keyboard Toggle ADS
+was changed through the registered profile command, saved by the engine, and
+loaded with the same value in a different game process. The original option was
+restored and saved through updateGamerProfile. All 27 startup fences passed.
+Both game processes were stopped and temporary development command files removed.
+The backend remains running; launch the game normally for the remote retest.
 
 INI configuration:
 The EXE reads its own basename with .ini instead of .exe, then replay-dw.ini as
@@ -86,6 +111,8 @@ E:\DW\IW8\data\remote-readiness.json
 E:\DW\IW8\validation\20261005-proxy-free-host-guest.json
 E:\DW\IW8\data\backend-coverage-inventory.json
 E:\DW\IW8\data\remote-package-receipt.json
+E:\DW\IW8\data\native-settings-presence-20261005\proof.json
+E:\DW\IW8\validation\20261005-presence-local-settings.json
 
 Temporary root-folder test EXEs were removed. The original proxy is retained at
 E:\DW\IW8\data\proxy-retained\XInput9_1_0.dll. Development command flags/configs

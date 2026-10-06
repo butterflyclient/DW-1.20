@@ -44,6 +44,15 @@ extern "C"
     double func_1420F1050(uint64_t *);
     void func_1420F1090(uint64_t *);
     extern DWPlatformUser gl_14E5C0730[8];
+    void *func_141670560(); // native Battle.net presence service
+    uint8_t func_14166D610(void *, uint64_t, const uint32_t *, uint8_t *);
+    uint8_t func_14166D6C0(void *, uint64_t, const uint32_t *, uint8_t *);
+    void func_14166F3D0(void *, const uint32_t *, uint8_t);
+    void func_141B95F20(int, unsigned); // native Social online-status change/delay
+    uint8_t LUI_BeginEvent(unsigned, const char *, void *);
+    uint64_t func_1419CE4F0(const char *, uint64_t, void *); // LuaShared_SetTableInt
+    uint64_t func_1419BDA00(void *); // native LUI_EndEvent
+    extern void *gl_151868880;
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
     __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
     __declspec(dllimport) int __stdcall FreeLibrary(void *);
@@ -66,6 +75,7 @@ namespace
         0; // 0 idle, 1 pending, 2 signed provider response verified, 3 failed/expired
     DWLocalPlatformReply s_reply{};
     bool s_registered = false;
+    unsigned s_onlineStatus = 2; // Same-Replay: 1 Away, 2 Online, 3 Busy, 4 Offline.
     bool s_identityApplied = false; // engine thread only; native auth state alone is insufficient
     bool s_refreshIdentityHeld = false; // DW refresh must not sign out the local platform user
     cmd_function_s s_statusCommand{};
@@ -357,6 +367,27 @@ namespace
         if (!__atomic_compare_exchange_n(
                 &s_state, &idle, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
             return;
+        // Replay already writes config.cfg and settings.<platformId>.iw8 under
+        // the player's Windows Documents directory. Its native cloud-sync opt-out
+        // keeps that local GamerProfile authoritative, including on sign-in.
+        // Set it before the profile callbacks; this affects only this process.
+        using SetEnvironment = int(__stdcall *)(const char *, const char *);
+        auto library = LoadLibraryA("kernel32.dll");
+        auto setEnvironment = library
+                                  ? reinterpret_cast<SetEnvironment>(
+                                        GetProcAddress(library, "SetEnvironmentVariableA"))
+                                  : nullptr;
+        const bool localProfile =
+            setEnvironment && setEnvironment("CODPC_NOCLOUD_SYNC", "1");
+        if (library)
+            FreeLibrary(library);
+        if (!localProfile)
+        {
+            __atomic_store_n(&s_state, 3U, __ATOMIC_RELEASE);
+            Log("DW_LOCAL_PROFILE_FAILED unable to select native local profile storage");
+            return;
+        }
+        Log("DW_LOCAL_PROFILE native local settings/profile persistence selected");
         Log("DW_LOCAL_PLATFORM_BEGIN requesting nonce-bound local platform session");
         s_loginThread = CreateThread(nullptr, 0, LoginThread, nullptr, 0, nullptr);
         if (!s_loginThread)
@@ -899,6 +930,67 @@ extern "C" uint8_t func_1416659B0(int controller, int *reason)
     if (reason)
         *reason = ok ? 0 : State() == 3 ? 12 : 1;
     return ok ? 1 : 0;
+}
+
+namespace
+{
+    unsigned PlatformOnlineStatus(uint64_t user, bool universalId)
+    {
+        const auto &local = gl_14E5C0730[0];
+        const uint64_t ownId = universalId ? local.xuid : local.platformId;
+        if (DW_LocalBackend_IsEnabled() && user && user == ownId)
+            return func_1416659B0(0, nullptr) ? s_onlineStatus : 4;
+
+        // Foreign accounts and native builds still use the original SDK cache.
+        // Field 15 is connected, 8 invisible, 5 away and 7 busy. The two native
+        // readers differ only in whether they first resolve a universal ID.
+        auto read = universalId ? func_14166D610 : func_14166D6C0;
+        auto *service = func_141670560();
+        uint8_t values[4]{};
+        const uint32_t fields[]{15, 8, 5, 7};
+        for (unsigned index = 0; index < 4; ++index)
+            read(service, user, &fields[index], &values[index]);
+        if (!values[0] || values[1] || (values[2] && values[3]))
+            return 4;
+        return values[2] ? 1 : values[3] ? 3 : 2;
+    }
+}
+
+// Keep the native UI and rich-presence callers; replace their first-party
+// boundary because the launcher cache is not populated by the local provider.
+extern "C" uint64_t func_140C88A30(uint64_t user)
+{
+    return PlatformOnlineStatus(user, true);
+}
+
+extern "C" uint64_t func_140C88B20(uint64_t user)
+{
+    return PlatformOnlineStatus(user, false);
+}
+
+extern "C" uint8_t func_140C88C10(unsigned status)
+{
+    if (status < 1 || status > 4)
+        return 0;
+    if (DW_LocalBackend_IsEnabled())
+    {
+        s_onlineStatus = status;
+        Log("DW_LOCAL_PRESENCE native online-status selection retained by local provider");
+    }
+    else
+    {
+        const uint32_t fields[]{5, 7, 8};
+        for (unsigned index = 0; index < 3; ++index)
+            func_14166F3D0(func_141670560(), &fields[index],
+                          status == (index == 0 ? 1U : index == 1 ? 3U : 4U));
+    }
+    // Preserve both native effects of the setter: schedule Social's normal
+    // update and notify the menu. Its next presence update reads the same state.
+    func_141B95F20(0, status);
+    if (!LUI_BeginEvent(0, "bnet_online_status_set", gl_151868880))
+        return 0;
+    func_1419CE4F0("onlineStatus", status, gl_151868880);
+    return static_cast<uint8_t>(func_1419BDA00(gl_151868880));
 }
 
 // bdLoginTaskFetchFirstPartyToken::pump. Preserve the real native task,

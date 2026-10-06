@@ -1001,6 +1001,25 @@ try:
             else None
         ),
         "native_profile_sign_in_state": struct.unpack("<i", read(user_rva, 4))[0],
+        # Same-Replay GamerProfile_IsProfileLoggedIn / keyboard ADS getter:
+        # controller stride 7808; native load/save headers and the actual option.
+        "native_local_player_settings": (
+            {
+                "controller": 0,
+                "profile_logged_in": bool(read(symbols["gl_14EF28AE0"], 1)[0]),
+                "profile_reading": bool(read(symbols["gl_14EF28AE0"] + 1, 1)[0]),
+                "keyboard_toggle_ads": bool(read(symbols["gl_14EF29596"], 1)[0]),
+            }
+            if all(name in symbols for name in ("gl_14EF28AE0", "gl_14EF29596"))
+            else None
+        ),
+        # SetPresence/CreatePresenceInfo and native online-status selection share
+        # this 56-byte controller record; status is at +48, next update at +44.
+        "native_social_online_status": (
+            struct.unpack("<I", read(symbols["gl_152BDE6F8"] + 48, 4))[0]
+            if "gl_152BDE6F8" in symbols
+            else None
+        ),
         "native_user_xuid": struct.unpack_from("<Q", user, 144)[0],
         "native_user_xuid_text": user[152:173].split(b"\0")[0].decode(errors="replace"),
         "native_user_platform_id": struct.unpack_from("<Q", user, 184)[0],

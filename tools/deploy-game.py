@@ -170,6 +170,7 @@ if {
     and item.get("compiled_legacy_url_selection")
     and item.get("compiled_publisher_key_selection_and_verification_lifetime")
     and item.get("compiled_connection_disconnect_lifecycle")
+    and item.get("compiled_platform_online_status_persistence")
     for item in endpoint_cases
 ):
     raise RuntimeError(
@@ -197,6 +198,10 @@ if not local_cases[0].get("compiled_dw_restart_lifecycle"):
 if not local_cases[0].get("compiled_dw_restart_preserves_platform_identity"):
     raise RuntimeError(
         "DW restart platform-identity preservation was not verified in linked code"
+    )
+if not local_cases[0].get("compiled_native_local_profile_selection"):
+    raise RuntimeError(
+        "Native local profile storage was not selected before compiled sign-in"
     )
 resource_proof = json.loads(
     (ROOT / "data/platform-resource-verification.json").read_text()
@@ -355,6 +360,18 @@ receipt = {
     "runtime_test": "owner pending",
     "sources": saved["sources"],
     "disconnect_lifecycle": "compiled local provider disconnect, verified null-native-client lobby-loss path",
+    "platform_presence": {
+        "compiled_status_selection_verified": True,
+        "native_social_update_and_menu_event_retained": True,
+        "native_runtime_verified": False,
+    },
+    "local_player_settings": {
+        "native_cloud_sync_opt_out": "CODPC_NOCLOUD_SYNC=1",
+        "compiled_selection_before_signin_verified": True,
+        "serializer": "native GamerProfile and config.cfg writers",
+        "directory": "Documents/Call of Duty Modern Warfare/players",
+        "native_runtime_verified": False,
+    },
     "dw_restart": {
         "command": "dw_restart",
         "compiled_lifecycle_verified": True,
@@ -439,6 +456,7 @@ readiness = {
         "extended auth and session-token reporting",
     ],
     "profile_flow": [
+        "native per-player local config and GamerProfile settings with cloud settings sync disabled",
         "public/private profile CRUD",
         "contextual opaque file storage CRUD",
         "native user-object vector read/upload/update with content and metadata",
@@ -453,6 +471,8 @@ readiness = {
         "windows_sec_image_mapping": verification["windows_sec_image_mapping"],
         "relocation_audit_passed": relocations["passed"],
         "compiled_profile_license_and_account_metadata": True,
+        "compiled_platform_online_status_persistence": True,
+        "compiled_native_local_profile_selection": True,
         "compiled_payload_rejections": local_cases[0][
             "compiled_platform_payload_validation"
         ]["rejected"],
