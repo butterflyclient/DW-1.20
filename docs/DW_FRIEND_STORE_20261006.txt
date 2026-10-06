@@ -1,0 +1,74 @@
+REPLAY DW FRIENDSHIP PERSISTENCE AND NATIVE LIFECYCLE - 2026-10-06
+
+Issue and implementation
+The previous social loader silently accepted duplicate JSON keys. Its friend
+handler checked the outer arrays but did not validate every stored account,
+relationship pair or pending invitation before reading and publishing changes.
+Malformed account types, self relationships, reversed duplicate edges and
+inconsistent pending consent could therefore survive a later mutation.
+
+The complete private friend-store layout is now validated before reads and
+mutations, and again before publication. It contains exactly schema/context/
+friends/pending. Accounts contain one bounded UInt64 userID and uno/bnet type.
+Relationship pairs must be distinct and unique regardless of ordering. Pending
+pairs must be distinct and unique, and must not already be accepted. Optional
+inviting names must fit the native 64-byte name cache including the #0 suffix.
+Both arrays retain the 4096-record storage bound. Damaged stores produce an
+explicit persistence error without rewriting the damaged bytes.
+
+Registered provider aliases reconcile on a private in-memory copy. Reads never
+rewrite existing bytes. An authenticated mutation atomically publishes the
+canonical graph after preflighting its native response. Failed publication
+acknowledges no success and queues no relationship notification. Social JSON
+input and persisted JSON reject duplicate keys and excessive nesting. Responses
+retain the shared native 256 KiB REST limit.
+
+This changes backend private persistence validation, not game layouts, native
+friend task IDs, authentication or client identity creation. No new human
+profiles or initial friendships are provisioned. Unregistered account policy
+remains separate; this pass does not claim to implement retail account lookup.
+
+Verification
+Clean Release /W4 /WX build and C++ formatting passed. Signed platform/auth/
+resource checks and 269 encrypted native-wire service groups passed for backend
+0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09.
+Game remains b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885.
+Wire receipt: validation/20261006-friend-store-wire.json.
+
+Four new groups cover duplicate outer/nested caller fields, complete malformed
+graph validation on reads/invites/removals, reversed/alias/self/consent conflicts,
+name and collection bounds, canonical provider publication with unchanged read
+bytes, and a real failed file publication that preserves the friendship.
+Only isolated fixture directories are modified by these fault injections.
+
+Actual root-folder native validation passed profile/Online state, all 27 fences
+and three completed empty friend lists. The game's native name-search and
+invitation tasks created an outgoing request to the existing diagnostic peer.
+That peer's authenticated acceptance moved it into the native accepted list.
+Separate backend stop/start plus dw_restart retained the same game process,
+account and accepted peer. The refreshed relay remained stable for 114.9 seconds,
+with eleven keepalive replies and zero rejected packets. The peer's authenticated
+revocation cleared all three native lists. No temporary friendship remains.
+
+Native lifecycle: validation/20261006-friend-store-native-lifecycle.json.
+Reconnect/relay: validation/20261006-friend-store-native-reconnect.json.
+The receipts bind current backend/game hashes and exact social source hashes.
+The coverage ledger credits only the observed native name search, invitation
+and accepted-friend fetch; peer-originated revocation is callback evidence,
+not proof of the game's own removal task completion.
+
+The game closed normally. Owned test controls were removed. Executable, INI and
+existing machine identity hashes are unchanged. Backend remains running. No
+game recompile, human profile, initial friendship or new external port was added.
+The diagnostic peer is an existing labelled wire client, not a second game.
+These native callbacks do not establish two-game or remote-network gameplay.
+
+Continuing exact-target research
+Category tasks 193/9 and 193/10 have request writers and native wrappers in the
+original Replay PE. Their list response allocation/reader bindings remain
+unrecovered. A limited direct instruction scan for object/pagination literals
+located the known vector readers but no additional listing reader. The scan
+does not cover indirect or dynamically assembled strings and is not proof that
+a reader is absent. The routes remain explicit gaps; no generic success reply
+or guessed response DTO was added. Several misleading SQLite class aliases
+also pointed to unrelated code, reinforcing the original-byte provenance rule.

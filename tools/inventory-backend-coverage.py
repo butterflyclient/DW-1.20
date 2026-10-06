@@ -168,7 +168,38 @@ GAPS["193"] += (
 )
 
 
-def rest_coverage(inventory):
+def friend_native_evidence(server_hash, game_hash):
+    path = ROOT / "validation/20261006-friend-store-native-lifecycle.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    expected_sources = {
+        "src/social_services.cpp",
+        "src/rest_services.cpp",
+        "tools/observe-game.py",
+        "tools/record-native-friend-store-proof.py",
+    }
+    reconnect = proof.get("reconnect_proof", {})
+    reconnect_path = ROOT / "validation/20261006-friend-store-native-reconnect.json"
+    if not (
+        proof.get("passed") is True
+        and proof.get("server_sha256") == server_hash
+        and proof.get("game_sha256") == game_hash
+        and set(proof.get("source_sha256", {})) == expected_sources
+        and all(
+            proof["source_sha256"][source] == digest(ROOT / source)
+            for source in expected_sources
+        )
+        and reconnect_path.is_file()
+        and reconnect.get("path", "").replace("\\", "/")
+        == reconnect_path.relative_to(ROOT).as_posix()
+        and reconnect.get("sha256") == digest(reconnect_path)
+    ):
+        return None
+    return path.relative_to(ROOT).as_posix(), proof
+
+
+def rest_coverage(inventory, friend_evidence):
     receipt_path = ROOT / "validation/20261006-objectstore-rest-target-layout.json"
     proof = json.loads(receipt_path.read_bytes())
     if proof["target_image_sha256"] != inventory["target_image_sha256"] or proof[
@@ -198,10 +229,31 @@ def rest_coverage(inventory):
             if bound
             else None
         )
+        native_scope = None
+        if bound and handler and friend_evidence:
+            _, native_proof = friend_evidence
+            binding = (row["services"][0], *row["resource_operations"][0])
+            if binding in (
+                ("umbrella", "UserResource", "usernamesearch"),
+                ("friends", "Friends", "invite_friend"),
+            ) and native_proof.get(
+                "native_game_owned_name_search_and_outgoing_invitation"
+            ):
+                native_scope = "The game's native name-search and invitation tasks produced the diagnostic peer in its completed outgoing list"
+            elif binding == (
+                "social-service",
+                "Friends",
+                "get_friends",
+            ) and native_proof.get(
+                "accepted_friendship_persisted_across_backend_and_dw_restart"
+            ):
+                native_scope = "The same game process refetched its accepted diagnostic peer after backend restart and dw_restart"
         row.update(
             dedicated_domain_handler=(bool(handler) if bound else None),
             handler_source=("src/" + handler if handler else None),
-            current_native_method_completion_verified=False,
+            current_native_method_completion_verified=bool(native_scope),
+            native_completion_evidence=(friend_evidence[0] if native_scope else None),
+            native_completion_scope=native_scope,
             coverage_scope=(
                 "Dedicated handler registration; native callback evidence is separate"
                 if bound
@@ -371,7 +423,10 @@ def main():
             channel_path, channel_proof = path, proof
     rest_path = DATA / "native-rest-callgraph.json"
     rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
-    rest_requests = rest_coverage(rest_inventory) if rest_inventory else []
+    friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
+    rest_requests = (
+        rest_coverage(rest_inventory, friend_evidence) if rest_inventory else []
+    )
     if rest_inventory:
         if rest_inventory["inventory_tool_sha256"] != digest(
             ROOT / "tools/inventory-native-rest.py"
@@ -514,6 +569,10 @@ def main():
                     unresolved_dynamic_or_helper_bindings=sum(
                         row["dedicated_domain_handler"] is None for row in rest_requests
                     ),
+                    current_native_method_completions=sum(
+                        row["current_native_method_completion_verified"]
+                        for row in rest_requests
+                    ),
                 ),
                 unresolved=rest_inventory["unresolved"],
                 full_rest_audit_complete=False,
@@ -558,6 +617,9 @@ def main():
                 domain="REST friends, presence and user lists",
                 sources=["src/social_services.cpp", "src/rest_services.cpp"],
                 gaps="Bulk username hydration now implements the exact Replay DTO, 200-user capacity, registered-provider aliases and signed title scope. Its response vtable was verified from native resolver allocation; per-method live username-resolver completion remains open. Other native REST resources must be recovered individually",
+                native_friend_lifecycle_evidence=(
+                    friend_evidence[0] if friend_evidence else None
+                ),
                 target_layout_receipt="validation/20261006-username-target-layout.json",
             ),
             dict(

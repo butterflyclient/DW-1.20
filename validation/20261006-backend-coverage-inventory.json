@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_utc": "2026-10-06T14:07:28.270048+00:00",
+  "generated_utc": "2026-10-06T14:34:58.148305+00:00",
   "full_backend_complete": false,
   "full_native_method_audit_complete": false,
   "scope": "Known target constructors plus explicitly reviewed local handler routes; indirect/virtual and unclassified REST call sites remain audit gaps",
@@ -51,7 +51,7 @@
     "xmodelhasmaterialswithstreamedimages"
   ],
   "target_database_changed_during_inventory": false,
-  "server_sha256": "ce16a7b4d7b0bfc07537eeb606179077da5b3abde64c99192715c313ce8cd119",
+  "server_sha256": "0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09",
   "game_sha256": "b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885",
   "source_sha256": {
     "src\\team_services.cpp": "8dffc1ad59322e6001754e9ed6d4f0439c256e7ffee82baf3a72023e2df8ffc8",
@@ -93,12 +93,12 @@
     "src/regulation_services.cpp": "daa63ef00fdfb0fe20f5ff953c3a45f22199c1c5e34af2948288b8715bf56be1",
     "src/regulation_services.h": "fd846ed38285c76f9402ee7060ab4a2e8db78476e1e0f8c161c814d3831b9ad3",
     "src/rest_services.h": "325b7ff3417690471be78879bc49159305431ca5e49e1ae8773ccb8f7a0793da",
-    "src/social_services.cpp": "bf06ef6d02e1762f39735a79e97c6a4038c0551742620eacf6dfd28bd9cfd0f0",
+    "src/social_services.cpp": "8c172fede650cb399ff4944b3e8ae96a4e65380a752df8f83e5baed3ceadc5dd",
     "src/social_services.h": "4742db37b82c80e059bd9ab08b189b9926ebad262c2c9bec4c06c8207dd8cd05"
   },
   "validation": {
     "independent_suite_matches_binary": true,
-    "grouped_checks": 265,
+    "grouped_checks": 269,
     "receipt": "data/lobby-verification.json",
     "native_method_completion_is_separate": true
   },
@@ -130,7 +130,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4253,
+          "line": 4258,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -596,32 +596,26 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3182,
+          "line": 3187,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3183,
+          "line": 3188,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3184,
+          "line": 3189,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3388,
+          "line": 3393,
           "expected_error": 108,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3170,
-          "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
@@ -633,6 +627,12 @@
         {
           "file": "tools\\test-lobby.py",
           "line": 3180,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3185,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -670,13 +670,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4359,
+          "line": 4364,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4476,
+          "line": 4481,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -704,7 +704,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4360,
+          "line": 4365,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -780,7 +780,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4476,
+          "line": 4481,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -894,7 +894,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4474,
+          "line": 4479,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -940,13 +940,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4361,
+          "line": 4366,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4475,
+          "line": 4480,
           "expected_error": 1000,
           "evidence": "static fixture call site"
         }
@@ -1008,13 +1008,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3760,
+          "line": 3765,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3761,
+          "line": 3766,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1064,55 +1064,55 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3185,
+          "line": 3190,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3233,
+          "line": 3238,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3346,
+          "line": 3351,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3429,
+          "line": 3434,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4100,
+          "line": 4105,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4280,
+          "line": 4285,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3264,
+          "line": 3269,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3749,
+          "line": 3754,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3749,
+          "line": 3754,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1239,7 +1239,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3161,
+          "line": 3166,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1295,13 +1295,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3162,
+          "line": 3167,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4281,
+          "line": 4286,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -1415,7 +1415,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4308,
+          "line": 4313,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1531,13 +1531,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4293,
+          "line": 4298,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4309,
+          "line": 4314,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1569,7 +1569,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4243,
+          "line": 4248,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -1639,13 +1639,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4116,
+          "line": 4121,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4117,
+          "line": 4122,
           "expected_error": 101,
           "evidence": "static fixture call site"
         }
@@ -1935,7 +1935,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4249,
+          "line": 4254,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -2319,13 +2319,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 2979,
+          "line": 2984,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4192,
+          "line": 4197,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -2675,7 +2675,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4381,
+          "line": 4386,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3685,13 +3685,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3144,
+          "line": 3149,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4265,
+          "line": 4270,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -3723,7 +3723,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4269,
+          "line": 4274,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4145,7 +4145,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4374,
+          "line": 4379,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -4183,7 +4183,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3445,
+          "line": 3450,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4275,13 +4275,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4353,
+          "line": 4358,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4355,
+          "line": 4360,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4293,13 +4293,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3446,
+          "line": 3451,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3383,
+          "line": 3388,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4469,7 +4469,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4397,
+          "line": 4402,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4637,13 +4637,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3465,
+          "line": 3470,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3496,
+          "line": 3501,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4741,7 +4741,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3495,
+          "line": 3500,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -4851,7 +4851,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3485,
+          "line": 3490,
           "expected_error": 108,
           "evidence": "static fixture call site"
         },
@@ -5011,25 +5011,25 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3387,
+          "line": 3392,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3430,
+          "line": 3435,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3431,
+          "line": 3436,
           "expected_error": 14507,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3448,
+          "line": 3453,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -5815,13 +5815,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4470,
+          "line": 4475,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4468,
+          "line": 4473,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -5833,7 +5833,7 @@
         }
       ],
       "native_positive_completion_verified_current_binary": true,
-      "native_completion_evidence": "validation/20261006-objectstore-rest-native-reconnect.json",
+      "native_completion_evidence": "validation/20261006-friend-store-native-reconnect.json",
       "native_completion_scope": null,
       "native_fence_completion_is_not_per_method_proof": true
     },
@@ -5877,7 +5877,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4398,
+          "line": 4403,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -5939,7 +5939,7 @@
         }
       ],
       "native_positive_completion_verified_current_binary": true,
-      "native_completion_evidence": "validation/20261006-objectstore-rest-native-reconnect.json",
+      "native_completion_evidence": "validation/20261006-friend-store-native-reconnect.json",
       "native_completion_scope": null,
       "native_fence_completion_is_not_per_method_proof": true
     },
@@ -6241,7 +6241,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4297,
+          "line": 4302,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6323,7 +6323,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4298,
+          "line": 4303,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6491,7 +6491,7 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4079,
+          "line": 4084,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -6547,25 +6547,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4046,
+          "line": 4051,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4062,
+          "line": 4067,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4078,
+          "line": 4083,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4082,
+          "line": 4087,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -6621,31 +6621,31 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3918,
+          "line": 3923,
           "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3920,
-          "expected_error": 106,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3843,
-          "expected_error": 0,
-          "evidence": "static fixture call site"
-        },
-        {
-          "file": "tools\\test-lobby.py",
-          "line": 3915,
-          "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
           "line": 3925,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3848,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3920,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\test-lobby.py",
+          "line": 3930,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6761,25 +6761,25 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3794,
+          "line": 3799,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3816,
+          "line": 3821,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3819,
+          "line": 3824,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3909,
+          "line": 3914,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -6854,7 +6854,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4388,
+          "line": 4393,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7014,13 +7014,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 3579,
+          "line": 3584,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3583,
+          "line": 3588,
           "expected_error": 106,
           "evidence": "static fixture call site"
         }
@@ -7151,13 +7151,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4314,
+          "line": 4319,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4347,
+          "line": 4352,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7259,13 +7259,13 @@
       "static_fixture_references": [
         {
           "file": "tools\\test-lobby.py",
-          "line": 4338,
+          "line": 4343,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4344,
+          "line": 4349,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -7309,7 +7309,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4318,
+          "line": 4323,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -7546,13 +7546,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4334,
+          "line": 4339,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4349,
+          "line": 4354,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -7602,7 +7602,7 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 4326,
+          "line": 4331,
           "expected_error": 0,
           "evidence": "static fixture call site"
         }
@@ -8037,9 +8037,9 @@
           "evidence": "static fixture call site"
         }
       ],
-      "native_positive_completion_verified_current_binary": true,
-      "native_completion_evidence": "validation/20261006-objectstore-rest-channel-native-message.json",
-      "native_completion_scope": "Native private-party create response installed its real channel/host; peer event-24/25 callbacks updated its native member records. The peer's subscribe/unsubscribe task requests came from an independent wire client, not another game; the first real peer message was consumed in native chat history. The peer send request came from the wire client",
+      "native_positive_completion_verified_current_binary": false,
+      "native_completion_evidence": null,
+      "native_completion_scope": null,
       "native_fence_completion_is_not_per_method_proof": true
     },
     {
@@ -8248,37 +8248,37 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3253,
+          "line": 3258,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3272,
+          "line": 3277,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3329,
+          "line": 3334,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3640,
+          "line": 3645,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3653,
+          "line": 3658,
           "expected_error": 101,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3695,
+          "line": 3700,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8308,25 +8308,25 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3216,
+          "line": 3221,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3302,
+          "line": 3307,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3599,
+          "line": 3604,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3626,
+          "line": 3631,
           "expected_error": 106,
           "evidence": "static fixture call site"
         },
@@ -8362,13 +8362,13 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3403,
+          "line": 3408,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3736,
+          "line": 3741,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8398,19 +8398,19 @@
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3667,
+          "line": 3672,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3285,
+          "line": 3290,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
         {
           "file": "tools\\test-lobby.py",
-          "line": 3317,
+          "line": 3322,
           "expected_error": 0,
           "evidence": "static fixture call site"
         },
@@ -8571,6 +8571,48 @@
           "evidence": "static fixture call site"
         },
         {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 106,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 91,
+          "expected_error": 106,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 139,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 100,
+          "expected_error": 102,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 119,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 122,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
+          "file": "tools\\social_store_fixtures.py",
+          "line": 143,
+          "expected_error": 0,
+          "evidence": "static fixture call site"
+        },
+        {
           "file": "tools\\username_fixtures.py",
           "line": 62,
           "expected_error": 106,
@@ -8657,7 +8699,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": false,
+        "current_native_method_completion_verified": true,
+        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
+        "native_completion_scope": "The game's native name-search and invitation tasks produced the diagnostic peer in its completed outgoing list",
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8678,6 +8722,8 @@
         "dedicated_domain_handler": null,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dynamic/helper service binding remains unresolved"
       },
       {
@@ -8701,6 +8747,8 @@
         "dedicated_domain_handler": false,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8724,6 +8772,8 @@
         "dedicated_domain_handler": false,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8744,6 +8794,8 @@
         "dedicated_domain_handler": null,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dynamic/helper service binding remains unresolved"
       },
       {
@@ -8767,6 +8819,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8790,6 +8844,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8813,6 +8869,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8836,6 +8894,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8858,7 +8918,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": false,
+        "current_native_method_completion_verified": true,
+        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
+        "native_completion_scope": "The game's native name-search and invitation tasks produced the diagnostic peer in its completed outgoing list",
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8882,6 +8944,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8905,6 +8969,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8927,7 +8993,9 @@
         "native_response_verified": false,
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
-        "current_native_method_completion_verified": false,
+        "current_native_method_completion_verified": true,
+        "native_completion_evidence": "validation/20261006-friend-store-native-lifecycle.json",
+        "native_completion_scope": "The same game process refetched its accepted diagnostic peer after backend restart and dw_restart",
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8951,6 +9019,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8974,6 +9044,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -8997,6 +9069,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9020,6 +9094,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9043,6 +9119,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/regulation_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9066,6 +9144,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/regulation_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9089,6 +9169,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/regulation_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9110,6 +9192,8 @@
         "dedicated_domain_handler": null,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dynamic/helper service binding remains unresolved"
       },
       {
@@ -9136,6 +9220,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/objectstore_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9162,6 +9248,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/objectstore_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9185,6 +9273,8 @@
         "dedicated_domain_handler": true,
         "handler_source": "src/social_services.cpp",
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9202,6 +9292,8 @@
         "dedicated_domain_handler": null,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dynamic/helper service binding remains unresolved"
       },
       {
@@ -9225,6 +9317,8 @@
         "dedicated_domain_handler": false,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9248,6 +9342,8 @@
         "dedicated_domain_handler": false,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9271,6 +9367,8 @@
         "dedicated_domain_handler": false,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dedicated handler registration; native callback evidence is separate"
       },
       {
@@ -9291,6 +9389,8 @@
         "dedicated_domain_handler": null,
         "handler_source": null,
         "current_native_method_completion_verified": false,
+        "native_completion_evidence": null,
+        "native_completion_scope": null,
         "coverage_scope": "Dynamic/helper service binding remains unresolved"
       }
     ],
@@ -9298,7 +9398,8 @@
       "containing_functions": 29,
       "dedicated_domain_handlers": 19,
       "known_literal_bindings_without_handler": 5,
-      "unresolved_dynamic_or_helper_bindings": 5
+      "unresolved_dynamic_or_helper_bindings": 5,
+      "current_native_method_completions": 3
     },
     "unresolved": [],
     "full_rest_audit_complete": false,
@@ -9389,6 +9490,7 @@
         "src/rest_services.cpp"
       ],
       "gaps": "Bulk username hydration now implements the exact Replay DTO, 200-user capacity, registered-provider aliases and signed title scope. Its response vtable was verified from native resolver allocation; per-method live username-resolver completion remains open. Other native REST resources must be recovered individually",
+      "native_friend_lifecycle_evidence": "validation/20261006-friend-store-native-lifecycle.json",
       "target_layout_receipt": "validation/20261006-username-target-layout.json"
     },
     {

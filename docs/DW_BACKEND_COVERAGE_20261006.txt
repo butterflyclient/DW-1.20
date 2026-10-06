@@ -3,7 +3,7 @@ REPLAY DW BACKEND COVERAGE INVENTORY
 Full backend and full native method audit remain incomplete.
 Handler registration, protocol fixtures and native method completion are separate gates.
 
-Server SHA256: ce16a7b4d7b0bfc07537eeb606179077da5b3abde64c99192715c313ce8cd119
+Server SHA256: 0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 Known task routes: 140; registered: 134; known target tasks without handler: 6
 
@@ -152,7 +152,7 @@ The JSON ledger retains exact constructor call-site provenance and static fixtur
 No map tests performed. No generic success replies or native fence overrides.
 
 Exact-target direct REST request inventory (response semantics remain separate):
-  0x1420FCBB0 bdGetCrossPlatformUserSearchRequest::restSerializeRequest: services=['umbrella']; resource/operations=[['UserResource', 'usernamesearch']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
+  0x1420FCBB0 bdGetCrossPlatformUserSearchRequest::restSerializeRequest: services=['umbrella']; resource/operations=[['UserResource', 'usernamesearch']]; literal binding resolved=True; dedicated handler=True; current native method completion=True
   0x1420FFE50 bdABTestingEnrollRequest::restSerializeRequest: services=[]; resource/operations=[['abtesting', 'enroll']]; literal binding resolved=False; dedicated handler=None; current native method completion=False
   0x142100230 bdRenameCrossPlatformUserRequest::restSerializeRequest: services=['uno']; resource/operations=[['UserResource', 'renameUsername']]; literal binding resolved=True; dedicated handler=False; current native method completion=False
   0x142100B00 bdUpgradeAnonUnoAccRequest::restSerializeRequest: services=['uno']; resource/operations=[['UnoRes', 'updatesecuredfields']]; literal binding resolved=True; dedicated handler=False; current native method completion=False
@@ -161,10 +161,10 @@ Exact-target direct REST request inventory (response semantics remain separate):
   0x14212E9A0 bdGetUsersPresenceRequestV3::restSerializeRequest: services=['social-service']; resource/operations=[['UsersPresence', 'get_users_presence']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x14212EE50 bdSubscribeToUsersPresenceRequestV3::restSerializeRequest: services=['presence']; resource/operations=[['UsersPresence', 'subscribe_to_users']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x14212F370 bdUnsubscribeFromUsersPresenceRequest::restSerializeRequest: services=['presence']; resource/operations=[['UsersPresence', 'unsubscribe_from_users']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
-  0x142136E60 bdSendFriendInvitationsRequest::restSerializeRequest: services=['friends']; resource/operations=[['Friends', 'invite_friend']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
+  0x142136E60 bdSendFriendInvitationsRequest::restSerializeRequest: services=['friends']; resource/operations=[['Friends', 'invite_friend']]; literal binding resolved=True; dedicated handler=True; current native method completion=True
   0x142137360 bdGetPendingFriendsRequest::restSerializeRequest: services=['social-service']; resource/operations=[['Friends', 'get_pending_friend_requests']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x142137780 bdRejectFriendRequest::restSerializeRequest: services=['friends']; resource/operations=[['Friends', 'reject_friend_request']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
-  0x142137B00 bdGetFriendsRequest::restSerializeRequest: services=['social-service']; resource/operations=[['Friends', 'get_friends']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
+  0x142137B00 bdGetFriendsRequest::restSerializeRequest: services=['social-service']; resource/operations=[['Friends', 'get_friends']]; literal binding resolved=True; dedicated handler=True; current native method completion=True
   0x142138030 bdCreateUserListRequest::restSerializeRequest: services=['userlists']; resource/operations=[['UserLists', 'create_user_list']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x142138600 bdUpdateUsersInUserListRequest::restSerializeRequest: services=['userlists']; resource/operations=[['UserLists', 'add_or_update_users_in_user_list']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x142138CB0 bdRemoveUsersFromUserListRequest::restSerializeRequest: services=['userlists']; resource/operations=[['UserLists', 'remove_users_from_user_list']]; literal binding resolved=True; dedicated handler=True; current native method completion=False

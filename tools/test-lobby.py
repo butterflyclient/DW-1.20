@@ -2939,6 +2939,11 @@ try:
     checks.append(
         "native friend invitation/retry/revoke, reciprocal consent, complete result arrays and caller-scoped relationship lists"
     )
+    import social_store_fixtures
+
+    social_store_fixtures.exercise(
+        client, graph, user, peer, native_rest, rest_response, checks
+    )
     nonce = os.urandom(32)
     with post("/platform/login/peer", nonce) as response:
         peer_platform = response.read()

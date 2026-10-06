@@ -177,7 +177,24 @@ namespace services
             std::ifstream in(path);
             if (!in)
                 throw std::runtime_error("Social store read failed");
-            auto data = Json::parse(in);
+            std::vector<std::set<std::string>> keys;
+            bool unique = true;
+            auto data =
+                Json::parse(in,
+                            [&](int depth, Json::parse_event_t event, Json &value)
+                            {
+                                if (depth > 32)
+                                    throw std::runtime_error("Social store nesting invalid");
+                                if (event == Json::parse_event_t::object_start)
+                                    keys.emplace_back();
+                                else if (event == Json::parse_event_t::key)
+                                    unique &= keys.back().insert(value.get<std::string>()).second;
+                                else if (event == Json::parse_event_t::object_end)
+                                    keys.pop_back();
+                                return true;
+                            });
+            if (!unique)
+                throw std::runtime_error("Social store duplicate keys");
             if (!data.is_object() || data.value("schema", 0) != 1)
                 throw std::runtime_error("Social store schema invalid");
             return data;
@@ -212,6 +229,7 @@ namespace services
             result.version = r.version;
             result.status = status;
             result.body = body.is_null() ? "" : body.dump();
+            wire::require(result.body.size() <= 256 * 1024);
             out.rest = std::move(result);
             return out;
         }
@@ -243,13 +261,25 @@ namespace services
             wire::require(r.hasBody && r.content == 1 && !r.body.empty());
             try
             {
-                return Json::parse(r.body.begin(),
-                                   r.body.end(),
-                                   [](int depth, Json::parse_event_t, Json &)
-                                   {
-                                       wire::require(depth <= 32);
-                                       return true;
-                                   });
+                std::vector<std::set<std::string>> keys;
+                bool unique = true;
+                auto json =
+                    Json::parse(r.body.begin(),
+                                r.body.end(),
+                                [&](int depth, Json::parse_event_t event, Json &value)
+                                {
+                                    wire::require(depth <= 32);
+                                    if (event == Json::parse_event_t::object_start)
+                                        keys.emplace_back();
+                                    else if (event == Json::parse_event_t::key)
+                                        unique &=
+                                            keys.back().insert(value.get<std::string>()).second;
+                                    else if (event == Json::parse_event_t::object_end)
+                                        keys.pop_back();
+                                    return true;
+                                });
+                wire::require(unique);
+                return json;
             }
             catch (const Json::exception &)
             {
@@ -510,6 +540,66 @@ namespace services
             return response(r, "cross-platform-usernames", 200, Json{{"users", users}});
         }
 
+        void validateFriendStore(Json &data,
+                                 const platform::LobbyIdentity &id,
+                                 const std::string &context)
+        {
+            const auto valid = [](bool condition)
+            {
+                if (!condition)
+                    throw std::runtime_error("Friend store layout invalid");
+            };
+            valid(data.is_object() && data.size() == 4 && data.contains("schema") &&
+                  data.at("schema").is_number_integer() && data.at("schema") == 1 &&
+                  data.contains("context") && data.at("context") == context &&
+                  data.contains("pending") && data.at("pending").is_array() &&
+                  data.contains("friends") && data.at("friends").is_array() &&
+                  data.at("pending").size() <= 4096 && data.at("friends").size() <= 4096);
+            const auto storedAccount = [&](Json &value)
+            {
+                valid(value.is_object() && value.size() == 2 && value.contains("userID") &&
+                      value.at("userID").is_number_unsigned() &&
+                      value.at("userID").get<uint64_t>() > 0 &&
+                      value.at("userID").get<uint64_t>() != UINT64_MAX &&
+                      value.contains("accountType") && value.at("accountType").is_string() &&
+                      (value.at("accountType") == "uno" || value.at("accountType") == "bnet"));
+                // Reconcile registered provider aliases on the private copy. Reads
+                // never rewrite the store; an owned mutation publishes it atomically.
+                value = account(value, id);
+                return key(value);
+            };
+            using Pair = std::pair<std::string, std::string>;
+            std::set<Pair> relationships, invitations;
+            for (auto &row : data.at("friends"))
+            {
+                valid(row.is_object() && row.size() == 2 && row.contains("a") && row.contains("b"));
+                auto a = storedAccount(row.at("a")), b = storedAccount(row.at("b"));
+                valid(a != b);
+                if (b < a)
+                    std::swap(a, b);
+                valid(relationships.emplace(a, b).second);
+            }
+            for (auto &row : data.at("pending"))
+            {
+                valid(row.is_object() && row.contains("from") && row.contains("to") &&
+                      row.size() == (row.contains("from_name") ? 3 : 2));
+                auto a = storedAccount(row.at("from")), b = storedAccount(row.at("to"));
+                valid(a != b);
+                if (row.contains("from_name"))
+                {
+                    valid(row.at("from_name").is_string());
+                    const auto name = row.at("from_name").get<std::string>();
+                    // The native username buffer is 64 bytes, including our #0 suffix.
+                    valid(!name.empty() && name.size() < 62);
+                    for (const unsigned char c : name)
+                        valid(c >= 32 && c < 127);
+                }
+                if (b < a)
+                    std::swap(a, b);
+                valid(!relationships.contains({a, b}) && invitations.emplace(a, b).second);
+            }
+        }
+
         Reply friends(const std::filesystem::path &root,
                       const platform::LobbyIdentity &id,
                       const RESTRequest &r,
@@ -529,11 +619,9 @@ namespace services
                                   {"context", context},
                                   {"pending", Json::array()},
                                   {"friends", Json::array()}});
-            wire::require(data.at("context") == context);
+            validateFriendStore(data, id, context);
             auto &pending = data.at("pending");
             auto &edges = data.at("friends");
-            wire::require(pending.is_array() && edges.is_array() && pending.size() <= 4096 &&
-                          edges.size() <= 4096);
             const auto linked = [&](const Json &a, const Json &b)
             {
                 return std::any_of(
@@ -615,7 +703,6 @@ namespace services
                         invited.push_back(target);
                     }
                 }
-                save(path, data);
                 auto reply = response(r,
                                       "friend-invitations-persisted",
                                       200,
@@ -623,6 +710,8 @@ namespace services
                                            {"pending", invited},
                                            {"friended", friended},
                                            {"errors", Json::array()}});
+                validateFriendStore(data, id, context);
+                save(path, data);
                 reply.deliveries = std::move(notifications);
                 return reply;
             }
@@ -661,8 +750,9 @@ namespace services
                                                        key(e.at("a")) == key(target));
                                            }),
                             edges.end());
-                save(path, data);
                 auto reply = response(r, "friend-relationship-removed", 204);
+                validateFriendStore(data, id, context);
+                save(path, data);
                 reply.deliveries = std::move(notifications);
                 return reply;
             }

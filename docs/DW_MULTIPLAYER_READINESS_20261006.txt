@@ -1,6 +1,40 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND - SHARED USER-OBJECT REST TRANSPORT
+CURRENT BACKEND - COMPLETE FRIEND-STORE VALIDATION AND NATIVE LIFECYCLE
+Backend SHA256: 0f1ad0a9846dfc4832427c418588015438659830cccb7adc89ebfcc5bc556f09
+Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Backend-only update; no game recompile or new client package is needed.
+
+Complete private friendship layouts now reject duplicate keys, invalid accounts,
+self/reversed duplicate relationships and conflicting pending consent before
+reads or publication. Registered provider aliases reconcile on a private copy;
+reads preserve stored bytes. Response preflight precedes atomic publication;
+failed writes preserve the graph and acknowledge no success or notification.
+Release /W4 /WX, formatting, signed platform/auth/resources and 269 encrypted
+protocol/service groups passed for this exact backend.
+
+Actual root-folder game tasks found the diagnostic peer by name and created an
+outgoing request. Peer consent reached the game's accepted list. That accepted
+friendship was refetched by the same game process after separate backend
+stop/start and dw_restart. All 27 fences, profile/Online state and refreshed
+native relay passed; 114.9 seconds, eleven keepalive replies, zero rejections.
+Peer revocation cleared every native friend list. The game closed normally;
+owned test controls were removed and EXE/INI/machine identity hashes preserved.
+No temporary friendship, new human profile or new external port remains.
+
+Receipts:
+validation/20261006-friend-store-wire.json
+validation/20261006-friend-store-native-lifecycle.json
+validation/20261006-friend-store-native-reconnect.json
+Implementation/scope: docs/DW_FRIEND_STORE_20261006.txt.
+
+The labelled peer is a wire diagnostic, not a second native game. Current proof
+credits native name search, invitation and accepted-friend refetch individually.
+Bulk username resolution, new vector REST tasks and other unobserved methods
+remain open. Full backend and actual two-network gameplay are not complete.
+Backend remains live. Earlier sections certify their recorded artifact hashes.
+
+RETAINED BACKEND - SHARED USER-OBJECT REST TRANSPORT
 Backend SHA256: ce16a7b4d7b0bfc07537eeb606179077da5b3abde64c99192715c313ce8cd119
 Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
 This backend-only pass requires no game recompile or new client package.

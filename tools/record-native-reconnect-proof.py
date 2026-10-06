@@ -21,7 +21,18 @@ parser.add_argument(
     type=Path,
     help="Later observation proving at least 60 seconds of relay keepalives",
 )
+parser.add_argument(
+    "--expected-friend",
+    type=int,
+    action="append",
+    default=[],
+    help="Exact accepted diagnostic peer UID expected before and after restart; pending lists stay empty",
+)
 args = parser.parse_args()
+expected_friends = set(args.expected_friend)
+assert len(expected_friends) == len(args.expected_friend) and all(
+    0 < user < 2**64 - 1 for user in expected_friends
+)
 
 
 def load(path):
@@ -50,8 +61,13 @@ for observation in (before, after):
     )
     lists = observation["native_crossplay_friend_lists"]
     assert len(lists) == 3 and all(row["fetch_state"] == 2 for row in lists)
-    # This pass creates no friendships and never clears an owner's real ones.
-    assert all(row["count"] == 0 for row in lists)
+    # Default remains the empty-list pass. Explicit peer IDs permit a controlled
+    # persistence check without silently accepting another owner's relationships.
+    assert {row["list_index"] for row in lists} == {0, 1, 2}
+    for row in lists:
+        users = [entry["user"] for entry in row["entries"]]
+        assert len(set(users)) == len(users) == row["count"]
+        assert set(users) == (expected_friends if row["list_index"] == 0 else set())
     relay = observation["native_relay_transport"]
     association = observation["native_relay_association"]
     assert relay["state"] == 6 and relay["native_connected_callback_observed"]
@@ -154,7 +170,8 @@ receipt = {
     "passed": True,
     "native_startup_fences_passed": 27,
     "native_profile_and_online_state_verified": True,
-    "native_friend_lists_completed_and_empty": True,
+    "native_friend_lists_completed_and_empty": not expected_friends,
+    "native_accepted_friend_ids_preserved": sorted(expected_friends),
     "backend_restart_and_dw_restart_same_game_process": True,
     "native_account_preserved_on_reconnect": True,
     "native_network_online_and_started": True,
@@ -188,6 +205,10 @@ if args.stability:
     assert stable["native_relay_transport"] == after["native_relay_transport"]
     assert stable["native_relay_association"] == after["native_relay_association"]
     assert stable["native_relay_client_auth"] == after["native_relay_client_auth"]
+    assert (
+        stable["native_crossplay_friend_lists"]
+        == after["native_crossplay_friend_lists"]
+    )
     assert len(stable["native_fences_controller_0"]) == 27 and all(
         row["passing"] and not row["failed"]
         for row in stable["native_fences_controller_0"]
@@ -225,7 +246,11 @@ readiness["native_relay_restart_verified"] = True
 readiness["native_startup_reconnect_proof"] = str(output)
 readiness["native_verified_scopes"] = [
     "startup login/profile/Online and 27 fences",
-    "completed empty accepted/incoming/outgoing friend lists",
+    (
+        "completed accepted diagnostic friend list with no pending requests"
+        if expected_friends
+        else "completed empty accepted/incoming/outgoing friend lists"
+    ),
     "same-process backend restart with unchanged player identity",
     "fresh relay credential and authenticated native UDP association",
 ]
