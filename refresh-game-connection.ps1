@@ -13,6 +13,13 @@ if (-not $ConnectionReceipt.StartsWith($dataRoot, [StringComparison]::OrdinalIgn
 }
 $deployment = Get-Content -LiteralPath $DeploymentReceipt -Raw | ConvertFrom-Json
 $launch = Get-Content -LiteralPath $LaunchReceipt -Raw | ConvertFrom-Json
+if (-not $PSBoundParameters.ContainsKey('DeploymentReceipt') -and $launch.deployment_receipt) {
+    $DeploymentReceipt = $launch.deployment_receipt.path
+    if ((Get-FileHash -LiteralPath $DeploymentReceipt).Hash.ToLowerInvariant() -ne $launch.deployment_receipt.sha256) {
+        throw 'The runtime deployment receipt changed after launch.'
+    }
+    $deployment = Get-Content -LiteralPath $DeploymentReceipt -Raw | ConvertFrom-Json
+}
 $server = Get-Content -LiteralPath (Join-Path $data 'server-process.json') -Raw | ConvertFrom-Json
 $process = Get-CimInstance Win32_Process -Filter ('ProcessId=' + [int]$server.pid)
 if (-not $process -or $process.ExecutablePath -ne $server.executable -or

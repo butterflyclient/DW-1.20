@@ -103,7 +103,7 @@ GAPS = {
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
-    "255": "Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; remaining account/objectstore REST mutations need explicit request/result/domain contracts.",
+    "255": "Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Four exact-target account upgrade/auth/link/Umbrella routes persist optional credentials on the existing signed owner; per-session UNO grants, credential-change revocation and recoverable account/profile publication are covered by encrypted fixtures. Native account-menu/crossplay-login callbacks and two-network lifecycle remain unverified; other account/objectstore REST mutations need explicit request/result/domain contracts.",
 }
 
 GAPS["145"] += (
@@ -139,6 +139,10 @@ GAPS["194"] += (
 # to an implemented authenticated account/objectstore mutation.
 REST_HANDLERS = {
     ("uno", "UserResource", "renameUsername"): "identity_rest_services.cpp",
+    ("uno", "UnoRes", "updatesecuredfields"): "identity_rest_services.cpp",
+    ("uno", "UserResource", "authenticateUser"): "identity_rest_services.cpp",
+    ("umbrella", "UserResource", "linkUser"): "identity_rest_services.cpp",
+    ("umbrella", "Umbrella", "updateUmbrellaAccount"): "identity_rest_services.cpp",
     ("abtesting", "abtesting", "enroll"): "abtesting_services.cpp",
     ("umbrella", "UserResource", "usernamesearch"): "social_services.cpp",
     ("presence", "UserPresence", "set_user_presence"): "social_services.cpp",
@@ -753,6 +757,16 @@ def main():
                     friend_evidence[0] if friend_evidence else None
                 ),
                 target_layout_receipt="validation/20261006-username-target-layout.json",
+            ),
+            dict(
+                domain="REST account credentials and UNO/Umbrella grants",
+                sources=[
+                    "src/identity_rest_services.cpp",
+                    "src/platform.cpp",
+                    "src/platform_account_store.cpp",
+                ],
+                gaps="Four original request/response contracts and encrypted fixtures implemented; native account-menu/crossplay-login callbacks, cross-player migration and retail ownership remain separate scopes",
+                target_layout_receipt="validation/20261006-native-account-auth-layout.json",
             ),
             dict(
                 domain="REST regulation publications and owned preferences",

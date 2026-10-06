@@ -31,10 +31,10 @@ namespace services
                 Json{{"error", {{"code", code}, {"name", "LocalAccountError"}, {"msg", message}}}});
         }
 
-        Json body(const RESTRequest &request)
+        Json body(const RESTRequest &request, size_t maximum = 1024)
         {
             wire::require(request.hasBody && request.content == 1 && !request.body.empty() &&
-                          request.body.size() <= 1024);
+                          request.body.size() <= maximum);
             std::vector<std::set<std::string>> keys;
             bool unique = true;
             auto callback = [&](int depth, Json::parse_event_t event, Json &value)
@@ -49,16 +49,16 @@ namespace services
                 return true;
             };
             auto value = Json::parse(request.body, callback, false);
-            wire::require(unique && value.is_object() && value.size() == 1 &&
-                          value.contains("userName") && value["userName"].is_string());
+            wire::require(unique && value.is_object());
             return value;
         }
 
-        uint64_t pathOwner(const RESTRequest &request)
+        uint64_t pathOwner(const RESTRequest &request,
+                           std::string_view prefix = "/v1.0/users/",
+                           std::string_view suffix = "/securedfields/?client=")
         {
             // Exact 142100230 writer: /v1.0/users/{auth-info.userID}/securedfields/
             // plus the registered client ID. No account/path/query aliases.
-            constexpr std::string_view prefix = "/v1.0/users/", suffix = "/securedfields/?client=";
             wire::require(request.uri.starts_with(prefix));
             const auto end = request.uri.find(suffix, prefix.size());
             wire::require(end != std::string::npos);
@@ -75,13 +75,29 @@ namespace services
 
     std::optional<Reply> identityRest(const platform::LobbyIdentity &id, const RESTRequest &request)
     {
-        if (request.service != "uno" || request.resource != "UserResource" ||
-            request.operation != "renameUsername")
+        const bool rename = request.service == "uno" && request.resource == "UserResource" &&
+                            request.operation == "renameUsername";
+        const bool upgrade = request.service == "uno" && request.resource == "UnoRes" &&
+                             request.operation == "updatesecuredfields";
+        const bool authenticate = request.service == "uno" && request.resource == "UserResource" &&
+                                  request.operation == "authenticateUser";
+        const bool link = request.service == "umbrella" && request.resource == "UserResource" &&
+                          request.operation == "linkUser";
+        const bool update = request.service == "umbrella" && request.resource == "Umbrella" &&
+                            request.operation == "updateUmbrellaAccount";
+        if (!rename && !upgrade && !authenticate && !link && !update)
             return std::nullopt;
-        wire::require(request.method == 0x505554 && request.accept == 1);
-        if (pathOwner(request) != id.userId)
+        wire::require(request.method == ((authenticate || update) ? 0x504F5354U : 0x505554U) &&
+                      request.accept == 1);
+        if ((rename || upgrade) && pathOwner(request) != id.userId)
             return error(request, 403, 220000, "The account belongs to another player");
-        const auto json = body(request);
+        if (link && pathOwner(request, "/v1.0/users/crossplatform/", "/?client=") != id.userId)
+            return error(request, 403, 220000, "The account belongs to another player");
+        if (authenticate)
+            wire::require(request.uri == "/v1.0/auth/?client=replaylocal");
+        if (update)
+            wire::require(request.uri == "/v1.0/tokens/uno/?client=replaylocal");
+        const auto json = body(request, rename ? 1024 : 24576);
         const auto header = request.headers.find("authorization");
         // The original writer uses TWO spaces after Bearer. Accept the usual
         // single-space form too, but reject extra tokens or whitespace.
@@ -94,6 +110,16 @@ namespace services
             else if (value.starts_with("Bearer "))
                 token = value.substr(7);
         }
+        if (!rename)
+        {
+            const auto account =
+                platform::accountRequest(id, request.operation, token, json.dump());
+            Reply reply{0, {}, "identity-account-operation"};
+            reply.rest = RESTResult{request.version, account.status, account.body};
+            return reply;
+        }
+        wire::require(json.size() == 1 && json.contains("userName") &&
+                      json["userName"].is_string());
         switch (platform::renameAccount(id, token, json["userName"].get<std::string>()))
         {
         case platform::RenameResult::Changed:

@@ -1,5 +1,9 @@
+param([switch]$ValidateOnly)
 $ErrorActionPreference = 'Stop'
-$record = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\deployment.json') -Raw | ConvertFrom-Json
+$python = 'C:\Users\achar\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+$deploymentPath = & $python -B (Join-Path $PSScriptRoot 'tools\resolve-runtime-deployment.py')
+if ($LASTEXITCODE) { throw 'The current backend/game pair has no matching validation evidence.' }
+$record = Get-Content -LiteralPath $deploymentPath -Raw | ConvertFrom-Json
 if (-not $record.startup_compatibility) {
     throw 'Rebuild and deploy the DW image with its compiled Windows startup fix before launching.'
 }
@@ -15,8 +19,15 @@ if ($status.server -ne 'iw8-dw') { throw 'Start the IW8 DW server first.' }
 if (-not $status.platform_auth -or -not $status.native_auth -or -not $status.native_tasks -or
     $status.capability_stage -ne $record.stage) { throw 'Restart the newly compiled DW server before launching.' }
 $serverRecord = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\server-process.json') -Raw | ConvertFrom-Json
-if ($serverRecord.sha256 -ne $record.server_sha256) {
+$serverProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + [int]$serverRecord.pid)
+if ($serverRecord.sha256 -ne $record.server_sha256 -or -not $serverProcess -or
+    $serverProcess.ExecutablePath -ne $serverRecord.executable -or
+    (Get-FileHash -LiteralPath $serverRecord.executable).Hash.ToLowerInvariant() -ne $serverRecord.sha256) {
     throw 'The running server differs from the verified deployment. Stop it, then start the current server.'
+}
+if ($ValidateOnly) {
+    Write-Host 'Validated the unchanged shipping game and current live backend. No game launched.'
+    return
 }
 if (Get-CimInstance Win32_Process -Filter "Name LIKE 'game_dx12_ship_replay%.exe'") {
     throw 'A Replay instance is already running. Close it before starting the DW test.'
@@ -38,6 +49,7 @@ $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Argumen
 if ($created.ReturnValue -ne 0) { throw "DW game creation failed with WMI result $($created.ReturnValue)." }
 $process = [pscustomobject]@{ Id=[int]$created.ProcessId }
 @{ pid=$process.Id; executable=$record.executable; sha256=$record.sha256;
+   deployment_receipt=@{path=$deploymentPath; sha256=(Get-FileHash -LiteralPath $deploymentPath).Hash.ToLowerInvariant()};
    launched_utc=[DateTime]::UtcNow.ToString('o'); client_log_offset=$offset; server_log_offset=$serverOffset;
    server_baseline=$status; server_process=$serverRecord } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'data\current-runtime-launch.json') -Encoding utf8
 Write-Host ('Started root-folder DW test PID ' + $process.Id)

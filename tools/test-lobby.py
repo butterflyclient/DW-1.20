@@ -35,6 +35,12 @@ subprocess.run(
     stdout=subprocess.DEVNULL,
     creationflags=subprocess.CREATE_NO_WINDOW,
 )
+subprocess.run(
+    [str(exe), str(directory), "--provision-profile", "account", "Account Original"],
+    check=True,
+    stdout=subprocess.DEVNULL,
+    creationflags=subprocess.CREATE_NO_WINDOW,
+)
 
 
 def choose_offset():
@@ -2652,6 +2658,24 @@ try:
         blob,
         checks,
     )
+    import account_auth_fixtures
+
+    account_prepare_restart, account_stopped, account_after_restart = (
+        account_auth_fixtures.exercise(
+            client,
+            rename_access_token,
+            user,
+            directory,
+            title,
+            seed,
+            post,
+            Client,
+            native_rest,
+            rest_response,
+            blob,
+            checks,
+        )
+    )
 
     event_body = {
         "titleID": title,
@@ -4258,8 +4282,10 @@ try:
         "unknown ticket, invalid verify, modified MAC and out-of-order counter rejection"
     )
     # Restart only the fixture child. Actual server, game and player data stay untouched.
+    account_prepare_restart()
     process.terminate()
     process.wait(timeout=5)
+    account_stopped()
     output.flush()
     matchmaking_transaction_fixtures.before_restart(matchmaking_transaction_fixture)
     objectstore_transaction_fixtures.before_restart(objectstore_transaction_fixture)
@@ -4306,6 +4332,7 @@ try:
     relay_fixtures.check_restart(client, relay_fixture, checks)
     regulation_restart(client)
     rename_restart()
+    account_after_restart()
     objectstore_rest_fixtures.check_restart(
         client, objectstore_rest_restart, rest_response, checks
     )

@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include "platform.h"
+#include "platform_account_store.h"
 #include "platform_resources.h"
 #include "crypto.h"
 #include "../integration/replay/dw_platform_protocol.h"
@@ -41,6 +42,7 @@ namespace platform
             uint32_t titleId = 0;
             uint32_t ivSeed = 0;
             std::string umbrellaToken;
+            std::string unoIDToken, unoAccessToken, unoRefreshToken;
         };
 
         Identity identity;
@@ -58,6 +60,7 @@ namespace platform
         BCRYPT_KEY_HANDLE key = nullptr;
         std::mutex mutex;
         std::vector<Session> issuedSessions;
+        accounts::Store accountStore;
         unsigned loginCount = 0;
         unsigned authCount = 0;
         unsigned legacyCount = 0;
@@ -161,6 +164,70 @@ namespace platform
                     throw std::runtime_error("Local player name already in use");
         }
 
+        struct SelectedProfile
+        {
+            Identity *value;
+            std::filesystem::path path;
+            bool machineOwned;
+        };
+
+        SelectedProfile selectProfile(uint64_t user)
+        {
+            if (identity.userId == user)
+                return {&identity, identityDirectory / "platform-profile.bin", false};
+            for (auto &[name, profile] : profiles)
+                if (profile.userId == user)
+                    return {
+                        &profile, identityDirectory / "platform-profiles" / (name + ".bin"), false};
+            for (auto &[keyName, profile] : clientProfiles)
+                if (profile.userId == user)
+                    return {&profile,
+                            identityDirectory / "platform-client-profiles" / (keyName + ".bin"),
+                            true};
+            throw std::runtime_error("Account has no existing platform profile");
+        }
+
+        accounts::Profile accountProfile(uint64_t user)
+        {
+            const auto selected = selectProfile(user);
+            accounts::Profile result{user, selected.path, {}};
+            std::memcpy(result.bytes.data(), selected.value, result.bytes.size());
+            return result;
+        }
+
+        void publishAccountProfile(const accounts::Profile &profile,
+                                   bool validateOnly,
+                                   bool revokeCredentials)
+        {
+            const auto selected = selectProfile(profile.user);
+            Identity changed;
+            std::memcpy(&changed, profile.bytes.data(), sizeof(changed));
+            if (profile.path != selected.path ||
+                std::memcmp(&changed, selected.value, offsetof(Identity, name)) != 0 ||
+                changed.name[35])
+                throw std::runtime_error("Account publication changes stable profile fields");
+            availableName(changed.name, profile.user, selected.machineOwned);
+            const auto persisted = readIdentity(selected.path);
+            if (validateOnly)
+                return;
+            if (std::memcmp(&persisted, &changed, sizeof(changed)) != 0)
+                write(selected.path, &changed, sizeof(changed));
+            *selected.value = changed;
+            if (revokeCredentials)
+                for (auto &session : issuedSessions)
+                    if (session.payload.userId == profile.user)
+                    {
+                        session.unoIDToken.clear();
+                        session.unoAccessToken.clear();
+                        session.unoRefreshToken.clear();
+                    }
+        }
+
+        void recoverAccounts(uint64_t onlyOwner = 0)
+        {
+            accountStore.recover(accountProfile, publishAccountProfile, onlyOwner);
+        }
+
         Identity newIdentity(const std::string &name)
         {
             validateName(name);
@@ -182,6 +249,34 @@ namespace platform
             return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
                                              std::chrono::system_clock::now().time_since_epoch())
                                              .count());
+        }
+
+        Session *liveSession(const LobbyIdentity &owner)
+        {
+            const auto time = now();
+            if (owner.expires <= time)
+                return nullptr;
+            for (auto &session : issuedSessions)
+                if (session.payload.expires > time && session.titleId == owner.titleId &&
+                    session.payload.userId == owner.userId && session.ivSeed == owner.ivSeed &&
+                    crypto::equal(session.sessionKey, owner.key))
+                    return &session;
+            return nullptr;
+        }
+
+        bool matchesToken(const std::string &supplied, const std::string &issued)
+        {
+            return supplied.size() == 64 && issued.size() == 64 &&
+                   crypto::equal(
+                       std::span(reinterpret_cast<const uint8_t *>(supplied.data()),
+                                 supplied.size()),
+                       std::span(reinterpret_cast<const uint8_t *>(issued.data()), issued.size()));
+        }
+
+        bool accountAccess(const Session *session, const std::string &access)
+        {
+            return session && (matchesToken(access, session->umbrellaToken) ||
+                               matchesToken(access, session->unoAccessToken));
         }
 
         void token(char (&text)[65])
@@ -322,6 +417,7 @@ namespace platform
                                  const std::string &playerName,
                                  bool machineOwned = false)
         {
+            recoverAccounts(selected->userId);
             const auto time = now();
             std::erase_if(issuedSessions,
                           [time](const auto &session)
@@ -450,6 +546,8 @@ namespace platform
                 throw std::runtime_error("Duplicate or excessive machine profiles");
             clientProfiles.emplace(fingerprint, account);
         }
+        accountStore.initialize(directory);
+        recoverAccounts();
     }
 
     std::string clientChallenge(const std::string &bytes)
@@ -589,6 +687,7 @@ namespace platform
     std::optional<std::string> accountName(uint64_t user)
     {
         std::lock_guard lock(mutex);
+        recoverAccounts(user);
         if (user == identity.userId)
             return std::string(identity.name);
         for (const auto &entry : profiles)
@@ -605,57 +704,16 @@ namespace platform
                                const std::string &name)
     {
         std::lock_guard lock(mutex);
-        const auto time = now();
-        const bool authorized =
-            accessToken.size() == 64 && owner.expires > time &&
-            std::any_of(
-                issuedSessions.begin(),
-                issuedSessions.end(),
-                [&](const auto &session)
-                {
-                    return session.payload.expires > time && session.titleId == owner.titleId &&
-                           session.payload.userId == owner.userId &&
-                           session.ivSeed == owner.ivSeed &&
-                           crypto::equal(session.sessionKey, owner.key) &&
-                           crypto::equal(
-                               std::span(reinterpret_cast<const uint8_t *>(accessToken.data()),
-                                         accessToken.size()),
-                               std::span(
-                                   reinterpret_cast<const uint8_t *>(session.umbrellaToken.data()),
-                                   session.umbrellaToken.size()));
-                });
-        if (!authorized)
+        recoverAccounts(owner.userId);
+        if (!accountAccess(liveSession(owner), accessToken))
             return RenameResult::Unauthorized;
-
-        Identity *selected = nullptr;
-        std::filesystem::path path;
-        bool machineOwned = false;
-        if (identity.userId == owner.userId)
-        {
-            selected = &identity;
-            path = identityDirectory / "platform-profile.bin";
-        }
-        for (auto &[keyName, profile] : profiles)
-            if (profile.userId == owner.userId)
-            {
-                selected = &profile;
-                path = identityDirectory / "platform-profiles" / (keyName + ".bin");
-            }
-        for (auto &[fingerprint, profile] : clientProfiles)
-            if (profile.userId == owner.userId)
-            {
-                selected = &profile;
-                machineOwned = true;
-                path = identityDirectory / "platform-client-profiles" / (fingerprint + ".bin");
-            }
-        if (!selected)
-            return RenameResult::Unauthorized;
-        const auto persisted = readIdentity(path);
-        if (std::memcmp(&persisted, selected, sizeof(persisted)) != 0)
+        const auto selected = selectProfile(owner.userId);
+        const auto persisted = readIdentity(selected.path);
+        if (std::memcmp(&persisted, selected.value, sizeof(persisted)) != 0)
             throw std::runtime_error("Persisted platform identity changed during the live session");
         try
         {
-            availableName(name, owner.userId, machineOwned);
+            availableName(name, owner.userId, selected.machineOwned);
         }
         catch (const std::runtime_error &error)
         {
@@ -665,19 +723,20 @@ namespace platform
                 return RenameResult::NameUnavailable;
             throw;
         }
-        if (name == selected->name)
+        if (name == selected.value->name)
             return RenameResult::Unchanged;
-        auto changed = *selected;
+        auto changed = *selected.value;
         std::memset(changed.name, 0, sizeof(changed.name));
         std::memcpy(changed.name, name.data(), name.size());
-        write(path, &changed, sizeof(changed));
-        *selected = changed;
+        write(selected.path, &changed, sizeof(changed));
+        *selected.value = changed;
         return RenameResult::Changed;
     }
 
     std::vector<Account> findAccounts(const std::string &username, bool prefix)
     {
         std::lock_guard lock(mutex);
+        recoverAccounts();
         std::vector<Account> found;
         const auto match = folded(username);
         const auto append = [&](const Identity &account)
@@ -702,6 +761,235 @@ namespace platform
             if (!machineNames.contains(folded(account.name)))
                 append(account);
         return found;
+    }
+
+    AccountReply accountRequest(const LobbyIdentity &owner,
+                                const std::string &operation,
+                                const std::string &accessToken,
+                                const std::string &body)
+    {
+        using Json = nlohmann::json;
+        const auto reject = [](uint32_t status, uint32_t code, const char *message)
+        {
+            return AccountReply{
+                status,
+                Json{{"error", {{"code", code}, {"name", "LocalAccountError"}, {"msg", message}}}}
+                    .dump()};
+        };
+        const auto input = Json::parse(body, nullptr, false);
+        if (!input.is_object())
+            return reject(400, 213000, "Invalid account request");
+        const auto stringField = [&input](const char *fieldName, size_t maximum)
+        {
+            if (!input.contains(fieldName) || !input[fieldName].is_string())
+                return false;
+            const auto &text = input[fieldName].get_ref<const std::string &>();
+            return !text.empty() && text.size() <= maximum &&
+                   std::none_of(text.begin(),
+                                text.end(),
+                                [](unsigned char c)
+                                {
+                                    return c < 32;
+                                });
+        };
+        const auto onlyFields = [&input](std::initializer_list<const char *> allowed)
+        {
+            for (auto item = input.begin(); item != input.end(); ++item)
+                if (std::none_of(allowed.begin(),
+                                 allowed.end(),
+                                 [&item](const char *name)
+                                 {
+                                     return item.key() == name;
+                                 }))
+                    return false;
+            return true;
+        };
+        std::lock_guard lock(mutex);
+        auto *session = liveSession(owner);
+        if (!session)
+            return reject(403, 220000, "Account session is unavailable or expired");
+        recoverAccounts(owner.userId);
+        // Recovery can revoke the old grant. Check it after publication, so a
+        // stale token cannot authorize another update in the same request.
+        if (operation == "updatesecuredfields" && !accountAccess(session, accessToken))
+            return reject(403, 220000, "Access token is not owned by this account session");
+        const auto before = accountProfile(owner.userId);
+        auto after = before;
+        const auto previous = accountStore.read(owner.userId);
+        auto record = previous.value_or(
+            Json{{"schema", 1}, {"owner", owner.userId}, {"fields", Json::object()}});
+        const auto grants = [&session]()
+        {
+            for (auto *target :
+                 {&session->unoIDToken, &session->unoAccessToken, &session->unoRefreshToken})
+                if (target->empty())
+                {
+                    char value[65]{};
+                    token(value);
+                    *target = value;
+                    SecureZeroMemory(value, sizeof(value));
+                }
+        };
+
+        if (operation == "authenticateUser")
+        {
+            if (!onlyFields({"email", "password", "grantType"}) || !stringField("email", 255) ||
+                !stringField("password", 100) || !stringField("grantType", 8) ||
+                input["grantType"] != "password")
+                return reject(400, 213000, "Invalid password grant");
+            if (!previous || previous->at("fields").value("email", "") != folded(input["email"]) ||
+                !accountStore.passwordMatches(*previous, input["password"]))
+                return reject(403, 220000, "Credentials do not belong to this signed player");
+            grants();
+            return {200,
+                    Json{{"unoID", owner.userId},
+                         {"tokens",
+                          {{"IDToken", session->unoIDToken},
+                           {"accessToken", session->unoAccessToken},
+                           {"refreshToken", session->unoRefreshToken}}}}
+                        .dump()};
+        }
+
+        if (operation == "updatesecuredfields")
+        {
+            if (!onlyFields({"userName",
+                             "email",
+                             "password",
+                             "accountType",
+                             "firstName",
+                             "lastName",
+                             "dateOfBirth",
+                             "country",
+                             "subscriptionOptIn"}) ||
+                !stringField("accountType", 4) || input["accountType"] != "full" ||
+                !input.contains("subscriptionOptIn") || !input["subscriptionOptIn"].is_boolean())
+                return reject(400, 213000, "Invalid full-account fields");
+            if (input.contains("userName"))
+            {
+                if (!stringField("userName", 35))
+                    return reject(400, 214500, "Invalid local player name");
+                const auto name = input["userName"].get<std::string>();
+                try
+                {
+                    availableName(name, owner.userId, selectProfile(owner.userId).machineOwned);
+                }
+                catch (const std::runtime_error &error)
+                {
+                    if (std::string(error.what()) == "Invalid local profile name")
+                        return reject(400, 214500, "Invalid local player name");
+                    if (std::string(error.what()) == "Local player name already in use")
+                        return reject(409, 214500, "Local player name already in use");
+                    throw;
+                }
+                std::fill(
+                    after.bytes.begin() + offsetof(Identity, name), after.bytes.end(), uint8_t(0));
+                std::copy(name.begin(), name.end(), after.bytes.begin() + offsetof(Identity, name));
+            }
+            for (const auto *field : {"email", "firstName", "lastName", "country", "dateOfBirth"})
+                if (input.contains(field))
+                {
+                    const size_t limit = std::string_view(field) == "email" ? 255 : 400;
+                    if (!stringField(field, limit))
+                        return reject(400, 214000, "Invalid account field");
+                    auto value = input[field].get<std::string>();
+                    if (std::string_view(field) == "email")
+                    {
+                        value = folded(value);
+                        const auto at = value.find('@');
+                        if (!at || at == std::string::npos || at + 1 == value.size() ||
+                            value.find('@', at + 1) != std::string::npos ||
+                            value.find_first_of(" \t\r\n") != std::string::npos)
+                            return reject(400, 214000, "Invalid local account email");
+                        if (!accountStore.emailAvailable(owner.userId, value))
+                            return reject(409, 244000, "Local account email already in use");
+                    }
+                    if (std::string_view(field) == "country" &&
+                        (value.size() != 2 ||
+                         value.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") !=
+                             std::string::npos))
+                        return reject(400, 214000, "Invalid account country");
+                    if (std::string_view(field) == "dateOfBirth")
+                    {
+                        if (value.size() != 10 || value[4] != '-' || value[7] != '-' ||
+                            !std::all_of(value.begin(),
+                                         value.end(),
+                                         [&value](const char &c)
+                                         {
+                                             const auto offset = &c - value.data();
+                                             return offset == 4 || offset == 7 ||
+                                                    (c >= '0' && c <= '9');
+                                         }))
+                            return reject(400, 214700, "Invalid account date of birth");
+                        unsigned year = 0, month = 0, day = 0;
+                        if (std::from_chars(value.data(), value.data() + 4, year).ec !=
+                                std::errc{} ||
+                            std::from_chars(value.data() + 5, value.data() + 7, month).ec !=
+                                std::errc{} ||
+                            std::from_chars(value.data() + 8, value.data() + 10, day).ec !=
+                                std::errc{} ||
+                            year < 1900 || month < 1 || month > 12)
+                            return reject(400, 214700, "Invalid account date of birth");
+                        constexpr unsigned days[] = {
+                            31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+                        const auto maximum =
+                            days[month - 1] + unsigned(month == 2 && year % 4 == 0 &&
+                                                       (year % 100 != 0 || year % 400 == 0));
+                        if (!day || day > maximum)
+                            return reject(400, 214700, "Invalid account date of birth");
+                    }
+                    record["fields"][field] = value;
+                }
+            record["fields"]["accountType"] = "full";
+            record["fields"]["subscriptionOptIn"] = input["subscriptionOptIn"];
+            if (input.contains("password"))
+            {
+                if (!stringField("password", 100))
+                    return reject(400, 214600, "Invalid account password");
+                record = accountStore.withPassword(record, input["password"]);
+            }
+            const bool credentialsChanged =
+                !previous ||
+                previous->at("fields").value("email", "") != record["fields"].value("email", "") ||
+                previous->value("password", Json()) != record.value("password", Json());
+            accountStore.commit(before, after, record, credentialsChanged, publishAccountProfile);
+            grants();
+            return {200, Json{{"success", true}, {"IDToken", session->unoIDToken}}.dump()};
+        }
+
+        if (operation == "linkUser")
+        {
+            if (!onlyFields({"unoIDToken", "accessToken", "refreshToken"}) ||
+                !stringField("unoIDToken", 1023) || !stringField("accessToken", 6783) ||
+                !stringField("refreshToken", 6783))
+                return reject(400, 213000, "Invalid account link fields");
+            if (!matchesToken(accessToken, session->umbrellaToken) ||
+                !matchesToken(input["unoIDToken"], session->unoIDToken) ||
+                !matchesToken(input["accessToken"], session->unoAccessToken) ||
+                !matchesToken(input["refreshToken"], session->unoRefreshToken))
+                return reject(403, 220000, "Link tokens do not belong to this account session");
+            record["link"] = Json{
+                {"accountType", "bnet"}, {"userID", owner.userId}, {"umbrellaID", owner.userId}};
+        }
+        else if (operation == "updateUmbrellaAccount")
+        {
+            if (!onlyFields({"accountID", "tokens"}) || !input.contains("accountID") ||
+                !input["accountID"].is_number_unsigned() || !input.contains("tokens") ||
+                !input["tokens"].is_object() || input["tokens"].size() != 2 ||
+                !input["tokens"].contains("accessToken") ||
+                !input["tokens"]["accessToken"].is_string() ||
+                !input["tokens"].contains("refreshToken") ||
+                !input["tokens"]["refreshToken"].is_string())
+                return reject(400, 213000, "Invalid umbrella upgrade fields");
+            if (input["accountID"].get<uint64_t>() != owner.userId ||
+                !matchesToken(input["tokens"]["accessToken"], session->unoAccessToken) ||
+                !matchesToken(input["tokens"]["refreshToken"], session->unoRefreshToken))
+                return reject(403, 220000, "Upgrade tokens do not belong to this account session");
+            record["umbrellaUpgraded"] = true;
+        }
+        else
+            throw std::runtime_error("Unsupported account operation");
+        accountStore.commit(before, after, record, false, publishAccountProfile);
+        return {200, Json{{"umbrellaID", owner.userId}}.dump()};
     }
 
     std::string login(const std::string &nonce,
@@ -854,6 +1142,9 @@ namespace platform
         session->titleId = static_cast<uint32_t>(title);
         session->ivSeed = static_cast<uint32_t>(number("iv_seed"));
         session->umbrellaToken.clear();
+        session->unoIDToken.clear();
+        session->unoAccessToken.clear();
+        session->unoRefreshToken.clear();
         // Exact packed 128-byte PC auth ticket, proven by Replay's deserialize and
         // processAuthInfo. The native parser validates the signed reply and magic.
         std::array<uint8_t, 128> ticket{};

@@ -1,0 +1,136 @@
+REPLAY DW OPTIONAL ACCOUNT CREDENTIALS AND CROSSPLAY TOKEN ROUTES
+2026-10-06
+
+IMPLEMENTATION
+The existing encrypted REST task 255/10 now supports these original Replay routes:
+  uno / UnoRes / updatesecuredfields
+    PUT /v1.0/users/{owned-user}/securedfields/?client=replaylocal
+  uno / UserResource / authenticateUser
+    POST /v1.0/auth/?client=replaylocal
+  umbrella / UserResource / linkUser
+    PUT /v1.0/users/crossplatform/{owned-user}/?client=replaylocal
+  umbrella / Umbrella / updateUmbrellaAccount
+    POST /v1.0/tokens/uno/?client=replaylocal
+
+Upgrade accepts the target writer's optional userName, email, password,
+firstName, lastName, dateOfBirth and country fields, mandatory accountType=full
+and boolean subscriptionOptIn. Authentication uses the target email/password
+grant. Link uses unoIDToken, accessToken and refreshToken, plus the current
+Umbrella Authorization header. Umbrella upgrade uses accountID and the nested
+accessToken/refreshToken pair. Ambiguous JSON keys, unsupported fields, wrong
+methods, path/query aliases and mismatched account paths are rejected.
+
+These routes augment the existing signed machine-owned player. They do not
+provision a different player, accept another player's credentials, invent a
+retail account or change the existing user/platform IDs. The original native
+197/10 and 197/11 aliases continue to identify this local player. Optional
+email credentials are attached through an authorized native upgrade request;
+ordinary signed machine login still works without any email/password setup.
+Cross-player account migration and retail account ownership are separate scopes.
+
+No password text is persisted. Verifiers use independently salted 16-byte
+salts, PBKDF2-HMAC-SHA256 with 200000 rounds and a 32-byte result. Exact password
+retries retain the existing salt and durable record. Email uniqueness follows
+the local case-insensitive account policy. Full-account metadata lives in
+data/platform-accounts/{owned-user}.json; no display-name copy is kept there.
+The existing platform profile remains the canonical display-name store.
+
+UNO ID/access/refresh tokens are separate random grants for each live signed
+lobby session. The backend checks the player, title, IV seed, session key and
+expiration. It does not accept token triples mixed between sessions or accounts.
+Credential changes revoke all of this player's previous UNO grants, including
+other live sessions. Backend restart and native reauthentication invalidate old
+grants. Link and Umbrella upgrade publish owned link/upgrade state before replying.
+The existing rename handler now also accepts a current owned UNO access token.
+The INI's explicit player_name remains a signed-login display-name override.
+
+DURABLE PUBLICATION
+An upgrade can change a credential record and the existing 56-byte identity's
+name together. A flushed publication intent binds the old/new identity bytes,
+the previous account-document hash, the complete new account record and the
+credential-revocation decision. It contains no password text or issued token.
+Only identity bytes at +20 onward may change; magic, version and IDs remain intact.
+
+The backend preflights ownership and schema before publishing either file,
+then atomically replaces the account document and identity, updates canonical
+memory and retires the intent. Recovery accepts only the exact before/after
+images and never overwrites unrelated persisted data. An interrupted write
+does not report success. Its durable intent can finish during the next affected
+account request or server initialization. A changed or corrupt image blocks
+recovery rather than being repaired into a different owner.
+
+Affected-account recovery runs before checking its mutation token: recovery
+may revoke that token. A stale token cannot authorize a second credential
+update after the first interrupted update finishes. Player-specific lookups and
+logins recover only that player's intent, leaving other owners available.
+Global username searches require a consistent complete name inventory. Server
+initialization validates and recovers the persisted inventory before listening.
+
+TARGET CONTRACT AND VALIDATION SCOPE
+tools/research-account-auth-target.py binds all four original writers,
+constructors, response vtable success/error slots and response string capacities
+to the untouched original Replay executable. The SQLite names remain candidate
+aliases. Exact byte/vtable evidence is recorded in:
+  validation/20261006-native-account-auth-layout.json
+
+tools/account_auth_fixtures.py uses real issued fixture sessions and an
+independent encrypted native-wire client. It checks field validation, grants,
+password derivation, session separation, credential revocation, failed staging,
+same-process and process-restart publication recovery and current-token rename.
+tools/prepare-backend-fixtures.py freezes the compiled backend's source and
+explicit owned fixture overlays without including unrelated dirty work.
+
+The current game still selects its legacy signed-platform login path. Native
+account-menu callbacks and crossplay-login selection require separate original
+consumer integration and runtime validation. These routes and their fixtures
+do not by themselves prove those callbacks or two-network gameplay completion.
+
+FINAL BUILD AND GAME EVIDENCE
+Private frozen Release build passed MSVC /W4 /WX. Unrelated dirty matchmaking,
+host-migration and game-source edits were excluded from the compiled snapshot.
+Backend SHA256:
+  cb6beb439d1254171661196b4a70a6021e764606b527ad8cd0fedb534d8d5d07
+Build receipt:
+  data/backend-snapshot-1791316023414050900/build-receipt.json
+
+All 289 encrypted protocol groups passed against that exact image, including
+six account validation/lifecycle/recovery groups. Fixtures were frozen under
+data/backend-validation-1791316221288523200; they did not change the normal
+player's identity or settings. The prior backend was stopped and the fresh
+backend was deployed and started in separate steps. It remains running.
+
+A focused native test used the existing compiled private image, launched from
+E:\IW8\Builds\1.20-replay with its separate accepted test profile. Online status
+was 2, the profile was logged in, all 27 fences passed, network error was 0 and
+the relay association reached state 3. Friend lists and active crossplay presence
+were empty. No map run was performed. The test process was stopped and its
+owned temporary root-game EXE/INI/command files were removed. No game recompile
+was performed in this pass. The shipping EXE, INI and normal identity hashes
+remain unchanged. These observations verify startup, not the new account menus.
+
+Hash-bound combined evidence:
+  validation/20261006-account-auth-native-readiness.json
+Private full observations remain under data/native-pair-accounts-20261006.
+Those observations contain authentication state and must not be shared.
+
+NORMAL LAUNCH WORKFLOW
+The original data/deployment.json is preserved as the game compilation record.
+It previously pinned the backend to an older image and rejected backend-only
+updates. tools/resolve-runtime-deployment.py now produces a separate
+data/current-runtime-deployment.json. A newer backend needs a matching compiled
+image, protocol result and native-startup readiness reference, bound to the
+unchanged shipping game. The resolver checks all referenced evidence hashes.
+
+launch-game.ps1 verifies the actual backend process path/hash and health before
+launching. -ValidateOnly checks the selection without launching the normal
+profile; this check passed. Launch receipts bind the derived deployment hash.
+observe-game.ps1 and refresh-game-connection.ps1 use that bound selection. The
+original read-only Python observer was unchanged, preserving observation source
+provenance. Repeated validation retains an identical runtime manifest. A new
+backend cannot silently inherit an old game's protocol or native proof.
+
+REMAINING COVERAGE
+The refreshed constructor inventory has 140 known binary task routes, 134 with
+registered handlers and six missing: 50/22, 58/22, 193/9, 193/10, 193/12, 193/24.
+Indirect dispatch and unclassified REST/push routes remain separate audit gaps.
+Full native callback coverage and cross-network gameplay are not complete.

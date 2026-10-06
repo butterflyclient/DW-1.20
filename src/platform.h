@@ -54,6 +54,17 @@ namespace platform
     // Relay INIT omits the lobby ticket; bind its signed digest to a live session.
     bool relaySessionMatches(uint32_t title, uint64_t user, std::span<const uint8_t> digest);
     bool sessionTokenMatches(const LobbyIdentity &identity, const std::string &token);
+
+    struct AccountReply
+    {
+        uint32_t status;
+        std::string body;
+    };
+
+    AccountReply accountRequest(const LobbyIdentity &identity,
+                                const std::string &operation,
+                                const std::string &accessToken,
+                                const std::string &body);
     enum class RenameResult
     {
         Changed,

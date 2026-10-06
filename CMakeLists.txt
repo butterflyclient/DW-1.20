@@ -7,6 +7,7 @@ add_executable(iw8-dw-server
     src/server.cpp
     src/network.cpp
     src/platform.cpp
+    src/platform_account_store.cpp
     src/platform_resources.cpp
     src/crypto.cpp
     src/lobby.cpp

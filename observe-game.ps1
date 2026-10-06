@@ -15,6 +15,15 @@ if (Test-Path -LiteralPath $launchPath) {
     $launch = Get-Content -LiteralPath $launchPath -Raw | ConvertFrom-Json
     $useReceipt = $launch.pid -eq $ProcessId -and $launch.sha256 -eq $deployment.sha256
 }
-if ($useReceipt) { & $python -B (Join-Path $PSScriptRoot 'tools\observe-game.py') }
-else { & $python -B (Join-Path $PSScriptRoot 'tools\observe-game.py') --pid $ProcessId }
+$deploymentPath = Join-Path $PSScriptRoot 'data\deployment.json'
+if ($useReceipt -and $launch.deployment_receipt) {
+    $deploymentPath = $launch.deployment_receipt.path
+    if ((Get-FileHash -LiteralPath $deploymentPath).Hash.ToLowerInvariant() -ne $launch.deployment_receipt.sha256) {
+        throw 'The runtime deployment receipt changed after launch.'
+    }
+} elseif (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'data\current-runtime-deployment.json')) {
+    $deploymentPath = Join-Path $PSScriptRoot 'data\current-runtime-deployment.json'
+}
+if ($useReceipt) { & $python -B (Join-Path $PSScriptRoot 'tools\observe-game.py') --deployment $deploymentPath }
+else { & $python -B (Join-Path $PSScriptRoot 'tools\observe-game.py') --deployment $deploymentPath --pid $ProcessId }
 if ($LASTEXITCODE) { throw 'The read-only DW observation failed; no game state was changed.' }
