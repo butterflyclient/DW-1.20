@@ -263,7 +263,7 @@ def exercise_results(
     lobby = int.from_bytes(push[15:23], "little")
     assert peer.receive() == (
         2,
-        u32(2001) + push[5:23] + push[32:],
+        b"\x08" + (2001).to_bytes(4, "little") + push[5:23] + push[32:],
     )
     lobby_path = directory / "matchmaking" / str(title) / "lobbies" / f"{lobby}.json"
     lobby_bytes = lobby_path.read_bytes()
