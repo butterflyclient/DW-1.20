@@ -1,0 +1,52 @@
+REPLAY DW PARTY MATCHMAKING -- FOCUSED FIX
+2026-10-06
+
+Issue
+Friend addition and private-party joining worked. The second player did not
+enter the Quick Play matchmaking player-list lobby. The host later disconnected.
+
+Confirmed cause and correction
+The fresh-lobby task 145/18 broadcast event 2005 (CreateNewLobby) to all party
+members. Original Replay function 0x141041550 accepts that event only in the
+searching-host state: cmp edx,7 at 0x14104161F, jne at 0x141041622.
+Original image SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+
+The backend now sends event 2005 only to the creator and event 2001 (JoinLobby)
+to the other authenticated party members. It retains the shared search ID,
+host/backend documents and queued-delivery validation. Join envelopes omit the
+create envelope's update-ID field, as the native SDK decoder requires.
+
+Verification and deployment
+Fresh isolated Release compilation from committed sources passed.
+The independent encrypted-wire suite passed all 296 protocol/service groups.
+Party membership, reservation, migration and tournament-result setup fixtures
+now distinguish host create and peer join envelopes.
+
+Deployed backend SHA256:
+e3d7e40904f890b77d4fae88b61fa4a42c002364212dadcf68476ea3290cddce
+
+The server was stopped, deployed, and started in separate steps. The unchanged
+main game and existing private second instance were launched from:
+E:\IW8\Builds\1.20-replay
+
+Both native instances are connected, online, logged in, have 27 passing fences,
+network error 0 and relay state 3. Both retain their one existing friendship.
+The main player's normal local identity/settings and the peer's separate local
+identity/settings were preserved. No game executable was recompiled.
+
+Readiness evidence:
+validation/20261006-party-lobby-routing-readiness.json
+Runtime state and per-instance launch/deployment receipts:
+data/manual-pair-quickplay-20261006
+
+Next native gate
+Join the main player's party from DW Test 2, then start Quick Play on the host.
+Both instances must reach the same matchmaking player list before advancing to
+the remaining backend domains. Combined native matchmaking and match loading
+are not yet verified on this backend. Only Shipment should be used for map
+testing. The earlier task-145/13 error 106 was not conclusively attributable to
+the original failure versus cleanup, and must not be presented as resolved.
+
+Unrelated pending host-migration and tournament-lifecycle source changes were
+preserved and excluded from this compiled backend.
