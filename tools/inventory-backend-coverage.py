@@ -107,6 +107,18 @@ GAPS = {
 }
 
 GAPS["145"] += (
+    " Globally unavailable managed publications now retire forming/playing searches and "
+    "allocated lobbies, remove account assignments and clear readiness in one recoverable "
+    "transaction. A validated system terminal record preserves actual results, prevents "
+    "re-published IDs from resurrecting the old competition and enables native event-2012 "
+    "catch-up for accepted and pending registrations. Cleanup runs on an enrolled client's "
+    "idle update or authenticated tournament request. A missing personal bracket slot does "
+    "not cancel a globally live publication; other tournaments and newer assignments are "
+    "preserved. Native allocated-round retirement and all-offline background sweeping remain "
+    "separate gates."
+)
+
+GAPS["145"] += (
     " Managed unfinished tournament withdrawal now has a complete persistent cancellation layout "
     "and shared enrollment/lobby/search/account-index transaction. Native tasks 145/22 and "
     "145/23 false cancel a still-competing participant's tournament; idle event-2012 retires "
@@ -473,6 +485,52 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def private_tournament_retirement_evidence(server_hash):
+    path = ROOT / "validation/20261006-tournament-retirement-native-proof.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed") is True
+        and proof.get("server_sha256") == server_hash
+        and proof.get("tournament_source_sha256")
+        == digest(ROOT / "src/tournament_services.cpp")
+        and proof.get("observer_source_sha256")
+        == digest(ROOT / "tools/observe-game.py")
+        and proof.get("recorder_source_sha256")
+        == digest(ROOT / "tools/record-native-tournament-retirement.py")
+        and proof.get("native_update_parser_verified")
+        and proof.get("native_disband_callback_verified")
+        and proof.get("native_state_cleared")
+        and proof.get("exact_fixture_restoration_verified")
+        and proof.get("accepted_membership_seeded")
+        and proof.get("bracket_membership_seeded")
+        and proof.get("evidence")
+    ):
+        return None
+    for item in proof["evidence"]:
+        evidence = (ROOT / item["file"]).resolve()
+        if (
+            not evidence.is_relative_to(ROOT)
+            or not evidence.is_file()
+            or digest(evidence) != item["sha256"]
+        ):
+            return None
+    return dict(
+        receipt=path.relative_to(ROOT).as_posix(),
+        sha256=digest(path),
+        private_game_sha256=proof["game_sha256"],
+        scope=proof["scope"],
+        native_registration_response_callback_verified=True,
+        native_update_and_disband_receivers_verified=True,
+        native_registration_enrollment_was_seeded=True,
+        accepted_membership_and_playing_bracket_seeded=True,
+        native_allocated_round_retirement_verified=False,
+        shipping_executable_native_completion_inherited=False,
+        cross_network_gameplay_verified=False,
+    )
+
+
 def private_pair_evidence(server_hash):
     current = native_pair_evidence(server_hash)
     if current:
@@ -817,6 +875,9 @@ def main():
         source_sha256=sources,
         source_inventory_scope="Current checkout source hashes; these are not a compiled-backend source receipt",
         private_native_pair_evidence=private_pair_evidence(current_hash),
+        private_native_tournament_retirement_evidence=private_tournament_retirement_evidence(
+            current_hash
+        ),
         validation=dict(
             independent_suite_matches_binary=valid_fixture,
             grouped_checks=len(fixture["checks"]),
@@ -989,6 +1050,18 @@ def main():
         "The JSON ledger retains exact constructor call-site provenance and static fixture source references.",
         "No map tests performed. No generic success replies or native fence overrides.",
     ]
+    retirement = inventory["private_native_tournament_retirement_evidence"]
+    if retirement:
+        text += [
+            "",
+            "Current-backend private native tournament receiver evidence:",
+            "  Receipt: " + retirement["receipt"],
+            "  Native registration response, PLAYING update and event-2012 disband consumed.",
+            "  Enrollment, acceptance and bracket membership explicitly seeded using registered accounts.",
+            "  Same native game/backend processes; complete state clearing and exact restoration verified.",
+            "  No native join assignment, allocated-round retirement, map or WAN gameplay credit.",
+            "  Shipping-executable completion is not inherited from this private image.",
+        ]
     if rest_inventory:
         text += [
             "",

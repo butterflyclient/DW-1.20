@@ -1040,6 +1040,16 @@ namespace services
                 }
             }
             auto index = searchIndex(root, title);
+            if (!eliminatedTeam)
+                for (const auto &entry : index["searches"].items())
+                {
+                    // A FORMING competition may also have authenticated searches
+                    // which have not reserved a bracket slot yet. Retire these on
+                    // whole-competition cancellation, preserving other tournaments.
+                    const auto search = searchDocument(root, title, entry.value().get<uint64_t>());
+                    if (search.at("tournament_id") == tournament)
+                        searches.insert(search["id"].get<uint64_t>());
+                }
             for (const auto &player : bracket["players"])
             {
                 const auto key = std::to_string(player["playerID"].get<uint64_t>());
@@ -1102,6 +1112,56 @@ namespace services
                 }
             }
             return writes;
+        }
+
+        void retireUnavailableManagedTournament(const std::filesystem::path &directory,
+                                                uint32_t title,
+                                                uint64_t tournament,
+                                                const Json &rows,
+                                                Json &enrollment)
+        {
+            // Being absent from one user's bracket is not publication withdrawal.
+            // Only globally unavailable managed publications enter this path.
+            for (const auto &row : rows)
+                if (row["id"] == tournament && row["expires"].get<uint64_t>() > now())
+                    return;
+            if (terminated(directory, title, tournament))
+                return;
+            const auto root = directory / "tournaments" / std::to_string(title);
+            const auto path = formationPath(root, title, tournament);
+            if (!std::filesystem::exists(path))
+                return;
+            const auto formation = read(path, 128 * 1024);
+            validateFormation(formation, title, tournament);
+            auto row = formation["definition"];
+            row["state"] = formation["state"];
+            const auto journal = results(
+                root / "results" / (std::to_string(tournament) + ".json"), title, tournament);
+            const auto bracket = stateWithReadiness(
+                stateWithResults(row, journal), tournament, enrollment["players"]);
+            Json termination = {{"schema", 1},
+                                {"title", title},
+                                {"id", tournament},
+                                {"expires", formation["expires"]},
+                                {"actor", uint64_t{0}},
+                                {"action", "publication-unavailable"},
+                                {"recorded", now()},
+                                {"state", bracket}};
+            validateTournamentTermination(termination, title, tournament);
+            auto writes = retireTournamentAssignments(directory, title, tournament, bracket);
+            writes.push_back({"tournament-terminations/" + std::to_string(tournament) + ".json",
+                              std::move(termination)});
+            for (auto &player : enrollment["players"])
+                if (player["id"] == tournament)
+                {
+                    // Reuse the native unavailable-publication event and retain
+                    // registrations for authenticated leave. Never invent results.
+                    player["live_updates"] = true;
+                    player["ready"] = false;
+                    player.erase("ready_round");
+                    player.erase("ready_match");
+                }
+            commitEnrollment(directory, title, enrollment, std::nullopt, writes);
         }
 
         std::optional<Reply> withdrawManagedParticipant(const std::filesystem::path &directory,
@@ -1354,15 +1414,18 @@ namespace services
         persisted(record.is_object() && record.size() == 8 && record.at("schema") == 1 &&
                   record.at("title") == title && record.at("id") == id && id &&
                   record.at("expires").is_number_unsigned() &&
-                  record.at("actor").is_number_unsigned() && record["actor"].get<uint64_t>() &&
+                  record.at("actor").is_number_unsigned() &&
                   record.at("recorded").is_number_unsigned() &&
-                  record["recorded"].get<uint64_t>() &&
-                  record["recorded"].get<uint64_t>() <= record["expires"].get<uint64_t>() &&
-                  record.at("action").is_string() &&
-                  (record["action"] == "leave" || record["action"] == "decline"));
+                  record["recorded"].get<uint64_t>() && record.at("action").is_string() &&
+                  (record["action"] == "leave" || record["action"] == "decline" ||
+                   record["action"] == "publication-unavailable"));
         const auto members = validateBracket(record.at("state"), id);
-        persisted(members.contains(record["actor"].get<uint64_t>()) &&
-                  participantStillCompeting(record["state"], record["actor"].get<uint64_t>()));
+        if (record["action"] == "publication-unavailable")
+            persisted(record["actor"] == 0 && record["expires"].get<uint64_t>());
+        else
+            persisted(record["recorded"].get<uint64_t>() <= record["expires"].get<uint64_t>() &&
+                      members.contains(record["actor"].get<uint64_t>()) &&
+                      participantStillCompeting(record["state"], record["actor"].get<uint64_t>()));
     }
 
     std::optional<Reply> startTournamentSearch(const std::filesystem::path &directory,
@@ -1522,12 +1585,13 @@ namespace services
         const auto enrollmentPath = root / "enrollments.json";
         if (!std::filesystem::exists(enrollmentPath))
             return std::nullopt;
-        const auto enrollment = enrollments(enrollmentPath, title);
+        auto enrollment = enrollments(enrollmentPath, title);
         const auto key = std::to_string(user);
         if (!enrollment["players"].contains(key))
             return std::nullopt;
         const auto tournament = enrollment["players"][key]["id"].get<uint64_t>();
         const auto rows = catalog(root / "catalog.json", title);
+        retireUnavailableManagedTournament(directory, title, tournament, rows, enrollment);
         const auto *row = published(rows, tournament, user);
         Json activeRow;
         if (row && row->contains("formation") &&
@@ -1564,7 +1628,8 @@ namespace services
                 row = &activeRow;
             }
         }
-        if (enrollment["players"][key]["accepted"] != true)
+        if (enrollment["players"][key]["accepted"] != true &&
+            (row || !terminated(directory, title, tournament)))
         {
             if (!row && enrollment["players"][key].value("formation_disbanded", false))
                 for (const auto &publication : rows)
@@ -1712,7 +1777,10 @@ namespace services
                            stateHash(row["state"]) == delivery.tournamentStateHash;
             return false;
         }
-        if (player["id"] != delivery.tournamentId || player["accepted"] == delivery.tournamentJoin)
+        if (player["id"] != delivery.tournamentId ||
+            (player["accepted"] == delivery.tournamentJoin &&
+             !(delivery.tournamentUnavailable &&
+               terminated(directory, title, delivery.tournamentId))))
             return false;
         if (delivery.tournamentRefresh && !delivery.tournamentJoin &&
             !player.value("live_updates", false))
@@ -1825,11 +1893,13 @@ namespace services
             Reply reply{0, {}, "tournament-owner-left-all"};
             std::optional<Json> leaveFormation;
             std::optional<Json> leaveRow;
+            std::optional<Json> leaveRows;
             // Leave must still succeed when publication is unavailable. A malformed
             // notification source cannot undo the authenticated enrollment removal.
             try
             {
                 const auto rows = catalog(root / "catalog.json", id.titleId);
+                leaveRows = rows;
                 const auto *row = published(rows, tournamentLeft, id.userId);
                 if (row)
                     leaveRow = *row;
@@ -1838,6 +1908,9 @@ namespace services
             {
                 reply.detail = "tournament leave notification source unavailable";
             }
+            if (leaveRows && tournamentLeft)
+                retireUnavailableManagedTournament(
+                    directory, id.titleId, tournamentLeft, *leaveRows, state);
             // Fail closed on retirement/transaction errors. The fallback below
             // applies to notification-source failures, never a half-committed
             // cancellation whose active lobbies could otherwise survive the leave.
@@ -1889,6 +1962,9 @@ namespace services
             return reply;
         }
         const auto rows = catalog(root / "catalog.json", id.titleId);
+        if (players.contains(key))
+            retireUnavailableManagedTournament(
+                directory, id.titleId, players[key]["id"].get<uint64_t>(), rows, state);
         if (task == 29)
         {
             const Json *selected = nullptr;

@@ -374,6 +374,11 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         tournament_withdrawal_fixtures.exercise(
             directory, title, clients, publication, bracket, helpers, publish, checks
         )
+        import tournament_unavailability_fixtures
+
+        tournament_unavailability_fixtures.exercise(
+            directory, title, clients, publication, helpers, publish, checks
+        )
     finally:
         if blocker_created:
             blocker.rmdir()

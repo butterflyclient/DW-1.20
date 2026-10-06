@@ -1,0 +1,97 @@
+REPLAY DW BACKEND: MANAGED PUBLICATION WITHDRAWAL AND EXPIRY
+2026-10-06
+
+ISSUE AND RESEARCH
+The idle publisher notified Replay when a tournament disappeared or expired,
+but that notification did not retire managed searches, round lobbies or account
+assignments. Pending registrations could also miss the unavailable notification.
+These stale assignments could survive the competition and interfere with later
+matchmaking. A missing slot in one player's bracket is different from global
+publication withdrawal and must not cancel a live competition.
+
+The existing managed formation, result journal, retirement planner and recoverable
+matchmaking/enrollment transaction already provided the required complete layouts.
+The fix extends those mechanisms. It does not add generic success replies or alter
+native game fences, renderer logic, task state, scores or winner selection.
+
+IMPLEMENTATION
+Globally withdrawn/expired managed publications get an exact validated terminal
+record: schema, title, id, expires, actor, action, recorded and full native state.
+The system action is publication-unavailable with actor zero. Ordinary participant
+leave/decline still requires a real competing member and the original time bounds.
+Expiry may be recorded after the pinned deadline. Malformed terminals fail closed.
+
+The terminal, owned search/lobby retirement, search/account indexes and cleared
+readiness commit through the existing flushed transaction. Forming searches not
+yet assigned to a bracket are included. Exact IDs preserve unrelated competitions
+and newer assignments. Real result journals are retained unchanged. A republished
+terminal ID cannot resurrect the old competition; a new competition needs a new ID.
+
+Native event 2012 is available to accepted and pending registrations after the
+durable transition. Queued stale joins are revalidated. Cleanup runs on an enrolled
+client's idle publisher or authenticated tournament request. All-offline background
+sweeping, retail forfeits and disconnect timeout policy remain separate work.
+
+BUILD AND PROTOCOL GATES
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: f3bbe6529dc3ff22672c08ffd5cb76aecf88a2f90a88e296e05c20de032fe2e2
+Frozen source: data\backend-snapshot-1791322853684856700
+Only src/tournament_services.cpp was overlaid on the committed source for this
+build. Unrelated dirty matchmaking and game-integration work was excluded.
+MSVC Release /W4 /WX passed. No game recompilation was needed.
+
+294 independent protocol/service checks passed on that exact binary.
+New fixture: tools/tournament_unavailability_fixtures.py
+It is included by tools/tournament_round_fixtures.py in the existing full suite.
+Coverage includes forming withdrawal, allocated playing withdrawal, real-clock
+expiry, unaccepted/no-slot registrations, unrelated search preservation, unchanged
+results, exact once-only event 2012, stale ID denial and full terminal validation.
+A blocked terminal .pending path verifies prepared transaction recovery and that
+no successful event is emitted before durable completion.
+Protocol evidence: data/lobby-verification.json
+Frozen fixture inputs: data/backend-validation-1791323232368797600
+
+ACTUAL NATIVE GAME GATES
+An existing privately compiled game ran from E:\IW8\Builds\1.20-replay with its
+independent persisted Alpha profile and the previously approved agreement accepted.
+Private image SHA256:
+73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+It reached Multiplayer, Online state 2, a logged-in profile, all 27 passing fences
+and zero network error. Native tournament registration task 145/29 completed with
+one result: the game parsed the 600-second offset, entered state 2 and had no retry.
+
+Enrollment and acceptance were explicitly seeded for this receiver test. A complete
+PLAYING bracket was seeded using the running player and seven additional real
+machine-registered test accounts. This does not prove native join/formation logic.
+The game parsed its exact tournament ID, 8 participants, team size 1, 8 teams,
+3 rounds and local team 0. No lobby, map, result or engine-memory write was used.
+
+Withdrawing only the temporary publication caused durable managed retirement and
+the native disband receiver cleared the tournament state, ID and participant count.
+The same game and backend processes remained running. No tournament request occurred
+during withdrawal, and the native network error remained zero. The stock UI showed
+"Tournament has been disbanded. Please try again later." with status SPILLWAY.
+
+Proof: validation/20261006-tournament-retirement-native-proof.json
+Recorder: tools/record-native-tournament-retirement.py
+Startup/readiness: validation/20261006-tournament-retirement-native-readiness.json
+Evidence/screenshots: data/native-tournament-retirement-20261006/alpha
+The ledger validates current binary/source/observer/recorder/evidence hashes and
+retains the seeded-membership scope. Private-image completion does not transfer
+automatically to the shipping executable.
+
+RESTORATION AND DEPLOYMENT
+The four temporary catalog/enrollment/formation/terminal files were restored byte
+for byte. The owned game closed. Temporary root test executables, INIs and control
+files were moved into the test evidence archive after deletion was rejected by
+automatic approval review. The shipping EXE, INI and owner identity hashes match
+their pre-test values. No proxy/compiler files, external ports or owner profile
+data were modified. Backend stop and start were separate steps; the restored backend is
+running. launch-game.ps1 -ValidateOnly passes with current readiness evidence.
+
+OPEN COMPLETE-BACKEND GATES
+Known binary routes still without recovered result bindings: 50/22, 58/22 and
+193/9,10,12,24. Indirect/virtual and additional REST/push paths remain audit gaps.
+Fresh native tournament enrollment, join/ready/result/leave callbacks, allocated
+round retirement, complete tournament gameplay and WAN peer DATA/gameplay remain
+separate gates. Protocol checks and startup fences alone do not establish them.
