@@ -3207,6 +3207,20 @@ try:
         time.sleep(0.01)
     else:
         raise AssertionError("Disconnected peer remained online")
+    # A still-unexpired party token cannot introduce an offline member into
+    # a new lobby. Reauthenticating the same account cannot revive that token.
+    disconnected_peer_state = json.loads(
+        (directory / "matchmaking" / str(title) / "players" / f"{peer_user}.json").read_text()
+    )
+    offline_party_query = {
+        **match_query,
+        "members": [user, peer_user],
+        "tokens": [
+            struct.unpack_from("<Q", client.task(145, 3), 1)[0],
+            disconnected_peer_state["token"],
+        ],
+    }
+    client.task(145, 18, text(json.dumps(offline_party_query)), error=14507)
     client.task(6, 14, u64(peer_user) + blob(b"offline"), error=108)
     lobby_join_fixtures.reject_offline_owner(
         client,
@@ -3249,6 +3263,37 @@ try:
         )
     )
     assert renewed_peer.task(12, 6).startswith(b"\x08")
+    client.task(145, 18, text(json.dumps(offline_party_query)), error=14507)
+    renewed_peer.task(
+        145,
+        18,
+        text(json.dumps({
+            **match_query,
+            "members": [peer_user],
+            "tokens": [disconnected_peer_state["token"]],
+        })),
+        error=14507,
+    )
+    renewed_peer.task(145, 2, text(player_json))
+    renewed_match_token = struct.unpack_from("<Q", renewed_peer.task(145, 3), 1)[0]
+    assert renewed_match_token != disconnected_peer_state["token"]
+    renewed_peer.task(
+        145,
+        18,
+        text(json.dumps({
+            **match_query,
+            "members": [peer_user],
+            "tokens": [renewed_match_token],
+        })),
+    )
+    kind, renewed_push = renewed_peer.receive()
+    assert kind == 2 and renewed_push.startswith(u32(2005))
+    renewed_lobby = struct.unpack_from("<Q", renewed_push, 15)[0]
+    assert renewed_peer.task(145, 10, u64(renewed_lobby)) == []
+    assert renewed_peer.receive() == (2, u32(2002) + u64(renewed_lobby) + u64(0))
+    checks.append(
+        "party tokens require live issuer sessions; offline/reauthenticated members and old owner tokens reject, while a refreshed token creates a new lobby"
+    )
     lobby_join_fixtures.reject_offline_owner(
         client,
         peer_user,

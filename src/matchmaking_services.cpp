@@ -72,15 +72,7 @@ namespace services
 
         std::string sessionFingerprint(const platform::LobbyIdentity &id)
         {
-            const auto hash = crypto::sha256(id.key);
-            std::string result;
-            result.reserve(hash.size() * 2);
-            for (const auto byte : hash)
-            {
-                result.push_back("0123456789abcdef"[byte >> 4]);
-                result.push_back("0123456789abcdef"[byte & 15]);
-            }
-            return result;
+            return wire::base64Encode(crypto::sha256(id.key));
         }
 
         Json object(const std::string &bytes)
@@ -390,6 +382,13 @@ namespace services
                     if (state.value("token", uint64_t{}) != token ||
                         state.value("token_expires", uint64_t{}) <= time)
                         return Reply{14507, {}, "matchmaker-member-token-invalid"};
+                    const auto session = state.value("token_session", std::string{});
+                    // A party token grants membership only while its issuing
+                    // authenticated session is live. The owner must use this
+                    // request's own session, not another login for the same ID.
+                    if ((user == id.userId && session != sessionFingerprint(id)) ||
+                        !lobby::sessionOnline(id.titleId, user, session))
+                        return Reply{14507, {}, "matchmaker-member-token-session-expired"};
                     if (user == id.userId)
                         hostInfo = state.at("info");
                 }
