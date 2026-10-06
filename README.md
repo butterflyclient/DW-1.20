@@ -53,8 +53,10 @@ The host-membership iteration is recorded separately in
 `validation/20261006-membership-native-reconnect.json`.
 The primary-slot/platform iteration has its own receipt at
 `validation/20261006-constraints-native-reconnect.json`.
-The current object-store recovery iteration is recorded in
+The object-store recovery iteration is recorded in
 `validation/20261006-objectstore-native-reconnect.json`.
+The current recipient-purchase iteration has its own receipt at
+`validation/20261006-gifts-native-reconnect.json`.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
@@ -120,6 +122,8 @@ they are not silently promoted to a newer build.
 | validation/20261006-constraints-native-reconnect.json | Constraint backend image: focused native startup, backend restart and renewed authenticated relay stability |
 | validation/20261006-objectstore-transactions.json | Complete user-object upload windows, real interrupted-write recovery, preflight, owner aliases and process persistence |
 | validation/20261006-objectstore-native-reconnect.json | Object-store backend image: focused native startup/reconnect and sustained authenticated relay |
+| validation/20261006-marketplace-gifts.json | Published recipient purchases, exact owner/buyer coupons, conflicting snapshot preflight and multi-account disk/process recovery |
+| validation/20261006-gifts-native-reconnect.json | Recipient-purchase backend image: focused native startup/reconnect and authenticated relay stability |
 
 `observe-game.ps1` or `tools/observe-game.py --output data/<name>.json` reads
 native state without modifying it. `--pid` supports directly launched games and
@@ -212,6 +216,11 @@ whole window is applied. Native reads recover pending uploads or reject partial
 state, and restart recovery retains the original versions/content. See
 [the object-store recovery contract](docs/objectstore-upload-recovery.txt).
 
+Published task-106 recipient purchases use a flushed multi-account journal for
+buyer debit, recipient grants and exact retry responses. Inventory/wallet reads
+recover pending checkpoints or fail while recovery is blocked. Conflicting disk
+edits are preserved. See [the recipient purchase contract](docs/marketplace-gifts.txt).
+
 - `data/platform-profile.bin`: stable default identity; never replace it to make a peer.
 - `%LOCALAPPDATA%\ReplayDW\player-identity.bin`: the player's local P-256 identity, protected with Windows user DPAPI and created on first launch.
 - `data/platform-client-profiles/<public-key-sha256>.bin`: automatically registered account metadata; no client private keys.
@@ -267,7 +276,7 @@ packages remain a deferred game-build concern.
 
 - Native playable multiuser lobby joining, public-search callbacks, host migration, tournament bracket scheduling/match assignment/join pushes and remote relay deployment/migration. Automatic compatible public filling is implemented and covered by independent encrypted clients; its native menu/gameplay gate remains open. Explicit presence joins by lobby/player, party-token/capacity checks, shared membership/documents and event-2001/2006 delivery have independent wire proof, plus a native friend-menu session-info exchange and lobby/host assignment; see [docs/presence-lobby-joins.md](docs/presence-lobby-joins.md) for remaining gates. The published tournament lifecycle, task-21 journal and event-2010/2012 transports are described in [docs/tournaments.md](docs/tournaments.md). Native registration, persisted-state, FORMING/PLAYING bracket parsing, idle publication changes and the disband callback were verified. The update test explicitly seeded accepted recipient enrollment; native join assignment, result/ready/accept/leave/rejoin callbacks and playable tournaments remain unverified. Local relay client/server authentication and UDP BIND/JOIN/forwarding are implemented. Native BIND/VERIFY/ESTABLISHED and decrypted SDK join-data fields are verified separately from the independent two-client JOIN/forwarding check; native two-game forwarding remains untested.
 - Remaining streaming tasks 50/22 and 58/22 live/multipart download. Whole-user post and copy are implemented, but preparation IDs 50/5, 15 and 20 are source-oracle contracts without target writer proofs, and positive native upload/copy callbacks remain unobserved. Multipart download's exact bound result reader remains unresolved.
-- Marketplace cross-account gifting, discount publication, inventory-token validation task 80/58, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Cross-account purchases remain unavailable until a multi-account transaction journal exists; a buyer is never debited before an uncommitted gift acknowledgement.
+- Marketplace discount publication, retail inventory-token semantics, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Task-106 cross-account purchases now require published gifting rules and existing realm accounts, and recover the buyer debit/recipient grants through a flushed multi-account journal. Native positive gift/purchase callbacks remain unverified.
 - Object-store category/list and large-upload completion families, including 193/3, 9, 10, 12 and 24. User metadata accompanies the implemented task-6 object read; source-oracle task 3 is a separate user-object listing route and remains unimplemented. Request writers for 9/10 are recovered; their exact response bindings still need resolution.
 - Published achievement progression/reward rules. Replay requests achievement 1500 with no local publication, so it correctly returns unavailable. Changed-payload retry conflicts are rejected; event ingestion itself does not fabricate XP targets, quest definitions or rewards.
 - Categorized mail/status and other service-family gaps require same-build constructor/reader confirmation. [Server-validated stats](docs/validated-stats.md) implement task 4/14 with trusted local authorization and atomic retries; retail token payload validation and its native positive callback remain unverified. The ordinary mail methods and esports registration result are implemented.

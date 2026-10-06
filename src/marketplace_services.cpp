@@ -8,6 +8,7 @@
 #include <charconv>
 #include <set>
 #include <map>
+#include <memory>
 
 namespace services
 {
@@ -15,6 +16,7 @@ namespace services
     {
         using Json = nlohmann::json;
         wire::Bytes inventoryItem(const Json &);
+        void validatePurchaseReceipts(const Json &, uint32_t title, uint64_t user);
 
         void validateBalances(const Json &balances)
         {
@@ -36,6 +38,19 @@ namespace services
             }
         }
 
+        void validateInventory(const Json &out)
+        {
+            wire::require(out.is_object() && out.at("items").is_array() &&
+                          out.at("items").size() <= 15000);
+            std::set<uint32_t> ids;
+            for (const auto &item : out.at("items"))
+            {
+                (void)inventoryItem(item);
+                wire::require(ids.insert(item.at("1").get<uint32_t>()).second);
+            }
+            validateBalances(out.at("balances"));
+        }
+
         Json read(const std::filesystem::path &path)
         {
             if (!std::filesystem::exists(path))
@@ -48,15 +63,7 @@ namespace services
             auto out = Json::parse(stream);
             try
             {
-                wire::require(out.is_object() && out.at("items").is_array() &&
-                              out.at("items").size() <= 15000);
-                std::set<uint32_t> ids;
-                for (const auto &item : out.at("items"))
-                {
-                    (void)inventoryItem(item);
-                    wire::require(ids.insert(item.at("1").get<uint32_t>()).second);
-                }
-                validateBalances(out.at("balances"));
+                validateInventory(out);
             }
             catch (const std::runtime_error &)
             {
@@ -109,24 +116,145 @@ namespace services
                                                      });
         }
 
-        void saveInventory(const std::filesystem::path &path, const Json &data)
+        void saveInventory(const std::filesystem::path &path,
+                           const Json &data,
+                           size_t limit = 4 * 1024 * 1024)
         {
             const auto bytes = data.dump();
-            if (bytes.size() > 4 * 1024 * 1024)
+            if (bytes.size() > limit)
                 throw std::runtime_error("Marketplace store capacity exceeded");
             std::filesystem::create_directories(path.parent_path());
             auto pending = path;
             pending += ".pending";
+            // A journal must reach disk before any account checkpoint. Flushing
+            // the C++ stream alone only drains its userspace buffer.
+            const auto handle = CreateFileW(pending.c_str(),
+                                            GENERIC_WRITE,
+                                            0,
+                                            nullptr,
+                                            CREATE_ALWAYS,
+                                            FILE_ATTRIBUTE_NORMAL,
+                                            nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Marketplace store write open failed");
             {
-                std::ofstream out(pending, std::ios::binary | std::ios::trunc);
-                if (!out.write(bytes.data(), static_cast<std::streamsize>(bytes.size())) ||
-                    !out.flush())
-                    throw std::runtime_error("Marketplace store write failed");
+                const std::unique_ptr<void, decltype(&CloseHandle)> file(handle, &CloseHandle);
+                DWORD written = 0;
+                if (!WriteFile(handle,
+                               bytes.data(),
+                               static_cast<DWORD>(bytes.size()),
+                               &written,
+                               nullptr) ||
+                    written != bytes.size() || !FlushFileBuffers(handle))
+                    throw std::runtime_error("Marketplace store write/flush failed");
             }
             if (!MoveFileExW(pending.c_str(),
                              path.c_str(),
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
                 throw std::runtime_error("Marketplace publication failed");
+        }
+
+        std::filesystem::path purchaseJournal(const std::filesystem::path &directory,
+                                              uint32_t title)
+        {
+            return directory / "marketplace" / std::to_string(title) / "pending-purchase.json";
+        }
+
+        void recoverPurchase(const std::filesystem::path &directory,
+                             const platform::LobbyIdentity &id)
+        {
+            const auto path = purchaseJournal(directory, id.titleId);
+            if (!std::filesystem::exists(path))
+                return;
+            if (std::filesystem::file_size(path) > 64 * 1024 * 1024)
+                throw std::runtime_error("Marketplace purchase journal size invalid");
+            std::ifstream stream(path);
+            if (!stream)
+                throw std::runtime_error("Marketplace purchase journal read failed");
+            auto journal = Json::parse(stream);
+            stream.close();
+            std::vector<std::pair<std::filesystem::path, Json>> checkpoints;
+            try
+            {
+                const auto checksum = journal.at("checksum").get<std::string>();
+                journal.erase("checksum");
+                wire::require(hashText(checksum) && checksum == digest(journal.dump()) &&
+                              journal.size() == 7 && journal.at("schema") == 1 &&
+                              journal.at("title").is_number_unsigned() &&
+                              journal.at("title") == id.titleId &&
+                              journal.at("buyer").is_number_unsigned());
+                const auto &owners = journal.at("owners");
+                wire::require(owners.is_array());
+                const auto buyer = journal.at("buyer").get<uint64_t>();
+                const auto transaction = journal.at("transaction").get<std::string>();
+                wire::require(buyer && buyer != UINT64_MAX && !transaction.empty() &&
+                              transaction.size() < 25 &&
+                              transaction.find('\0') == std::string::npos &&
+                              hashText(journal.at("request").get<std::string>()));
+                const auto &phase = journal.at("phase");
+                wire::require((phase == "applied" && owners.empty()) ||
+                              (phase == "prepared" && owners.size() > 1 && owners.size() <= 256));
+                if (phase == "applied")
+                    return;
+                std::set<uint64_t> users;
+                bool haveBuyer = false;
+                for (const auto &entry : owners)
+                {
+                    wire::require(entry.is_object() && entry.size() == 4 &&
+                                  entry.at("owner").is_number_unsigned());
+                    const auto user = entry.at("owner").get<uint64_t>();
+                    wire::require(user && user != UINT64_MAX && users.insert(user).second);
+                    const auto &after = entry.at("after");
+                    validateInventory(after);
+                    validatePurchaseReceipts(after, id.titleId, user);
+                    wire::require(after.dump().size() <= 4 * 1024 * 1024 &&
+                                  hashText(entry.at("after_checksum").get<std::string>()) &&
+                                  digest(after.dump()) ==
+                                      entry.at("after_checksum").get<std::string>());
+                    auto owner = id;
+                    owner.userId = user;
+                    const auto accountPath = store(directory, owner);
+                    const auto current = std::filesystem::exists(accountPath)
+                                             ? Json(digest(read(accountPath).dump()))
+                                             : Json(nullptr);
+                    const auto &before = entry.at("before_checksum");
+                    wire::require(before.is_null() ||
+                                  (before.is_string() && hashText(before.get<std::string>())));
+                    // Recovery accepts either the old image or a completed
+                    // checkpoint. A conflicting external edit is never overwritten.
+                    wire::require(current == before || current == entry.at("after_checksum"));
+                    if (user == buyer)
+                    {
+                        const auto &receipt =
+                            after.at("purchases")
+                                .at(digest(std::to_string(id.titleId) + "\n" + transaction));
+                        wire::require(receipt.at("owner") == buyer &&
+                                      receipt.at("title") == id.titleId &&
+                                      receipt.at("transaction") == transaction &&
+                                      receipt.at("request") == journal.at("request"));
+                        auto receiptBody = receipt;
+                        receiptBody.erase("checksum");
+                        wire::require(receipt.at("checksum") == digest(receiptBody.dump()));
+                        haveBuyer = true;
+                    }
+                    if (current != entry.at("after_checksum"))
+                        checkpoints.emplace_back(accountPath, after);
+                }
+                wire::require(haveBuyer);
+            }
+            catch (const std::exception &)
+            {
+                throw std::runtime_error(
+                    "Marketplace purchase journal schema or checkpoint invalid");
+            }
+            // services::storeMutex excludes other marketplace readers/writers.
+            // Validate every checkpoint before touching the first account.
+            for (const auto &[accountPath, after] : checkpoints)
+                saveInventory(accountPath, after);
+            journal["phase"] = "applied";
+            journal["owners"] = Json::array();
+            journal["checksum"] = digest(journal.dump());
+            saveInventory(path, journal);
         }
 
         void account(wire::Bytes &out, uint64_t user)
@@ -620,6 +748,70 @@ namespace services
             return digest(body.dump());
         }
 
+        void validatePurchaseReceipts(const Json &inventory, uint32_t title, uint64_t user)
+        {
+            const auto context = std::to_string(title);
+            const auto receipts = inventory.value("purchases", Json::object());
+            try
+            {
+                wire::require(receipts.is_object() && receipts.size() <= 4096);
+                for (auto entry = receipts.begin(); entry != receipts.end(); ++entry)
+                {
+                    const auto &receipt = entry.value();
+                    const auto saved = receipt.at("transaction").get<std::string>();
+                    wire::require(!saved.empty() && saved.size() < 25 &&
+                                  saved.find('\0') == std::string::npos &&
+                                  receipt.at("schema") == 1);
+                    const auto format = receipt.value("format", 106u);
+                    wire::require(format == 106 || format == 125);
+                    wire::require(receipt.at("title") == title && receipt.at("owner") == user &&
+                                  receipt.at("context") == context);
+                    wire::require(entry.key() == digest(context + "\n" + saved) &&
+                                  hashText(receipt.at("request").get<std::string>()));
+                    wire::require(receipt.at("recorded").is_number_unsigned() &&
+                                  receipt.at("recorded").get<uint64_t>() <= UINT32_MAX);
+                    wire::require(receipt.at("orders").is_array() &&
+                                  !receipt.at("orders").empty() &&
+                                  receipt.at("orders").size() <= 255);
+                    for (const auto &order : receipt.at("orders"))
+                    {
+                        wire::require(catalogNumber(order, "sku", UINT32_MAX - 1) > 0 &&
+                                      catalogNumber(order, "quantity", UINT32_MAX - 1) > 0);
+                        (void)catalogNumber(order, "discount", UINT32_MAX - 1);
+                        wire::require(catalogNumber(order, "recipient", UINT64_MAX - 1) > 0 &&
+                                      (format == 106 || order.at("recipient") == user));
+                        (void)wire::base64(order.at("metadata").get<std::string>(), 64);
+                    }
+                    (void)catalogNumber(receipt, "maximum", 255);
+                    (void)catalogNumber(receipt, "source", format == 106 ? 255 : UINT32_MAX);
+                    wire::require(receipt.at("ignore_entitlements").is_boolean());
+                    const PurchaseRequest previous{context,
+                                                   saved,
+                                                   receipt.at("orders"),
+                                                   receipt.value("metadata", Json::array()),
+                                                   receipt.at("maximum").get<uint32_t>(),
+                                                   receipt.at("source").get<uint32_t>(),
+                                                   receipt.at("ignore_entitlements").get<bool>(),
+                                                   format == 125};
+                    wire::require(receipt.at("request") == purchaseRequestDigest(previous));
+                    wire::require(hashText(receipt.at("checksum").get<std::string>()) &&
+                                  receipt.at("checksum") == purchaseChecksum(receipt));
+                    const auto response =
+                        wire::base64(receipt.at("response").get<std::string>(), 128 * 1024);
+                    wire::Reader decoded{response};
+                    wire::require(decoded.text(25) == saved);
+                    if (format == 106)
+                        wire::require(decoded.u32() <= 255);
+                    else
+                        wire::require(decoded.u64() == user && decoded.text(10) == "uno");
+                }
+            }
+            catch (const std::runtime_error &)
+            {
+                throw std::runtime_error("Marketplace purchase receipt schema invalid");
+            }
+        }
+
         Reply commitPurchase(const std::filesystem::path &directory,
                              const platform::LobbyIdentity &id,
                              const PurchaseRequest &input);
@@ -765,73 +957,11 @@ namespace services
             const auto &orders = input.orders;
             const auto maximum = input.maximum, source = input.source;
             const auto ignoreEntitlements = input.ignoreEntitlements;
-            // Cross-account gifts require a multi-account journal. Do not debit the
-            // buyer and acknowledge an uncommitted recipient grant through this path.
-            for (const auto &order : orders)
-                if (order.at("recipient") != id.userId)
-                    return {108, {}, "marketplace-gift-not-supported"};
             const auto request = purchaseRequestDigest(input);
             const auto path = store(directory, id);
             auto inventory = read(path);
             auto receipts = inventory.value("purchases", Json::object());
-            try
-            {
-                wire::require(receipts.is_object() && receipts.size() <= 4096);
-                for (auto entry = receipts.begin(); entry != receipts.end(); ++entry)
-                {
-                    const auto &receipt = entry.value();
-                    const auto saved = receipt.at("transaction").get<std::string>();
-                    wire::require(!saved.empty() && saved.size() < 25 &&
-                                  saved.find('\0') == std::string::npos &&
-                                  receipt.at("schema") == 1);
-                    const auto format = receipt.value("format", 106u);
-                    wire::require(format == 106 || format == 125);
-                    wire::require(receipt.at("title") == id.titleId &&
-                                  receipt.at("owner") == id.userId &&
-                                  receipt.at("context") == context);
-                    wire::require(entry.key() == digest(context + "\n" + saved) &&
-                                  hashText(receipt.at("request").get<std::string>()));
-                    wire::require(receipt.at("recorded").is_number_unsigned() &&
-                                  receipt.at("recorded").get<uint64_t>() <= UINT32_MAX);
-                    wire::require(receipt.at("orders").is_array() &&
-                                  !receipt.at("orders").empty() &&
-                                  receipt.at("orders").size() <= 255);
-                    for (const auto &order : receipt.at("orders"))
-                    {
-                        wire::require(catalogNumber(order, "sku", UINT32_MAX - 1) > 0 &&
-                                      catalogNumber(order, "quantity", UINT32_MAX - 1) > 0);
-                        (void)catalogNumber(order, "discount", UINT32_MAX - 1);
-                        wire::require(order.at("recipient") == id.userId);
-                        (void)wire::base64(order.at("metadata").get<std::string>(), 64);
-                    }
-                    (void)catalogNumber(receipt, "maximum", 255);
-                    (void)catalogNumber(receipt, "source", format == 106 ? 255 : UINT32_MAX);
-                    wire::require(receipt.at("ignore_entitlements").is_boolean());
-                    const PurchaseRequest previous{context,
-                                                   saved,
-                                                   receipt.at("orders"),
-                                                   receipt.value("metadata", Json::array()),
-                                                   receipt.at("maximum").get<uint32_t>(),
-                                                   receipt.at("source").get<uint32_t>(),
-                                                   receipt.at("ignore_entitlements").get<bool>(),
-                                                   format == 125};
-                    wire::require(receipt.at("request") == purchaseRequestDigest(previous));
-                    wire::require(hashText(receipt.at("checksum").get<std::string>()) &&
-                                  receipt.at("checksum") == purchaseChecksum(receipt));
-                    const auto response =
-                        wire::base64(receipt.at("response").get<std::string>(), 128 * 1024);
-                    wire::Reader decoded{response};
-                    wire::require(decoded.text(25) == saved);
-                    if (format == 106)
-                        wire::require(decoded.u32() <= 255);
-                    else
-                        wire::require(decoded.u64() == id.userId && decoded.text(10) == "uno");
-                }
-            }
-            catch (const std::runtime_error &)
-            {
-                throw std::runtime_error("Marketplace purchase receipt schema invalid");
-            }
+            validatePurchaseReceipts(inventory, id.titleId, id.userId);
             if (!transaction.empty())
             {
                 const auto key = digest(context + "\n" + transaction);
@@ -871,6 +1001,8 @@ namespace services
                     wire::require(skus.contains(skuId) && definitions.emplace(skuId, rule).second);
                     wire::require(rule.at("enabled").is_boolean() &&
                                   rule.at("allow_ignore_entitlements").is_boolean());
+                    if (rule.contains("allow_gifting"))
+                        wire::require(rule.at("allow_gifting").is_boolean());
                     wire::require(catalogNumber(rule, "maximum_quantity", UINT32_MAX) > 0);
                     const auto &sources = rule.at("sources");
                     wire::require(sources.is_array() && !sources.empty() && sources.size() <= 256);
@@ -907,6 +1039,12 @@ namespace services
                                           .count());
             std::map<uint8_t, uint64_t> costs;
             std::map<uint32_t, uint64_t> quantities;
+            std::map<std::pair<uint64_t, uint32_t>, uint64_t> grants;
+            std::map<uint64_t, Json> recipients;
+            std::map<uint64_t, Json> beforeChecksums;
+            size_t snapshotBytes = inventory.dump().size();
+            beforeChecksums[id.userId] =
+                std::filesystem::exists(path) ? Json(digest(inventory.dump())) : Json(nullptr);
             uint64_t couponCount = 0;
             for (const auto &order : orders)
             {
@@ -917,6 +1055,29 @@ namespace services
                     return {108, {}, "marketplace-purchase-not-published"};
                 const auto &definition = definitions.at(skuId);
                 const auto &offer = skus.at(skuId);
+                const auto recipient = order.at("recipient").get<uint64_t>();
+                if (recipient != id.userId)
+                {
+                    if (!definition.value("allow_gifting", false))
+                        return {108, {}, "marketplace-gift-not-published"};
+                    if (!platform::accountName(recipient))
+                        return {108, {}, "marketplace-gift-recipient-not-found"};
+                    if (!recipients.contains(recipient))
+                    {
+                        auto owner = id;
+                        owner.userId = recipient;
+                        const auto recipientPath = store(directory, owner);
+                        auto recipientInventory = read(recipientPath);
+                        const auto snapshot = recipientInventory.dump();
+                        if (snapshot.size() > 64 * 1024 * 1024 - snapshotBytes)
+                            return {102, {}, "marketplace-gift-window-capacity-exceeded"};
+                        snapshotBytes += snapshot.size();
+                        beforeChecksums[recipient] = std::filesystem::exists(recipientPath)
+                                                         ? Json(digest(snapshot))
+                                                         : Json(nullptr);
+                        recipients.emplace(recipient, std::move(recipientInventory));
+                    }
+                }
                 if (order.at("discount") != 0)
                     return {108, {}, "marketplace-discount-not-published"};
                 if (input.assetsV3 && !order.at("expected_prices").empty())
@@ -946,6 +1107,7 @@ namespace services
                      offer.at("sale_end").get<uint32_t>() <= stamp))
                     return {108, {}, "marketplace-offer-not-active"};
                 quantities[skuId] += quantity;
+                grants[{recipient, skuId}] += quantity;
                 if (quantities[skuId] > definition.at("maximum_quantity").get<uint32_t>())
                     return {102, {}, "marketplace-purchase-quantity-limit"};
                 for (const auto &price : offer.at("prices"))
@@ -962,8 +1124,8 @@ namespace services
             }
             if (couponCount > 4096 || receipts.size() >= 4096)
                 return {102, {}, "marketplace-purchase-receipt-capacity-exceeded"};
-            // All order validation precedes mutations. Debit, grants and the exact
-            // response are one atomic inventory-file replacement, never separate files.
+            // All order validation precedes durable mutations. A gift's complete
+            // before/after images and exact response are journaled together.
             for (const auto &[currency, cost] : costs)
             {
                 auto &balances = inventory["balances"];
@@ -980,12 +1142,14 @@ namespace services
                 if (found != balances.end())
                     (*found)["amount"] = before - cost;
             }
-            for (const auto &[skuId, quantity] : quantities)
+            for (const auto &[destination, quantity] : grants)
             {
+                const auto [recipient, skuId] = destination;
+                auto &target = recipient == id.userId ? inventory : recipients.at(recipient);
                 const auto &definition = definitions.at(skuId);
                 for (const auto &grant : definition.at("items"))
                 {
-                    auto &items = inventory["items"];
+                    auto &items = target["items"];
                     auto found = std::find_if(items.begin(),
                                               items.end(),
                                               [&](const auto &row)
@@ -1014,7 +1178,7 @@ namespace services
                 }
                 for (const auto &grant : definition.at("currencies"))
                 {
-                    auto &balances = inventory["balances"];
+                    auto &balances = target["balances"];
                     auto found = std::find_if(balances.begin(),
                                               balances.end(),
                                               [&](const auto &row)
@@ -1105,7 +1269,7 @@ namespace services
                     // SKU/rental/expiry/Int32 type. Grants are already applied locally.
                     response.text(
                         digest(transactionId + "\n" + std::to_string(emitted)).substr(0, 24));
-                    response.u64(id.userId);
+                    response.u64(order.at("recipient").get<uint64_t>());
                     response.text("uno");
                     response.boolean(true);
                     response.u32(offer.at("product").get<uint32_t>());
@@ -1141,7 +1305,35 @@ namespace services
             }
             receipts[digest(context + "\n" + transactionId)] = receipt;
             inventory["purchases"] = receipts;
-            saveInventory(path, inventory);
+            if (recipients.empty())
+                saveInventory(path, inventory);
+            else
+            {
+                recipients.emplace(id.userId, std::move(inventory));
+                Json journal{{"schema", 1},
+                             {"title", id.titleId},
+                             {"buyer", id.userId},
+                             {"transaction", transactionId},
+                             {"request", request},
+                             {"phase", "prepared"},
+                             {"owners", Json::array()}};
+                wire::require(recipients.size() <= 256);
+                for (const auto &[owner, after] : recipients)
+                {
+                    validateInventory(after);
+                    if (after.dump().size() > 4 * 1024 * 1024)
+                        return {102, {}, "marketplace-gift-store-capacity-exceeded"};
+                    journal["owners"].push_back(Json{{"owner", owner},
+                                                     {"before_checksum", beforeChecksums.at(owner)},
+                                                     {"after", after},
+                                                     {"after_checksum", digest(after.dump())}});
+                }
+                journal["checksum"] = digest(journal.dump());
+                // Publication is the commit decision. If a checkpoint fails, all
+                // marketplace access first rolls it forward, including after restart.
+                saveInventory(purchaseJournal(directory, id.titleId), journal, 64 * 1024 * 1024);
+                recoverPurchase(directory, id);
+            }
             return {0, {std::move(response.data)}, "marketplace-purchase-committed"};
         }
 
@@ -1485,6 +1677,8 @@ namespace services
                                              uint8_t task,
                                              wire::Reader &p)
     {
+        if (service == 80 || service == 123)
+            recoverPurchase(directory, id);
         if (service == 80 && task == 243)
             return reconcile(directory, id, p);
         if (service == 80 && task == 69)

@@ -1,0 +1,70 @@
+REPLAY DW RECIPIENT PURCHASE READINESS
+2026-10-06
+
+Issue
+The native purchase request supports recipient accounts, but the backend
+rejected every cross-account purchase. The buyer debit and recipient grants
+needed one recoverable transaction, with no second charge on retry.
+
+Research
+Original Replay constructor 0x1421295B0 emits task 80/106 and its optional
+per-order recipient array. Coupon reader 0x14215CF20 has separate owner and
+buyer account fields. Existing self-purchase prices, grant rules and retry
+receipts already supplied the native layout. The previously deferred gift
+prototype was reused and tightened for the current backend.
+Relay cleanup was separately checked: its existing 300-second established idle
+timeout removed the association after the prior controlled game exit. That
+briefly retained association did not require an executable or relay patch.
+
+Fix
+Published allow_gifting=true rules permit recipients already registered in the
+local signed realm. Mixed self/gift orders debit only the buyer and grant each
+order's exact published items/currencies to its recipient. Native coupon owner
+is the recipient and buyer is the authenticated purchaser. The buyer owns the
+durable request checksum and exact retry response.
+A bounded title-wide journal binds all account snapshots and their old/new
+checksums. Full preflight validates title, buyer, unique numeric owners, inventory
+layouts, receipts and conflicting disk edits before any checkpoint is replaced.
+Intent, snapshots and applied marker are flushed and replaced with write-through.
+Failed checkpoints block inventory/wallet access until roll-forward can finish.
+Recovery preserves metadata and the exact response; it does not debit or grant
+again. An applied marker carries no snapshots and never replays.
+The existing shared inventory reader/receipt validator is reused. No engine
+recompile, proxy DLL, new port, account provisioning or initial friendships.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: f2ff2fc90f022b6446850710fbaceea03f0cd11efdd347f73a43fee7aa2b61d9
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+209 grouped independent encrypted-protocol/service checks passed on this image.
+Seven new groups cover gifting publication/account checks, mixed grants and
+coupon DTOs, overflow/retry conflicts, corrupt/current-image preflight, all
+partial checkpoint states, a real second-file failure and process persistence.
+Recipient inventory was read through a separately authenticated native-wire
+client. Blocked wallet/inventory reads, exact retry and original offer removal
+were exercised without touching production profiles or identities.
+Signed platform/auth/resource gates passed. Native startup and same-process
+backend restart passed all 27 fences, profile sign-in, Online state and fresh
+authenticated relay establishment. Stability lasted 79.796 seconds with eight
+fresh keepalive replies and no rejections. Local identity remained unchanged.
+Testing used the root game folder. No map or match test was performed.
+
+validation/20261006-marketplace-gifts.json
+validation/20261006-gifts-native-reconnect.json
+data/lobby-verification.json
+data/native-gifts-final-20261006.jpg
+docs/marketplace-gifts.txt
+
+Remaining gates
+Full backend work remains active. Native positive gift/purchase callbacks and
+gift UI flows remain unverified. Menu-driven joins are still behind the
+unaccepted Terms of Agreement; acceptance authorization was requested separately.
+No guessed gift push event, CouponOrderV2 request, retail token or reward policy
+was introduced. Six known constructor routes, additional indirect/REST/push
+coverage, host migration and two-network gameplay remain open. Use controlled
+restarts and dw_restart; the broken dw_leave command remains excluded.

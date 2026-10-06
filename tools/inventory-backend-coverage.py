@@ -89,7 +89,7 @@ GAPS = {
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Task 22 multipart/live download exact result binding; positive native multipart upload/commit.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
-    "80": "Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Gifts need a multi-account atomic journal; discount rules, other variants, loot generation and native purchase callback validation remain open.",
+    "80": "Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Task106 recipient SKU orders support published gifting to existing local accounts with full owner/buyer coupon DTOs, flushed multi-account intents, conflicting-image preflight and disk/process recovery. Native gift/purchase callbacks, discount rules, other variants and loot generation remain open.",
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
     "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",

@@ -1,0 +1,62 @@
+REPLAY MARKETPLACE RECIPIENT PURCHASES
+
+Original Replay task 80/106, constructor 0x1421295B0, serializes the optional
+recipient account array alongside SKU, quantity, discount and metadata arrays.
+Each optional array is absent or has one entry per SKU order. Coupon reader
+0x14215CF20 consumes separate owner and buyer accounts. Gift responses retain
+that exact existing native envelope: owner is the recipient, buyer is the
+authenticated purchaser. No new task ID, engine patch or guessed push event.
+Task 80/125 has no recipient field in its recovered SKU-order layout; its
+unrecovered CouponOrderV2 family is still explicitly unavailable.
+
+Publication and account contract
+The existing purchase-rules.json may set allow_gifting=true on an SKU rule.
+Absent/false leaves cross-account purchases unavailable; non-booleans invalidate
+the publication. A recipient must already exist in the local signed realm.
+Gifting does not provision accounts, seed friends or change player identities.
+All existing price/source/quantity/entitlement/sale-window checks still apply.
+Buyer prices are debited once. Each order's explicit item/currency grants go to
+its recipient; self and gift orders may coexist. Only the buyer owns the saved
+purchase receipt and native retry response. Successful retry does not require
+the original offers/rules still to be published. Changed retries fail unchanged.
+
+Persistence layout
+marketplace/<title>/<user>/inventory.json retains its existing items/balances,
+native item metadata, purchase/redemption receipts and other account fields.
+Cross-account commits use marketplace/<title>/pending-purchase.json:
+  schema/title/buyer/transaction/request/phase/owners/checksum
+  Each owner checkpoint contains owner/before_checksum/after/after_checksum.
+The title/account numeric keys generate destinations; the journal cannot supply
+arbitrary filesystem paths. One title-wide pending intent is sufficient because
+the backend serializes marketplace dispatch. Reads, purchases and redemptions
+recover a pending intent before exposing or changing the participating state.
+The overall journal is bounded to 64 MiB, each inventory to 4 MiB, and the owner
+set to at most 256 accounts (buyer plus 255 native recipient orders).
+
+Before any replacement, recovery validates the complete intent checksum, title,
+buyer, phase, unique owners, inventory item/balance layouts, purchase receipts,
+each snapshot checksum and the buyer's bound transaction/request. Current disk
+images must equal the old snapshot or the already-published new snapshot. A
+conflicting external edit blocks recovery rather than being overwritten. Full
+preflight precedes every checkpoint. Prepared intent, account snapshots and the
+final applied marker use FlushFileBuffers and write-through replacement. An
+applied marker has no snapshots and never replays a debit or grant.
+
+A failed disk checkpoint returns storage error 102, and inventory/wallet access
+remains blocked while recovery cannot finish. The contract is durable roll-forward,
+not rollback of files already published. Native success follows completion of
+all account checkpoints and the applied marker. No invented success callback is
+sent for an interrupted request. Owner-only purchases keep their existing
+single-inventory atomic replacement contract.
+
+Verification scope
+tools/gift_fixtures.py uses independent authenticated clients and isolated data.
+It checks publication denial, existing-account checks, mixed self/gift grants,
+the exact owner/buyer coupon DTO, recipient inventory readback, transaction
+conflicts, recipient overflow, corrupt/conflicting intent preflight, each partial
+checkpoint state, a real second-file CreateFile failure, blocked wallet/inventory
+reads, idempotent recovery and persistence across a process restart. Fixture
+edits never target the owner's production identity or inventory.
+Current-image native startup/reconnect evidence is recorded separately. Native
+gift callbacks, gift UI flows and two-network gameplay are not proved by these
+protocol fixtures; no opaque retail token or reward policy is fabricated.

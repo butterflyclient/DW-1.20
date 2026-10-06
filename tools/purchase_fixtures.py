@@ -279,6 +279,11 @@ def exercise(client, other, directory, title, user, helpers, checks):
     v4 = purchase_v4_fixtures.exercise(
         client, other, directory, title, user, helpers, checks
     )
+    import gift_fixtures
+
+    gift = gift_fixtures.exercise(
+        client, other, directory, title, user, helpers, checks
+    )
     # The general catalog fixture is used by other service checks. Accepted
     # purchase retries do not depend on changing or republishing offers.
     catalog_path.write_bytes(original_catalog)
@@ -293,12 +298,15 @@ def exercise(client, other, directory, title, user, helpers, checks):
         "server_id_retry": server_id_retry,
         "server_id_result": first,
         "v4": v4,
+        "gift": gift,
     }
 
 
 def check_restart(client, fixture, checks):
+    import gift_fixtures
     import purchase_v4_fixtures
 
+    gift_fixtures.check_restart(client, fixture["gift"], checks)
     purchase_v4_fixtures.check_restart(client, fixture["v4"], checks)
     assert client.task(80, 106, fixture["request"]) == fixture["result"]
     assert (

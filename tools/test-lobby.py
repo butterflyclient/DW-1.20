@@ -3998,6 +3998,9 @@ try:
     output.flush()
     matchmaking_transaction_fixtures.before_restart(matchmaking_transaction_fixture)
     objectstore_transaction_fixtures.before_restart(objectstore_transaction_fixture)
+    import gift_fixtures
+
+    gift_fixtures.prepare_restart(purchase_fixture["gift"])
     # Turn on the actual loopback QoS peer for the restart phase. The earlier
     # empty/configured-fleet checks remain unchanged and production is untouched.
     (directory / "qos" / "local-provider.json").write_text('{"enabled":true}')
