@@ -56,13 +56,19 @@ Ordinary Replay, shared compiler work and game assets are preserved.
 Backend-only work does not rebuild or patch the game EXE.
 
 Remote setup uses `tools/prepare-host-network.py`,
-`configure-host-firewall.ps1`, `tools/prepare-remote-friends.py`, and
+`configure-host-firewall.ps1`, `new-guest.ps1`, and
 `tools/package-remote-guest.py`. Configuration is read at process startup; use
 separate controlled game/server stops and starts after endpoint changes.
 Guest packages contain the DW executable, INI and launcher, with no proxy or
 backend signing keys. Each guest still needs the compatible Replay game data.
 Router/firewall configuration, native startup, authenticated lobby assignment,
 and actual two-network gameplay are distinct validation gates.
+
+Set `player_name` in the executable's INI to change your name at the next full
+game start, preserving the account ID and local saves. Provision a separate
+private guest package for each person; new accounts have no initial friends.
+Native Social name search, requests and acceptance are documented in
+[player names and friends](docs/player-names-and-friends.md).
 
 ## Native game evidence
 

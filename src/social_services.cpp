@@ -433,6 +433,37 @@ namespace services
                         const Json &,
                         const std::string &);
 
+        Reply usernameSearch(const RESTRequest &r, const URI &route)
+        {
+            // Replay 0x1420FCBB0 emits this route; 0x1420FD110 reads users[],
+            // then 0x14210B940 requires provider/accountID/created/updated.
+            wire::require(r.method == get && !r.hasBody &&
+                          route.path == std::vector<std::string>{"v1.0", "users"} &&
+                          query(route, "searchType") == "username" &&
+                          !query(route, "client").empty());
+            auto username = query(route, "username");
+            wire::require(!username.empty() && username.size() <= 256);
+            const bool prefix = username.back() == '%';
+            if (prefix)
+                username.pop_back();
+            wire::require(!username.empty() && username.find('%') == std::string::npos);
+            const auto provider = query(route, "provider");
+            Json users = Json::array();
+            if (provider.empty() || provider == "uno" || provider == "bnet")
+                for (const auto &account : platform::findAccounts(username, prefix))
+                {
+                    Json accounts = Json::array();
+                    for (const auto *type : {"uno", "bnet"})
+                        accounts.push_back(Json{{"provider", type},
+                                                {"accountID", account.userId},
+                                                {"username", account.name + "#0"},
+                                                {"created", "2026-10-05T00:00:00Z"},
+                                                {"updated", "2026-10-05T00:00:00Z"}});
+                    users.push_back(Json{{"accounts", accounts}});
+                }
+            return response(r, "cross-platform-username-search", 200, Json{{"users", users}});
+        }
+
         Reply friends(const std::filesystem::path &root,
                       const platform::LobbyIdentity &id,
                       const RESTRequest &r,
@@ -945,9 +976,13 @@ namespace services
              (r.resource == "UsersPresence" &&
               (r.operation == "get_users_presence" || r.operation == "subscribe_to_users" ||
                r.operation == "unsubscribe_from_users")));
-        if (!isList && !isFriend && !isPresence)
+        const bool isSearch = r.service == "umbrella" && r.resource == "UserResource" &&
+                              r.operation == "usernamesearch";
+        if (!isList && !isFriend && !isPresence && !isSearch)
             return std::nullopt;
         const auto route = uri(r.uri);
+        if (isSearch)
+            return usernameSearch(r, route);
         const auto context = query(route, "context", "iw8");
         wire::require(!context.empty() && context.size() < 16);
         if (const auto title = query(route, "titleID"); !title.empty())

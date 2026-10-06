@@ -38,6 +38,8 @@ extern "C"
     unsigned Sys_Milliseconds();
     void func_1410C88F0(unsigned char, bool); // native Com_GameMode_SetDesiredGameMode
     void func_140D66AC0(int, int); // native CL_Mgr_ActivateClient, including notifications
+    void *func_141B371E0(); // Online_Friends::GetInstance
+    uint8_t func_140F54AE0(void *, unsigned, const char *, uint8_t);
     DWPlatformString *func_14038BAD0(DWPlatformString *, const char *, uint64_t);
     void func_1420F9380(void *, const char *);
     void func_1420F9330(void *, const char *);
@@ -91,7 +93,7 @@ namespace
     uint64_t s_restartStarted = 0;
     bool s_restartDisconnectIssued = false;
     void *s_loginThread = nullptr; // joined non-blockingly before credentials are reset
-    cmd_function_s s_testKeyCommand{}, s_testMenuCommand{};
+    cmd_function_s s_testKeyCommand{}, s_testMenuCommand{}, s_testFriendCommand{};
     unsigned s_testMode = 0;
     uint64_t s_testPoll = 0;
     uint32_t s_testRequest = 0;
@@ -190,6 +192,18 @@ namespace
             func_1410C88F0(2, false);
         func_140D66AC0(0, 0);
         Log("DW_LOCAL_TEST_MENU_MP native mode/client selection dispatched");
+    }
+
+    void TestAddFriend_f()
+    {
+        if (s_testMode != 2 || Cmd_Argc() != 2 || State() != 2)
+            return;
+        // Same native entry point as Social.AddFriendCrossplay(controller, name,
+        // platform). Platform zero selects UNO; native search and callback own
+        // the invitation, asynchronous completion and LUI toast notification.
+        const bool queued = func_140F54AE0(func_141B371E0(), 0, Cmd_Argv(1), 0) != 0;
+        Log(queued ? "DW_LOCAL_TEST_FRIEND native name search queued"
+                   : "DW_LOCAL_TEST_FRIEND native name search rejected");
     }
 
     void TestFrame()
@@ -908,6 +922,7 @@ extern "C" DWPlatformAuth *func_141665AC0()
         {
             Cmd_AddCommandInternal("dw_localTestKey", TestKey_f, &s_testKeyCommand);
             Cmd_AddCommandInternal("dw_localTestMenuMP", TestMenuMP_f, &s_testMenuCommand);
+            Cmd_AddCommandInternal("dw_localTestAddFriend", TestAddFriend_f, &s_testFriendCommand);
         }
         s_registered = true;
     }

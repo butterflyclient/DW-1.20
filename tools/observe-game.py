@@ -1021,6 +1021,7 @@ try:
             else None
         ),
         "native_user_xuid": struct.unpack_from("<Q", user, 144)[0],
+        "native_user_name": user[4:40].split(b"\0")[0].decode(errors="replace"),
         "native_user_xuid_text": user[152:173].split(b"\0")[0].decode(errors="replace"),
         "native_user_platform_id": struct.unpack_from("<Q", user, 184)[0],
         "native_user_platform_id_text": user[192:213]

@@ -2672,6 +2672,25 @@ try:
     checks.append(
         "native Friends and pending-invitation REST response schema and bounded requested context"
     )
+    search_uri = "/v1.0/users/?client=replaylocal&searchType=username&username="
+    for value in ("Fixture%20Peer", "fixture%20peer%230", "Fixture%25"):
+        status, result = rest_response(client.task(
+            255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
+                                uri=search_uri + value + "&provider=uno")))
+        assert status == 200 and len(result["users"]) == 1
+        accounts = result["users"][0]["accounts"]
+        assert [row["provider"] for row in accounts] == ["uno", "bnet"]
+        assert all(row["username"] == "Fixture Peer#0" and row["accountID"] > 0
+                   and len(row["created"]) == 20 and len(row["updated"]) == 20
+                   for row in accounts)
+    for value in ("NoSuchReplayUser", "Fixture%20Peer&provider=psn"):
+        status, result = rest_response(client.task(
+            255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
+                                uri=search_uri + value)))
+        assert status == 200 and result == {"users": []}
+    client.task(255, 10, native_rest("umbrella", "UserResource", "usernamesearch",
+                                     uri=search_uri + "bad%00name"), error=106)
+    checks.append("Replay native username search, UNO account schema, exact/tag/prefix matching and malformed query rejection")
     # Use actual Replay route versions/methods, not a synthetic endpoint alias.
     mutation_uri = f"/v3/user/bnet-{user}/list/recent/"
     assert client.task(

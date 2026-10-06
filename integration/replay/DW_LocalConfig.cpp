@@ -18,7 +18,7 @@ namespace
     char s_host[64] = "127.0.0.1";
     wchar_t s_wideHost[64]{};
     wchar_t s_loginPath[96]{};
-    wchar_t s_headers[160]{};
+    wchar_t s_headers[256]{};
     char s_authUrl[128]{}, s_nativeAuthUrl[128]{}, s_legacyUrl[160]{};
     char s_public[64]{}, s_local[64]{};
     uint16_t s_gamePort = 3074;
@@ -88,7 +88,7 @@ namespace
         if (__atomic_compare_exchange_n(
                 &s_state, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
         {
-            char profile[65]{}, key[65]{}, path[96]{}, headers[160]{}, port[8]{};
+            char profile[65]{}, key[65]{}, path[96]{}, headers[256]{}, port[8]{}, name[36]{};
             // An executable-specific file allows independent native test instances.
             // Normal guest installations use replay-dw.ini in the game folder.
             char executableIni[264]{};
@@ -120,6 +120,7 @@ namespace
                         Field(text + at, "public_address", s_public, sizeof(s_public));
                         Field(text + at, "local_address", s_local, sizeof(s_local));
                         Field(text + at, "game_port", port, sizeof(port));
+                        Field(text + at, "player_name", name, sizeof(name));
                         while (at < count && text[at] != '\n')
                             ++at;
                         if (at < count)
@@ -151,6 +152,12 @@ namespace
                 valid = valid && ((key[keyLength] >= 'a' && key[keyLength] <= 'f') ||
                                   (key[keyLength] >= '0' && key[keyLength] <= '9'));
             valid = valid && (keyLength == 0 || keyLength == 64);
+            unsigned nameLength = 0;
+            for (; name[nameLength]; ++nameLength)
+                valid = valid && name[nameLength] >= 32 && name[nameLength] < 127 &&
+                        name[nameLength] != '#' && name[nameLength] != '%';
+            if (nameLength)
+                valid = valid && name[0] != ' ' && name[nameLength - 1] != ' ';
             for (unsigned i = 0; profile[i]; ++i)
                 valid = valid && ((profile[i] >= 'a' && profile[i] <= 'z') ||
                                   (profile[i] >= '0' && profile[i] <= '9') || profile[i] == '-');
@@ -169,6 +176,13 @@ namespace
                         : "Content-Type: application/octet-stream",
                  key,
                  "\r\n");
+            if (valid && nameLength)
+            {
+                unsigned end = 0;
+                while (headers[end])
+                    ++end;
+                Join(headers + end, "X-Replay-Player-Name: ", name, "\r\n");
+            }
             Wide(s_headers, headers);
             Join(s_authUrl, "http://", s_host, ":8085/auth/");
             Join(s_nativeAuthUrl, "https://", s_host, ":8443/auth/");

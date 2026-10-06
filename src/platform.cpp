@@ -43,6 +43,7 @@ namespace platform
 
         Identity identity;
         std::map<std::string, Identity> profiles;
+        std::filesystem::path identityDirectory;
         BCRYPT_ALG_HANDLE rsa = nullptr, sha = nullptr;
         BCRYPT_KEY_HANDLE key = nullptr;
         std::mutex mutex;
@@ -81,7 +82,9 @@ namespace platform
                     !file.flush())
                     throw std::runtime_error("Cannot persist platform identity/key");
             }
-            std::filesystem::rename(pending, path);
+            if (!MoveFileExW(pending.c_str(), path.c_str(),
+                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+                throw std::runtime_error("Cannot publish platform identity/key");
         }
 
         void profileKey(const std::string &value)
@@ -111,13 +114,37 @@ namespace platform
             return result;
         }
 
-        Identity newIdentity(const std::string &name)
+        void validateName(const std::string &name)
         {
-            if (name.empty() || name.size() >= 36)
+            if (name.empty() || name.size() >= 36 || name.front() == ' ' || name.back() == ' ')
                 throw std::runtime_error("Invalid local profile name");
             for (const unsigned char c : name)
-                if (c < 32 || c >= 127)
+                if (c < 32 || c >= 127 || c == '#' || c == '%')
                     throw std::runtime_error("Invalid local profile name");
+        }
+
+        std::string folded(std::string value)
+        {
+            for (auto &c : value)
+                if (c >= 'A' && c <= 'Z')
+                    c = static_cast<char>(c + ('a' - 'A'));
+            return value;
+        }
+
+        void availableName(const std::string &name, uint64_t own = 0)
+        {
+            validateName(name);
+            const auto match = folded(name);
+            if (identity.userId != own && folded(identity.name) == match)
+                throw std::runtime_error("Local player name already in use");
+            for (const auto &[profile, other] : profiles)
+                if (other.userId != own && folded(other.name) == match)
+                    throw std::runtime_error("Local player name already in use");
+        }
+
+        Identity newIdentity(const std::string &name)
+        {
+            validateName(name);
             Identity result;
             check(BCryptGenRandom(nullptr,
                                   reinterpret_cast<unsigned char *>(&result.userId),
@@ -217,6 +244,7 @@ namespace platform
 
     void initialize(const std::filesystem::path &directory)
     {
+        identityDirectory = std::filesystem::absolute(directory);
         check(BCryptOpenAlgorithmProvider(&rsa, BCRYPT_RSA_ALGORITHM, nullptr, 0), "RSA provider");
         check(BCryptOpenAlgorithmProvider(&sha, BCRYPT_SHA256_ALGORITHM, nullptr, 0),
               "SHA256 provider");
@@ -294,6 +322,7 @@ namespace platform
         const auto path = directory / "platform-profiles" / (profile + ".bin");
         if (std::filesystem::exists(path) || profiles.contains(profile) || profiles.size() >= 63)
             throw std::runtime_error("Local profile already exists or capacity reached");
+        availableName(name);
         auto result = newIdentity(name);
         for (unsigned attempt = 0;; ++attempt)
         {
@@ -324,7 +353,26 @@ namespace platform
         return std::nullopt;
     }
 
-    std::string login(const std::string &nonce, const std::string &profile)
+    std::vector<Account> findAccounts(const std::string &username, bool prefix)
+    {
+        std::lock_guard lock(mutex);
+        std::vector<Account> found;
+        const auto match = folded(username);
+        const auto append = [&](const Identity &account)
+        {
+            const auto name = folded(account.name), tag = name + "#0";
+            if (prefix ? (name.starts_with(match) || tag.starts_with(match))
+                       : (name == match || tag == match))
+                found.push_back({account.userId, account.name});
+        };
+        append(identity);
+        for (const auto &[profile, account] : profiles)
+            append(account);
+        return found;
+    }
+
+    std::string login(const std::string &nonce, const std::string &profile,
+                      const std::string &playerName)
     {
         if (nonce.size() != 32)
             throw std::runtime_error("Invalid platform nonce size");
@@ -334,7 +382,7 @@ namespace platform
         if (!nonzero)
             throw std::runtime_error("Invalid platform nonce");
         std::lock_guard lock(mutex);
-        const Identity *selected = &identity;
+        Identity *selected = &identity;
         if (!profile.empty())
         {
             profileKey(profile);
@@ -351,6 +399,18 @@ namespace platform
                       });
         if (issuedSessions.size() >= 64)
             throw std::runtime_error("Platform session capacity reached");
+        if (!playerName.empty() && playerName != selected->name)
+        {
+            availableName(playerName, selected->userId);
+            auto renamed = *selected;
+            std::memset(renamed.name, 0, sizeof(renamed.name));
+            std::memcpy(renamed.name, playerName.data(), playerName.size());
+            const auto path = profile.empty()
+                                  ? identityDirectory / "platform-profile.bin"
+                                  : identityDirectory / "platform-profiles" / (profile + ".bin");
+            write(path, &renamed, sizeof(renamed));
+            *selected = renamed;
+        }
         DWLocalPlatformReply reply{};
         auto &p = reply.payload;
         p.magic = DW_LOCAL_PLATFORM_MAGIC;

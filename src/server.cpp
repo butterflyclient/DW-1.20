@@ -231,6 +231,7 @@ namespace
         std::optional<std::string> rangeHeader;
         std::optional<std::string> destinationHeader;
         std::optional<std::string> accessHeader;
+        std::optional<std::string> playerNameHeader;
         size_t at = firstLineEnd + 2;
         while (at < headerEnd)
         {
@@ -287,6 +288,15 @@ namespace
                     return;
                 }
                 accessHeader = value;
+            }
+            if (key == "x-replay-player-name")
+            {
+                if (playerNameHeader || value.empty() || value.size() > 35)
+                {
+                    reply(socket, 400, "{\"error\":\"invalid_player_name_header\"}");
+                    return;
+                }
+                playerNameHeader = value;
             }
             at = end + 2;
         }
@@ -462,7 +472,8 @@ namespace
                     reply(socket, 403, "{\"error\":\"platform_access_rejected\"}");
                     return;
                 }
-                auto response = platform::login(request.substr(bodyAt, length), profile);
+                auto response = platform::login(request.substr(bodyAt, length), profile,
+                                                playerNameHeader.value_or(""));
                 reply(socket, 200, response, "application/octet-stream");
                 log("PLATFORM issued signed local identity/session; native DW authentication still "
                     "required");

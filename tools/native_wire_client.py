@@ -103,7 +103,8 @@ def expand(key, info, size):
 
 class NativeClient:
     def __init__(
-        self, root: Path, title=5800, profile="", host="127.0.0.1", access_key=""
+        self, root: Path, title=5800, profile="", host="127.0.0.1", access_key="",
+        player_name=""
     ):
         self.socket = None
         self.title = title
@@ -112,11 +113,14 @@ class NativeClient:
 
         def post(path, value):
             data = value if isinstance(value, bytes) else json.dumps(value).encode()
+            headers = {"X-Replay-Access": access_key} if access_key else {}
+            if player_name and path.startswith("/platform/login"):
+                headers["X-Replay-Player-Name"] = player_name
             return urllib.request.urlopen(
                 urllib.request.Request(
                     base + path,
                     data,
-                    headers={"X-Replay-Access": access_key} if access_key else {},
+                    headers=headers,
                 ),
                 timeout=5,
             )

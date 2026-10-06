@@ -5,6 +5,7 @@
 #include <span>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace platform
 {
@@ -14,11 +15,19 @@ namespace platform
     };
 
     void initialize(const std::filesystem::path &directory);
-    std::string login(const std::string &nonce, const std::string &profile = "");
+    std::string login(const std::string &nonce,
+                      const std::string &profile = "",
+                      const std::string &playerName = "");
     void provisionProfile(const std::filesystem::path &directory,
                           const std::string &profile,
                           const std::string &name);
     std::optional<std::string> accountName(uint64_t user);
+    struct Account
+    {
+        uint64_t userId;
+        std::string name;
+    };
+    std::vector<Account> findAccounts(const std::string &username, bool prefix);
     std::string resource(const std::string &request);
     unsigned sessions();
     unsigned logins();

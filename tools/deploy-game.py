@@ -171,6 +171,7 @@ if {
     and item.get("compiled_publisher_key_selection_and_verification_lifetime")
     and item.get("compiled_connection_disconnect_lifecycle")
     and item.get("compiled_platform_online_status_persistence")
+    and item.get("compiled_ini_player_name_header")
     for item in endpoint_cases
 ):
     raise RuntimeError(

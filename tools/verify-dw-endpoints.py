@@ -53,6 +53,7 @@ def verify(pe, report):
         ini = (
             f"host={host}\nprofile=remote-test-1\naccess_key={'a'*64}\n"
             f"public_address={host}\nlocal_address=192.168.1.124\ngame_port=3074\n"
+            "player_name=Replay INI Tester\n"
         ).encode()
         native = bytearray(2088)
         native[:36] = bytes(range(36))
@@ -132,6 +133,10 @@ def verify(pe, report):
         assert bytes(machine.mem_read(config + 1060, len(native) - 1060)) == bytes(
             native[1060:]
         )
+        header_address = run("DW_LocalConfig_Headers")
+        header_text = bytes(machine.mem_read(header_address, 512)).decode("utf-16le").split("\0", 1)[0]
+        assert ("X-Replay-Player-Name: Replay INI Tester\r\n" in header_text) == remote
+        assert ("X-Replay-Access: " + "a" * 64 + "\r\n" in header_text) == remote
         if not enabled:
             assert bytes(machine.mem_read(config, len(native))) == bytes(native)
         # The private DW image must reach the native CRT constructor's caller
@@ -876,6 +881,7 @@ def verify(pe, report):
                 "compiled_legacy_url_selection": True,
                 "compiled_connection_disconnect_lifecycle": True,
                 "compiled_profile_license_and_account_metadata": enabled,
+                "compiled_ini_player_name_header": True,
             }
         )
         cases[-1]["compiled_web_credential_queue_and_callback"] = enabled

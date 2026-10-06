@@ -6,9 +6,9 @@ snapshot. Shared compiler sources and unrelated game assets were preserved.
 
 Installed game:
 E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
-SHA256: 82005de3b87725296b9d16b3880c1ab3a0dd89c0f98aa3fa757df789f9a55440
-Compiler job: 9e68daf606294557
-Backend SHA256: 1d88793755cbdb20fc1e35b42c25987c09e884cd8673de79a9a9305d051ef239
+SHA256: 7aac53fdb15428829d7063773ad167896f5bb218ed56741f75f272e10f7db0fd
+Compiler job: 3cfa71cfc983468c
+Backend SHA256: d52c76bc9e9fb9b76a74c1bbb92f89abc1d1284cb5284f4afef5b4b85ef05325
 
 Give the guest E:\DW\IW8\data\Replay-DW-Guest-Test.zip.
 It contains the exact EXE, its executable-specific INI, a root-folder launcher
@@ -16,7 +16,47 @@ and READ_ME.txt. No proxy DLL or backend signing keys are included.
 The guest needs their compatible 1.20 Replay game files and normal dependencies.
 Use one guest configuration on one computer at a time.
 Close the old game and replace both the EXE and INI on each client. The revised
-guest ZIP has SHA256 cd8ed5087b2399f6f5873824c8b831b6d7eb0e68cede12d765c6b49353d54dc5.
+guest ZIP has SHA256 9fb81e45e31d1dfb8fdfa16ec3fbb12ca05807b6b7d939bc03c6133e5a5343c2.
+
+PLAYER NAMES AND EMPTY FRIEND LISTS
+The INI now supports player_name=YourName. It applies on a full game start,
+renames the same signed persistent identity and keeps universal/platform IDs,
+local settings and friends. Use a unique name of 1..35 printable ASCII characters,
+without #, %, or spaces at either end. Omitting it retains the last saved name.
+The host INI is currently player_name=DWPlayer.
+
+There are separate guest packages for three people:
+E:\DW\IW8\data\Replay-DW-Guest-Test.zip       (remote-test-1 / ReplayGuest)
+E:\DW\IW8\data\Replay-DW-remote-test-2.zip   (remote-test-2 / ReplayGuest2)
+E:\DW\IW8\data\Replay-DW-remote-test-3.zip   (remote-test-3 / ReplayGuest3)
+Give each person a different ZIP. Do not share one INI between simultaneous users.
+All contain the same freshly compiled EXE with their own account/key and editable
+player_name. New accounts never receive automatic friendships. The host/guests'
+existing friendships and pending requests were cleared at the owner's request;
+original stores remain privately backed up.
+
+Native Social Add Friend now uses the target Replay umbrella username-search
+route. It resolves the provisioned name or Name#0, then the original game callback
+sends the invitation. The other player accepts it through Friend Requests. The
+backend persists it and publishes the native list/push updates. Accepted friends
+remain accepted after later restarts; clearing is not a boot-time behavior.
+
+Actual current-image validation: INI name ReplayHostTest loaded into the native
+user record with the unchanged host ID. The game initiated a name search and
+outgoing invitation, displayed the accepted friendship in its native cache,
+received an incoming request and accepted it through the native Social entry
+point. Removal cleared every native friend/request cache. A full process restart
+loaded DWPlayer with the same universal/platform IDs and saved keyboard Toggle ADS
+value. The test setting was restored by the native writer. All 27 fences passed.
+The development command marker and temporary relationships are removed.
+Native evidence: data/native-names-friends-20261005.
+Sanitized proof: validation/20261005-player-names-friends.json.
+
+To add another tester, before anyone plays:
+E:\DW\IW8\new-guest.ps1 -Profile remote-test-4 -PlayerName "MyFriend"
+It stops the backend, provisions a unique identity/key, starts it again and builds
+that player's ZIP. Existing profiles are not overwritten. Packaging preserves
+your host INI. More details: docs/player-names-and-friends.md.
 
 ONLINE STATUS AND LOCAL SETTINGS FIX
 Both test clients were sending online:false because Replay's native status
@@ -54,7 +94,8 @@ Host procedure:
 1. Keep the backend running. After a reboot, run E:\DW\IW8\start-server.ps1.
 2. Run Run_Replay_DW.cmd in E:\IW8\Builds\1.20-replay.
 3. Choose Multiplayer and create a private party/match. Select Shipment.
-4. Have ReplayGuest join DWPlayer through Social, then start the match.
+4. Add the guest by name in Social > Add Friends > Activision Account.
+   Enter their name or Name#0. They accept in Friend Requests, then join you.
 5. Check both players load, can see one another, move, shoot and finish a match.
 6. Test a controlled full restart/rejoin. Do not use dw_leave.
 
@@ -62,17 +103,20 @@ Guest procedure:
 1. Extract all four archive files into the compatible Replay root game folder.
 2. Keep a local XInput9_1_0.dll proxy out of the DLL search path; keep normal
    shipped dependency DLLs. Allow the game through its firewall prompt if asked.
-3. Run Run_Replay_DW_Guest.cmd. Identity: ReplayGuest. Host friend: DWPlayer.
+3. Edit player_name in your own INI if desired. Run Run_Replay_DW_Guest.cmd.
+   No friends are pre-added; add DWPlayer (or the host's chosen name) through
+   Social > Add Friends > Activision Account, then accept the request.
 4. Enter Multiplayer and join the host's private party through Social.
 5. Test Shipment with the host. A backend process is not needed on the guest PC.
 
 Confirmed validation:
-- Both distinct native identities sign in and pass all 27 startup fences when
-  run separately. Native relay authentication reaches established state.
+- The current native host image passed all 27 startup fences in two processes.
+  Native relay authentication reaches established state. Earlier guest native
+  startup evidence retains its original image hash; it was not replayed here.
 - Root game startup works without the local proxy. XInput loads from System32.
 - Native host common address publishes 198.255.173.206:3074, retains both local
   addresses, uses open NAT publication and has a populated native hash.
-- 174 protocol/service checks pass, plus signed auth/resource and concurrent
+- 175 protocol/service checks pass, plus signed auth/resource and concurrent
   local/public QoS, relay-credential and content-address checks.
 - Router mappings and exact-program firewall rules are configured/verified.
 - Independent external nodes connect to TCP 8085 and 3075; external /health

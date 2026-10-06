@@ -7,12 +7,17 @@ These are observations of the real game, not a profile-format reimplementation.
 """
 
 import hashlib
+import argparse
 import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST = ROOT / "data/native-settings-presence-20261005"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--directory", type=Path, default=ROOT / "data/native-settings-presence-20261005")
+TEST = parser.parse_args().directory.resolve()
+if not TEST.is_relative_to(ROOT / "data"):
+    raise ValueError("Native observations must be inside the private DW data directory")
 
 
 def read(name):
