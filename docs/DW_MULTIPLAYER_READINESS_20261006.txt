@@ -219,3 +219,23 @@ The test game closed normally; its owned command files were removed. The game
 EXE, owner INI and unrelated compiler work were preserved. Backend remains live.
 See DW_CHAT_DELIVERY_REST_AUDIT_20261006.txt for proof paths, expanded exact-target
 REST inventory and the remaining backend/profile-isolation work.
+
+CURRENT BACKEND ADDENDUM - REGULATION REST DOMAIN
+Backend SHA256: 3b24b08f70c8592fdc624478607043d23d78ad0a5662a61acc8d337a1a91d51e
+The game EXE and owner INI are unchanged. 257 encrypted protocol/service groups,
+including five regulation publication/preference groups, passed along with the
+signed platform/auth/resource gates. Owner choices are never seeded by reads.
+Exact response vtables rejected a misleading regulation handler database alias.
+Native startup, profile/Online and 27 fences passed on this backend. The native
+first-message history test passed before and after separate stop/start and
+same-process dw_restart. Relay stability passed for 104.4 seconds with ten
+keepalives and zero rejected packets. The owned game closed normally; its
+temporary command files were removed and the backend remains running.
+Current native proof: validation/20261006-regulation-native-reconnect.json
+Native chat proofs: validation/20261006-regulation-channel-native-message.json
+and validation/20261006-regulation-channel-native-message-after-restart.json.
+Regulation native task callbacks are still unverified: this compiled Replay
+does not register the regulation developer test commands. No privacy choice,
+agreement, map test or two-network gameplay claim was made by this pass.
+Full implementation and native multiparty validation continue. See
+DW_REGULATION_BACKEND_20261006.txt for layouts, files, ownership and test details.

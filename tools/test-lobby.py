@@ -2605,6 +2605,12 @@ try:
         payload = b"" if body is None else json.dumps(body).encode()
         return u32(713) + blob(message) + boolean(body is not None) + blob(payload)
 
+    import regulation_fixtures
+
+    regulation_restart = regulation_fixtures.exercise(
+        client, directory, title, user, native_rest, rest_response, blob, checks
+    )
+
     event_body = {
         "titleID": title,
         "idempotentRequestID": "00000000-0000-0000-0000-000000000001",
@@ -4174,6 +4180,7 @@ try:
     )
     assert client.task(58, 6, content_fixture["post"]) == u64(content_fixture["id"])
     relay_fixtures.check_restart(client, relay_fixture, checks)
+    regulation_restart(client)
     tournament_fixtures.check_restart(client, tournament_fixture, checks)
     validated_stats_fixtures.check_restart(client, validated_stats_fixture, checks)
     inventory_validation_fixtures.check_restart(

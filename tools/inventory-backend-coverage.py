@@ -103,7 +103,7 @@ GAPS = {
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.",
-    "255": "Friends/user lists/presence/event ingestion implemented. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; other REST mutations need explicit request/result/domain contracts.",
+    "255": "Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; remaining account/objectstore REST mutations need explicit request/result/domain contracts.",
 }
 
 GAPS["145"] += (
@@ -247,6 +247,11 @@ def main():
         "playlist_catalog.h",
         "channel_store.cpp",
         "channel_store.h",
+        "regulation_services.cpp",
+        "regulation_services.h",
+        "rest_services.h",
+        "social_services.cpp",
+        "social_services.h",
     ):
         sources["src/" + filename] = digest(ROOT / "src" / filename)
     marketing_path = DATA / "native-marketing-verification.json"
@@ -445,6 +450,12 @@ def main():
                 domain="REST friends, presence and user lists",
                 sources=["src/social_services.cpp", "src/rest_services.cpp"],
                 gaps="Other native REST resources must be recovered individually",
+            ),
+            dict(
+                domain="REST regulation publications and owned preferences",
+                sources=["src/regulation_services.cpp", "src/rest_services.cpp"],
+                gaps="Exact target response layouts and durable owner semantics implemented; native regulation commands are absent from the current compiled game, and per-method runtime completion remains unverified",
+                target_layout_receipt="validation/20261006-regulation-target-layout.json",
             ),
             dict(
                 domain="authenticated relay UDP routing",

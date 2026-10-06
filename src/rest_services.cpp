@@ -3,6 +3,7 @@
 #include "protobuf.h"
 #include "achievement_services.h"
 #include "social_services.h"
+#include "regulation_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 
@@ -194,6 +195,11 @@ namespace services
         reply.detail = " rest_service=" + r.service + " resource=" + r.resource +
                        " operation_name=" + r.operation + " method=" + std::to_string(r.method);
         if (auto handled = social(directory, id, r))
+        {
+            handled->detail = reply.detail;
+            return *handled;
+        }
+        if (auto handled = regulations(directory, id, r))
         {
             handled->detail = reply.detail;
             return *handled;

@@ -1,0 +1,99 @@
+REPLAY DW REGULATION BACKEND - 2026-10-06
+
+Implemented
+The umbrella/Regulations REST domain now handles fetchRegulations,
+getUserPreference and setUserPreference through the authenticated lobby.
+Enforcement is an explicit title publication. Preferences are separate,
+account-owned records; reads do not create choices, and no default opt-out,
+agreement, friendship or human profile is provisioned by this implementation.
+
+Exact Replay layout research
+Untouched target SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+Request writers: 0x142141D40, 0x142142D90 and 0x1421426C0.
+Fetch path: /v1.0/regulations/?client=...
+Preference path: /v1.0/accounts/<accountType>/<owner>/optouts/?client=...
+Each request has the real method, resource/operation and JSON envelope.
+Regulation: name in a 10-byte buffer; unsigned 64-bit version; 24-byte record.
+Preference: regulation, unsigned 64-bit clientMessageVersion, boolean value,
+20-character UTC updated string plus terminator, optional unsigned 64-bit
+updatedTimestamp; 64-byte record. This implementation emits both time fields.
+Array responses have a 15-record limit. Fetch reads regulations; preferences
+read optouts; the update response reads a success boolean.
+The real response vtables independently bind these readers:
+0x1426A2610 +8 -> 0x142142270 (fetch)
+0x1426A2758 +8 -> 0x142142C00 (update)
+0x1426A2800 +8 -> 0x142143250 (preferences)
+The database's bdSetUserRegulationPreferenceResponse::handleReplySuccess alias
+at 0x141ADF960 is unrelated engine code. It was rejected, not used as evidence.
+Target byte hashes and reviewed schemas are retained in:
+validation/20261006-regulation-target-layout.json
+
+Publication and ownership
+data/regulations/<title>/publication.json is a bounded JSON object with schema=1,
+the exact unsigned title, and a regulations array. Each array element has exactly
+name and unsigned version. Names are unique, nonempty and fit the native buffer.
+The whole document is validated; more than 15 entries, duplicate keys, trailing
+JSON, noninteger versions and malformed names fail before data is returned.
+An absent publication returns unavailable, rather than inventing an empty policy.
+
+data/regulations/<title>/preferences/<signed-owner>.json contains schema, title,
+owner and optouts. Each record contains regulation, clientMessageVersion, value,
+updated and updatedTimestamp. Full ownership, uniqueness, capacities, types and
+matching UTC/time layouts are revalidated on every read/write.
+The local signed provider's uno/bnet representations select the same owner ID;
+another owner's request is denied. URI values never become filesystem paths.
+Only the existing authenticated owner can submit a real preference change.
+The stock writer's regulation version zero selects the explicitly published
+current version. A nonzero conflicting version or unpublished name is rejected.
+Existing choices are retained if publication later changes or disappears.
+
+Persistence
+Reads use one bounded immutable Windows handle with delete sharing. Writes use
+a flushed pending file followed by atomic replacement. A failed publication
+cannot acknowledge success. An identical choice/version retry does not rewrite
+the preference or its timestamp. Restart preserves the exact owned record.
+The service-store lock serializes requests with the existing backend domains.
+
+Build and verification
+Backend was freshly compiled in Release with MSVC /W4 /WX.
+Backend SHA256:
+3b24b08f70c8592fdc624478607043d23d78ad0a5662a61acc8d337a1a91d51e
+Unchanged deployed game SHA256:
+b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+257 isolated encrypted protocol/service groups passed. Five new regulation
+groups cover full UInt64 DTOs, owner aliases and denial, malformed requests,
+complete corrupted storage, failed atomic writes, retry idempotence and actual
+backend process restart. Signed platform/auth/resource gates passed too.
+Regulation fixture receipt: validation/20261006-regulation-wire.json
+
+The first full-suite attempt encountered a Windows atomic catalog replacement
+PermissionError during an existing tournament publication test. Its native
+reader already permits delete sharing. The fixture publisher now retries only
+the same immutable rename for up to one second for WinError 5/32/33; persistent
+failure still fails the test. It never falls back to truncating the live file.
+The complete rerun passed. The underlying transient denial was not attributed
+to a backend reader defect without evidence.
+
+Native validation scope
+The unchanged game was launched from E:/IW8/Builds/1.20-replay. Native profile,
+Online and all 27 startup fences passed. A game-owned private-party channel
+retained a real peer's first incoming message with the proper sender/body hash,
+before and after separate backend stop/start and same-process dw_restart.
+The owner identity and empty native friend lists recovered with a fresh native
+authenticated relay. Current proof files are listed in the readiness addendum.
+No map test, agreement acceptance or live owner privacy-choice change was made.
+
+This compiled Replay build does not register the regulation developer test
+commands. Protocol fixtures and the exact vtable/schema proof are not a live
+regulation task callback proof. That method-level gate remains open; a compiled
+test entry point can be added alongside the upcoming safe multi-profile work.
+No proxy or new game executable was needed for this backend iteration.
+
+Remaining
+Full backend and indirect/native method audit remain incomplete. The reviewed
+binary task ledger still has six missing result bindings: 50/22, 58/22, 193/9,
+193/10, 193/12 and 193/24. Other account/objectstore REST operations require
+complete native response/domain contracts. Native multi-profile isolation,
+two-game callbacks, migration and two-network playable JOIN/DATA remain open.
+The full backend goal remains active. Unrelated compiler sources were preserved.

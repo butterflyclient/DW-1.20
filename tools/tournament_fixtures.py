@@ -532,7 +532,19 @@ def live_publications(client, peer, directory, title, user, peer_user, helpers, 
     def publish(value=catalog):
         pending = catalog_path.with_suffix(".json.pending")
         pending.write_text(json.dumps(value))
-        pending.replace(catalog_path)
+        # The production snapshot reader permits delete sharing. Windows filter
+        # drivers can still briefly deny the rename of a freshly written file.
+        # Retry only that same atomic publication; never fall back to truncating
+        # the live catalog or hide a persistent path/permission failure.
+        deadline = time.monotonic() + 1
+        while True:
+            try:
+                pending.replace(catalog_path)
+                break
+            except PermissionError as error:
+                if error.winerror not in (5, 32, 33) or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.02)
 
     def disband():
         for connection in (client, peer):

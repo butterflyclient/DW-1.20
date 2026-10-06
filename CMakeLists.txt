@@ -14,6 +14,7 @@ add_executable(iw8-dw-server
     src/services.cpp
     src/startup_services.cpp
     src/rest_services.cpp
+    src/regulation_services.cpp
     src/objectstore_services.cpp
     src/account_services.cpp
     src/leaderboard_services.cpp
