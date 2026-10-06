@@ -447,3 +447,21 @@ does not register the regulation developer test commands. No privacy choice,
 agreement, map test or two-network gameplay claim was made by this pass.
 Full implementation and native multiparty validation continue. See
 DW_REGULATION_BACKEND_20261006.txt for layouts, files, ownership and test details.
+
+CURRENT BACKEND ADDENDUM - SHARED AB TRANSPORT AND NATIVE RECONNECT
+Backend SHA256: 9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f
+Unchanged game SHA256: bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
+All 280 encrypted service groups and signed platform/auth/resource gates pass.
+The explicit AB REST domain shares task-194/1 durable owner/cohort/token state;
+both transports now enforce the original 8096-byte legacy buffer including its
+terminator. The original SDK REST writer's empty service-name rejection is a
+confirmed client-side blocker, not a successful native REST method.
+The root-folder game consumed a positive treatment before/after backend restart,
+then returned to empty enrollment and dvar 16 after owned cleanup. Online/profile,
+27 fences and empty friend lists pass. Same-server relay reconnect retained one
+active association through 64.39 seconds/seven keepalives without rejections.
+The game closed normally; its EXE, INI and local identity were preserved and the
+backend remains running. No map test, port change or game rebuild occurred.
+Native two-network party JOIN/DATA/gameplay remains unverified. The exact-target
+coverage ledger still identifies six missing binary routes and additional native
+REST/method-completion gaps. See DW_AB_REST_READINESS_20261006.txt and its receipts.

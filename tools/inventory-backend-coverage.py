@@ -124,10 +124,21 @@ GAPS["255"] += (
     "Native username-resolver task completion is still a separate unverified scope."
 )
 
+GAPS["194"] += (
+    " Both transports preflight the original legacy reader's 8096-byte buffer "
+    "including its terminator before publication. The explicit abtesting/enroll "
+    "REST handler shares account-owned cohorts and token state with task 194/1; "
+    "encrypted fixtures cover the exact 8095-byte boundary and overflow. Original "
+    "Replay's REST writer leaves serviceName empty and its own validator rejects "
+    "that request before transport; the explicit backend route does not fix or "
+    "establish completion of that native REST path."
+)
+
 
 # Dedicated domain handlers only. A configured GET publication is not equivalent
 # to an implemented authenticated account/objectstore mutation.
 REST_HANDLERS = {
+    ("abtesting", "abtesting", "enroll"): "abtesting_services.cpp",
     ("umbrella", "UserResource", "usernamesearch"): "social_services.cpp",
     ("presence", "UserPresence", "set_user_presence"): "social_services.cpp",
     ("social-service", "UsersPresence", "get_users_presence"): "social_services.cpp",
@@ -237,6 +248,16 @@ def rest_coverage(inventory, friend_evidence):
     ] != digest(ROOT / "tools/research-objectstore-rest-target.py"):
         raise ValueError("Refresh the exact object-store REST target receipt")
     proven_requests = {row["va"]: row for row in proof["requests"]}
+    ab_receipt = ROOT / "validation/20261006-abtesting-rest-target-layout.json"
+    ab_proof = json.loads(ab_receipt.read_bytes())
+    if (
+        ab_proof["target_image_sha256"] != inventory["target_image_sha256"]
+        or ab_proof["audit_tool_sha256"]
+        != digest(ROOT / "tools/research-abtesting-rest-target.py")
+        or not ab_proof["original_rest_writer_requires_service_correction"]
+        or not ab_proof["original_validator_vm"]["passed"]
+    ):
+        raise ValueError("Refresh the exact AB REST writer/validator target receipt")
     requests = []
     for original in inventory["requests"]:
         row = dict(original)
@@ -290,6 +311,20 @@ def rest_coverage(inventory, friend_evidence):
                 else "Dynamic/helper service binding remains unresolved"
             ),
         )
+        if row["function_address"] == 0x1420FFE50:
+            if row["services"] or row["resource_operations"] != [
+                ["abtesting", "enroll"]
+            ]:
+                raise ValueError("Original AB REST writer binding changed")
+            row.update(
+                native_pre_transport_blocked=True,
+                native_pre_transport_blocker="Original writer leaves serviceName empty; original SDK validator rejects the request before sending",
+                target_binding_receipt=ab_receipt.relative_to(ROOT).as_posix(),
+                explicit_backend_service="abtesting",
+                explicit_backend_handler_source="src/"
+                + REST_HANDLERS[("abtesting", "abtesting", "enroll")],
+                coverage_scope="Explicit backend route implemented; original native writer requires a service-name correction and live REST callback validation",
+            )
         requests.append(row)
     return requests
 
@@ -628,7 +663,13 @@ def main():
                         for row in rest_requests
                     ),
                     unresolved_dynamic_or_helper_bindings=sum(
-                        row["dedicated_domain_handler"] is None for row in rest_requests
+                        row["dedicated_domain_handler"] is None
+                        and not row.get("native_pre_transport_blocked")
+                        for row in rest_requests
+                    ),
+                    confirmed_native_pre_transport_blockers=sum(
+                        bool(row.get("native_pre_transport_blocked"))
+                        for row in rest_requests
                     ),
                     current_native_method_completions=sum(
                         row["current_native_method_completion_verified"]
@@ -757,6 +798,9 @@ def main():
                 f'dedicated handler={request["dedicated_domain_handler"]}; '
                 f'current native method completion={request["current_native_method_completion_verified"]}'
             )
+            if request.get("native_pre_transport_blocked"):
+                text.append("    Blocker: " + request["native_pre_transport_blocker"])
+                text.append("    Backend scope: " + request["coverage_scope"])
     (DATA / "backend-coverage-inventory.txt").write_text("\n".join(text) + "\n")
     print(json.dumps(inventory["counts"]))
 

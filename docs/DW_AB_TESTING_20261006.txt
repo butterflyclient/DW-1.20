@@ -61,7 +61,9 @@ catalog, with at most eight selected active enrollments in the native reply.
 Each cohort has at most one treatment; modifiers are an opaque nonempty string
 of at most 1023 bytes with no NUL. Duplicate JSON keys/IDs, zero/overflowed
 weights, malformed schedules, cross-title/context state and unknown fields fail
-before state publication. The exact native reply is bounded below 16000 bytes.
+before state publication. The original legacy reader at 0x1420FF640 accepts an
+8096-byte string buffer including its terminator. Both transports therefore
+bound the exact JSON reply to at most 8095 bytes before state publication.
 
 Enrollment state is account/title/context owned. Revision rollback and changed
 content reusing a revision fail. To retire a published experiment, publish a

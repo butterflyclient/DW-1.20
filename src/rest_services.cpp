@@ -5,6 +5,7 @@
 #include "social_services.h"
 #include "regulation_services.h"
 #include "objectstore_services.h"
+#include "abtesting_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <set>
@@ -229,6 +230,11 @@ namespace services
         if (auto handled = objectStoreRest(directory, id, r))
         {
             handled->detail += reply.detail;
+            return *handled;
+        }
+        if (auto handled = abTestingRest(directory, id, r))
+        {
+            handled->detail = reply.detail;
             return *handled;
         }
         RESTResult result;

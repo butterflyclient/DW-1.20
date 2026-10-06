@@ -3,8 +3,8 @@ REPLAY DW BACKEND COVERAGE INVENTORY
 Full backend and full native method audit remain incomplete.
 Handler registration, protocol fixtures and native method completion are separate gates.
 
-Server SHA256: 612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400
-Game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Server SHA256: 9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f
+Game SHA256: bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
 Known task routes: 140; registered: 134; known target tasks without handler: 6
 
 3: legacy teams
@@ -125,7 +125,7 @@ Known task routes: 140; registered: 134; known target tasks without handler: 6
 194: AB enrollment
   Handlers: 1
   Missing known handlers: none in current constructor set
-  Remaining: Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch are verified on the current proof-bound artifact. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes.
+  Remaining: Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch have a hash-bound receipt; current-image completion is evaluated separately. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes. Both transports preflight the original legacy reader's 8096-byte buffer including its terminator before publication. The explicit abtesting/enroll REST handler shares account-owned cohorts and token state with task 194/1; encrypted fixtures cover the exact 8095-byte boundary and overflow. Original Replay's REST writer leaves serviceName empty and its own validator rejects that request before transport; the explicit backend route does not fix or establish completion of that native REST path.
 
 195: scripted loot
   Handlers: 1
@@ -154,6 +154,8 @@ No map tests performed. No generic success replies or native fence overrides.
 Exact-target direct REST request inventory (response semantics remain separate):
   0x1420FCBB0 bdGetCrossPlatformUserSearchRequest::restSerializeRequest: services=['umbrella']; resource/operations=[['UserResource', 'usernamesearch']]; literal binding resolved=True; dedicated handler=True; current native method completion=False
   0x1420FFE50 bdABTestingEnrollRequest::restSerializeRequest: services=[]; resource/operations=[['abtesting', 'enroll']]; literal binding resolved=False; dedicated handler=None; current native method completion=False
+    Blocker: Original writer leaves serviceName empty; original SDK validator rejects the request before sending
+    Backend scope: Explicit backend route implemented; original native writer requires a service-name correction and live REST callback validation
   0x142100230 bdRenameCrossPlatformUserRequest::restSerializeRequest: services=['uno']; resource/operations=[['UserResource', 'renameUsername']]; literal binding resolved=True; dedicated handler=False; current native method completion=False
   0x142100B00 bdUpgradeAnonUnoAccRequest::restSerializeRequest: services=['uno']; resource/operations=[['UnoRes', 'updatesecuredfields']]; literal binding resolved=True; dedicated handler=False; current native method completion=False
   0x142102A60 bdReportEventsRequest::restSerializeRequest: services=[]; resource/operations=[['user_events', 'report_user_events_batch']]; literal binding resolved=False; dedicated handler=None; current native method completion=False

@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "passed": true,
-  "observed_utc": "2026-10-06T15:11:16.543294+00:00",
-  "server_sha256": "612779df4f0d84547b490f1530da9809ffef5cf206ea18544e41056c834d2400",
-  "game_sha256": "b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885",
+  "observed_utc": "2026-10-06T16:50:57.611312+00:00",
+  "server_sha256": "9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f",
+  "game_sha256": "bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18",
   "sources": {
-    "src/abtesting_services.cpp": "e7b82418fe0c15ccb498fdb3af16cce2c3a9d0f604f9ce6b641252108d78f1b7",
-    "src/abtesting_services.h": "081b4a27fa5dcf01edf4ce3e4d73b08c964c695a794c786736b2432b230154e4",
+    "src/abtesting_services.cpp": "891e46c21c0e51df85f6d276221d698ad44811e218a7790f869176d4a9218083",
+    "src/abtesting_services.h": "1e0f918b588c4da81af6b5b8948affac58400c8b94cb5fbaf0590497cc9387b4",
     "src/engagement_services.cpp": "2248b4e10629422e80665189f5d6e659641acb28f8ffca0a932a40368f4c6466",
     "tools/observe-game.py": "401ffb650c9143adafe88d2586115a059869dfb140d07c7c00f0d8b06119f0a8",
     "tools/record-native-abtesting-proof.py": "55525aaf835cb20d0a2781f6b7214ed4fa5e0e1c4a30b45dbb324290a428d2d5"
@@ -30,10 +30,10 @@
   "two_network_multiplayer_verified": false,
   "complete_backend_verified": false,
   "observations": {
-    "data/native-ab-testing-20261006/party.json": "153375cd12e0bceec326a814dd65a59c759b56d6e9ac9b3057d0e04978e21abc",
-    "data/native-ab-testing-20261006/restarted.json": "fcd3e7365b493e9fc3b78cad9a2162093d974b21e803c0343b327be8639b2265",
-    "data/native-ab-testing-20261006/restored.json": "67751b86224f7583fa1614c0e26ea8d64dc1a0622a84a035170eda5d301e6b27",
-    "data/native-ab-testing-20261006/cleanup.json": "ec4f33d64f857269b86c8609a35772f0a605aa72fe112418f9dc9f270434854b"
+    "data/native-ab-rest-20261006/active.json": "5af76319fc54d8d6e3373ea33df157450660308980b05aaeac7b5c46d28e0f4a",
+    "data/native-ab-rest-20261006/restarted.json": "fd3ea4d78f52a59f92d24cc4f53e10a3b79864e13cf9cbea08259c60994ce30a",
+    "data/native-ab-rest-20261006/restored.json": "883676bd7d01852cf584b1a628f2a35e3ceeb6f9d29e3817bb22cd3b8bc7a462",
+    "data/native-ab-rest-20261006/cleanup.json": "74032170ef741e2a17f75104af12ec888427fd4809fd7f869905d8f424bbf324"
   },
   "scope": "One explicit active dvar treatment consumed by the unchanged native game before and after backend restart; future schedules and other modifier types have separate validation scopes."
 }

@@ -2980,6 +2980,13 @@ try:
     username_fixtures.exercise(
         client, title, user, peer_user, native_rest, rest_response, blob, checks
     )
+    import abtesting_rest_fixtures
+
+    ab_rest_fixture = abtesting_rest_fixtures.exercise(
+        client, peer_client, directory, title, user, peer_user, native_rest, rest_response,
+        enroll_params, (blob, structure, pb_text, pb_bytes, pb_integer, pb_fields), checks,
+    )
+
     import objectstore_rest_fixtures
 
     objectstore_rest_restart = objectstore_rest_fixtures.exercise(
@@ -4405,6 +4412,9 @@ try:
         and resumed["enrollments"] == []
     )
     abtesting_fixtures.after_restart(client, ab_fixture, pb_fields, checks)
+    abtesting_rest_fixtures.after_restart(
+        client, ab_rest_fixture, rest_response, pb_fields, checks
+    )
     assert client.task(145, 4, qos_report) == []
     native_host = json.loads(client.task(145, 25, qos_query)[1:-1])["hosts"][0]
     host_address = base64.b64decode(native_host["address"], validate=True)

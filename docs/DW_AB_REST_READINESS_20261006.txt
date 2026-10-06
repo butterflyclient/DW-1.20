@@ -1,0 +1,77 @@
+REPLAY DW AB ENROLLMENT TRANSPORT AND MULTIPLAYER READINESS
+
+Implementation
+The explicit abtesting / abtesting / enroll REST domain shares the existing
+task-194/1 account-owned enrollment implementation. It accepts the original
+bodyless POST shape and relative abtesting/v2/users/<account>-<id>/enrollments/
+URI, JSON Accept and no Content-Type. UNO and registered Battle.net aliases bind
+the same signed account. Title/context, cohorts, revision protection, schedules,
+token persistence and atomic-write failures have one implementation for both
+transports. No profile, friendship or experiment is provisioned by default.
+
+Native body boundary correction
+The untouched Replay reader 0x1420FF640 uses an 8096-byte string buffer including
+the terminator. The previous backend's 16000-byte upper limit could acknowledge
+an enrollment that the native legacy client could not read. Both transports
+now preflight a maximum of 8095 serialized JSON bytes before saving state. Eight
+enrollments, one treatment each and 1023 modifier bytes per treatment remain the
+independent native capacities; JSON overhead/escaping still counts toward the
+shared body limit. Overflow preserves the last committed token and enrollment.
+
+Exact target research
+Original request writer 0x1420FFE50 sets POST, JSON Accept, resource abtesting,
+operation enroll and the relative URI. It does not set serviceName. Builder
+constructor 0x1420FC2C0 clears that field at offset 24416; original validator
+0x142169540 rejects the empty field before sending. The research tool executes
+the validator's original instructions in isolation, with external utility calls
+explicitly stubbed. This confirms a client-side pre-transport blocker; adding
+an explicit backend service does not correct that writer or prove a native REST
+callback. The existing native engine enrollment path uses legacy task 194/1.
+
+The REST response handler is 0x1420FF850 at slot one of vtable 0x1423F0028.
+Constructor 0x140F28A60 installs that vtable at response offset 16. These bindings
+are verified from original PE bytes rather than trusting database display names.
+The game executable was not changed or recompiled for this backend integration.
+
+Validation
+The release server builds successfully and all 280 encrypted service groups
+pass. Five added AB groups cover shared positive cohorts/tokens, signed-owner
+aliases, malformed/empty-service requests, the exact 8095-byte boundary and
+8096-byte rejection, failed atomic publication and a real process restart.
+Signed platform/auth/resource gates also pass on the current server image.
+
+Target/VM proof: validation/20261006-abtesting-rest-target-layout.json
+Wire proof: validation/20261006-abtesting-rest-wire.json
+Native treatment proof: validation/20261006-abtesting-native.json
+Native same-server reconnect: validation/20261006-ab-rest-native-same-server-reconnect.json
+
+Current native result
+Server SHA256: 9d65291ea8732de9faedbb8183bc7e2c3aab55d28a856549406b9ad58e9c4a4f
+Game SHA256: bdc091d35dc57f29c10ce14a4552467a5ce0d8c0d881d287ec31f09fc7ee9e18
+The unchanged DW executable ran from E:\IW8\Builds\1.20-replay. Its native
+enrollment callback decoded the published test/cohort/treatment and set the
+actual registered ui_serverFrameDuration from 16 to 17. The same game process
+refetched that treatment after separate backend stop/start and dw_restart.
+Online/profile and all 27 startup fences recovered.
+
+A separate same-server dw_restart retired the old native relay association
+through an authenticated SDK disconnect and established fresh native credentials
+and UDP association. The 64.39-second stability interval contained seven
+keepalive replies, one active association and zero rejected packets. No relay
+dependency-callback fallback was required. Accepted/incoming/outgoing native
+friend lists completed empty; no initial friendship was added.
+
+The temporary publication was removed and the prior enrollment state restored
+before a final native refresh. That final run confirmed empty enrollment,
+ui_serverFrameDuration 16, Online/profile, all 27 fences and connected relay.
+The owned game closed normally and its command controls were removed. Game,
+INI and machine identity hashes are unchanged. The current backend remains live.
+No map or match was started, no game EXE was rebuilt, and no ports were opened.
+
+Limits
+The original native REST service-name correction and its positive live callback
+remain open. Future native treatment schedule polling, other modifier types,
+retail account/token rules and other coverage-ledger gaps remain separate work.
+Two real clients on different networks have not yet proved party JOIN/DATA and
+playable matchmaking. Protocol fixtures and passing startup fences do not
+establish complete backend or two-network gameplay completion.

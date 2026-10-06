@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "abtesting_services.h"
+#include "rest_services.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <chrono>
@@ -13,6 +14,10 @@ namespace services
     namespace
     {
         using Json = nlohmann::json;
+        // Original Replay 1420FF640 reads into an 8096-byte string buffer,
+        // including its terminator. Both transports share this bounded domain
+        // so a REST enrollment remains readable after a legacy refetch.
+        constexpr size_t enrollmentBodyCapacity = 8096;
 
         void valid(bool condition)
         {
@@ -146,7 +151,8 @@ namespace services
 
     Reply abTestingEnroll(const std::filesystem::path &root,
                           const platform::LobbyIdentity &id,
-                          const std::string &url)
+                          const std::string &url,
+                          std::optional<uint32_t> restVersion)
     {
         wire::require(url.find('#') == std::string::npos);
         const auto route = url.find("/v2/users/");
@@ -335,16 +341,38 @@ namespace services
             {"ABToken", state.at("token")},
             {"enrollments",
              native}}.dump();
-        valid(bytes.size() < 16000);
-        Reply reply{0, {}, "ab-enrollment-read", true, {}};
-        wire::Bytes header;
-        proto::text(header, 1, "Content-Length");
-        proto::text(header, 2, std::to_string(bytes.size()));
-        proto::bytes(reply.structure, 1, header);
-        proto::integer(reply.structure, 2, 200);
-        proto::text(reply.structure, 3, bytes);
+        valid(bytes.size() < enrollmentBodyCapacity);
+        Reply reply{0, {}, "ab-enrollment-read"};
+        if (restVersion)
+            reply.rest = RESTResult{*restVersion, 200, bytes};
+        else
+        {
+            reply.structured = true;
+            wire::Bytes header;
+            proto::text(header, 1, "Content-Length");
+            proto::text(header, 2, std::to_string(bytes.size()));
+            proto::bytes(reply.structure, 1, header);
+            proto::integer(reply.structure, 2, 200);
+            proto::text(reply.structure, 3, bytes);
+        }
         if (previous != state)
             publish(statePath, state);
         return reply;
+    }
+
+    std::optional<Reply> abTestingRest(const std::filesystem::path &root,
+                                       const platform::LobbyIdentity &id,
+                                       const RESTRequest &r)
+    {
+        if (r.service != "abtesting" || r.resource != "abtesting" || r.operation != "enroll")
+            return std::nullopt;
+        // Original 1420FFE50 emits a bodyless POST, JSON Accept, and this
+        // relative gateway prefix. It omits setServiceName; 142169540 rejects
+        // that empty name locally. Require an explicitly addressed request
+        // rather than weakening the common envelope to accept that SDK bug.
+        wire::require(r.method == 0x504F5354u && r.accept == 1 && r.content == 0 && !r.hasBody &&
+                      r.body.empty() && !r.headers.contains("content-type") &&
+                      r.uri.starts_with("abtesting/v2/users/"));
+        return abTestingEnroll(root, id, r.uri.substr(9), r.version);
     }
 } // namespace services
