@@ -55,12 +55,21 @@ The primary-slot/platform iteration has its own receipt at
 `validation/20261006-constraints-native-reconnect.json`.
 The object-store recovery iteration is recorded in
 `validation/20261006-objectstore-native-reconnect.json`.
-The current recipient-purchase iteration has its own receipt at
+The recipient-purchase iteration has its own receipt at
 `validation/20261006-gifts-native-reconnect.json`.
+The current lobby-session lifetime iteration has its own receipt at
+`validation/20261006-session-presence-native-reconnect.json`.
 Two-network party gameplay and the earlier main-menu-return issue still need
 separate validation. Use controlled game stops for executable replacements.
 Disk-backed publications, including marketing and scripted-loot catalogs, are
 read per request and can already be updated without restarting either process.
+
+Online recipients now require a registered, valid issuer lease. Revoked idle
+and incomplete lobby reads retire during the existing receive polling interval,
+and keepalives cannot extend a revoked session. Presence/channel teardown
+preserves another valid session for that player and publishes offline on the
+last valid disconnect. See `docs/lobby-session-lifetime.txt` for the scoped
+behavior and fixture/native validation distinction.
 
 The server defaults to loopback. Optional `data/network.json` configures the
 listener/public IPv4 addresses and fixed QoS, relay and bandwidth ports for an

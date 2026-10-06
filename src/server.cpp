@@ -463,10 +463,12 @@ namespace
             try
             {
                 const auto body = request.substr(bodyAt, length);
-                const auto response = challenge ? platform::clientChallenge(body) : platform::clientLogin(body);
+                const auto response =
+                    challenge ? platform::clientChallenge(body) : platform::clientLogin(body);
                 reply(socket, 200, response, "application/octet-stream");
                 if (!challenge)
-                    log("PLATFORM machine-owned identity verified; native DW authentication required");
+                    log("PLATFORM machine-owned identity verified; native DW authentication "
+                        "required");
             }
             catch (const std::exception &error)
             {
@@ -495,8 +497,8 @@ namespace
                     reply(socket, 403, "{\"error\":\"platform_access_rejected\"}");
                     return;
                 }
-                auto response = platform::login(request.substr(bodyAt, length), profile,
-                                                playerNameHeader.value_or(""));
+                auto response = platform::login(
+                    request.substr(bodyAt, length), profile, playerNameHeader.value_or(""));
                 reply(socket, 200, response, "application/octet-stream");
                 log("PLATFORM issued signed local identity/session; native DW authentication still "
                     "required");
@@ -580,7 +582,7 @@ namespace
                    SO_RCVTIMEO,
                    reinterpret_cast<const char *>(&timeout),
                    sizeof(timeout));
-        lobby::serve({[socket, &reads](std::span<uint8_t> bytes)
+        lobby::serve({[socket, &reads](std::span<uint8_t> bytes, const lobby::IO::ReadGuard &guard)
                       {
                           const auto begin = std::chrono::steady_clock::now();
                           auto partial = begin;
@@ -588,6 +590,8 @@ namespace
                           const auto idle = std::chrono::seconds(++reads < 5 ? 30 : 600);
                           while (at < bytes.size() && !stopping.load())
                           {
+                              if (guard && !guard())
+                                  return false;
                               const int n = recv(socket,
                                                  reinterpret_cast<char *>(bytes.data() + at),
                                                  static_cast<int>(bytes.size() - at),
@@ -605,7 +609,7 @@ namespace
                                   (at && now - partial > std::chrono::seconds(10)))
                                   return false;
                           }
-                          return at == bytes.size();
+                          return at == bytes.size() && (!guard || guard());
                       },
                       [socket](std::span<const uint8_t> bytes)
                       {

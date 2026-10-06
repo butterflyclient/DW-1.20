@@ -3397,6 +3397,24 @@ try:
     assert renewed_peer.task(145, 13, u64(offline_lobby))[0] == 16
     assert renewed_peer.task(145, 10, u64(offline_lobby)) == []
     assert renewed_peer.receive() == (2, u32(2002) + u64(offline_lobby) + u64(0))
+    from session_presence_fixtures import exercise as test_session_presence
+
+    test_session_presence(
+        client,
+        renewed_peer,
+        renewed_peer_auth,
+        peer_credentials,
+        request,
+        post,
+        Client,
+        native_rest,
+        rest_response,
+        user,
+        peer_user,
+        u32,
+        text,
+        checks,
+    )
     renewed_peer.close()
     checks.append(
         "a reauthenticated online host cannot revive an old lobby's endpoint/DTLS session through either presence target or a host update; read-only inspection and owner disband remain available"
@@ -3970,8 +3988,13 @@ try:
     c.task(38, 7, text("0" * 64), error=101)
     with post("/auth/", request) as response:
         json.load(response)
-    c.s.sendall(c.record(bytes([12, 3, 6, 0])))
-    assert c.s.recv(1) == b""
+    from session_presence_fixtures import expect_disconnect
+
+    try:
+        c.s.sendall(c.record(bytes([12, 3, 6, 0])))
+    except ConnectionResetError:
+        pass  # The guard already retired this revoked idle connection.
+    expect_disconnect(c.s)
     c.close()
     # Recover this fixture's new native tickets before testing another connection.
     with post("/auth/", request) as response:

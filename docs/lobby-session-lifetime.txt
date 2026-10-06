@@ -1,0 +1,44 @@
+REPLAY LOBBY SESSION LIFETIME AND PRESENCE
+
+The original protocol-210 encrypted lobby handshake, challenge, task records,
+keepalive format and signed issuer lease are unchanged. No native result layout,
+task ID, game fence or game executable is altered by this backend change.
+
+Previously, lobby::online used only the connection registry. Authentication can
+rotate a session key while its old socket is idle, so that entry could report a
+recipient online even after platform::valid rejected its credentials. The native
+task loop checked credentials after frame() returned; frame() handles keepalives
+internally, and the transport can wait 600 seconds for an idle frame. A partial
+header/body also retained the endpoint until its receive deadline.
+
+General online checks now snapshot registered identities under onlineMutex and
+validate issuer leases after releasing that lock, matching sessionOnline's
+existing lock order. At least one registered, valid identity is required. Auth
+credentials without an authenticated lobby connection do not count as online.
+
+IO carries the existing native identity's read guard once handshake validation
+finishes. The transport checks it before recv, on each existing one-second
+receive timeout, and after completing the requested bytes. This covers empty
+keepalive headers, partial headers and partial bodies as well as idle sockets.
+Handshake reads retain their existing limits and have no authenticated guard.
+Valid connections retain the existing idle and incomplete-read deadlines; this
+does not shorten all healthy sessions or impose a keepalive lifetime limit.
+
+Invalid readers return through the normal endpoint lease teardown. The existing
+channel cleanup and scoped presence service publish offline only when no other
+valid endpoint for that title/account remains. Two sockets sharing a still-valid
+key and independently signed sessions for the same account are both supported.
+An old socket's retirement cannot treat another valid session as offline.
+Presence revision checks retain their existing protection against older queued
+pushes overtaking a later publication. No new push format is invented.
+
+tools/session_presence_fixtures.py uses the isolated fixture's existing peer
+account and independent encrypted native-wire clients. It verifies last-valid
+disconnect notifications, duplicate sockets, immediate revoked-lease presence,
+idle and partial-header retirement without sending a task, revoked keepalive
+rejection and independent/replacement session survival. Production credentials,
+machine identities and friendships are not changed by those fixtures.
+
+These checks cover protocol/domain behavior. Native startup/reconnect on the
+fresh backend is recorded separately. Native credential-expiry UI callbacks,
+two-network friends/party/gameplay and host migration remain distinct gates.

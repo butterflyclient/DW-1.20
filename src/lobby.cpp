@@ -5,6 +5,7 @@
 #include "services.h"
 #include "bandwidth.h"
 #include "traffic_kdf.h"
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <condition_variable>
@@ -110,7 +111,8 @@ namespace lobby
                     bool online = false;
                     for (const auto &entry : endpoints)
                         if (entry.second->identity.titleId == endpoint->identity.titleId &&
-                            entry.second->identity.userId == endpoint->identity.userId)
+                            entry.second->identity.userId == endpoint->identity.userId &&
+                            platform::valid(entry.second->identity))
                             online = true;
                     if (!online)
                         try
@@ -354,7 +356,7 @@ namespace lobby
             for (;;)
             {
                 std::array<uint8_t, 4> header{};
-                if (!io.read(header))
+                if (!io.read(header, io.authenticatedRead))
                     return {};
                 const auto size = wire::at<uint32_t>(header, 0);
                 wire::require(size <= maxFrame);
@@ -375,7 +377,7 @@ namespace lobby
                 }
                 Bytes data(header.begin(), header.end());
                 data.resize(size + 4);
-                if (!io.read(std::span(data).subspan(4)))
+                if (!io.read(std::span(data).subspan(4), io.authenticatedRead))
                     return {};
                 ++frames;
                 return data;
@@ -456,8 +458,17 @@ namespace lobby
 
     bool online(uint32_t title, uint64_t user)
     {
-        std::lock_guard lock(onlineMutex);
-        return onlineUsers.contains({title, user});
+        std::vector<platform::LobbyIdentity> identities;
+        {
+            std::lock_guard lock(onlineMutex);
+            const auto entry = onlineUsers.find({title, user});
+            if (entry != onlineUsers.end())
+                for (const auto &[fingerprint, session] : entry->second)
+                    identities.push_back(session.identity);
+        }
+        // A registered but revoked idle socket is not an online recipient. Keep
+        // authentication outside the registry lock, as sessionOnline does.
+        return std::any_of(identities.begin(), identities.end(), platform::valid);
     }
 
     bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint)
@@ -498,7 +509,7 @@ namespace lobby
             Bytes hello(4);
             for (unsigned attempt = 0;; ++attempt)
             {
-                if (!io.read(hello))
+                if (!io.read(hello, io.authenticatedRead))
                     return;
                 if (wire::at<uint32_t>(hello, 0) != 0)
                     break;
@@ -508,7 +519,7 @@ namespace lobby
             }
             wire::require(wire::at<uint32_t>(hello, 0) == 200);
             hello.resize(28);
-            if (!io.read(std::span(hello).subspan(4)))
+            if (!io.read(std::span(hello).subspan(4), io.authenticatedRead))
                 return;
             wire::require(wire::at<uint32_t>(hello, 4) == 200 &&
                           wire::at<uint32_t>(hello, 8) <= 210 &&
@@ -568,6 +579,13 @@ namespace lobby
             SecureZeroMemory(trafficSession.data(), trafficSession.size());
             SecureZeroMemory(prk.data(), prk.size());
             SecureZeroMemory(challenge.data(), challenge.size());
+            io.authenticatedRead = [&identity, &io]
+            {
+                if (platform::valid(identity))
+                    return true;
+                io.log("LOBBY retired expired or superseded issuer lease during read");
+                return false;
+            };
             if (!io.write(done))
                 return;
             wire::Writer connectionMessage;

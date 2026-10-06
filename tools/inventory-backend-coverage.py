@@ -103,7 +103,7 @@ GAPS = {
     "195": "Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.",
     "197": "Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.",
     "198": "Current family implemented; multi-game native peer/chat and reconnect coverage remain open.",
-    "255": "Friends/user lists/presence/event ingestion implemented; other REST mutations need explicit request/result/domain contracts.",
+    "255": "Friends/user lists/presence/event ingestion implemented. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Native expiry UI callbacks and two-network lifecycle remain unverified; other REST mutations need explicit request/result/domain contracts.",
 }
 
 

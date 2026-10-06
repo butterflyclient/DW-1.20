@@ -1,0 +1,66 @@
+REPLAY DW LOBBY SESSION/PRESENCE READINESS
+2026-10-06
+
+Issue
+Revoked idle lobby sockets could retain online status for up to ten minutes.
+The native task loop checked credentials only after frame() returned, while
+the framing loop handled keepalives internally. Incomplete reads retained
+the same endpoint until the receive deadline.
+
+Research
+General online lookup counted the connection registry without validating its
+issuer leases. Host-specific sessionOnline already validated the issuer outside
+the registry lock. The transport polls recv every second, so existing polling
+can retire revoked sessions without a new background manager or wire protocol.
+Normal endpoint teardown already owns channel cleanup and revision-protected,
+scoped native presence notifications.
+
+Fix
+Online queries require at least one registered, valid issuer identity.
+After the original handshake verifies its challenge, transport read waits check
+that identity's lease before recv, on polling and after completing bytes.
+Revoked idle, keepalive and partial reads return through normal endpoint teardown.
+Disconnect handling counts only other valid endpoints for that title/account.
+Duplicate sockets and independently signed sessions remain online until their
+last valid connection disconnects. Windows FIN and unread-data connection-reset
+responses both count as disconnection in the fixture; neither permits an echo
+or successful native task result.
+
+Build
+Fresh backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: 5cca1c9771e91a99d3a3095cebe9b48d781af9ff562a1c1efa5a3e39abca050e
+Unchanged game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Private compiler job retained: 436f999a3d444276
+Unrelated Con_Developer.cpp and DW_PlayerDataPath.cpp work was preserved.
+
+Evidence
+213 grouped independent encrypted-protocol/service checks passed on this image.
+Four new groups cover duplicate sockets, revoked idle/partial-header reads,
+immediate offline queries, exact scoped push delivery, revoked keepalives,
+independent valid sessions and replacement/last-valid disconnect behavior.
+Signed platform/auth/resource checks and local identity persistence passed.
+Native startup from the root game folder reached all 27 fences, profile sign-in,
+Online state, completed empty friend lists and authenticated relay establishment.
+The backend was stopped and restarted separately, then dw_restart reconnected
+the same game process/account with a newly issued relay credential.
+Stability lasted 65.819 seconds with seven fresh keepalive replies and no relay
+rejections. The owned test game closed normally and test command markers were
+removed. The current backend remains running. No game executable rebuild,
+proxy, map/match test or extra public port.
+
+validation/20261006-session-presence.json
+validation/20261006-session-presence-native-reconnect.json
+data/lobby-verification.json
+data/session-leases-build-20261006.log
+data/session-leases-suite-20261006.log
+data/native-session-presence-final-20261006.jpg
+docs/lobby-session-lifetime.txt
+
+Remaining gates
+Full backend work remains active. Native credential-expiry UI callbacks and
+two-network social/party/gameplay still require separate validation. Menu-driven
+flows remain behind the unaccepted Terms of Agreement. No acceptance was made.
+Six known constructor routes and additional indirect/REST/push coverage remain
+open, along with host migration and other previously documented native callbacks.
+Use controlled restarts and dw_restart; dw_leave remains excluded.
