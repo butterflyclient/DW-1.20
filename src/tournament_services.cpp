@@ -3,6 +3,7 @@
 #include "matchmaking_store.h"
 #include "lobby.h"
 #include "matchmaking_services.h"
+#include "tournament_map_policy.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
@@ -238,6 +239,8 @@ namespace services
                                {"formation", row.at("formation")}};
             if (row.contains("round_rules"))
                 definition["round_rules"] = row["round_rules"];
+            if (row.contains("native_map_pool"))
+                definition["native_map_pool"] = row["native_map_pool"];
             return definition;
         }
 
@@ -251,6 +254,12 @@ namespace services
                       definition.at("num_teams").is_number_unsigned() &&
                       (definition["num_teams"] == 8 || definition["num_teams"] == 16));
             const auto teamCount = definition["num_teams"].get<unsigned>();
+            if (row.contains("native_map_pool"))
+            {
+                persisted(row.contains("round_rules"));
+                validateTournamentMapPolicy(row["native_map_pool"],
+                                            row["native_map_pool"].at("title").get<uint32_t>());
+            }
             if (row.contains("round_rules"))
             {
                 const auto &rules = row["round_rules"];
@@ -310,13 +319,16 @@ namespace services
                       record.at("expires").is_number_unsigned() &&
                       record.at("definition").is_object() &&
                       record["definition"].size() ==
-                          (record["definition"].contains("round_rules") ? 6 : 5) &&
+                          5 + (record["definition"].contains("round_rules") ? 1 : 0) +
+                              (record["definition"].contains("native_map_pool") ? 1 : 0) &&
                       record["definition"].at("id") == id &&
                       record["definition"].at("expires") == record["expires"] &&
                       boundedText(record["definition"].at("name"), 128) &&
                       boundedText(record["definition"].at("data_center"), 64) &&
                       record.at("parties").is_object() && record["parties"].size() <= 64);
             const auto expected = emptyBracket(record["definition"]);
+            if (record["definition"].contains("native_map_pool"))
+                validateTournamentMapPolicy(record["definition"]["native_map_pool"], title);
             const auto &state = record.at("state");
             const auto members = validateBracket(state, id);
             persisted(state["tournamentDefinition"] == expected["tournamentDefinition"]);
@@ -395,6 +407,7 @@ namespace services
                       result.at("tournaments").is_array() && result["tournaments"].size() <= 128);
             std::set<uint64_t> ids;
             std::set<std::pair<std::string, std::string>> names;
+            Json available = Json::array();
             matchmaking_store::recover(path.parent_path().parent_path().parent_path() /
                                            "matchmaking" / std::to_string(title),
                                        title);
@@ -413,6 +426,19 @@ namespace services
                               .emplace(row["name"].get<std::string>(),
                                        row["data_center"].get<std::string>())
                               .second);
+                persisted(!row.contains("native_map_pool"));
+                if (row.contains("native_map_pool_revision"))
+                {
+                    persisted(row.contains("formation") && row.contains("round_rules") &&
+                              row["native_map_pool_revision"].is_number_unsigned() &&
+                              row["native_map_pool_revision"].get<uint64_t>() > 0 &&
+                              row["native_map_pool_revision"].get<uint64_t>() <= UINT16_MAX);
+                    const auto policy =
+                        tournamentMapPolicy(path.parent_path().parent_path().parent_path(), title);
+                    if (!policy || policy->at("revision") != row["native_map_pool_revision"])
+                        continue;
+                    row["native_map_pool"] = *policy;
+                }
                 if (row.contains("formation"))
                 {
                     // A formation publication specifies capacity, never player IDs
@@ -426,8 +452,9 @@ namespace services
                 validateBracket(row.at("state"), row["id"].get<uint64_t>());
                 if (row.contains("live_updates"))
                     persisted(row["live_updates"].is_boolean());
+                available.push_back(std::move(row));
             }
-            return result["tournaments"];
+            return available;
         }
 
         void validateEnrollments(const Json &result, uint32_t title)
@@ -1008,7 +1035,8 @@ namespace services
                            Json &formation,
                            std::vector<matchmaking_store::Write> &writes)
         {
-            if (!row.contains("round_rules") || formation["state"]["tournamentStatus"] != "PLAYING")
+            if (!row.contains("round_rules") || !row.contains("native_map_pool") ||
+                formation["state"]["tournamentStatus"] != "PLAYING")
                 return false;
             Json updated = row;
             updated["state"] = formation["state"];
@@ -1057,6 +1085,8 @@ namespace services
                         if (searchIds.insert(search->at("id").get<uint64_t>()).second)
                             searches.push_back(*search);
                     }
+                    const auto maps =
+                        tournamentMapsForId(row["native_map_pool"], row["id"].get<uint64_t>());
                     auto plan = prepareTournamentRoundLobby(directory,
                                                             title,
                                                             row["id"].get<uint64_t>(),
@@ -1065,7 +1095,8 @@ namespace services
                                                             teams,
                                                             searches,
                                                             row["round_rules"][round],
-                                                            row["expires"].get<uint64_t>());
+                                                            row["expires"].get<uint64_t>(),
+                                                            maps[round]);
                     if (!plan)
                         return false;
                     auto &assigned = formation["state"]["rounds"][round]["matches"][index];
@@ -1368,7 +1399,7 @@ namespace services
         const auto tournament = enrolled["players"][key]["id"].get<uint64_t>();
         const auto rows = catalog(root / "catalog.json", title);
         const auto *row = published(rows, tournament, user);
-        if (!row || !row->contains("round_rules") ||
+        if (!row || !row->contains("round_rules") || !row->contains("native_map_pool") ||
             row->at("state")["tournamentStatus"] != "PLAYING" ||
             !enrolled["players"][key].contains("accepted_session") ||
             !lobby::sessionOnline(

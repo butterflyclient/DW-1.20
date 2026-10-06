@@ -14,5 +14,6 @@ namespace services
 
     std::optional<PlaylistSelection> selectPlaylist(const std::filesystem::path &directory,
                                                     uint32_t title,
-                                                    const nlohmann::json &query);
+                                                    const nlohmann::json &query,
+                                                    const std::string &requiredMap = {});
 } // namespace services

@@ -13,13 +13,24 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
     root = directory / "tournaments" / str(title)
     catalog_path, enrollment_path = root / "catalog.json", root / "enrollments.json"
     policy_path = directory / "playlists" / str(title) / "policy.json"
+    map_path, revision_path = root / "map-pools.json", root / "map-pools.applied.json"
     originals = {
-        p: p.read_bytes() for p in (catalog_path, enrollment_path, policy_path)
+        p: p.read_bytes() if p.exists() else None
+        for p in (catalog_path, enrollment_path, policy_path, map_path, revision_path)
     }
     mm_root = directory / "matchmaking" / str(title)
     tournament = (1 << 62) + 561
     clients, search_ids = [], {}
     query = {"ruleset_payload": copy.deepcopy(match_query["ruleset_payload"])}
+    maps = ["mp_shipment", "mp_rust", "mp_shipment", "mp_rust"]
+    map_policy = {
+        "schema": 1,
+        "title": title,
+        "revision": 73,
+        "rounds": [["mp_rust", "mp_shipment"] for _ in range(4)],
+    }
+    enabled_policy = json.loads(originals[policy_path])
+    enabled_policy["available_maps"] = ["mp_rust", "mp_shipment"]
     publication = {
         "id": tournament,
         "name": str(tournament),
@@ -29,6 +40,7 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         "start_search_offset_seconds": 1.25,
         "formation": {"team_size": 1, "num_teams": 8},
         "round_rules": [copy.deepcopy(query) for _ in range(3)],
+        "native_map_pool_revision": map_policy["revision"],
         "live_updates": False,
     }
 
@@ -86,11 +98,11 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         assert backend["team_balance"]["teams"] == expected_teams
         assert not host["team_balance"]["can_change_teams"]
         assert not host["lobby_open_for_pres_join"] and "public_pool" not in state
-        assert backend["ruleset_payload"]["map_weights"]["mp_shipment"] == 1
+        assert backend["ruleset_payload"]["map_weights"][maps[round_index]] == 1
         assert all(
             weight == 0
             for map_name, weight in backend["ruleset_payload"]["map_weights"].items()
-            if map_name != "mp_shipment"
+            if map_name != maps[round_index]
         )
         for member in state["members"]:
             search = json.loads(
@@ -105,12 +117,68 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         return state
 
     try:
+        publish(map_path, map_policy)
+        publish(policy_path, enabled_policy)
         publish(
             catalog_path, {"schema": 1, "title": title, "tournaments": [publication]}
         )
         for i in range(8):
             identity, connection = new_client(20 + i)
             clients.append((identity, connection))
+            if i == 0:
+                native_names = json.loads(
+                    (
+                        directory / "playlists" / str(title) / "native-dvar-names.json"
+                    ).read_bytes()
+                )
+                # No response is published until the revision receipt is durable.
+                blocker = revision_path.with_suffix(revision_path.suffix + ".pending")
+                blocker.mkdir()
+                try:
+                    connection.task(95, 1, text("") + text("general"), error=102)
+                    assert not revision_path.exists()
+                finally:
+                    blocker.rmdir()
+                variables = connection.task(95, 1, text("") + text("general"))
+                assert variables[:6] == b"\x06\x01\0\x06\x49\0"
+                assert variables[6:16] == text("general") + b"\x10"
+                document = json.loads(variables[16:-1])
+                for round_index in range(4):
+                    name = native_names[
+                        f"online_tournament_round_{round_index}_mapnames"
+                    ]
+                    assert document[name] == "mp_rust,mp_shipment"
+                accepted = revision_path.read_bytes()
+                for bad_json in (
+                    json.dumps(map_policy) + " trailing-content",
+                    json.dumps(map_policy).replace(
+                        '"revision": 73', '"revision": 72, "revision": 73'
+                    ),
+                ):
+                    map_path.write_text(bad_json)
+                    connection.task(95, 1, text("") + text("general"), error=102)
+                    assert revision_path.read_bytes() == accepted
+                for bad in (
+                    dict(map_policy, revision=0),
+                    dict(map_policy, title=title + 1),
+                    dict(map_policy, rounds=[["mp_rust", "mp_rust"] for _ in range(4)]),
+                    dict(map_policy, rounds=[["map_" + str(n) for n in range(9)]] * 4),
+                    dict(
+                        map_policy,
+                        rounds=[["mp_shipment", "mp_rust"] for _ in range(4)],
+                    ),
+                    dict(map_policy, revision=72),
+                ):
+                    publish(map_path, bad)
+                    connection.task(95, 1, text("") + text("general"), error=102)
+                    assert revision_path.read_bytes() == accepted
+                publish(map_path, map_policy)
+                assert (
+                    connection.task(95, 1, text("iw8") + text("general")) == variables
+                )
+                checks.append(
+                    "Canonical tournament pools publish native Replay dvar bindings with version 73 only after durable revision storage; blocked writes, trailing/duplicate JSON, malformed pools, foreign title, duplicate/oversized pools, rollback and changed content under the same revision fail before revision mutation"
+                )
             assert connection.task(145, 2, text(json.dumps(player_info))) == []
             token = struct.unpack_from("<Q", connection.task(145, 3), 1)[0]
             connection.task(
@@ -159,7 +227,7 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         # prepared, before the account assignment index can be published.
         blocker = mm_root / "current-lobbies.json.pending"
         blocker.mkdir()
-        policy_path.write_bytes(originals[policy_path])
+        publish(policy_path, enabled_policy)
         try:
             ready(1, error=102)
             journal = json.loads((mm_root / "transaction.json").read_bytes())
@@ -196,7 +264,7 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             assert lobby_packet(left + 1, bracket, 0, left // 2) == state
         assert len({m["lobbyID"] for m in bracket["rounds"][0]["matches"]}) == 4
         checks.append(
-            "Four independent ready tournament matches allocate distinct closed native lobbies with actual party search IDs, exact create/join envelopes, Replay tournament/team/round metadata and Shipment-only rules from the common playlist policy"
+            "Four independent ready tournament matches allocate distinct closed native lobbies with actual party search IDs, exact create/join envelopes, Replay tournament/team/round metadata and native-selected available map rules"
         )
 
         # A connection lost after publication recovers both bracket and its join.
@@ -273,8 +341,33 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         checks.append(
             "Authenticated host results advance all seven matches through an eight-team tournament; later rounds require fresh scoped readiness and retain distinct native lobby/search/index assignments without carrying forward old ready flags"
         )
+        accepted = revision_path.read_bytes()
+        revised = dict(map_policy, revision=74, rounds=[["mp_shipment"]] * 4)
+        publish(map_path, revised)
+        changed = dict(publication, native_map_pool_revision=74)
+        publish(catalog_path, {"schema": 1, "title": title, "tournaments": [changed]})
+        clients[0][1].task(145, 20, error=102)
+        assert (
+            json.loads((mm_root / "tournaments" / f"{tournament}.json").read_bytes())
+            == record
+        )
+        # Controlled fixture restoration only; production revisions cannot roll back.
+        revision_path.write_bytes(accepted)
+        publish(map_path, map_policy)
+        publish(
+            catalog_path, {"schema": 1, "title": title, "tournaments": [publication]}
+        )
+        assert (
+            json.loads(clients[0][1].task(145, 20)[1:-1])["rounds"] == bracket["rounds"]
+        )
+        checks.append(
+            "Backend rounds follow Replay's 16-bit tournament-ID map slices and repeat-avoidance fallback; an active competition pins the full policy and rejects changed pools without changing its bracket"
+        )
     finally:
         for _, connection in clients:
             connection.close()
         for path, content in originals.items():
-            path.write_bytes(content)
+            if content is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(content)

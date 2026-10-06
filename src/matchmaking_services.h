@@ -22,7 +22,8 @@ namespace services
         const nlohmann::json &teams,
         const std::vector<nlohmann::json> &searches,
         const nlohmann::json &query,
-        uint64_t expires);
+        uint64_t expires,
+        const std::string &requiredMap = {});
     std::optional<Delivery> tournamentRoundLobbyDelivery(const std::filesystem::path &directory,
                                                          uint32_t title,
                                                          uint64_t user,

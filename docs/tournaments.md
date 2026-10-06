@@ -215,8 +215,9 @@ encrypted clients, exact returned search identity, registration before acceptanc
 subsequent acknowledgement/readiness, idempotent retries, cancellation and
 shutdown, replacement, malformed state and expiry. These protocol checks do
 not establish that the native UI accepted a join or that a tournament is playable.
-Automatic team allocation and completed bracket formation are implemented by
-the capacity publication below. Round-to-lobby scheduling remains open.
+Automatic team allocation, completed bracket formation and round-to-lobby
+scheduling are implemented by the capacity publication below. Native gameplay
+and forfeits remain open.
 
 ## Automatic formation from authenticated parties
 
@@ -298,6 +299,63 @@ the playlist version with the current published catalog version:
 ]
 ```
 
+Round allocation also requires `native_map_pool_revision` on the publication.
+It must match the canonical policy in `data/tournaments/5800/map-pools.json`:
+
+```json
+{
+  "schema": 1,
+  "title": 5800,
+  "revision": 1,
+  "rounds": [["mp_shipment"], ["mp_shipment"], ["mp_shipment"], ["mp_shipment"]]
+}
+```
+
+This example uses Shipment only. No production tournament or player is seeded
+by installing the backend. Four pools are required even for an eight-team
+competition because Replay prepares four native round-map slots. Each pool
+contains one through eight unique lowercase map identifiers of at most 23
+bytes. Names use only letters, digits and underscores. Extra fields, duplicate
+JSON keys, trailing data, invalid titles and revision values outside 1..65535
+are rejected. Each chosen map must still exist with positive weight in that
+round's published playlist and in the installation's available-map policy.
+
+The same canonical policy supplies the four native map-name dvar strings in
+the title-5800 `general` publisher namespace. Bindings come from the generated
+Replay `native-dvar-names.json`, not another build's numeric addresses. Its
+revision becomes the namespace's MinorVersion and cannot be older than the
+configured publisher namespace version. A missing policy leaves ordinary
+publisher variables unchanged; legacy formations without this opt-in do not
+allocate new round lobbies. Refresh publisher variables on clients after a
+new policy is published, using the existing `dw_restart` connection refresh
+when needed. Backend files are read on demand; this does not require a game
+executable rebuild.
+
+The flushed atomic `map-pools.applied.json` receipt binds title, revision and
+the SHA256 of the canonical JSON document. The server rejects a lower revision
+or changed content under an already accepted revision, including after server
+restart. Keep this receipt intact; increment the policy revision for changes.
+An existing competition pins the complete policy snapshot as well as its round
+rules. Publish a new competition ID for changed pools. A publication whose
+requested revision is unavailable is suppressed rather than assigned a map
+different from its declaration.
+
+Map selection follows original Replay `0x141070840` / `0x141070950`. Round N
+uses bits `16*N` through `16*N+15` of the full UInt64 tournament ID. Pools with
+one map always select it. Larger pools first exclude every previously selected
+map; when that exhausts the pool, they exclude only the immediately previous
+map. Remaining candidates retain their published order, and the seed modulo
+their count chooses the index. `tools/verify-tournament-native-map-selector.py`
+executes the untouched PE instructions in Unicorn for 32 independent cases,
+including chained unwind fragments; only the security-cookie checker is
+stubbed. Build `tools/build-tournament-map-check.ps1`, then pass its executable
+as `--compiled-selector` to compare against the exact selector/crypto objects
+used by the backend. All 32 cases match. The Python tool needs the optional
+Unicorn and Capstone packages. This is an isolated CPU check and does not
+establish native tournament playability. A separate focused native startup
+and reconnect pass verified application of the four strings and their revision;
+see `validation/20261006-tournament-map-native-policy.json`.
+
 A round requires two complete teams, both preceding winners when applicable,
 all members' fresh round-scoped readiness and acceptance, and the actual live
 sessions/tokens that authorized their party searches. Cancelled or expired
@@ -333,9 +391,10 @@ join once; ordinary host document updates continue on their existing path.
 `tools/tournament_round_fixtures.py` exercises eight signed machine registrations,
 map-policy waiting, interrupted coupled publication, all four first-round
 allocations, temporary reconnect and all seven result-driven matches. These are
-encrypted protocol checks. Native tournament callbacks, client round-map pool
-alignment, host departure/forfeit rules and playable two-game tournaments remain
-unverified; startup/reconnect evidence does not establish those gates.
+encrypted protocol checks. The pools and backend map choice share the recovered
+native rule. Native tournament callbacks, host departure/forfeit rules and
+playable two-game tournaments remain unverified; startup/reconnect evidence
+does not establish those gates.
 
 ## Live publication changes and disband
 

@@ -93,9 +93,12 @@ namespace services
 
     std::optional<PlaylistSelection> selectPlaylist(const std::filesystem::path &directory,
                                                     uint32_t title,
-                                                    const Json &query)
+                                                    const Json &query,
+                                                    const std::string &requiredMap)
     {
         const auto root = directory / "playlists" / std::to_string(title);
+        if (!requiredMap.empty())
+            (void)identifier(requiredMap, 24);
         const auto catalog = document(root / "catalog.json", 409600, Json());
         if (catalog.is_null())
             return std::nullopt;
@@ -186,6 +189,7 @@ namespace services
                 const auto &entry = playlist["maps"][i];
                 const auto map = entry["map"].get<std::string>();
                 const bool allowed = (!policy.contains("available_maps") || maps.contains(map)) &&
+                                     (requiredMap.empty() || requiredMap == map) &&
                                      entry["weight"].get<double>() > 0;
                 weights[map] = allowed ? entry["weight"] : Json(0);
                 if (allowed)

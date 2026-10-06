@@ -1151,7 +1151,8 @@ namespace services
         const Json &teams,
         const std::vector<Json> &searches,
         const Json &roundQuery,
-        uint64_t expires)
+        uint64_t expires,
+        const std::string &requiredMap)
     {
         wire::require(tournament && round < 4 && match < 8 && teams.is_array() &&
                       teams.size() == 2 && !searches.empty() && searches.size() <= 8);
@@ -1241,7 +1242,7 @@ namespace services
         wire::require(assigned == users);
         query["lobby_slots"] = {{"max", users.size()}};
         query["team_balance"] = {{"num_teams", uint64_t{2}}};
-        const auto selection = selectPlaylist(directory, title, query);
+        const auto selection = selectPlaylist(directory, title, query, requiredMap);
         if (!selection)
             return std::nullopt;
         const auto &listen = hostPlayer.at("info").at("listen_server");

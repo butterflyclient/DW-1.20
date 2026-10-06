@@ -1,0 +1,82 @@
+REPLAY DW TOURNAMENT MAP POLICY - 2026-10-06
+
+Backend SHA256: 87855532543586649d6f42e1da8111841816719ed4b559b8d1f2840ecaa1de88
+Unchanged game SHA256: b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+
+ISSUE AND RESEARCH
+Replay independently prepares its tournament round maps. Selecting any allowed
+playlist map on the backend could disagree with the client's chosen map.
+Original Replay 0x141075360 builds four count/eight-name/round-index pools from
+native dvar strings. The state-8 preparation at 0x1410742B0 chooses four maps.
+The selector at 0x141070950 calls 0x141070840 to omit prior maps, then uses the
+round's unsigned 16-bit part of the full tournament ID. If all pool maps have
+been used, it omits only the immediately preceding map. A single-map pool is
+always selected. These contracts came from the original 1.20 Replay SQLite/PE;
+source from another build supplied behavioral context only.
+
+IMPLEMENTATION
+1. One canonical map-pools.json supplies both the backend selector and the four
+   native dvar strings in title-5800 general publisher variables. Native names
+   come from the existing generated Replay binding table.
+2. Schema, full title, revision 1..65535, four pools, one through eight unique
+   map names per pool and native/common-playlist string bounds are validated.
+   Duplicate keys, trailing data and malformed persisted layouts fail closed.
+3. A flushed atomic revision/hash receipt rejects rollback and changed contents
+   under an accepted revision. A blocked receipt write cannot publish success.
+4. Capacity publications opt in with native_map_pool_revision. The complete
+   snapshot is pinned in the competition definition. Changing it under an
+   allocated tournament ID cannot mutate that tournament. Publish a new ID.
+5. Round allocation requires the native-selected map in the normal playlist
+   and available-map policy. Unavailable maps leave the round unallocated.
+   Existing authenticated readiness, native lobby documents and recoverable
+   bracket/lobby/search/index/enrollment transactions remain in use.
+6. No game executable or proxy changes. No seeded players, friendships,
+   acceptance flags or production competitions.
+
+VERIFICATION ON THE CURRENT IMAGE
+- MSVC Release compilation/linking passed with /W4 /WX. All 74 backend C++/header
+  files pass clang-format verification.
+- 242 independent encrypted native-wire protocol/service groups passed.
+- Eight signed accounts completed all seven tournament matches through backend
+  ready/result calls, including exact map weights, interrupted-write recovery,
+  temporary same-session join catch-up and immutable pool protection.
+- The untouched x64 selector ran in Unicorn. The exact selector/crypto objects
+  linked into the backend matched all 32 original-instruction cases. Only the
+  original security-cookie check is stubbed; map logic and string comparisons
+  execute original instructions. Chained unwind fragments are accounted for.
+- The unchanged game ran from its root build folder. All 27 startup fences,
+  native profile/Online state and three empty friend lists completed.
+- Read-only native observations found all four publisher map strings set to
+  mp_shipment, with general MinorVersion 1 applied. No dvar setter or memory
+  write was used to establish those values.
+- Backend stop/start used separate steps. dw_restart reconnected the same game
+  process and identity, renewed relay credentials and established the native
+  authenticated UDP association. Four map strings and their revision remained
+  intact. A further 73.125 seconds produced seven keepalive replies with zero
+  rejected packets.
+- The owned test game closed normally. Temporary map policy/receipt and root
+  command opt-in files were restored/removed exactly. The backend remains up.
+
+EVIDENCE AND OPERATION
+validation/20261006-tournament-map-policy.json
+validation/20261006-tournament-map-native-policy.json
+validation/20261006-tournament-map-native-reconnect.json
+Private instruction/object reference: data/native-tournament-map-reference-20261006.json
+Complete publication layout and examples: docs/tournaments.md
+Build comparison driver: tools/build-tournament-map-check.ps1
+Original/compiled comparison: tools/verify-tournament-native-map-selector.py
+
+No new client package is required for this backend-only integration. Map pools
+are optional and read on demand; no default tournament was installed. Increment
+the revision and refresh client publisher variables for a new policy; dw_restart
+is available when a connection refresh is needed. Keep the revision receipt.
+
+REMAINING WORK
+Native round create/join/ready/result callbacks, playable tournaments and
+host-departure/forfeit behavior still need completion/validation. The current
+inventory has 134 registered handlers across 140 reviewed routes. Known missing
+routes are 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24; their unresolved native
+result bindings must be recovered before implementing positive replies.
+Indirect/virtual/REST/push auditing and two-network gameplay remain open.
+Protocol progression and startup evidence do not establish those gates.

@@ -25,6 +25,7 @@
 #include "content_services.h"
 #include "anticheat_services.h"
 #include "relay_services.h"
+#include "tournament_map_policy.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <chrono>
 #include <fstream>
@@ -339,6 +340,8 @@ namespace services
             return {0, {}, "extended-auth-report-recorded"};
         }
 
+        uint16_t publisherVersion(const Json &json, const char *key, uint16_t fallback);
+
         Json publisherDocument(const platform::LobbyIdentity &id,
                                const std::string &context,
                                const std::string &name)
@@ -365,7 +368,21 @@ namespace services
             }
             if (!content)
                 return nullptr;
-            const auto json = Json::parse(content->begin(), content->end());
+            auto json = Json::parse(content->begin(), content->end());
+            if (id.titleId == 5800 && (context.empty() || context == "iw8") && name == "general")
+                if (const auto policy = tournamentMapPolicy(directory, id.titleId))
+                {
+                    // One publication drives both native dvar strings and the
+                    // server selector. Never store a second independent map list.
+                    const auto revision = policy->at("revision").get<uint16_t>();
+                    if (revision < publisherVersion(json, "MinorVersion", 0))
+                        throw std::runtime_error(
+                            "Tournament map policy revision is older than publisher variables");
+                    json["MinorVersion"] = std::to_string(revision);
+                    const auto variables = tournamentMapDvars(directory, id.titleId, *policy);
+                    for (const auto &variable : variables.items())
+                        json[variable.key()] = variable.value();
+                }
             wire::require(json.is_object() && json.dump().size() < 65536);
             for (auto it = json.begin(); it != json.end(); ++it)
             {

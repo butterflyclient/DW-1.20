@@ -1,6 +1,28 @@
 REPLAY DW BACKEND AND MULTIPLAYER READINESS - 2026-10-06
 
-CURRENT BACKEND ADDENDUM - AUTOMATIC TOURNAMENT ROUND LOBBIES
+CURRENT BACKEND ADDENDUM - NATIVE TOURNAMENT MAP POLICY
+Backend SHA256: 87855532543586649d6f42e1da8111841816719ed4b559b8d1f2840ecaa1de88
+Game remains unchanged; no new client package is required for this integration.
+242 encrypted protocol/service groups passed on the current backend image.
+One versioned canonical policy supplies Replay's four publisher map-name dvars
+and the backend's deterministic round selector. Actual backend objects match
+the untouched x64 selector in 32 cases. Revision/hash receipts reject rollback
+and changed content at the same revision; active competitions pin their pools.
+Round assignment must use that native-selected map from the available playlist.
+Focused root-folder game startup passed all 27 fences. Read-only observations
+confirmed all four published strings and general revision 1 applied. A separate
+backend stop/start and dw_restart reconnected the same game process/identity.
+After another 73.125 seconds, relay keepalives and map values remained stable;
+seven keepalive replies, zero rejected packets. Temporary policy/receipt and
+root command files were restored exactly; test game closed normally.
+No production tournament is seeded. Native round callbacks, playable tournaments,
+forfeits and two-network gameplay remain open; the full backend is incomplete.
+Current protocol: validation/20261006-tournament-map-policy.json.
+Current native maps: validation/20261006-tournament-map-native-policy.json.
+Current native reconnect: validation/20261006-tournament-map-native-reconnect.json.
+Details: docs/DW_TOURNAMENT_MAP_POLICY_20261006.txt and docs/tournaments.md.
+
+HISTORICAL BACKEND PASS - AUTOMATIC TOURNAMENT ROUND LOBBIES
 Backend SHA256: 517b8bd7d15daff7d6723036cd2d6dcf5aa59be41ff58033d2989c98512b5b21
 Game is unchanged from the baseline below; no new client package is required.
 240 encrypted protocol/service groups passed on the current backend image.
