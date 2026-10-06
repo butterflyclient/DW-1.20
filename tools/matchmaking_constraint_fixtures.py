@@ -126,9 +126,12 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
     }
     lobby, documents = created(party)
     kind, packet = peer.receive()
-    assert kind == 2 and packet.startswith(u32(2005))
+    assert kind == 2 and packet.startswith(u32(2001))
+    assert struct.unpack_from("<Q", packet, 6)[0] == documents[1][
+        "player_id_to_mm_id"
+    ][str(peer_user)]
     assert struct.unpack_from("<Q", packet, 15)[0] == lobby
-    assert strings(packet[32:]) == documents
+    assert strings(packet[23:]) == documents
     # A presence request for an existing primary updates its reservation once;
     # it must not count that player's original slot a second time.
     presence["lobby_id_to_presence_join"] = lobby
