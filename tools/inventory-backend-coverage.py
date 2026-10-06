@@ -251,7 +251,47 @@ def abtesting_native_evidence(server_hash, game_hash):
     return path.relative_to(ROOT).as_posix(), proof
 
 
+def native_pair_evidence(server_hash):
+    path = ROOT / "validation/20261006-current-native-pair-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    expected_sources = {
+        "src/social_services.cpp",
+        "src/channel_services.cpp",
+        "tools/observe-game.py",
+    }
+    if not (
+        proof.get("passed")
+        and proof.get("backend_sha256") == server_hash
+        and proof.get("audit_tool_sha256")
+        == digest(ROOT / "tools/record-native-pair-readiness.py")
+        and proof.get("native_two_game_private_party_join_verified")
+        and proof.get(
+            "native_friend_removal_and_active_crossplay_mask_cleanup_verified"
+        )
+        and set(proof.get("source_sha256", {})) == expected_sources
+        and all(
+            digest(ROOT / source) == sha
+            for source, sha in proof.get("source_sha256", {}).items()
+        )
+    ):
+        return None
+    references = [proof["backend_build"], proof["protocol"]]
+    references.extend(
+        item for peer in proof["evidence"].values() for item in peer.values()
+    )
+    for item in references:
+        evidence = (ROOT / item["path"]).resolve()
+        if not evidence.is_relative_to(ROOT / "data") or not evidence.is_file():
+            return None
+        if digest(evidence) != item["sha256"]:
+            return None
+    return path.relative_to(ROOT).as_posix(), proof
+
+
 def rest_coverage(inventory, friend_evidence, server_hash):
+    pair_evidence = native_pair_evidence(server_hash)
     event_receipt = ROOT / "validation/20261006-achievement-rest-layout.json"
     event_proof = (
         json.loads(event_receipt.read_bytes()) if event_receipt.exists() else None
@@ -374,6 +414,17 @@ def rest_coverage(inventory, friend_evidence, server_hash):
                 else "Dynamic/helper service binding remains unresolved"
             ),
         )
+        if bound and handler and pair_evidence:
+            pair_path, pair_proof = pair_evidence
+            binding = [row["services"][0], *row["resource_operations"][0]]
+            if binding in pair_proof["native_rest_bindings"]:
+                row.update(
+                    current_native_method_completion_verified=True,
+                    native_completion_evidence=pair_path,
+                    native_completion_scope="Two private root-folder game processes completed native name search, friend/pending lists, reciprocal invitation, online presence and removal; shared private-party membership was verified",
+                    native_completion_game_sha256=pair_proof["game_sha256"],
+                    shipping_executable_native_completion_inherited=False,
+                )
         if row.get("shared_service_helper_only"):
             row["coverage_scope"] = (
                 "Shared service parameter helper; not an independent REST request"
@@ -423,6 +474,21 @@ def digest(path):
 
 
 def private_pair_evidence(server_hash):
+    current = native_pair_evidence(server_hash)
+    if current:
+        path, proof = current
+        return dict(
+            receipt=path,
+            sha256=digest(ROOT / path),
+            private_game_sha256=proof["game_sha256"],
+            scope=proof["scope"],
+            native_social_and_private_party_verified=True,
+            native_local_settings_persistence_tested_in_this_run=False,
+            active_crossplay_masks_cleared_after_native_removal=True,
+            shipping_executable_native_completion_inherited=False,
+            relay_peer_data_forwarding_verified=False,
+            cross_network_gameplay_verified=False,
+        )
     path = ROOT / "validation/20261006-native-pair-party-profile.json"
     if not path.is_file():
         return None

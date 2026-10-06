@@ -1,0 +1,76 @@
+CURRENT BACKEND: NATIVE TWO-CLIENT SOCIAL AND PARTY VALIDATION
+2026-10-06
+
+Backend SHA256:
+c614ff0b5340442ff2540343cc16de82ed3c3a7530f103db288e5f4b597b3e55
+Private game job: 728b618c35724535
+Private game SHA256:
+73ded44317c35d6efcfeb9ca9f5fa03a20f73e41926e6ea3a0d6c94423db7644
+
+Both real native games ran from E:\IW8\Builds\1.20-replay, using independent
+persisted local identities and native profile/cache directories. The previously
+approved agreement acceptance was retained. No agreement, friendship or player
+identity was seeded for this run. The existing private compiled image was reused;
+no new game compilation or shared workstation changes were needed.
+
+Both players passed all 27 startup fences, logged in natively, reached Online
+state 2 and established their authenticated relay associations in state 3.
+Each initially had three completed, empty friend/request lists.
+
+Alpha searched Bravo's name using the native game entry point. Bravo sent the
+reciprocal native invitation. Both completed accepted-friend lists then contained
+the other player, online, with one active crossplay subscription. Alpha selected
+Social -> Join Game. Both Party tabs displayed the same 2/20 roster with Bravo
+as leader. Both original party-chat pools independently contained those two
+members and exactly one host. The backend routed both real session-info instant
+messages. No map was launched; native relay peer DATA and WAN gameplay are not
+established by this local party result.
+
+Alpha removed the temporary friend through the game menu. Both players' three
+friend/request lists completed empty again. Active crossplay masks cleared to
+zero in both processes; pending subscribe/unsubscribe queues and error counts
+were zero. The remaining native record count of one is an inactive cache record.
+Original Replay UnsubscribeFromUser, 0x141058E70, clears the requested type bits
+without deleting an existing record. Its retained cache count alone does not
+prove a stuck task. No transport-unsubscribe request was emitted in this flow,
+so this receipt does not claim that callback was tested.
+
+The Remove Friend confirmation still displays nil instead of the peer name.
+The friend and action panels display the correct name. That UI issue remains
+open; no server-side name or success response was fabricated to hide it.
+
+Seven REST methods now have current-backend native consumer evidence:
+  umbrella / UserResource / usernamesearch
+  friends / Friends / invite_friend
+  social-service / Friends / get_friends
+  social-service / Friends / get_pending_friend_requests
+  friends / Friends / reject_friend_request
+  presence / UsersPresence / subscribe_to_users
+  presence / UserPresence / set_user_presence
+
+tools/record-native-pair-readiness.py verifies same-process identity retention,
+distinct native profiles, current backend/build/protocol hashes, complete friend
+lists, stable presence masks and matching party-channel membership. It checks
+each credited method's successful native request and corresponding consumer
+effect. The coverage ledger verifies the retained evidence and source hashes;
+an old backend hash, altered evidence or a changed observer earns no current
+native completion credit. Other observed requests are not credited by inference.
+
+Receipt: validation/20261006-current-native-pair-readiness.json
+Evidence: data/native-pair-current-20261006/{alpha,bravo}
+The ledger now has eight current-backend native REST method completions,
+including the separately verified single-user achievement callback. These are
+private-game observations; completion is not inherited by the shipping image.
+
+Both owned test games closed normally. Their root-folder EXEs, INIs and opt-in/
+command files were removed after path, image-hash and process-identity checks.
+The retained profiles and evidence remain inside the ignored backend data tree.
+The shipping EXE, INI and owner identity hashes were verified unchanged.
+
+Current backend Release compilation and all 291 encrypted protocol/service
+checks remain passed. No additional backend change/rebuild or network/port
+change was required for this native validation pass. The validated backend is
+still running. Full backend implementation remains active: six known binary
+handlers, the category REST response reader, the original AB REST writer's
+pre-transport defect, other native domain callbacks and WAN gameplay remain
+separate open scopes.
