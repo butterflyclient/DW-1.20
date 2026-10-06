@@ -1,0 +1,37 @@
+REPLAY OBJECT-STORE CATEGORY REQUEST BINDING AUDIT
+2026-10-06
+
+The previous REST inventory classified the category writer's environment-derived
+service as unresolved. The original Replay writer 0x142144CF0 instead calls the
+already recovered environment helper 0x1421443E0 and passes its actual RAX return
+to the service setter in RDX, with the original builder in RCX. This dataflow is
+checked directly against original bytes, not a SQLite display name.
+
+The four focused VM cases execute the unchanged host getter for dev, cert,
+prod and its original fallback enum. Its only modeled boundary is strncmp,
+using the actual memory arguments and count of 8. Every result points to the
+correct original host string after stripping https://.
+
+The original category request uses ObjectsResourcePublishers / get_metadata,
+GET /v2/core/publishers/{publisher}/objects/, with client, context, category,
+limit and optional pageToken. Original struct writer 0x142144F50 calls the same
+paginated URL family. Constructor 0x14212A960 proves service 193, task 9 and
+the caller-supplied response's struct base at +8.
+
+This does not prove the response body or its original reader. The current
+publisher vector response requires one requestIndex for every requested ID;
+that fixed-request result is not a verified substitute for a paginated listing.
+No empty-success or guessed category result was added.
+
+The coverage ledger now reports this as a known service binding without a
+dedicated handler, rather than an unknown service. It has 29 containing REST
+functions, 28 request functions, 26 dedicated bindings, one known unsupported
+category binding, zero unresolved direct service bindings, one original AB
+pre-transport blocker and one current-backend native method completion.
+Indirect/inlined routes and other native method completion remain open.
+
+Tool: tools/research-objectstore-category-target.py.
+Target proof: validation/20261006-objectstore-category-target.json.
+The ordinary Replay image and continuously updated SQLite were read only.
+No game/backend recompilation, restart or additional game test was required
+for this request-binding audit. The validated c614ff0b backend remains live.

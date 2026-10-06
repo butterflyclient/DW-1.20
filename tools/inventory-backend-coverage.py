@@ -293,6 +293,17 @@ def rest_coverage(inventory, friend_evidence, server_hash):
     ] != digest(ROOT / "tools/research-objectstore-rest-target.py"):
         raise ValueError("Refresh the exact object-store REST target receipt")
     proven_requests = {row["va"]: row for row in proof["requests"]}
+    category_path = ROOT / "validation/20261006-objectstore-category-target.json"
+    category = json.loads(category_path.read_bytes())
+    if (
+        category["target_image_sha256"] != inventory["target_image_sha256"]
+        or category["audit_tool_sha256"]
+        != digest(ROOT / "tools/research-objectstore-category-target.py")
+        or not category["getter_vm"]["passed"]
+        or category["environment_services"] != proof["environment_services"]
+    ):
+        raise ValueError("Refresh the exact object-store category request proof")
+    proven_requests[category["request"]["va"]] = category["request"]
     ab_receipt = ROOT / "validation/20261006-abtesting-rest-target-layout.json"
     ab_proof = json.loads(ab_receipt.read_bytes())
     if (
@@ -314,7 +325,14 @@ def rest_coverage(inventory, friend_evidence, server_hash):
                 raise ValueError("Object-store REST target operation changed")
             row["services"] = proof["environment_services"]
             row["service_operation_binding_resolved"] = True
-            row["target_binding_receipt"] = receipt_path.relative_to(ROOT).as_posix()
+            binding_receipt = (
+                category_path
+                if row["function_address"] == category["request"]["va"]
+                else receipt_path
+            )
+            row["target_binding_receipt"] = binding_receipt.relative_to(ROOT).as_posix()
+            if binding_receipt == category_path:
+                row["native_response_reader_verified"] = False
         bound = (
             row["service_operation_binding_resolved"]
             and (len(row["services"]) == 1 or bool(environment_binding))
