@@ -1,4 +1,4 @@
-"""Read the complete native event-67 player progression notification."""
+"""Read the complete native event-67 player or weapon progression notification."""
 
 import json
 import struct
@@ -31,8 +31,12 @@ def decode_reward(packet, user=None):
     assert number(7, "<i") == 1 and number(8, "<I") == 1 and number(7, "<i") == 1
     event = json.loads(text())
     assert position == len(packet)
-    assert event["type"] == "achievement" and event["name"] == "player_xp"
-    assert event["id_"] == 1000000 and event["kind"] == 0
+    assert event["type"] == "achievement"
+    if event["kind"] == 0:
+        assert event["id_"] == 1000000 and event["name"] == "player_xp"
+    else:
+        assert event["kind"] == 5 and 2000000 < event["id_"] < 2000683
+        assert event["name"].startswith("iw8_")
     assert event["reason"] in ("inProgress", "completed")
     for name in ("xp", "rank"):
         value = event["multiProgress"][name]["value"]

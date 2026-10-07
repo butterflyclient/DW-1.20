@@ -43,7 +43,7 @@ namespace lobby
             uint64_t lastTournamentRoundLobby = 0, lastTournamentRoundSearch = 0;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
-            std::map<std::string, uint64_t> lastProgression;
+            std::map<std::pair<std::string, uint64_t>, uint64_t> lastProgression;
             // This is transport publication history, not a guessed native state.
             // Each serialized writer publishes a required join before a message
             // and coalesces the same join still pending in the delayed queue.
@@ -179,7 +179,8 @@ namespace lobby
                 std::lock_guard lock(endpoint->mutex);
                 if (delivery.progressionRefresh)
                 {
-                    const auto previous = endpoint->lastProgression.find(delivery.progressionContext);
+                    const auto previous = endpoint->lastProgression.find(
+                        {delivery.progressionContext, delivery.progressionId});
                     if (previous != endpoint->lastProgression.end() &&
                         previous->second == delivery.progressionXp)
                         continue;
@@ -247,7 +248,7 @@ namespace lobby
                         else if (delivery.mailId)
                             endpoint->lastMail[delivery.mailContext] = delivery.mailId;
                         else if (!delivery.progressionContext.empty())
-                            endpoint->lastProgression[delivery.progressionContext] =
+                            endpoint->lastProgression[{delivery.progressionContext, delivery.progressionId}] =
                                 delivery.progressionXp;
                         else if (delivery.tournamentRoundLobby)
                         {
@@ -416,10 +417,9 @@ namespace lobby
                                       }
                                       try
                                       {
-                                          const auto progression =
-                                              services::progressionUpdate(title, user);
-                                          if (progression)
-                                              route(title, *progression);
+                                          for (const auto &progression :
+                                               services::progressionUpdates(title, user))
+                                              route(title, progression);
                                       }
                                       catch (const std::exception &)
                                       {

@@ -1,0 +1,16 @@
+REPLAY DW WEAPON PROGRESSION HANDOFF
+
+Primary server: 162.243.115.160
+Live backend SHA256: 16f7efe4a7471436457f0f3cfe376a5d11e0adc609cceb6fcbfc876179bcfe4d
+Existing Replay DW game EXE remains unchanged. No client download is required for this backend update.
+
+Issue: mp_addxp player XP was consumed, but Param2 weapon ID and Param3 weapon XP were ignored.
+Research: original Replay AddProgression/UpdateWeapon consumers and shipped loot/rank/per-weapon tables.
+Fix: canonicalize 680 weapon IDs to 51 base weapons; update player and weapon XP with one transaction; use native rank thresholds/caps; merge kind-5 state queries; publish absolute event-67 updates; retain idempotency and reconnect catch-up.
+Overflow: retain all native UInt32 XP bits and reject totals that would truncate in DDL_SetInt. Unknown IDs reject the complete event batch.
+Validation: Windows and Linux compile; 11 weapon groups, 8 retry groups and 8 local-save/catch-up groups on each platform; 19 linked delivery checks; public protocol/dashboard checks. No game runs.
+Original x64 consumer research: 10 isolated cases, with external JSON/table/controller boundaries modeled; this is not native gameplay proof.
+
+Playtest: restart both clients after deployment; leave host=162.243.115.160, unlock_all=0 and rank=0 when testing earned XP. Invite/join, play one available shipped map, check player/weapon XP and rank, then fully exit/relaunch and compare. Test match/chat/ping paths as usual.
+Weapon XP/rank notifications are implemented. Camo/attachment reward triggers remain a separate reconstruction task; do not infer unlock completion from weapon XP tests. Native local weapon XP saving still needs the owner playtest.
+Development/server restarts are held at this handoff for the requested multiplayer test. Full backend implementation remains in progress.

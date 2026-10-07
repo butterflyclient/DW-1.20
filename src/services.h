@@ -39,6 +39,7 @@ namespace services
         std::string progressionContext;
         uint64_t progressionXp = 0;
         bool progressionRefresh = false;
+        uint64_t progressionId = 1000000;
     };
 
     struct Reply
@@ -63,7 +64,7 @@ namespace services
     std::optional<Delivery> tournamentUpdate(uint32_t title, uint64_t user);
     std::optional<Delivery> tournamentLobbyUpdate(uint32_t title, uint64_t user);
     std::vector<Delivery> mailUpdates(uint32_t title, uint64_t user);
-    std::optional<Delivery> progressionUpdate(uint32_t title, uint64_t user);
+    std::vector<Delivery> progressionUpdates(uint32_t title, uint64_t user);
     Reply dispatch(const platform::LobbyIdentity &identity,
                    uint8_t service,
                    uint8_t task,
