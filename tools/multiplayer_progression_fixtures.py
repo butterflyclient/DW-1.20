@@ -96,6 +96,9 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
         assert [p.read_bytes() for p in journals] == before
     checks.append("non-host and non-member progression submissions cannot modify another player's XP")
 
+    from progression_transaction_fixtures import exercise as exercise_transactions
+    exercise_transactions(host, peer, data, report, reward, checks)
+
     performance = text("5800") + u32(1)
     for client in (host, peer):
         performance += u64(client.user) + b"\x09" + struct.pack("<q", 42)

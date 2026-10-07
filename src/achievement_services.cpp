@@ -1,5 +1,6 @@
 #include <windows.h>
 #include "achievement_services.h"
+#include "achievement_store.h"
 #include "protobuf.h"
 #include "matchmaking_services.h"
 #include "progression_ranks.h"
@@ -698,6 +699,31 @@ namespace services
             }
         }
 
+        void validateJournal(const Json &data, const platform::LobbyIdentity &id)
+        {
+            wire::require(data.is_object() && data.at("schema") == 1 &&
+                          data.at("events").is_array() && data.at("requests").is_array() &&
+                          data.at("events").size() <= 1024 && data.at("requests").size() <= 4096);
+            const auto next = integer(data, "next");
+            wire::require(next > 0);
+            if (data.contains("player_xp"))
+                (void)integer(data, "player_xp");
+            uint64_t previous = 0;
+            std::set<std::string> requests;
+            for (const auto &row : data.at("events"))
+            {
+                const auto sequence = integer(row, "id");
+                wire::require(sequence > previous && sequence < next);
+                previous = sequence;
+                validateEvent(row.at("event"));
+            }
+            for (const auto &receipt : data.at("requests"))
+            {
+                validateReceipt(receipt, id);
+                wire::require(requests.insert(receipt.at("id").get<std::string>()).second);
+            }
+        }
+
         std::filesystem::path receiptPath(const std::filesystem::path &journal,
                                           const std::string &request)
         {
@@ -710,6 +736,29 @@ namespace services
                 key += "0123456789abcdef"[byte & 15];
             }
             return journal.parent_path() / "receipts" / (key + ".json");
+        }
+
+        void validateEventWrite(const achievement_store::Write &write)
+        {
+            platform::LobbyIdentity id;
+            id.titleId = 5800;
+            id.userId = write.owner;
+            id.platformAccountId = write.platformAccount;
+            if (write.receiptKey.empty())
+            {
+                validateJournal(write.document, id);
+                return;
+            }
+            const auto &archive = write.document;
+            wire::require(archive.is_object() && archive.size() == 6 &&
+                          archive.at("schema") == 1 && integer(archive, "title") == id.titleId &&
+                          integer(archive, "owner") == id.userId &&
+                          archive.at("context") == write.context);
+            const auto &receipt = archive.at("receipt");
+            validateReceipt(receipt, id);
+            wire::require(archive.at("checksum") == fingerprint(receipt) &&
+                          receiptPath({}, receipt.at("id").get<std::string>()).stem().string() ==
+                              write.receiptKey);
         }
 
         Json archivedReceipt(const std::filesystem::path &path,
@@ -745,7 +794,8 @@ namespace services
         void archiveReceipt(const std::filesystem::path &journal,
                             const platform::LobbyIdentity &id,
                             const std::string &context,
-                            const Json &receipt)
+                            const Json &receipt,
+                            std::vector<achievement_store::Write> &writes)
         {
             const auto request = receipt.at("id").get<std::string>();
             const auto path = receiptPath(journal, request);
@@ -755,13 +805,10 @@ namespace services
                     throw std::runtime_error("Achievement receipt archive conflict");
                 return;
             }
-            publish(path,
-                    Json{{"schema", 1},
-                         {"title", id.titleId},
-                         {"owner", id.userId},
-                         {"context", context},
-                         {"receipt", receipt},
-                         {"checksum", fingerprint(receipt)}});
+            writes.push_back({id.userId, id.platformAccountId, context, path.stem().string(),
+                              Json{{"schema", 1}, {"title", id.titleId}, {"owner", id.userId},
+                                   {"context", context}, {"receipt", receipt},
+                                   {"checksum", fingerprint(receipt)}}});
         }
 
         Reply recordEvents(const std::filesystem::path &root,
@@ -769,7 +816,8 @@ namespace services
                            const std::string &context,
                            const std::string &request,
                            const Json &events,
-                           const Json &owners = Json())
+                           const Json &owners = Json(),
+                           std::vector<achievement_store::Write> *staged = nullptr)
         {
             wire::require(context == std::to_string(id.titleId) || context == "iw8");
             wire::require(!request.empty() && request.size() <= 36 && events.is_array() &&
@@ -785,26 +833,7 @@ namespace services
                                       {"requests", Json::array()}});
             try
             {
-                wire::require(data.is_object() && data.at("schema") == 1 &&
-                              data.at("events").is_array() && data.at("requests").is_array() &&
-                              data.at("events").size() <= 1024 &&
-                              data.at("requests").size() <= 4096);
-                const auto next = integer(data, "next");
-                wire::require(next > 0);
-                uint64_t previous = 0;
-                std::set<std::string> requests;
-                for (const auto &row : data.at("events"))
-                {
-                    const auto sequence = integer(row, "id");
-                    wire::require(sequence > previous && sequence < next);
-                    previous = sequence;
-                    validateEvent(row.at("event"));
-                }
-                for (const auto &receipt : data.at("requests"))
-                {
-                    validateReceipt(receipt, id);
-                    wire::require(requests.insert(receipt.at("id").get<std::string>()).second);
-                }
+                validateJournal(data, id);
             }
             catch (const std::runtime_error &)
             {
@@ -866,15 +895,18 @@ namespace services
             data["requests"].push_back(std::move(receipt));
             while (data["events"].size() > 1024)
                 data["events"].erase(data["events"].begin());
-            // Archive BEFORE evicting a hot receipt and publishing the next journal.
-            // A crash before journal commit leaves the old receipt in both places;
-            // a crash after commit leaves it in the archive. Neither can double-ingest.
+            std::vector<achievement_store::Write> local;
+            auto &writes = staged ? *staged : local;
+            // Archived receipts and their journal eviction share the same intent,
+            // including every other recipient in an attributed multiplayer batch.
             while (data["requests"].size() > 256)
             {
-                archiveReceipt(path, id, context, data["requests"].front());
+                archiveReceipt(path, id, context, data["requests"].front(), writes);
                 data["requests"].erase(data["requests"].begin());
             }
-            publish(path, data);
+            writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
+            if (!staged)
+                achievement_store::commit(root, id.titleId, writes, validateEventWrite);
             Reply result{0, {}, "achievement-events-recorded", true, {}};
             if (xp != previousXp)
             {
@@ -919,18 +951,19 @@ namespace services
             }
             wire::require(offset == events.size());
             Reply reply{0, {}, "achievement-events-recorded", true, {}};
+            std::vector<achievement_store::Write> writes;
             for (const auto &[user, batch] : batches)
             {
-                // Each recipient's XP and idempotency receipt share one atomic
-                // journal commit. A retry after a partial multi-user failure can
-                // finish remaining owners without awarding earlier owners twice.
+                // Preflight all retry receipts and XP arithmetic before changing
+                // any account. Late conflicts reject the whole submission.
                 auto recorded = recordEvents(root, batch.recipient, context, request,
-                                             batch.events, batch.owners);
+                                             batch.events, batch.owners, &writes);
                 if (recorded.error)
                     return recorded;
                 for (auto &delivery : recorded.deliveries)
                     reply.deliveries.push_back(std::move(delivery));
             }
+            achievement_store::commit(root, sender.titleId, writes, validateEventWrite);
             reply.detail = " event_owners=" + std::to_string(batches.size()) +
                            " progression_updates=" + std::to_string(reply.deliveries.size());
             return reply;
@@ -1147,6 +1180,7 @@ namespace services
                                        bool restore, unsigned startingRank)
     {
         wire::require(title == 5800 && user && startingRank <= replayPlayerRankMinimumXp.size());
+        achievement_store::recover(root, title, validateEventWrite);
         if (!restore && !startingRank)
             return;
         const auto path = root / "achievements" / std::to_string(title) /
@@ -1170,6 +1204,7 @@ namespace services
                                 const std::string &context,
                                 std::span<const uint8_t> bytes)
     {
+        achievement_store::recover(root, id.titleId, validateEventWrite);
         const char *stage = "json";
         try
         {
@@ -1276,6 +1311,8 @@ namespace services
                                              uint8_t task,
                                              wire::Reader &p)
     {
+        if (service == 125)
+            achievement_store::recover(root, id.titleId, validateEventWrite);
         if (service == 125 && (task == 3 || task == 4))
             return get(root, id, p, task == 4);
         if (service == 125 && task == 1)
