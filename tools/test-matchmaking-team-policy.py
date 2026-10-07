@@ -107,6 +107,7 @@ try:
         clients = (host, peer, third, fourth)
         for client in clients:
             info = {
+                "dedicated_server": {"build_name": "replay-team-fixture"},
                 "listen_server": {
                     "local_address": base64.b64encode(bytes(84)).decode(),
                     "security_id": base64.b64encode(os.urandom(8)).decode(),
