@@ -139,12 +139,17 @@ namespace services
             std::filesystem::create_directories(path.parent_path());
             auto pending = path;
             pending += ".pending";
-            {
-                std::ofstream out(pending, std::ios::binary | std::ios::trunc);
-                if (!out.write(bytes.data(), static_cast<std::streamsize>(bytes.size())) ||
-                    !out.flush())
-                    throw std::runtime_error("Achievement persistence failed");
-            }
+            const auto file = CreateFileW(pending.c_str(), GENERIC_WRITE, 0, nullptr,
+                                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (file == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Achievement persistence failed");
+            DWORD written = 0;
+            const bool saved = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()),
+                                         &written, nullptr) && written == bytes.size() &&
+                               FlushFileBuffers(file);
+            CloseHandle(file);
+            if (!saved)
+                throw std::runtime_error("Achievement persistence flush failed");
             if (!MoveFileExW(pending.c_str(),
                              path.c_str(),
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
@@ -350,6 +355,14 @@ namespace services
                         {{"name", "rank"}, {"current", rank}, {"target", uint64_t{0}}}})}};
         }
 
+        void validatePendingXp(const Json &journal)
+        {
+            if (journal.contains("player_xp_pending"))
+                wire::require(journal.contains("player_xp") &&
+                              integer(journal, "player_xp_pending") ==
+                                  integer(journal, "player_xp"));
+        }
+
         uint64_t initialPlayerXp(const std::filesystem::path &journal)
         {
             const auto states = document(journal.parent_path() / "states.json", Json::array());
@@ -408,6 +421,7 @@ namespace services
             if (!definitions)
             {
                 const auto journal = document(path.parent_path() / "events.json", Json::object());
+                validatePendingXp(journal);
                 if (journal.contains("player_xp"))
                 {
                     const auto xp = integer(journal, "player_xp");
@@ -711,6 +725,7 @@ namespace services
             wire::require(next > 0);
             if (data.contains("player_xp"))
                 (void)integer(data, "player_xp");
+            validatePendingXp(data);
             uint64_t previous = 0;
             std::set<std::string> requests;
             for (const auto &row : data.at("events"))
@@ -907,6 +922,8 @@ namespace services
                 xp += delta;
             }
             data["player_xp"] = xp;
+            if (xp != previousXp)
+                data["player_xp_pending"] = xp;
             auto next = integer(data, "next");
             wire::require(next > 0 && next <= UINT64_MAX - events.size());
             for (const auto &event : events)
@@ -1213,6 +1230,7 @@ namespace services
                           delivery.progressionContext / std::to_string(delivery.user) /
                           "events.json";
         const auto journal = document(path, Json::object());
+        validatePendingXp(journal);
         if (!journal.contains("player_xp"))
             return delivery.progressionXp == initialPlayerXp(path);
         wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
@@ -1220,6 +1238,33 @@ namespace services
                       journal.at("events").size() <= 1024 &&
                       journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
         return delivery.progressionXp == integer(journal, "player_xp");
+    }
+
+    std::optional<Delivery> currentProgressionDelivery(const std::filesystem::path &root,
+                                                      uint32_t title, uint64_t user)
+    {
+        if (title != 5800 || !user || user == UINT64_MAX || !platform::accountName(user))
+            return std::nullopt;
+        achievement_store::recover(root, title, validateEventWrite);
+        // Actual Replay login/event captures use the title context. Do not
+        // merge independent legacy contexts into the one native player record.
+        const auto context = std::to_string(title);
+        const auto path = root / "achievements" / context / context /
+                          std::to_string(user) / "events.json";
+        const auto journal = document(path, Json::object());
+        validatePendingXp(journal);
+        if (!journal.contains("player_xp"))
+            return std::nullopt;
+        wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
+                      journal.at("requests").is_array() &&
+                      journal.at("events").size() <= 1024 &&
+                      journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
+        platform::LobbyIdentity id;
+        id.titleId = title;
+        id.userId = user;
+        auto delivery = progressionUpdate(id, context, integer(journal, "player_xp"), false);
+        delivery.progressionRefresh = true;
+        return delivery;
     }
 
     std::vector<StoredProgression> achievementProgressionSnapshot(
@@ -1250,6 +1295,7 @@ namespace services
             if (!name)
                 continue; // A persisted record never provisions an account.
             const auto journal = document(entry.path() / "events.json", Json::object());
+            validatePendingXp(journal);
             if (journal.contains("player_xp"))
             {
                 wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
@@ -1284,7 +1330,8 @@ namespace services
                                        uint32_t title, uint64_t user, uint64_t xp,
                                        bool restore, unsigned startingRank)
     {
-        wire::require(title == 5800 && user && startingRank <= replayPlayerRankMinimumXp.size());
+        wire::require(title == 5800 && user && user != UINT64_MAX &&
+                      startingRank <= replayPlayerRankMinimumXp.size());
         achievement_store::recover(root, title, validateEventWrite);
         if (!restore && !startingRank)
             return;
@@ -1294,12 +1341,26 @@ namespace services
                                           {"events", Json::array()}, {"requests", Json::array()}});
         wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
                       journal.at("requests").is_array() &&
-                      journal.at("next").is_number_unsigned());
+                      journal.at("next").is_number_unsigned() &&
+                      integer(journal, "next") > 0 && journal.at("events").size() <= 1024 &&
+                      journal.at("requests").size() <= 4096);
+        validatePendingXp(journal);
         if (!restore)
             xp = journal.contains("player_xp") ? integer(journal, "player_xp")
                                               : initialPlayerXp(path);
         if (startingRank)
+        {
             xp = replayPlayerRankMinimumXp[startingRank - 1];
+            journal.erase("player_xp_pending");
+        }
+        else if (restore && journal.contains("player_xp_pending"))
+        {
+            const auto pending = integer(journal, "player_xp_pending");
+            if (xp >= pending)
+                journal.erase("player_xp_pending"); // Signed local snapshot confirms saving.
+            else
+                xp = pending; // Preserve an accepted award missing from the local snapshot.
+        }
         journal["player_xp"] = xp;
         publish(path, journal);
     }

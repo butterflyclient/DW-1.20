@@ -574,6 +574,12 @@ namespace services
         return currentMailDeliveries(directory, title, user);
     }
 
+    std::optional<Delivery> progressionUpdate(uint32_t title, uint64_t user)
+    {
+        std::lock_guard lock(storeMutex);
+        return currentProgressionDelivery(directory, title, user);
+    }
+
     std::optional<Delivery> tournamentLobbyUpdate(uint32_t title, uint64_t user)
     {
         std::lock_guard lock(storeMutex);

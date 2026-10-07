@@ -220,6 +220,7 @@ try:
             self.s = socket.create_connection(("127.0.0.1", 3075 + offset), timeout=5)
             self.outgoing = self.incoming = 1
             self.mail_notifications = []
+            self.progression_notifications = []
             hello = struct.pack("<5I", 200, 200, 210, 220, 1024 * 1024) + os.urandom(8)
             send_fragments(self.s, hello)
             ack = read_frame(self.s)
@@ -322,8 +323,13 @@ try:
                 if record == (2, u32(18)):
                     self.mail_notifications.append(record)
                     continue
+                if record[0] == 2 and record[1].startswith(u32(67)):
+                    from progression_delivery_fixtures import decode_reward
+                    decode_reward(record[1])
+                    self.progression_notifications.append(record)
+                    continue
                 return record
-            raise AssertionError("Unexpected native-mail notification flood")
+            raise AssertionError("Unexpected native notification flood")
 
         def receive_mail(self):
             if self.mail_notifications:

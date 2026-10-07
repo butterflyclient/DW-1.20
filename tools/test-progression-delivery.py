@@ -24,9 +24,9 @@ def main():
     fixture = root / "data" / f"progression-delivery-fixture-{time.time_ns()}"
     completed = subprocess.run([str(binary), str(fixture)], check=True,
                                capture_output=True, text=True)
-    assert completed.stdout.strip() == "PASS: 13 compiled progression delivery checks"
+    assert completed.stdout.strip() == "PASS: 19 compiled progression delivery checks"
     result = dict(
-        schema=1, passed=True, checks=13,
+        schema=1, passed=True, checks=19,
         scope="Actual backend delivery validator linked from current compiled objects; no game or socket stubs",
         server_sha256=hashlib.sha256((args.build / "iw8-dw-server").read_bytes()).hexdigest(),
         verifier_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),

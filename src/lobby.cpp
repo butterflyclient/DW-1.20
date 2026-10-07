@@ -43,6 +43,7 @@ namespace lobby
             uint64_t lastTournamentRoundLobby = 0, lastTournamentRoundSearch = 0;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
+            std::map<std::string, uint64_t> lastProgression;
             // This is transport publication history, not a guessed native state.
             // Each serialized writer publishes a required join before a message
             // and coalesces the same join still pending in the delayed queue.
@@ -176,6 +177,13 @@ namespace lobby
             for (const auto &endpoint : targets)
             {
                 std::lock_guard lock(endpoint->mutex);
+                if (delivery.progressionRefresh)
+                {
+                    const auto previous = endpoint->lastProgression.find(delivery.progressionContext);
+                    if (previous != endpoint->lastProgression.end() &&
+                        previous->second == delivery.progressionXp)
+                        continue;
+                }
                 // Validate after taking the serialized writer lock. A newer presence
                 // cannot overtake a previously validated push waiting for this lock.
                 if (delivery.mailId)
@@ -238,6 +246,9 @@ namespace lobby
                             endpoint->channelJoins.erase(channelMember);
                         else if (delivery.mailId)
                             endpoint->lastMail[delivery.mailContext] = delivery.mailId;
+                        else if (!delivery.progressionContext.empty())
+                            endpoint->lastProgression[delivery.progressionContext] =
+                                delivery.progressionXp;
                         else if (delivery.tournamentRoundLobby)
                         {
                             endpoint->lastTournamentRoundLobby = delivery.lobbyId;
@@ -402,6 +413,18 @@ namespace lobby
                                       {
                                           // A malformed mailbox cannot notify or prevent
                                           // another account's publication from progressing.
+                                      }
+                                      try
+                                      {
+                                          const auto progression =
+                                              services::progressionUpdate(title, user);
+                                          if (progression)
+                                              route(title, *progression);
+                                      }
+                                      catch (const std::exception &)
+                                      {
+                                          // An incomplete/corrupt XP transaction must not
+                                          // publish a fabricated snapshot or block mail.
                                       }
                                   }
                                   lock.lock();

@@ -1,0 +1,64 @@
+REPLAY OFFLINE PROGRESSION CATCH-UP - 2026-10-07
+
+CONFIRMED ISSUE
+The previous backend accepted an earned total of 15,750 XP, then a nonce-signed
+reconnect reporting the older locally saved 15,000 XP overwrote it. The baseline
+wire receipt reproduces that loss without a game run. There was also no automatic
+progression notification on reconnect unless the client retried an event or
+queried its achievement state.
+
+DURABLE JOURNAL CONTRACT
+The existing schema-1 event journal retains player_xp, next, events and requests.
+Positive earned deltas now also publish optional UInt64 player_xp_pending in the
+same flushed achievement transaction. When present, it must equal player_xp.
+Invalid types, missing totals or inconsistent snapshots fail validation. A
+partially written transaction cannot expose or notify a partial progression state.
+Legacy journals without the optional field keep their existing interpretation.
+
+SIGNED LOCAL RESTORE
+The existing nonce-bound machine login already reports the local saved XP and
+an explicit changed INI starting rank. A local XP report below the pending total
+now preserves that accepted total. A signed local report at or above the pending
+total confirms local persistence and retires the pending marker. The existing
+local-profile authority remains in effect when no pending award exists.
+An explicit starting-rank change overrides the pending total and removes its
+marker while retaining event retry receipts. Accepted events cannot award again
+after a manual rank change. Missing local restore fields do not erase progression.
+The confirmation is the authenticated client's report; it is not a server-side
+inspection of the player's local file or a new native push acknowledgement.
+
+AUTOMATIC NATIVE PUBLICATION
+The ordinary once-per-second lobby idle publisher reads the existing registered
+user's title-context progression. It recovers accepted intents and sends the
+original event-67 absolute player_xp/rank notification with reason inProgress.
+Actual Replay captures use context 5800. Independent legacy iw8 state is not
+merged into or allowed to overwrite this native title-context record; explicit
+legacy task/query/retry behavior stays supported.
+
+Each serialized endpoint records the XP snapshot only after its writer succeeds.
+Unchanged idle refreshes coalesce. Explicit event retries retain their refresh
+behavior. A new endpoint has no inherited publication history and receives the
+current snapshot without an achievement request. Validity is checked under the
+endpoint writer lock against the current service store and signed connection
+lease. Superseded snapshots and incomplete/corrupt transactions cannot publish.
+There is no new public route, transport protocol or game executable change.
+
+PERSISTENCE
+Local restoration/activation publication now uses WriteFile, FlushFileBuffers,
+CloseHandle and the existing atomic write-through rename. A failed write keeps
+the previous document. Pending awards remain in the existing transaction and
+receipt recovery mechanism; there is no independent unbounded notification log.
+
+VALIDATION AND LIMITS
+The readiness receipt binds source, Windows/Linux images, encrypted idle/reconnect
+fixtures and the compiled delivery validator. Coverage includes stale local
+snapshots, signed confirmation, manual rank changes, blocked publication,
+idle-only roll-forward, endpoint coalescing and backend process restart.
+The original absolute progression consumer proof is retained from the preceding
+integration; it remains a focused VM result rather than game callback evidence.
+No game launches or interactions were performed. The frozen source preserves
+the deployed dashboard/activity baseline and excludes unrelated dirty changes.
+
+The full DW goal remains open, including complete reward rules and the unresolved
+content response contracts. This does not claim exactly-once native notification
+acknowledgement or current-image native gameplay validation.

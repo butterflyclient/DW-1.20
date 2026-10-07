@@ -85,6 +85,29 @@ int main(int argc, char **argv)
         require(services::achievementDeliveryValid(root, 5800, delivery));
         delivery.progressionXp = 0;
         require(!services::achievementDeliveryValid(root, 5800, delivery));
+        for (const char *invalid : {
+            R"({"schema":1,"next":1,"events":[],"requests":[],"player_xp":0,"player_xp_pending":1})",
+            R"({"schema":1,"next":1,"events":[],"requests":[],"player_xp_pending":0})",
+            R"({"schema":1,"next":1,"events":[],"requests":[],"player_xp":0,"player_xp_pending":true})"})
+        {
+            publish(invalid);
+            rejects([&] { services::achievementDeliveryValid(root, 5800, delivery); });
+        }
+        publish(R"({"schema":1,"next":1,"events":[],"requests":[],"player_xp":100,"player_xp_pending":100})");
+        services::restoreAchievementProgression(root, 5800, 42, 50, true, 0);
+        delivery.progressionXp = 100;
+        require(services::achievementDeliveryValid(root, 5800, delivery));
+        services::restoreAchievementProgression(root, 5800, 42, 100, true, 0);
+        nlohmann::json confirmed;
+        {
+            std::ifstream in(path);
+            in >> confirmed;
+        }
+        require(!confirmed.contains("player_xp_pending"));
+        publish(R"({"schema":1,"next":1,"events":[],"requests":[],"player_xp":100,"player_xp_pending":100})");
+        services::restoreAchievementProgression(root, 5800, 42, 50, true, 2);
+        delivery.progressionXp = 3000;
+        require(services::achievementDeliveryValid(root, 5800, delivery));
         std::cout << "PASS: " << checks << " compiled progression delivery checks\n";
         return 0;
     }
