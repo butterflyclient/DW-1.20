@@ -202,6 +202,9 @@ try:
             assert "message_kind=" + kind in log
         assert "invitation_layout=valid inviter_matches_sender=1" in log
         checks.append("exact native invitation/request/response bytes preserved with typed routing diagnostics")
+        from multiplayer_progression_fixtures import exercise
+        exercise(host, peer, third, data, query, tokens, policy, ordinary,
+                 receive, documents, text, checks)
     receipt = {
         "schema": 1, "passed": True, "native_game_verified": False,
         "scope": "focused team allocation, native lobby wire and playlist policy regression",

@@ -116,6 +116,8 @@ namespace services
                 (!state.contains("disbanded") || state["disbanded"].is_boolean());
             if (!valid)
                 throw std::runtime_error("Invalid persisted lobby layout");
+            if (state.contains("host_ready") && !state["host_ready"].is_boolean())
+                throw std::runtime_error("Invalid persisted host readiness");
             if (state["backend_doc"].contains("tournament"))
                 matchmaking_store::validateWrite({"lobbies/" + path.filename().string(), state},
                                                  id.titleId);
@@ -432,6 +434,7 @@ namespace services
                           {"id", lobbyId},
                           {"owner", id.userId},
                           {"owner_session", ownerSession},
+                          {"host_ready", false},
                           {"members", query["members"]},
                           {"update_id", uint64_t{1}},
                           {"expires", expires},
@@ -582,6 +585,9 @@ namespace services
             auto rules = selection.rules;
             // This is a search instruction, not a different match ruleset.
             rules.erase("only_join_existing_lobbies");
+            // JIP is an admission preference, not an intermission ruleset.
+            // Native solo/party searches can disagree on it in the same playlist.
+            rules.erase("join_in_progress");
             Json pool = {{"rules", rules},
                     {"dedicated_server", query.value("dedicated_server", Json::object())},
                     {"performance", query.value("performance", Json{{"game_type", 1}})},
@@ -663,6 +669,17 @@ namespace services
             }
             wire::require(lobby["host_doc"].dump().size() < 16384 && backend.dump().size() < 16384);
             const auto lobbyId = lobby.at("id").get<uint64_t>();
+            const bool hostReady = lobby.value("host_ready", true);
+            if (!hostReady)
+            {
+                auto &pending = lobby["pending_join_members"];
+                if (pending.is_null())
+                    pending = Json::array();
+                for (const auto user : users)
+                    if (user != lobby.at("owner").get<uint64_t>() &&
+                        std::find(pending.begin(), pending.end(), Json(user)) == pending.end())
+                        pending.push_back(user);
+            }
             const auto assignments =
                 prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
             const std::array<matchmaking_store::Write, 3> writes = {
@@ -674,7 +691,8 @@ namespace services
             wire::Writer result;
             result.text(Json{{"mm_id", mmId}}.dump());
             Reply reply{0, {std::move(result.data)}, operation};
-            notify(reply, lobby, 2001, mmId, &users);
+            if (hostReady)
+                notify(reply, lobby, 2001, mmId, &users);
             std::set<uint64_t> observers;
             for (const auto user : existing)
                 if (!users.contains(user))
@@ -686,14 +704,12 @@ namespace services
         std::optional<Reply> publicJoin(const std::filesystem::path &directory,
                                         const platform::LobbyIdentity &id,
                                         const Json &query,
-                                        const std::set<uint64_t> &users,
-                                        const PlaylistSelection &selection)
+                                        const std::set<uint64_t> &users)
         {
             if (query.contains("private_lobby"))
                 return std::nullopt;
             const auto root = directory / "matchmaking" / std::to_string(id.titleId);
             const auto index = currentLobbies(root, id);
-            const auto pool = publicPool(query, selection);
             const auto &rules = query.at("ruleset_payload");
             const bool inProgress = rules.value("join_in_progress", false);
             std::set<uint64_t> ids;
@@ -709,13 +725,19 @@ namespace services
                 if (!std::filesystem::exists(path))
                     continue;
                 auto candidate = loadLobby(path, id);
+                const auto compatible = selectPlaylist(
+                    directory, id.titleId, query, {},
+                    candidate.at("match_selection").at("playlist_id").get<unsigned>());
+                if (!compatible)
+                    continue;
                 const auto ownerKey = std::to_string(candidate.at("owner").get<uint64_t>());
                 const auto &host = candidate.at("host_doc");
                 const auto &backend = candidate.at("backend_doc");
-                if (!candidate.contains("public_pool") || candidate["public_pool"] != pool ||
+                if (!candidate.contains("public_pool") ||
+                    candidate["public_pool"] != publicPool(query, *compatible) ||
                     backend.contains("private_lobby") || !index.at("lobbies").contains(ownerKey) ||
                     index.at("lobbies").at(ownerKey) != lobbyId ||
-                    candidate.at("match_selection") != selection.metadata ||
+                    candidate.at("match_selection") != compatible->metadata ||
                     candidate.value("disbanded", false) ||
                     candidate.at("expires").get<uint64_t>() <= now() ||
                     !host.value("lobby_open", false) || !hostSessionActive(candidate, id.titleId) ||
@@ -887,7 +909,7 @@ namespace services
                 const auto selection = selectPlaylist(directory, id.titleId, query);
                 if (!selection)
                     return Reply{108, {}, "matchmaker-playlist-or-map-unavailable"};
-                if (auto joined = publicJoin(directory, id, query, users, *selection))
+                if (auto joined = publicJoin(directory, id, query, users))
                     return joined;
                 if (query.at("ruleset_payload").value("only_join_existing_lobbies", false))
                     return Reply{108, {}, "matchmaker-public-lobby-unavailable"};
@@ -1177,6 +1199,7 @@ namespace services
                 host["update_id"] = revision + 1;
                 host["update_time"] = documentTime;
                 lobby["host_doc"] = host;
+                lobby["host_ready"] = true;
                 lobby["backend_doc"]["update_id"] = revision + 1;
                 lobby["backend_doc"]["update_time"] = documentTime;
                 std::set<uint64_t> joiningMembers;
@@ -1419,6 +1442,30 @@ namespace services
             if (!member(lobby, user))
                 return 101;
         return 0;
+    }
+
+    std::optional<platform::LobbyIdentity> matchmakingReportIdentity(
+        const std::filesystem::path &directory,
+        const platform::LobbyIdentity &sender,
+        uint64_t participant)
+    {
+        if (participant == sender.userId)
+            return sender;
+        const auto root = directory / "matchmaking" / std::to_string(sender.titleId);
+        const auto index = currentLobbies(root, sender);
+        const auto owner = std::to_string(sender.userId), user = std::to_string(participant);
+        const auto &assignments = index.at("lobbies");
+        if (!assignments.contains(owner) || !assignments.contains(user) ||
+            assignments.at(owner) != assignments.at(user))
+            return std::nullopt;
+        const std::array<uint64_t, 1> users{participant};
+        if (matchmakingHostAuthorized(directory, sender,
+                                     assignments.at(owner).get<uint64_t>(), users) != 0)
+            return std::nullopt;
+        // Native listen hosts submit match events for their remote members.
+        // Validate their first-party claims against that member's live signed
+        // identity, never against an arbitrary client-supplied account.
+        return lobby::onlineIdentity(sender.titleId, participant);
     }
 
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,

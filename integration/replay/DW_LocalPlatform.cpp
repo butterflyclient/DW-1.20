@@ -874,6 +874,35 @@ namespace
 } // namespace
 
 // ACCOUNT initialize/sign-in/frame: these are the actual SDK request boundaries.
+namespace
+{
+    bool CanCommunicate(const DWPlatformAccount *account)
+    {
+        // These three native getters otherwise read an absent launcher account
+        // protobuf. The local provider's authenticated adult profile explicitly
+        // grants unrestricted communication. Pending/expired profiles fail closed.
+        return account && DW_LocalBackend_IsEnabled() && Valid() &&
+               account == func_1416702C0() && account->service.state == 1 &&
+               s_reply.payload.capabilities == 1 && s_reply.payload.accountPolicy == 0 &&
+               s_reply.payload.age >= 18;
+    }
+}
+
+extern "C" bool func_14165D550(const DWPlatformAccount *account)
+{
+    return CanCommunicate(account);
+}
+
+extern "C" bool func_14165D5E0(const DWPlatformAccount *account)
+{
+    return CanCommunicate(account);
+}
+
+extern "C" bool func_14165DDB0(const DWPlatformAccount *account)
+{
+    return !CanCommunicate(account);
+}
+
 extern "C" uint64_t func_14165DD20(DWPlatformAccount *account)
 {
     return AccountFrame(account);

@@ -556,6 +556,22 @@ namespace lobby
         return std::any_of(identities.begin(), identities.end(), platform::valid);
     }
 
+    std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user)
+    {
+        std::vector<platform::LobbyIdentity> identities;
+        {
+            std::lock_guard lock(onlineMutex);
+            const auto entry = onlineUsers.find({title, user});
+            if (entry != onlineUsers.end())
+                for (const auto &[fingerprint, session] : entry->second)
+                    identities.push_back(session.identity);
+        }
+        for (const auto &identity : identities)
+            if (platform::valid(identity))
+                return identity;
+        return std::nullopt;
+    }
+
     bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint)
     {
         std::optional<platform::LobbyIdentity> identity;

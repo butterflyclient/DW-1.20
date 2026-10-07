@@ -1,5 +1,7 @@
 #pragma once
 #include "crypto.h"
+#include "platform.h"
+#include <optional>
 #include <functional>
 #include <string>
 #include <atomic>
@@ -19,6 +21,7 @@ namespace lobby
 
     void serve(const IO &io);
     bool online(uint32_t title, uint64_t user);
+    std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user);
     bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint);
     extern std::atomic<unsigned> connections, authenticated, frames, tasks, failures;
 } // namespace lobby

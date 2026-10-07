@@ -94,7 +94,8 @@ namespace services
     std::optional<PlaylistSelection> selectPlaylist(const std::filesystem::path &directory,
                                                     uint32_t title,
                                                     const Json &query,
-                                                    const std::string &requiredMap)
+                                                    const std::string &requiredMap,
+                                                    unsigned preferredPlaylist)
     {
         const auto root = directory / "playlists" / std::to_string(title);
         if (!requiredMap.empty())
@@ -132,7 +133,14 @@ namespace services
         wire::require(policy.is_object());
         if (policy.contains("split_parties_for_team_balance"))
             wire::require(policy["split_parties_for_team_balance"].is_boolean());
-        if (policy.contains("preferred_playlist_id"))
+        if (preferredPlaylist)
+        {
+            const auto match = std::find(candidates.begin(), candidates.end(), preferredPlaylist);
+            if (match == candidates.end())
+                return std::nullopt;
+            candidates = {*match};
+        }
+        if (!preferredPlaylist && policy.contains("preferred_playlist_id"))
         {
             const auto preferred = number(policy["preferred_playlist_id"], 127);
             const auto match = std::find(candidates.begin(), candidates.end(), preferred);
@@ -215,6 +223,9 @@ namespace services
                 assign(dvars, bindings, "party_minplayers", minimum);
                 rules["min_slots_scale_percent"] = 0;
             }
+            if (policy.contains("minimum_lobby_seconds"))
+                assign(dvars, bindings, "party_minLobbyTime",
+                       number(policy["minimum_lobby_seconds"], 2147483));
             if (policy.value("split_parties_for_team_balance", false))
             {
                 // Replay ReadyTeams otherwise evaluates the original private

@@ -34,6 +34,10 @@ namespace services
                                        const platform::LobbyIdentity &identity,
                                        uint64_t lobby,
                                        std::span<const uint64_t> participants);
+    std::optional<platform::LobbyIdentity> matchmakingReportIdentity(
+        const std::filesystem::path &directory,
+        const platform::LobbyIdentity &sender,
+        uint64_t participant);
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,
                                   uint32_t title,
                                   const Delivery &delivery);

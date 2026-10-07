@@ -1,11 +1,14 @@
 #include <windows.h>
 #include "achievement_services.h"
 #include "protobuf.h"
+#include "matchmaking_services.h"
+#include "progression_ranks.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <algorithm>
 #include <charconv>
 #include <set>
+#include <map>
 
 namespace services
 {
@@ -328,6 +331,65 @@ namespace services
             return values.empty() || std::find(values.begin(), values.end(), value) != values.end();
         }
 
+        uint64_t playerRank(uint64_t xp)
+        {
+            return static_cast<uint64_t>(
+                std::upper_bound(replayPlayerRankMinimumXp.begin(),
+                                 replayPlayerRankMinimumXp.end(), xp) -
+                replayPlayerRankMinimumXp.begin() - 1);
+        }
+
+        Json playerState(uint64_t xp)
+        {
+            const auto rank = playerRank(xp);
+            return {{"id", uint64_t{1000000}}, {"name", "player_xp"}, {"kind", uint64_t{0}},
+                    {"status", uint64_t{1}}, {"progress", uint64_t{0}}, {"target", uint64_t{0}},
+                    {"multiProgress", Json::array({
+                        {{"name", "xp"}, {"current", xp}, {"target", uint64_t{0}}},
+                        {{"name", "rank"}, {"current", rank}, {"target", uint64_t{0}}}})}};
+        }
+
+        uint64_t initialPlayerXp(const std::filesystem::path &journal)
+        {
+            const auto states = document(journal.parent_path() / "states.json", Json::array());
+            wire::require(states.is_array());
+            for (const auto &row : states)
+                if (integer(row, "id") == 1000000)
+                    for (const auto &progress : array(row, "multiProgress", 4))
+                        if (string(progress, "name", 32) == "xp")
+                            return integer(progress, "current");
+            return 0;
+        }
+
+        Delivery progressionUpdate(const platform::LobbyIdentity &id,
+                                   const std::string &context,
+                                   uint64_t xp,
+                                   bool rankedUp)
+        {
+            // Replay's event 67 -> 0x142125410 reads version UInt64(1), full
+            // ContextSerialization user, context, Int32 JSON format, count,
+            // then each bdRewardEventJSONV2 (Int32 format + typed string).
+            const Json event = {
+                {"type", "achievement"}, {"name", "player_xp"},
+                {"reason", rankedUp ? "completed" : "inProgress"},
+                {"kind", 0}, {"id_", 1000000},
+                {"multiProgress", {{"xp", {{"value", xp}}},
+                                   {"rank", {{"value", playerRank(xp)}}}}}};
+            wire::Writer push;
+            push.u32(67);
+            push.u64(1);
+            push.u64(id.userId);
+            push.text("uno");
+            push.text(context);
+            push.data.push_back(7);
+            wire::raw(push.data, int32_t{1});
+            push.u32(1);
+            push.data.push_back(7);
+            wire::raw(push.data, int32_t{1});
+            push.text(event.dump());
+            return {id.userId, std::move(push.data)};
+        }
+
         Reply get(const std::filesystem::path &root,
                   const platform::LobbyIdentity &id,
                   wire::Reader &p,
@@ -337,8 +399,20 @@ namespace services
             const auto folder = root / "achievements" / std::to_string(id.titleId) / q.context;
             const auto path = definitions ? folder / "definitions.json"
                                           : folder / std::to_string(id.userId) / "states.json";
-            const auto data = document(path, Json::array());
+            auto data = document(path, Json::array());
             wire::require(data.is_array() && data.size() <= 15000);
+            if (!definitions)
+            {
+                const auto journal = document(path.parent_path() / "events.json", Json::object());
+                if (journal.contains("player_xp"))
+                {
+                    const auto xp = integer(journal, "player_xp");
+                    data.erase(std::remove_if(data.begin(), data.end(), [](const Json &row)
+                                              { return integer(row, "id") == 1000000; }),
+                               data.end());
+                    data.push_back(playerState(xp));
+                }
+            }
             std::vector<Json> filtered;
             std::set<uint64_t> ids;
             for (const auto &row : data)
@@ -766,6 +840,21 @@ namespace services
             }
             if (accepted)
                 return {0, {}, "achievement-events-idempotent", true, {}};
+            const auto previousXp = data.contains("player_xp")
+                                        ? integer(data, "player_xp") : initialPlayerXp(path);
+            auto xp = previousXp;
+            for (const auto &event : events)
+            {
+                // The native engine aggregates earned score/bonuses into this
+                // event. Consume its XP delta; do not invent XP for raw kills.
+                if (event.at("name") != "mp_addxp")
+                    continue;
+                const auto &values = event.at("values");
+                const auto delta = integer(values, "Param0");
+                wire::require(xp <= UINT64_MAX - delta);
+                xp += delta;
+            }
+            data["player_xp"] = xp;
             auto next = integer(data, "next");
             wire::require(next > 0 && next <= UINT64_MAX - events.size());
             for (const auto &event : events)
@@ -786,7 +875,65 @@ namespace services
                 data["requests"].erase(data["requests"].begin());
             }
             publish(path, data);
-            return {0, {}, "achievement-events-recorded", true, {}};
+            Reply result{0, {}, "achievement-events-recorded", true, {}};
+            if (xp != previousXp)
+            {
+                result.deliveries.push_back(
+                    progressionUpdate(id, context, xp, playerRank(xp) > playerRank(previousXp)));
+                result.detail = " progression_xp=" + std::to_string(xp) +
+                                " progression_rank=" + std::to_string(playerRank(xp));
+            }
+            return result;
+        }
+
+        Reply recordAttributedEvents(const std::filesystem::path &root,
+                                     const platform::LobbyIdentity &sender,
+                                     const std::string &context,
+                                     const std::string &request,
+                                     const Json &events,
+                                     const Json &owners)
+        {
+            struct Batch
+            {
+                platform::LobbyIdentity recipient;
+                Json events = Json::array(), owners = Json::array();
+            };
+            std::map<uint64_t, Batch> batches;
+            size_t offset = 0;
+            // Validate every recipient before recording any part of the batch.
+            for (const auto &owner : owners)
+            {
+                const auto user = integer(owner, "userID");
+                const auto recipient = matchmakingReportIdentity(root, sender, user);
+                if (!recipient ||
+                    !firstPartyOwner({integer(owner, "firstPartyUserID"),
+                                      string(owner, "firstPartyAccountType", 10)}, *recipient))
+                    return {101, {}, "achievement-event-owner-denied"};
+                const auto count = integer(owner, "eventCount", 128);
+                wire::require(count && offset + count <= events.size());
+                auto &batch = batches[user];
+                batch.recipient = *recipient;
+                batch.owners.push_back(owner);
+                for (size_t index = 0; index < count; ++index)
+                    batch.events.push_back(events[offset++]);
+            }
+            wire::require(offset == events.size());
+            Reply reply{0, {}, "achievement-events-recorded", true, {}};
+            for (const auto &[user, batch] : batches)
+            {
+                // Each recipient's XP and idempotency receipt share one atomic
+                // journal commit. A retry after a partial multi-user failure can
+                // finish remaining owners without awarding earlier owners twice.
+                auto recorded = recordEvents(root, batch.recipient, context, request,
+                                             batch.events, batch.owners);
+                if (recorded.error)
+                    return recorded;
+                for (auto &delivery : recorded.deliveries)
+                    reply.deliveries.push_back(std::move(delivery));
+            }
+            reply.detail = " event_owners=" + std::to_string(batches.size()) +
+                           " progression_updates=" + std::to_string(reply.deliveries.size());
+            return reply;
         }
 
         Reply events(const std::filesystem::path &root,
@@ -889,7 +1036,9 @@ namespace services
                         }
                     }
                     wire::require(batchSeen == 26 && !pending.empty() && platform == 113);
-                    if (!eventOwner(owner, id) || !firstPartyOwner(firstParty, id))
+                    const auto recipient = matchmakingReportIdentity(root, id, owner.user);
+                    if (!recipient || !eventOwner(owner, *recipient) ||
+                        !firstPartyOwner(firstParty, *recipient))
                         return {101, {}, "achievement-event-owner-denied"};
                     owners.push_back(attribution(owner, firstParty, pending.size()));
                     for (auto &event : pending)
@@ -897,7 +1046,7 @@ namespace services
                 }
             }
             wire::require(seen == 10 && !owners.empty());
-            return recordEvents(root, id, context, batchRequestId(request), events, owners);
+            return recordAttributedEvents(root, id, context, batchRequestId(request), events, owners);
         }
 
         Reply activation(const std::filesystem::path &root,
@@ -1036,7 +1185,8 @@ namespace services
                 stage = "owner";
                 const auto owner = integer(batch, "userID");
                 const auto type = string(batch, "accountType", 10);
-                if (!eventOwner({owner, type}, id))
+                const auto recipient = matchmakingReportIdentity(root, id, owner);
+                if (!recipient || !eventOwner({owner, type}, *recipient))
                     return {101, {}, "achievement-event-owner-denied"};
                 const auto rows = array(batch, "events", 128);
                 wire::require(!rows.empty());
@@ -1053,13 +1203,17 @@ namespace services
                                   string(batch, "platform", 16) == "bnet");
                     EventAccount firstParty{integer(batch, "firstPartyUserID"),
                                             string(batch, "firstPartyAccountType", 10)};
-                    if (!firstPartyOwner(firstParty, id))
+                    if (!firstPartyOwner(firstParty, *recipient))
                         return {101, {}, "achievement-event-owner-denied"};
                     owners.push_back(attribution({owner, type}, firstParty, rows.size()));
                     attributed = true;
                 }
                 else
+                {
+                    if (owner != id.userId)
+                        return {101, {}, "achievement-event-owner-denied"};
                     legacy = true;
+                }
                 wire::require(!(attributed && legacy));
                 stage = "event-list";
                 for (const auto &event : rows)
@@ -1074,7 +1228,8 @@ namespace services
             stage = "context";
             wire::require(context == std::to_string(id.titleId) || context == "iw8");
             stage = "persistence";
-            return recordEvents(root, id, context, request, events, attributed ? owners : Json());
+            return attributed ? recordAttributedEvents(root, id, context, request, events, owners)
+                              : recordEvents(root, id, context, request, events);
         }
         catch (const Json::exception &)
         {

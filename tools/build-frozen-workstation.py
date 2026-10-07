@@ -16,6 +16,8 @@ parser.add_argument(
     type=Path,
     help="Explicit frozen DW integration inputs, keeping unrelated working-tree edits out of a private test build",
 )
+parser.add_argument("--optimized", action="store_true",
+                    help="Include the existing runtime com_optimized 0/1/2 controls in this private DW build")
 args = parser.parse_args()
 ORIGINAL = Path(r"E:\replay-compiler")
 snapshot = ROOT / "data" / ("compiler-snapshot-" + str(time.time_ns()))
@@ -134,6 +136,21 @@ for source in (ORIGINAL / "tools" / "native").rglob("*"):
         ".txt",
     ):
         copy_file(source, snapshot / source.relative_to(ORIGINAL))
+if args.optimized:
+    # Change only this private job's compiler invocation. The normal workstation
+    # and its saved source revisions remain untouched.
+    project_path = snapshot / "workstation/project.py"
+    original = project_path.read_text()
+    marker = "            if job['profile'] == 'current':\n                args += ['--frontend-probe'"
+    if original.count(marker) != 1:
+        raise RuntimeError("Private optimization compiler insertion point changed")
+    project_path.write_text(original.replace(
+        marker,
+        "            if job['profile'] == 'engine':\n                args += ['--optimized']\n" + marker,
+    ))
+    record = next(item for item in records if Path(item["snapshot"]) == project_path)
+    record["original_sha256"] = record["sha256"]
+    record["sha256"] = hashlib.sha256(project_path.read_bytes()).hexdigest()
 copy_file(ORIGINAL / "source-units.json", snapshot / "source-units.json")
 # DW-owned endpoint implementation is overlaid in this private snapshot only.
 # Its saved workstation ownership remains the same; the new content gets its

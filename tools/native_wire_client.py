@@ -139,6 +139,7 @@ class NativeClient:
         if len(platform) != 512:
             raise ValueError("Platform reply size")
         self.user = struct.unpack_from("<Q", platform, 56)[0]
+        self.platform_account_id = struct.unpack_from("<I", platform, 64)[0]
         credentials = {
             "session_token": platform[112:176].decode(),
             "account_token": platform[177:241].decode(),

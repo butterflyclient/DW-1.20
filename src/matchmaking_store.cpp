@@ -218,6 +218,8 @@ namespace matchmaking_store
                 require(member.is_number_unsigned() && member.get<uint64_t>() &&
                         members.insert(member.get<uint64_t>()).second);
             require(members.contains(state["owner"].get<uint64_t>()));
+            if (state.contains("host_ready"))
+                require(state["host_ready"].is_boolean());
             validatePendingJoins(state);
             if (state.contains("match_selection"))
             {

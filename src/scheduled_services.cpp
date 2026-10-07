@@ -1,10 +1,12 @@
 #include <windows.h>
 #include "scheduled_services.h"
+#include "matchmaking_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <set>
+#include <map>
 
 namespace services
 {
@@ -276,78 +278,85 @@ namespace services
             const auto scope = context(p.text(16));
             const auto gameType = p.u32();
             wire::require(gameType != UINT32_MAX);
-            std::vector<int64_t> values;
+            std::map<uint64_t, std::vector<int64_t>> samples;
+            size_t total = 0;
             while (p.more())
             {
-                wire::require(values.size() < 200);
+                wire::require(total++ < 200);
                 const auto user = p.u64();
                 wire::require(p.offset < p.data.size());
                 const bool nan = p.data[p.offset] == 20;
                 const auto value = nan ? (++p.offset, INT64_MAX) : p.value<int64_t>(9);
                 wire::require(nan || value != INT64_MAX);
-                if (user != id.userId)
+                if (!matchmakingReportIdentity(root, id, user))
                     return {101, {}, "performance-owner-denied"};
-                values.push_back(value);
+                samples[user].push_back(value);
             }
             p.end();
-            if (values.empty())
+            if (samples.empty())
                 return {0, {}, "performance-empty-batch"};
-            const auto path = root / "performance" / std::to_string(id.titleId) / scope /
-                              (std::to_string(id.userId) + ".json");
-            auto data =
-                read(path, Json{{"schema", 1}, {"owner", id.userId}, {"types", Json::object()}});
-            try
+            std::vector<std::pair<std::filesystem::path, Json>> writes;
+            for (const auto &[user, values] : samples)
             {
-                wire::require(data.at("schema") == 1 && data.at("owner") == id.userId &&
-                              data.at("types").is_object() && data.at("types").size() <= 128);
-                for (auto row = data.at("types").begin(); row != data.at("types").end(); ++row)
+                const auto path = root / "performance" / std::to_string(id.titleId) / scope /
+                                  (std::to_string(user) + ".json");
+                auto data =
+                    read(path, Json{{"schema", 1}, {"owner", user}, {"types", Json::object()}});
+                try
                 {
-                    const auto &name = row.key();
-                    wire::require(!name.empty() && name.size() <= 10 &&
-                                  (name.size() == 1 || name[0] != '0'));
-                    uint64_t type = 0;
-                    for (char c : name)
+                    wire::require(data.at("schema") == 1 && data.at("owner") == user &&
+                                  data.at("types").is_object() && data.at("types").size() <= 128);
+                    for (auto row = data.at("types").begin(); row != data.at("types").end(); ++row)
                     {
-                        wire::require(c >= '0' && c <= '9');
-                        type = type * 10 + static_cast<unsigned>(c - '0');
+                        const auto &name = row.key();
+                        wire::require(!name.empty() && name.size() <= 10 &&
+                                      (name.size() == 1 || name[0] != '0'));
+                        uint64_t type = 0;
+                        for (char c : name)
+                        {
+                            wire::require(c >= '0' && c <= '9');
+                            type = type * 10 + static_cast<unsigned>(c - '0');
+                        }
+                        wire::require(type < UINT32_MAX);
+                        wire::require(row->at("count").is_number_unsigned() &&
+                                      row->at("recent").is_array() && row->at("recent").size() <= 256 &&
+                                      row->at("count").get<uint64_t>() >= row->at("recent").size());
+                        for (const auto &value : row->at("recent"))
+                            wire::require(value.is_null() ||
+                                          (value.is_number_integer() &&
+                                           (!value.is_number_unsigned() ||
+                                            value.get<uint64_t>() < uint64_t(INT64_MAX)) &&
+                                           value.get<int64_t>() != INT64_MAX));
+                        if (row->contains("updated"))
+                            wire::require(row->at("updated").is_number_unsigned() &&
+                                          row->at("updated").get<uint64_t>() <= UINT32_MAX);
                     }
-                    wire::require(type < UINT32_MAX);
-                    wire::require(row->at("count").is_number_unsigned() &&
-                                  row->at("recent").is_array() && row->at("recent").size() <= 256 &&
-                                  row->at("count").get<uint64_t>() >= row->at("recent").size());
-                    for (const auto &value : row->at("recent"))
-                        wire::require(value.is_null() ||
-                                      (value.is_number_integer() &&
-                                       (!value.is_number_unsigned() ||
-                                        value.get<uint64_t>() < uint64_t(INT64_MAX)) &&
-                                       value.get<int64_t>() != INT64_MAX));
-                    if (row->contains("updated"))
-                        wire::require(row->at("updated").is_number_unsigned() &&
-                                      row->at("updated").get<uint64_t>() <= UINT32_MAX);
                 }
+                catch (const std::runtime_error &)
+                {
+                    throw std::runtime_error("Performance store schema invalid");
+                }
+                auto &types = data["types"];
+                const auto key = std::to_string(gameType);
+                wire::require(types.contains(key) || types.size() < 128);
+                auto entry = types.value(key, Json{{"count", uint64_t{0}}, {"recent", Json::array()}});
+                auto &recent = entry["recent"];
+                wire::require(recent.is_array() && recent.size() <= 256);
+                const auto count = entry.at("count").get<uint64_t>();
+                wire::require(count <= UINT64_MAX - values.size());
+                for (const auto value : values)
+                    recent.push_back(value == INT64_MAX ? Json() : Json(value));
+                if (recent.size() > 256)
+                    recent.erase(recent.begin(),
+                                 recent.begin() +
+                                     static_cast<Json::difference_type>(recent.size() - 256));
+                entry["count"] = count + values.size();
+                entry["updated"] = now();
+                types[key] = std::move(entry);
+                writes.emplace_back(path, std::move(data));
             }
-            catch (const std::runtime_error &)
-            {
-                throw std::runtime_error("Performance store schema invalid");
-            }
-            auto &types = data["types"];
-            const auto key = std::to_string(gameType);
-            wire::require(types.contains(key) || types.size() < 128);
-            auto entry = types.value(key, Json{{"count", uint64_t{0}}, {"recent", Json::array()}});
-            auto &recent = entry["recent"];
-            wire::require(recent.is_array() && recent.size() <= 256);
-            const auto count = entry.at("count").get<uint64_t>();
-            wire::require(count <= UINT64_MAX - values.size());
-            for (const auto value : values)
-                recent.push_back(value == INT64_MAX ? Json() : Json(value));
-            if (recent.size() > 256)
-                recent.erase(recent.begin(),
-                             recent.begin() +
-                                 static_cast<Json::difference_type>(recent.size() - 256));
-            entry["count"] = count + values.size();
-            entry["updated"] = now();
-            types[key] = std::move(entry);
-            save(path, data);
+            for (const auto &[path, data] : writes)
+                save(path, data);
             return {0, {}, "performance-samples-recorded"};
         }
     } // namespace
