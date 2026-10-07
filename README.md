@@ -110,6 +110,21 @@ game start, preserving the account ID and local saves. Send the same universal
 Native Social name search, requests and acceptance are documented in
 [player names and friends](docs/player-names-and-friends.md).
 
+Player XP is saved on the player's machine in
+`%LOCALAPPDATA%\ReplayDW\player-progression.bin`. The record is bound to that
+player's existing identity and replaced atomically after native progression
+updates. The server restores the signed local total at login and mirrors earned
+XP for native achievements and rank notifications. Keep this file with the
+existing local identity when preserving a player's progress.
+
+The executable's INI accepts `unlock_all=0` or `unlock_all=1` and `rank=0`
+or a career rank from `1` through `55`. Defaults are `unlock_all=0` and `rank=0`.
+Unlock-all selects Replay's native item, emblem, attachment and killstreak
+unlock controls. Rank zero uses saved progression; a nonzero rank sets that
+rank's native XP threshold once when the configured value changes. It does
+not reset subsequently earned XP each launch. Restart the game after editing
+the INI. These settings do not affect another player's local profile.
+
 `Replay-DW-Diagnostics.zip` contains a portable existing-identity checker and
 read-only client/INI/network/log checks. It reports the precise failed Win32,
 DPAPI or P-256 import stage without deleting or replacing an identity. The game

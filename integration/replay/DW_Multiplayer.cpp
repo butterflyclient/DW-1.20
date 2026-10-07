@@ -47,7 +47,7 @@ extern "C" void func_140F3BA70(void *manager,
 // Original SV_ClientMP_GetLocalClientPing reports the minimum remote ping for
 // the listen host. Scoreboard consumers should use this client's own ACK RTT,
 // just as they already do for every remote client. RTT collection stays native.
-extern "C" unsigned func_1413711C0(unsigned client)
+extern "C" __attribute__((disable_tail_calls)) unsigned func_1413711C0(unsigned client)
 {
     return func_141370C40(client);
 }

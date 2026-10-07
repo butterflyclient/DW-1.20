@@ -50,11 +50,11 @@ target_compile_features(iw8-dw-server PRIVATE cxx_std_20)
 target_compile_definitions(iw8-dw-server PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0601)
 target_link_libraries(iw8-dw-server PRIVATE ws2_32 bcrypt)
 add_library(iw8-dw-platform-client SHARED integration/replay/DW_LocalPlatformCrypto.cpp
-    integration/replay/DW_LocalIdentity.cpp)
+    integration/replay/DW_LocalIdentity.cpp tools/identity-test-adapter.cpp)
 target_compile_features(iw8-dw-platform-client PRIVATE cxx_std_20)
 set_target_properties(iw8-dw-platform-client PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_executable(iw8-dw-identity-check tools/identity-file-diagnostic.cpp
-    integration/replay/DW_LocalIdentity.cpp)
+    integration/replay/DW_LocalIdentity.cpp tools/identity-test-adapter.cpp)
 target_compile_features(iw8-dw-identity-check PRIVATE cxx_std_20)
 target_link_libraries(iw8-dw-identity-check PRIVATE bcrypt crypt32)
 if(MSVC)
