@@ -36,6 +36,8 @@ namespace services
         uint64_t channelId = 0, channelMember = 0;
         uint32_t channelEvent = 0, channelMemberGeneration = 0, channelRecipientGeneration = 0;
         wire::Bytes channelJoinPayload;
+        std::string progressionContext;
+        uint64_t progressionXp = 0;
     };
 
     struct Reply

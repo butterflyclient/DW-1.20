@@ -58,4 +58,6 @@ def exercise(fixture, data, offset, restart, checks):
         committed = journal.read_bytes()
         assert len(json.loads(committed)["requests"]) == 256
         assert client.task(125, 2, packet) == b"" and journal.read_bytes() == committed
+        from progression_delivery_fixtures import reward
+        reward(client, xp + 123)
     checks.append("a real archive/journal interruption survives backend process restart, rolls forward, and retains once-only XP receipts")

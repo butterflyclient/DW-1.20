@@ -388,7 +388,10 @@ namespace services
             push.data.push_back(7);
             wire::raw(push.data, int32_t{1});
             push.text(event.dump());
-            return {id.userId, std::move(push.data)};
+            Delivery delivery{id.userId, std::move(push.data)};
+            delivery.progressionContext = context;
+            delivery.progressionXp = xp;
+            return delivery;
         }
 
         Reply get(const std::filesystem::path &root,
@@ -868,7 +871,27 @@ namespace services
                 accepted = true;
             }
             if (accepted)
-                return {0, {}, "achievement-events-idempotent", true, {}};
+            {
+                Reply result{0, {}, "achievement-events-idempotent", true, {}};
+                const bool earnedXp = std::any_of(events.begin(), events.end(),
+                    [](const Json &event)
+                    {
+                        return event.at("name") == "mp_addxp" &&
+                               integer(event.at("values"), "Param0") > 0;
+                    });
+                if (earnedXp)
+                {
+                    // The original consumer assigns absolute XP/rank. Replay the
+                    // latest accepted snapshot after a lost result or recovered
+                    // commit; never award the delta or repeat a rank-up event.
+                    const auto xp = data.contains("player_xp")
+                                        ? integer(data, "player_xp") : initialPlayerXp(path);
+                    result.deliveries.push_back(progressionUpdate(id, context, xp, false));
+                    result.operation = "achievement-events-idempotent-refresh";
+                    result.detail = " progression_xp=" + std::to_string(xp);
+                }
+                return result;
+            }
             const auto previousXp = data.contains("player_xp")
                                         ? integer(data, "player_xp") : initialPlayerXp(path);
             auto xp = previousXp;
@@ -1174,6 +1197,30 @@ namespace services
                 0, {}, activate ? "achievement-activated" : "achievement-deactivated", true, {}};
         }
     } // namespace
+
+    bool achievementDeliveryValid(const std::filesystem::path &root, uint32_t title,
+                                  const Delivery &delivery)
+    {
+        if (delivery.progressionContext.empty())
+            return true;
+        wire::require(title == 5800 && delivery.user && delivery.user != UINT64_MAX &&
+                      (delivery.progressionContext == "5800" ||
+                       delivery.progressionContext == "iw8"));
+        // A second event or signed local restore can supersede an absolute
+        // notification between dispatch and its serialized socket write.
+        achievement_store::recover(root, title, validateEventWrite);
+        const auto path = root / "achievements" / std::to_string(title) /
+                          delivery.progressionContext / std::to_string(delivery.user) /
+                          "events.json";
+        const auto journal = document(path, Json::object());
+        if (!journal.contains("player_xp"))
+            return delivery.progressionXp == initialPlayerXp(path);
+        wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
+                      journal.at("requests").is_array() &&
+                      journal.at("events").size() <= 1024 &&
+                      journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
+        return delivery.progressionXp == integer(journal, "player_xp");
+    }
 
     std::vector<StoredProgression> achievementProgressionSnapshot(
         const std::filesystem::path &root, uint32_t title, const std::string &context)

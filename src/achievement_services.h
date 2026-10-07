@@ -12,6 +12,8 @@ namespace services
 
     std::vector<StoredProgression> achievementProgressionSnapshot(
         const std::filesystem::path &, uint32_t title, const std::string &context);
+    bool achievementDeliveryValid(const std::filesystem::path &, uint32_t title,
+                                  const Delivery &);
     void restoreAchievementProgression(const std::filesystem::path &,
                                        uint32_t title, uint64_t user, uint64_t xp,
                                        bool restore, unsigned startingRank);

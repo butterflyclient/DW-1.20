@@ -6,6 +6,20 @@ import time
 from tournament_fixtures import no_update, updates
 
 
+def journal_snapshot(path):
+    # Windows rejects a read while the backend's durable writer owns its
+    # exclusive handle. Wait only for that sharing window, never for malformed
+    # JSON or a failed state assertion.
+    deadline = time.monotonic() + 1
+    while True:
+        try:
+            return json.loads(path.read_bytes())
+        except PermissionError as error:
+            if getattr(error, "winerror", None) not in (32, 33) or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+
+
 def exercise(directory, title, clients, publication, helpers, publish, checks):
     u64, text, boolean = helpers
     root = directory / "tournaments" / str(title)
@@ -115,7 +129,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
                 if offline:
                     deadline = time.monotonic() + 6
                     while time.monotonic() < deadline:
-                        journal = json.loads((mm / "transaction.json").read_bytes())
+                        journal = journal_snapshot(mm / "transaction.json")
                         if journal["phase"] == "prepared" and any(
                             entry["path"]
                             == f"tournament-terminations/{tournament}.json"
@@ -130,7 +144,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
                 else:
                     clients[0][1].task(145, 20, error=102)
                 assert not terminal_path.exists()
-                journal = json.loads((mm / "transaction.json").read_bytes())
+                journal = journal_snapshot(mm / "transaction.json")
                 assert journal["phase"] == "prepared"
                 paths = {entry["path"] for entry in journal["writes"]}
                 assert f"lobbies/{lobby}.json" in paths
@@ -156,7 +170,7 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             while time.monotonic() < deadline:
                 if (
                     terminal_path.exists()
-                    and json.loads((mm / "transaction.json").read_bytes())["phase"]
+                    and journal_snapshot(mm / "transaction.json")["phase"]
                     == "applied"
                 ):
                     break

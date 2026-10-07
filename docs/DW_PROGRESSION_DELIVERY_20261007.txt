@@ -1,0 +1,64 @@
+REPLAY PROGRESSION RETRY DELIVERY - 2026-10-07
+
+CONFIRMED GAP
+The backend commits earned mp_addxp deltas and their retry receipts before
+returning a result. An interrupted journal transaction can subsequently recover
+without reconstructing its lost notification. Previously, a matching retry
+acknowledged the request but returned no event-67 update. An isolated native-wire
+fixture against the prior compiled backend reproduces that missing notification.
+The focused fixture also exposed a separate REST carrier bug: its wrapper saved
+the domain event and returned allSucceeded but discarded the domain's deliveries.
+That prevented newly earned REST XP from reaching the native player as well.
+
+TARGET CONSUMER
+Original Replay OnlineProgression::UpdateProgression, VA 0x141060490, reads
+id_ 1000000 and multiProgress.xp.value/rank.value as UInt64. It assigns those
+absolute values to the selected controller's progression record. Its completion
+flag selects the player_ranked_up UI and stat-update path; false uses the normal
+progress update path. The nine-case original-byte VM proof executes the consumer
+and cookie check unchanged. JSON operations and diagnostics are modeled. Repeated
+absolute values do not add XP, other controller slots stay intact, and false
+completion does not invoke the UI/stat path. This is not a native game run.
+
+IMPLEMENTATION
+Matching accepted requests containing positive mp_addxp deltas now return the
+latest cumulative progression as the existing event-67 player_xp notification,
+reason inProgress. They never reapply the event delta or manufacture another
+completed/rank-up notification. This covers binary tasks 125/1 and 125/2 and the
+REST batch path, including native UUID aliases and archived retry receipts.
+An old accepted request returns current XP, rather than its historical total.
+Conflicting retries remain rejected without publication or notification.
+Ordinary event retries do not create progression updates.
+The REST wrapper now preserves the complete accepted domain Reply before adding
+its response envelope, including first-award and cross-player notifications and
+diagnostic details. It retains the original allSucceeded success body and error
+handling; the ordinary transport writer delivers the preserved notifications.
+
+The internal Delivery layout records progression context and snapshot XP. The
+existing service-store validation runs after the endpoint's writer lock is
+taken. It recovers accepted intents, binds title/context/account, and checks the
+current stored XP before sending. A newer award or signed local restoration
+invalidates an older absolute notification. This uses the ordinary transport
+writer and native reward DTO; it changes no engine executable or fence status.
+
+VALIDATION
+The readiness receipt binds Windows/Linux compiled images and their 93 C++ input
+hashes, nine original consumer cases, focused encrypted replay/recovery fixtures,
+the compiled stale-delivery verifier and public endpoint checks. The wire tests
+exercise binary-to-REST retry identity, legacy archived receipts, changed retry
+rejection, actual pending-file failure and backend/session restart. Existing
+multi-player fixtures consume and verify each recipient's refreshed snapshot.
+
+SOURCE AND DEPLOYMENT
+The frozen build preserves the independently deployed dashboard/activity source
+archive and applies only the owned progression changes to its shared service
+files. Other dirty compiler, migration and tournament changes are excluded.
+The game image stays unchanged. No game launches or interactions were performed.
+
+REMAINING SCOPE
+This closes the lost notification on a matching event retry. It does not claim
+exactly-once push acknowledgement, automatic offline delivery, or a reconnect
+refresh when the client never retries and never queries its achievement state.
+Player-local XP restore remains authoritative according to the existing signed
+login contract. Full reward/quest rules and positive native callback consumption
+remain separate implementation/validation work. The full DW objective is open.

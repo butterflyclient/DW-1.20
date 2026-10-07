@@ -326,7 +326,12 @@ namespace services
                 // require JSON allSucceeded. An empty 204 cannot complete them.
                 result.status = 200;
                 result.body = Json{{"allSucceeded", true}}.dump();
-                reply.operation = domain.operation;
+                // Keep the complete domain result, including cross-player
+                // notifications. Adding the REST envelope must not discard
+                // earned progression while acknowledging its accepted event.
+                auto transportDetail = std::move(reply.detail);
+                reply = std::move(domain);
+                reply.detail += transportDetail;
             }
             catch (const std::runtime_error &e)
             {

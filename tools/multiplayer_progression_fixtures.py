@@ -70,6 +70,7 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
         event = json.loads(packet[len(prefix) + 1:-1])
         assert event["id_"] == 1000000 and event["kind"] == 0
         assert event["multiProgress"]["xp"]["value"] == expected
+        return event
 
     request = bytes(range(16))
     packet = report([(host, 1500), (peer, 3500)], request)
@@ -80,6 +81,8 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
     before = [p.read_bytes() for p in journals]
     assert host.task(125, 2, packet) == b""
     assert [p.read_bytes() for p in journals] == before
+    assert reward(host, 1500)["reason"] == "inProgress"
+    assert reward(peer, 3500)["reason"] == "inProgress"
     for client, expected, rank in ((host, 1500, 0), (peer, 3500, 1)):
         states = fields(client.task(125, 3, structure(
             proto_text(1, "5800") + integer(3, 100) + proto_text(4, "") + integer(8, 0))))

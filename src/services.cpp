@@ -585,7 +585,8 @@ namespace services
         std::lock_guard lock(storeMutex);
         try
         {
-            return channelDeliveryValid(directory, title, delivery) &&
+            return achievementDeliveryValid(directory, title, delivery) &&
+                   channelDeliveryValid(directory, title, delivery) &&
                    socialDeliveryValid(title, delivery) &&
                    mailDeliveryValid(directory, title, delivery) &&
                    clanDeliveryValid(directory, title, delivery) &&

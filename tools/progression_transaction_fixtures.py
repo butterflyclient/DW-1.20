@@ -89,4 +89,6 @@ def exercise(host, peer, data, report, reward, checks):
     committed = [path.read_bytes() for path in paths]
     assert host.task(125, 2, packet) == b""
     assert [path.read_bytes() for path in paths] == committed
+    for client, path in zip(clients, paths):
+        assert reward(client, json.loads(path.read_bytes())["player_xp"])["reason"] == "inProgress"
     checks.append("XP roll-forward finishes both native state results and retry receipts without double-awarding")
