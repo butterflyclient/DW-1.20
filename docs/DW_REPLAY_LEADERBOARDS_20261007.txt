@@ -1,0 +1,72 @@
+REPLAY LEADERBOARD COLUMN SUPPORT - 2026-10-07
+
+Issue
+Replay virtual leaderboard views request physical columns in UI order, including
+nonascending IDs above 10. The backend previously stored at most ten columns,
+required unpublished name definitions, and emitted included columns in numeric
+order. That could reject a real request or display another statistic's value.
+
+Target research
+The original Replay image SHA256 is
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+The native DB allocator identifies LeaderboardDef as type 55, 56 bytes, and
+VirtualLeaderboardDef as type 56, 48 bytes. Their column entries are 56 and
+24 bytes. The export retains the complete root/column fields and asset names.
+The root-folder game supplied 40 regular and 41 virtual assets, including two
+defaults. No process memory or statistics were changed during extraction.
+
+Original LB column builder 1419B5070 was executed for all 40 non-default virtual
+views. Only memset and bounded Com_sprintf boundaries were modeled. Original
+LB_VR_GetXUserColExt 1419B5D80 then read distinguishable packed values from every
+physical display column. It retrieved the correct value in each case. Native
+DW wrappers 140F755B0/140F75830 select included reads when a column list exists;
+SDK constructors 142128100/142128500 send service 4 tasks 16 and 17.
+
+For example, accuracy requests:
+col_0, col_1, col_16, col_13, col_14, col_15, col_17, col_2, col_3, col_4.
+Sorting that list changes the packed UI slots. It must retain its request order.
+Original LeaderBoardRow<10>::deserialize 14150E900 limits the response to ten
+Int32 columns; the stored schema and the response window are different bounds.
+
+Implementation
+Stored rows and published schemas support up to 240 physical columns. Included
+reads preserve request order. Excluded reads preserve schema order and reject a
+result wider than ten columns. Ordinary reads retain their ten-column layout.
+Unknown names, duplicate schema/request names, invalid schema types, and values
+outside the signed Int32/Int64 native ranges are rejected. Reads do not mutate
+player statistics. Existing ten-column publications remain supported.
+
+deploy/leaderboards/replay120-assets.json is the target-bound asset snapshot.
+tools/build-replay-leaderboards.py regenerates 747 column definitions, including
+native 140000/150000 read namespaces and regular tracked variants. This is a
+column schema publication: no player scores, ranks, XP or ownership are seeded.
+The publisher requires a stopped backend, validates every generated file, saves
+prior definitions and a manifest, rolls back failures, and publishes its receipt
+last. Player-stat directories are outside its write set.
+
+Validation and deployment
+Both current Windows and Linux builds passed 80 encrypted projected reads over
+all 40 shipped selections, plus ordinary/excluded reads and malformed-input
+groups. Linux also passed nine Store contract checks and twelve public native
+authentication/transport checks. Evidence is bound to the compiled server hash.
+Linux release: /opt/replay-dw/releases/20261007-7e447d81283a/iw8-dw-server
+SHA256: 7e447d81283a63afbcbb3009e46f64538a2dfdf74dfd95fe7d7ff132204a14e0
+Primary: 162.243.115.160, replay-dw.service, nonroot replay-dw account.
+
+The unchanged game b09a9ba25f733960dd1f8c569f566979804c2a1a247a9753e2c6e7a50556c138
+ran from E:\IW8\Builds\1.20-replay. Final single-instance PID 29832 reached native
+HSM 33, all 27 startup fences passing, and displayed the native Store without a
+Lua error. Prior Standard Issue I ownership remained effective. The leaderboard
+menu/read callback was not reached in that run. Live positive leaderboard rows,
+and automatic population of virtual ratings from match/stat events, remain open.
+The game was stopped and development control files removed. The user requested
+no further game runs after that test; future work uses research and fixtures.
+
+Reproduction
+python tools/build-replay-leaderboards.py deploy/leaderboards/replay120-assets.json --output OUTPUT
+python tools/test-replay-leaderboards.py --server SERVER --publication OUTPUT --output PROOF.json
+Stop backend; run publisher as replay-dw with OUTPUT and --data /var/lib/replay-dw;
+then restart replay-dw.service. Preserve rollback snapshots and player stats.
+
+Full DW backend completion is not claimed. This closes column-schema and native
+packed-order support, not unverified match aggregation or other remaining domains.

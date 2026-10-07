@@ -78,7 +78,7 @@ ROUTES = [
 ]
 GAPS = {
     "3": "Only published legacy team data; broader clan/team SDK families require target evidence.",
-    "4": "Task 14 applies explicitly trusted local token-hash/stat-batch authorizations with atomic retry receipts. Retail opaque token payload validation and a positive native callback remain unverified. Verified game leaderboard asset column publication remains open.",
+    "4": "Task 14 applies explicitly trusted local token-hash/stat-batch authorizations with atomic retry receipts. Retail opaque token payload validation and a positive native callback remain unverified. Shipped column publication and packed projection support are implemented; positive native row callbacks and virtual score aggregation remain open.",
     "6": "Offline delivery is unavailable; no unsolicited invented recipient identity.",
     "8": "Full native positive CRUD roundtrip still needs observation.",
     "10": "Full native positive editing/deletion/backup roundtrip still needs observation.",
@@ -197,6 +197,15 @@ for environment in ("dev", "cert", "prod"):
                 operation,
             )
         ] = "objectstore_services.cpp"
+
+GAPS["4"] += (
+    " Shipped regular/virtual asset schemas now generate 747 native column publications. "
+    "Stored rows support 240 columns while each response retains its ten-column native "
+    "bound. Included projections retain request order; excluded projections retain schema "
+    "order. All 40 original virtual column builders/accessors and 80 encrypted entity/rank "
+    "projections were verified on current Windows/Linux binaries. Positive native menu/row "
+    "callbacks and automatic virtual score aggregation remain open; no statistics were seeded."
+)
 
 GAPS["193"] += (
     " The same native REST vector GET/PUT routes now share the struct-buffer domain, "

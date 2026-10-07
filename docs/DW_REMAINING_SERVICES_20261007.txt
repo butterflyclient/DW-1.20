@@ -4,14 +4,17 @@ Branch: codex/dw-remaining-services
 Private remote: IDARETW/IW8-Replay-DW
 Verified main baseline: 16a858b
 Main readiness: validation/20261007-main-native-startup-readiness.json
-Main executable/backend pair remains the existing shipping game and the
+The validated main baseline used the existing shipping game and the
 26e8b34b93de backend. One native game instance reached Multiplayer with all
 27 startup fences passing, no network error and no lobby failures. Protocol
 and native startup evidence are separate; this is not a full gameplay claim.
 
 All remaining implementation belongs on this branch, including object store,
-live content and the player-facing store. Game tests are authorized one
-instance at a time. Do not start a second game while the first exists.
+live content and the player-facing store. The primary backend has moved to the
+Linux droplet at 162.243.115.160. Current release is the 7e447d81283a image; see
+docs/DW_REPLAY_LEADERBOARDS_20261007.txt and the hash-bound deployment receipts.
+The owner requested no more game tests after the final PID 29832 run. Continue
+with target research and protocol fixtures; do not launch another game.
 Use controlled root-folder launches; preserve player identity/profile data and
 unrelated dirty compiler, migration and tournament sources. Freeze builds from
 committed sources plus an explicit owned overlay. Rebuild the game only when
@@ -24,19 +27,32 @@ KNOWN TASK CONTRACTS STILL OPEN
 Initial upload task/serializer bindings are separate from those completions.
 Do not use misleading SQLite names as proof or add guessed success replies.
 
-STORE NAVIGATION BASELINE
+STORE NAVIGATION BASELINE AND RESOLUTION
 Single game PID 20740 traversed Weapons, Operators, Challenges, Barracks and
 Battle Pass through native input. Entering Store triggered a Lua nil-call:
   ui/MenuBuilder.lua - BuildRegisteredType
   ui/frontEnd/MPStoreMenu.lua
   ui/utils/TabUtils.lua - UpdateBuiltWidgetOnTabChange
   ui/frontEnd/MPTabsMenu.lua
-The interface returned to Play. This is a real frontend construction failure;
-it is not yet established as an object-store RPC failure or missing catalog.
-Trace the requested widget/registered factory and required publisher inputs
-before choosing a fix. Preserve native menu, purchase, inventory and ownership
-consumers instead of presenting an unrelated replacement shop.
+The interface returned to Play. That initial failure is resolved: the publisher
+store root lacked the required layoutType 3/4. Later native tuning truncated
+offer lists at its 128-byte value buffer. The generated catalog now respects both
+native layouts. Store opened, stock previews displayed, an actual free claim
+completed, and ownership survived restarts. See DW_REPLAY_STORE_20261007.txt.
+The latest 7e447d81283a run reconfirmed native Store display and retained ownership;
+new paid claims and full marketplace variants remain separate validation gates.
 
 Evidence: validation/20261007-store-navigation-baseline.json
 Debug capture: data/remaining-store-20261007/debug.jsonl (capture stopped/frozen).
 The full backend implementation goal remains active.
+
+LEADERBOARD COLUMN SUPPORT
+The shipped regular/virtual schemas and native column builder/accessor now
+generate 747 publications. Included reads preserve UI order, wide stored schemas
+are supported, and each response remains bounded to ten native columns. Eighty
+encrypted projections pass on both Windows and Linux. Positive native menu/row
+callbacks and automatic virtual score aggregation are still unverified/open.
+
+Content SDK methods with missing original response bindings remain explicitly
+unimplemented. Request wrappers or misleading SQLite names do not prove a usable
+response class; keep original-byte and caller/constructor evidence for each route.

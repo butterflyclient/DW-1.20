@@ -5,12 +5,15 @@
 #include <fstream>
 #include <set>
 #include <charconv>
+#include <numeric>
 
 namespace services
 {
     namespace
     {
         using Json = nlohmann::json;
+        constexpr size_t maximumStoredColumns = 240;
+        constexpr size_t maximumResponseColumns = 10;
 
         struct Row
         {
@@ -58,16 +61,35 @@ namespace services
                 const auto &value = data.at(key);
                 wire::require(value.is_object() && value.contains("rating") &&
                               value.contains("columns") && value["columns"].is_array() &&
-                              value["columns"].size() <= 10);
+                              value["columns"].size() <= maximumStoredColumns);
                 Row row;
                 row.user = user;
-                row.rating = value["rating"].is_null() ? 0 : value["rating"].get<int64_t>();
+                if (!value["rating"].is_null())
+                {
+                    wire::require(value["rating"].is_number_integer() &&
+                                  (!value["rating"].is_number_unsigned() ||
+                                   value["rating"].get<uint64_t>() <= uint64_t{INT64_MAX}));
+                    row.rating = value["rating"].get<int64_t>();
+                }
                 row.updated = value.value("updated", uint64_t{});
                 row.name = value.value("name", user == id.userId ? id.name : std::string{});
                 wire::require(row.name.size() < 64);
                 for (const auto &column : value["columns"])
-                    row.columns.push_back(column.is_null() ? 0 : column.get<int32_t>());
-                row.columns.resize(10, 0);
+                {
+                    if (column.is_null())
+                        row.columns.push_back(0);
+                    else
+                    {
+                        wire::require(column.is_number_integer() &&
+                                      (!column.is_number_unsigned() ||
+                                       column.get<uint64_t>() <= uint64_t{INT32_MAX}) &&
+                                      column.get<int64_t>() >= INT32_MIN &&
+                                      column.get<int64_t>() <= INT32_MAX);
+                        row.columns.push_back(column.get<int32_t>());
+                    }
+                }
+                if (row.columns.size() < maximumResponseColumns)
+                    row.columns.resize(maximumResponseColumns, 0);
                 result.push_back(std::move(row));
             }
             std::sort(result.begin(),
@@ -81,7 +103,7 @@ namespace services
             return result;
         }
 
-        wire::Bytes serialize(const Row &row, const std::set<size_t> &excluded)
+        wire::Bytes serialize(const Row &row, const std::vector<size_t> &selected)
         {
             // Native bdStatsInfo reader 0x14214AEE0, followed by the selected typed
             // Int32 columns in LeaderBoardRow<10>::deserialize 0x14150E900.
@@ -98,24 +120,33 @@ namespace services
             out.u32(row.updated && row.updated <= time
                         ? static_cast<uint32_t>(std::min(time - row.updated, uint64_t{UINT32_MAX}))
                         : 0);
-            for (size_t i = 0; i < row.columns.size(); ++i)
-                if (!excluded.contains(i))
-                {
-                    out.data.push_back(7);
-                    wire::raw(out.data, row.columns[i]);
-                }
+            wire::require(selected.size() <= maximumResponseColumns);
+            for (const auto index : selected)
+            {
+                wire::require(index < maximumStoredColumns);
+                out.data.push_back(7);
+                // An absent, unrecorded column has the same zero default as an
+                // absent trailing field in existing ten-column publications.
+                wire::raw(out.data, index < row.columns.size() ? row.columns[index] : int32_t{0});
+            }
             return std::move(out.data);
         }
 
-        std::optional<std::set<size_t>> exclusions(const std::filesystem::path &directory,
-                                                   uint32_t title,
-                                                   uint32_t board,
-                                                   const std::vector<std::string> &requested,
-                                                   bool included)
+        std::vector<size_t> ordinaryColumns()
         {
-            std::set<size_t> indices;
+            std::vector<size_t> result(maximumResponseColumns);
+            std::iota(result.begin(), result.end(), size_t{0});
+            return result;
+        }
+
+        std::optional<std::vector<size_t>> projection(const std::filesystem::path &directory,
+                                                       uint32_t title,
+                                                       uint32_t board,
+                                                       const std::vector<std::string> &requested,
+                                                       bool included)
+        {
             if (requested.empty())
-                return indices;
+                return ordinaryColumns();
             // Column names are asset data, not SDK layout. Do not guess their indices.
             const auto path = directory / "leaderboard-definitions" / std::to_string(title) /
                               (std::to_string(board) + ".json");
@@ -123,24 +154,39 @@ namespace services
                 return std::nullopt;
             const auto definition = document(path);
             wire::require(definition.contains("columns") && definition["columns"].is_array() &&
-                          definition["columns"].size() <= 10);
+                          !definition["columns"].empty() &&
+                          definition["columns"].size() <= maximumStoredColumns);
+            std::set<std::string> names;
+            for (const auto &column : definition["columns"])
+            {
+                wire::require(column.is_string());
+                const auto name = column.get<std::string>();
+                wire::require(!name.empty() && name.size() < 65 &&
+                              name.find('\0') == std::string::npos && names.insert(name).second);
+            }
+            std::vector<size_t> indices;
             for (const auto &name : requested)
             {
                 auto found = std::find(
                     definition["columns"].begin(), definition["columns"].end(), Json(name));
                 if (found == definition["columns"].end())
                     return std::nullopt;
-                indices.insert(static_cast<size_t>(found - definition["columns"].begin()));
+                indices.push_back(static_cast<size_t>(found - definition["columns"].begin()));
             }
             if (included)
+                return indices;
+            else
             {
-                std::set<size_t> omitted;
-                for (size_t i = 0; i < 10; ++i)
-                    if (!indices.contains(i))
-                        omitted.insert(i);
-                return omitted;
+                std::vector<size_t> retained;
+                for (size_t i = 0; i < definition["columns"].size(); ++i)
+                    if (std::find(indices.begin(), indices.end(), i) == indices.end())
+                        retained.push_back(i);
+                // Excluded-column reads retain numeric schema order. Included
+                // reads above MUST retain request order: the original virtual
+                // leaderboard UI indexes its packed response by that order.
+                wire::require(retained.size() <= maximumResponseColumns);
+                return retained;
             }
-            return indices;
         }
     } // namespace
 
@@ -233,7 +279,7 @@ namespace services
                         item.u64(user);
                     else
                     {
-                        auto bytes = serialize(*found, {});
+                        auto bytes = serialize(*found, ordinaryColumns());
                         item.data.insert(item.data.end(), bytes.begin(), bytes.end());
                     }
                     reply.results.push_back(std::move(item.data));
@@ -242,9 +288,9 @@ namespace services
         }
         // Replay constructors 0x142128100/0x142128500 are the included-column
         // entity/rank variants (16/17); 13/4 are the excluded-column variants.
-        const auto projection =
-            exclusions(directory, id.titleId, boards[0], excluded, task == 16 || task == 17);
-        if (!projection)
+        const auto selected =
+            projection(directory, id.titleId, boards[0], excluded, task == 16 || task == 17);
+        if (!selected)
             return Reply{108, {}, "leaderboard-column-definition-required"};
         if (task == 13 || task == 16)
             for (const auto user : users)
@@ -256,13 +302,13 @@ namespace services
                                                     return row.user == user;
                                                 });
                 if (found != datasets[0].end())
-                    reply.results.push_back(serialize(*found, *projection));
+                    reply.results.push_back(serialize(*found, *selected));
             }
         if (task == 4 || task == 17)
             for (const auto &row : datasets[0])
             {
                 if (row.rank >= firstRank && reply.results.size() < maximum)
-                    reply.results.push_back(serialize(row, *projection));
+                    reply.results.push_back(serialize(row, *selected));
             }
         return reply;
     }
