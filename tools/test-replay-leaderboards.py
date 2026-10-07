@@ -23,6 +23,13 @@ def text(value):
     return b"\x10" + value.encode() + b"\0"
 
 
+def write_row(board, owner, rating, values, mode=0):
+    score = b"\x14" if rating is None else b"\x09" + struct.pack("<q", rating)
+    columns = b"".join(b"\x14" if value is None else b"\x07" + struct.pack("<i", value)
+                       for value in values)
+    return u32(board) + u64(owner) + b"\x03" + bytes([mode]) + score + columns
+
+
 def columns(raw, count):
     offset = 0
 
@@ -100,7 +107,8 @@ def main():
                 for case in catalog["native_column_builder"]["cases"]:
                     board = 150000 + case["id"]
                     width = len(catalog["definitions"][str(board)]["columns"])
-                    stats[str(board)] = {"rating": 42, "name": "Column Fixture",
+                    storage_board = catalog["definitions"][str(board)]["storage_board"]
+                    stats[str(storage_board)] = {"rating": 42, "name": "Column Fixture",
                                          "columns": [1000 + i for i in range(width)]}
                 stats["7000"] = {"rating": 1, "columns": list(range(10))}
                 path.write_text(json.dumps(stats))
@@ -127,6 +135,49 @@ def main():
                 assert columns(result, 10) == list(range(10))
                 checks.append("included request order, excluded schema order and ordinary ten-column layout")
 
+                # The native packet updates only its ten-column window. The
+                # wider row and the base/read-namespace relation must survive.
+                prior = json.loads(path.read_bytes())["17"]
+                client.task(4, 1, write_row(17, client.user, 73, [11, 22] + [None] * 8),
+                            structured=False)
+                saved = json.loads(path.read_bytes())
+                assert saved["17"]["rating"] == 73
+                assert saved["17"]["columns"][:2] == [11, 22]
+                assert saved["17"]["columns"][2:] == prior["columns"][2:]
+                client.task(4, 1, write_row(17, client.user, 2, [3, None, 4] + [None] * 7, mode=1),
+                            structured=False)
+                client.task(4, 1, write_row(17, client.user, 72, [-10] + [None] * 9, mode=2),
+                            structured=False)
+                saved = json.loads(path.read_bytes())
+                assert saved["17"]["rating"] == 75
+                assert saved["17"]["columns"][:3] == [14, 22, 1006]
+                assert saved["17"]["columns"][3:] == prior["columns"][3:]
+                for board in (140017, 150017):
+                    result = client.task(4, 17, request(board, ["col_16", "col_0", "col_13"]),
+                                         structured=False)
+                    assert columns(result, 3) == [1016, 14, 1013]
+                checks.append("native partial write preserves the wide tail and resolves both published read namespaces")
+                checks.append("replace/add/max and NAN preserve untouched columns throughout wide rows")
+                client.task(4, 1, write_row(1003, client.user, 91, list(range(10))), structured=False)
+                for board in (141003, 151003):
+                    result = client.task(4, 17, request(board, []), structured=False)
+                    assert columns(result, 10) == list(range(10))
+                client.task(4, 1, write_row(7010, client.user, 2, list(range(10))), structured=False)
+                assert client.task(4, 17, request(1507010, []), structured=False) == b""
+                checks.append("actual regular write IDs feed namespaced reads; unpublished prefixes never alias automatically")
+                saved = json.loads(path.read_bytes())
+                saved["7001"] = {"rating": 1, "columns": list(range(240))}
+                path.write_text(json.dumps(saved))
+                alias = data / "leaderboard-definitions/5800/7002.json"
+                alias.write_text(json.dumps({"schema": 2, "storage_board": 7001,
+                                             "columns": [f"col_{i}" for i in range(240)]}))
+                client.task(4, 1, write_row(7001, client.user, None, [7] + [None] * 9),
+                            structured=False)
+                result = client.task(4, 17, request(7002, ["col_239", "col_0"]), structured=False)
+                assert columns(result, 2) == [239, 7]
+                checks.append("full 240-column stored boundary supports partial writes and last-column projection")
+                before = path.read_bytes()
+
                 def rejected(task, params, error):
                     try:
                         client.task(4, task, params, structured=False)
@@ -146,7 +197,35 @@ def main():
                 definition.write_text(json.dumps({"columns": [7]}))
                 rejected(17, request(7000, ["col_0"]), 106)
                 checks.append("duplicate and non-string schema publications rejected before serializing rows")
+                for invalid in (-1, 2**32 - 1, True, "7000"):
+                    definition.write_text(json.dumps({"schema": 2, "storage_board": invalid,
+                                                     "columns": ["col_0"]}))
+                    rejected(17, request(7000, []), 106)
+                definition.write_text(json.dumps({"schema": 3, "storage_board": 7000,
+                                                 "columns": ["col_0"]}))
+                rejected(17, request(7000, []), 106)
+                checks.append("invalid alias IDs and unknown publication schemas rejected even on ordinary reads")
                 definition.write_text(json.dumps({"columns": [f"col_{i}" for i in range(10)]}))
+                stats = json.loads(path.read_bytes())
+                stats["17"]["columns"][20] = 2**31
+                path.write_text(json.dumps(stats))
+                before = path.read_bytes()
+                rejected(1, write_row(17, client.user, 80, list(range(10))), 106)
+                stats["17"]["columns"][20] = 1020
+                stats["7001"]["columns"].append(240)
+                path.write_text(json.dumps(stats))
+                before = path.read_bytes()
+                rejected(1, write_row(7001, client.user, None, [8] + [None] * 9), 106)
+                rejected(17, request(7002, ["col_239"]), 106)
+                stats["7001"]["columns"].pop()
+                stats["17"]["rating"] = 2**63 - 1
+                path.write_text(json.dumps(stats))
+                before = path.read_bytes()
+                rejected(1, write_row(1004, client.user, 3, list(range(10))) +
+                         write_row(17, client.user, 1, [None] * 10, mode=1), 106)
+                rejected(1, write_row(1004, client.user, 3, list(range(10))) +
+                         write_row(17, client.user + 1, 1, [None] * 10), 101)
+                checks.append("partial writes reject malformed tail, late overflow and foreign-owner batches without partial commit")
                 stats["7000"]["columns"] = [2**31]
                 path.write_text(json.dumps(stats))
                 before = path.read_bytes()
@@ -156,6 +235,29 @@ def main():
                 before = path.read_bytes()
                 rejected(17, request(7000, ["col_0"]), 106)
                 checks.append("out-of-range signed native column values rejected without integer wrapping")
+                stats["7000"]["columns"] = list(range(10))
+                path.write_text(json.dumps(stats))
+                before = path.read_bytes()
+            process.terminate()
+            process.wait(timeout=10)
+            process = subprocess.Popen([str(args.server), str(data), "--port-offset", str(offset)],
+                                       stdout=log, stderr=subprocess.STDOUT, creationflags=flags)
+            for _ in range(100):
+                assert process.poll() is None
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{8085 + offset}/health",
+                                           timeout=0.5).close()
+                    break
+                except urllib.error.URLError:
+                    time.sleep(0.05)
+            else:
+                raise RuntimeError("Fixture restart failed to become ready")
+            with NativeClient(fixture, profile="leaderboard", port_offset=offset) as client:
+                result = client.task(4, 17, request(150017, ["col_16", "col_0", "col_13"]),
+                                     structured=False)
+                assert columns(result, 3) == [1016, 14, 1013]
+                assert path.read_bytes() == before
+            checks.append("fresh backend/session retains canonical rows, wide tails and published namespace resolution")
         finally:
             if process.poll() is None:
                 process.terminate()

@@ -205,6 +205,11 @@ GAPS["4"] += (
     "order. All 40 original virtual column builders/accessors and 80 encrypted entity/rank "
     "projections were verified on current Windows/Linux binaries. Positive native menu/row "
     "callbacks and automatic virtual score aggregation remain open; no statistics were seeded."
+    " Schema-2 publications now resolve native read namespaces to base/tracked stored boards; "
+    "unpublished client prefixes are never inferred. Shared row validation and partial native "
+    "writes preserve up to 240 columns with replace/add/max/NAN semantics, atomic failure "
+    "and restart persistence. Current deployment has exact-binary protocol evidence without "
+    "a new game run, following the owner's test restriction."
 )
 
 GAPS["193"] += (

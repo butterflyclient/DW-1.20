@@ -11,8 +11,8 @@ and native startup evidence are separate; this is not a full gameplay claim.
 
 All remaining implementation belongs on this branch, including object store,
 live content and the player-facing store. The primary backend has moved to the
-Linux droplet at 162.243.115.160. Current release is the 7e447d81283a image; see
-docs/DW_REPLAY_LEADERBOARDS_20261007.txt and the hash-bound deployment receipts.
+Linux droplet at 162.243.115.160. Current release is the f874f8b215c5 image; see
+docs/DW_REPLAY_LEADERBOARD_STORAGE_20261007.txt and hash-bound deployment receipts.
 The owner requested no more game tests after the final PID 29832 run. Continue
 with target research and protocol fixtures; do not launch another game.
 Use controlled root-folder launches; preserve player identity/profile data and
@@ -39,7 +39,7 @@ store root lacked the required layoutType 3/4. Later native tuning truncated
 offer lists at its 128-byte value buffer. The generated catalog now respects both
 native layouts. Store opened, stock previews displayed, an actual free claim
 completed, and ownership survived restarts. See DW_REPLAY_STORE_20261007.txt.
-The latest 7e447d81283a run reconfirmed native Store display and retained ownership;
+The last game run on 7e447d81283a reconfirmed native Store display and retained ownership;
 new paid claims and full marketplace variants remain separate validation gates.
 
 Evidence: validation/20261007-store-navigation-baseline.json
@@ -52,6 +52,11 @@ generate 747 publications. Included reads preserve UI order, wide stored schemas
 are supported, and each response remains bounded to ten native columns. Eighty
 encrypted projections pass on both Windows and Linux. Positive native menu/row
 callbacks and automatic virtual score aggregation are still unverified/open.
+Schema 2 now explicitly resolves native read namespaces to base/tracked stored
+boards. Reads/writes share the entire 240-column persistent layout, while native
+packets keep their ten-column limit. Partial writes preserve wide tails, and
+actual write -> both namespace read roundtrips survive backend/session restart.
+Current f874f8b215c5 has protocol/deployment evidence only; no new game run.
 
 Content SDK methods with missing original response bindings remain explicitly
 unimplemented. Request wrappers or misleading SQLite names do not prove a usable

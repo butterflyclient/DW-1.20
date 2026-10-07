@@ -1,5 +1,6 @@
 #include "host_os.h"
 #include "account_services.h"
+#include "leaderboard_row.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
@@ -149,7 +150,7 @@ namespace services
                 while (p.offset < p.data.size() &&
                        (p.data[p.offset] == 7 || p.data[p.offset] == 20))
                 {
-                    wire::require(row.columns.size() < 10);
+                    wire::require(row.columns.size() < leaderboard_row::maximumResponseColumns);
                     row.columns.push_back(statValue<int32_t>(p, 7));
                 }
                 rows.push_back(std::move(row));
@@ -230,8 +231,7 @@ namespace services
                 auto &target = data[key];
                 if (target.is_null())
                     target = Json{{"rating", nullptr}, {"columns", Json::array()}};
-                wire::require(target.is_object() && target.contains("rating") &&
-                              target.at("columns").is_array());
+                leaderboard_row::validate(target);
                 auto &rating = target["rating"];
                 if (row.rating)
                     rating = rating.is_null() ? *row.rating
@@ -241,7 +241,6 @@ namespace services
                                                       std::numeric_limits<int64_t>::min(),
                                                       std::numeric_limits<int64_t>::max());
                 auto &columns = target["columns"];
-                wire::require(columns.size() <= 10);
                 while (columns.size() < row.columns.size())
                     columns.push_back(nullptr);
                 for (size_t i = 0; i < row.columns.size(); ++i)
@@ -259,6 +258,7 @@ namespace services
                     static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
                                               std::chrono::system_clock::now().time_since_epoch())
                                               .count());
+                leaderboard_row::validate(target);
             }
             if (!tokenHash.empty())
                 data["_validated_tokens"][tokenHash] = {

@@ -141,15 +141,17 @@ def main():
                if row["name"].startswith("lb_")}
     definitions, cases = {}, []
 
-    def add(board, width, asset, origin):
+    def add(board, storage_board, width, asset, origin):
         assert 0 < width <= 240 and 0 <= board < 2**32 - 1
         columns = [f"col_{i}" for i in range(width)]
         key = str(board)
         if key in definitions:
-            assert definitions[key]["columns"] == columns, (key, asset)
+            assert definitions[key]["columns"] == columns and \
+                definitions[key]["storage_board"] == storage_board, (key, asset)
             definitions[key]["assets"].append(asset)
         else:
-            definitions[key] = {"schema": 1, "columns": columns, "assets": [asset],
+            definitions[key] = {"schema": 2, "storage_board": storage_board,
+                                "columns": columns, "assets": [asset],
                                 "origin": origin}
 
     def source_width(source):
@@ -161,7 +163,8 @@ def main():
         tracks = [0] + [100 * bit for bit in range(8) if row["track_mask"] & (1 << bit)]
         for track in set(tracks):
             for scope in (0, 140000, 150000):
-                add(row["id"] + track + scope, width, row["name"], "shipped-regular")
+                add(row["id"] + track + scope, row["id"] + track,
+                    width, row["name"], "shipped-regular")
     for row in assets["virtual_leaderboards"]:
         if not row["name"].startswith("lb_"):
             continue
@@ -171,7 +174,7 @@ def main():
         cases.append(case)
         width = source_width(source)
         for scope in (0, 140000, 150000):
-            add(row["id"] + scope, width, row["name"], "shipped-virtual")
+            add(row["id"] + scope, row["id"], width, row["name"], "shipped-virtual")
     args.output.mkdir(parents=True, exist_ok=True)
     result = {"schema": 1, "title": 5800, "generated_utc": datetime.now(timezone.utc).isoformat(),
               "asset_export_sha256": hashlib.sha256(raw).hexdigest(),
@@ -180,7 +183,7 @@ def main():
               "native_column_builder": {"original_instructions_executed": True,
                                         "modeled_boundaries": ["memset", "bounded Com_sprintf"],
                                         "cases": cases},
-              "scope": "Column layouts only. No player statistics, ranks or progression are seeded."}
+              "scope": "Column layouts and explicit native read-namespace aliases. No player statistics, ranks or progression are seeded."}
     (args.output / "catalog.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     for board, definition in definitions.items():
         destination = args.output / "leaderboard-definitions/5800" / f"{board}.json"

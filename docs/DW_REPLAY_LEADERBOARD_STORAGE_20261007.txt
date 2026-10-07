@@ -1,0 +1,68 @@
+REPLAY LEADERBOARD STORAGE/NAMESPACE INTEGRATION - 2026-10-07
+
+Issue
+Native stat writes use a base/tracked board ID. UI reads add 140000 or 150000.
+The backend previously treated each resulting number as a separate stored board,
+so a successful native write could remain invisible to a later UI request.
+The write path also rejected valid wide rows accepted by the projected reader.
+
+Target evidence
+Untouched Replay SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+tools/research-leaderboard-namespaces.py executes original LB_GetByRank
+1419B43C0 and row producer 1419B4AF0. Three base IDs (0, 1003, 1603) are written
+unchanged by the native row producer; all six native namespace choices add the
+expected 140000/150000 prefix before dwReadStatsByRankExcluded. The fixture
+models controller readiness, task-slot allocation, debug logging and the column
+builder boundary, and stops before creating a remote task. No game is run.
+The write-ID proof initializes zero stat columns: it does not invent player
+values or claim that every part of a game statistics upload was executed.
+
+Implementation
+Publication schema 2 adds an explicit storage_board alongside the complete
+column layout. The generator derives it from the shipped base/tracked/view IDs.
+All 747 current definitions are regenerated. Query handlers load the published
+layout once per requested board and resolve its storage ID before selecting rows.
+The original requested ID remains in matrix replies. Arbitrary client prefixes
+are never stripped automatically, and old unaliased schemas remain supported.
+These aliases are a local backend implementation choice derived from native
+write/read contracts, not a claim about retail Demonware's internal storage.
+The current emulator targets PC Replay accounts; distinct cross-platform
+population/filtering beyond that target remains a separate integration scope.
+
+leaderboard_row.h defines and validates the complete shared persistent row:
+nullable signed Int64 rating, up to 240 nullable signed Int32 columns, bounded
+optional name and nonnegative update time. Both read and write paths use it.
+Native writes still accept at most ten packet columns. Replace/add/max and NAN
+updates preserve untouched fields, including the wide tail. An invalid tail,
+late arithmetic overflow or foreign-owner row rejects the entire batch before
+publication. Projected responses remain bounded to the native ten-column reader.
+
+Verification
+Windows and Linux each pass 80 shipped virtual projections and 12 focused
+contract groups. Added checks cover base write -> both namespaced reads,
+unpublished-prefix isolation, replace/add/max/NAN preservation, the full
+240-column limit, rejection at 241, malformed alias/schema rejection, signed
+overflow, foreign-owner batch denial, and persistence after backend/session
+restart. Actual Store/XP/player data on the primary server is not seeded.
+All 92 frozen C++ compilation inputs match the Linux source used for the build.
+Twelve public CNG/authentication/transport checks pass after deployment.
+
+Deployment
+Primary: 162.243.115.160, replay-dw.service.
+Release: /opt/replay-dw/releases/20261007-f874f8b215c5/iw8-dw-server
+SHA256: f874f8b215c524964f095e1b0b97299af88f5b0b78effa72eac1af1920b0cf43
+The server was stopped, the validated publication was installed with rollback
+copies, then the new release was selected and the service restarted.
+The game EXE is unchanged. No game runs were performed for this update, as
+requested. The last native startup/Store validation belongs to server 7e447d...
+and is retained as historical evidence, not reassigned to this binary.
+
+Still open
+Automatic generation of complete virtual ratings/columns from match/stat events
+is not implemented by aliases. Captured start_match/end_match fields do not
+provide a complete stat row, and unrelated values must not be guessed. The
+original XP cache flush sends mp_addxp, so end_match is not silently reinterpreted
+as XP. Current authoritative event/row producers must be traced before adding
+that aggregation. Live positive leaderboard-menu completion remains unverified.
+The complete backend objective and the other documented service gaps remain open.

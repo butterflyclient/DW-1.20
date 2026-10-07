@@ -58,7 +58,10 @@ def main():
         width = len(definition["columns"])
         assert 0 < width <= 240
         assert definition["columns"] == [f"col_{i}" for i in range(width)]
-        assert definition["schema"] == 1 and definition["assets"]
+        assert definition["schema"] == 2 and definition["assets"]
+        assert isinstance(definition["storage_board"], int) and \
+            not isinstance(definition["storage_board"], bool) and \
+            0 <= definition["storage_board"] < 2**32 - 1
         data = (source / f"{board}.json").read_bytes()
         assert json.loads(data) == definition
         files[f"leaderboard-definitions/5800/{board}.json"] = data

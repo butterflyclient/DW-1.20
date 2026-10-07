@@ -1,4 +1,5 @@
 #include "leaderboard_services.h"
+#include "leaderboard_row.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
@@ -12,8 +13,14 @@ namespace services
     namespace
     {
         using Json = nlohmann::json;
-        constexpr size_t maximumStoredColumns = 240;
-        constexpr size_t maximumResponseColumns = 10;
+        using leaderboard_row::maximumStoredColumns;
+        using leaderboard_row::maximumResponseColumns;
+
+        struct Definition
+        {
+            uint32_t storageBoard = 0;
+            std::vector<std::string> columns;
+        };
 
         struct Row
         {
@@ -31,6 +38,41 @@ namespace services
                 throw std::runtime_error("Leaderboard read failed");
             auto result = Json::parse(stream);
             wire::require(result.is_object());
+            return result;
+        }
+
+        std::optional<Definition> definition(const std::filesystem::path &directory,
+                                               uint32_t title,
+                                               uint32_t board)
+        {
+            const auto path = directory / "leaderboard-definitions" / std::to_string(title) /
+                              (std::to_string(board) + ".json");
+            if (!std::filesystem::exists(path))
+                return std::nullopt;
+            const auto data = document(path);
+            if (data.contains("schema"))
+                wire::require(data["schema"] == 1 || data["schema"] == 2);
+            wire::require(data.contains("columns") && data["columns"].is_array() &&
+                          !data["columns"].empty() &&
+                          data["columns"].size() <= maximumStoredColumns);
+            Definition result;
+            result.storageBoard = board;
+            if (data.contains("storage_board"))
+            {
+                wire::require(data.contains("schema") && data["schema"] == 2 &&
+                              data["storage_board"].is_number_unsigned() &&
+                              data["storage_board"].get<uint64_t>() < UINT32_MAX);
+                result.storageBoard = data["storage_board"].get<uint32_t>();
+            }
+            std::set<std::string> names;
+            for (const auto &column : data["columns"])
+            {
+                wire::require(column.is_string());
+                const auto name = column.get<std::string>();
+                wire::require(!name.empty() && name.size() < 65 &&
+                              name.find('\0') == std::string::npos && names.insert(name).second);
+                result.columns.push_back(name);
+            }
             return result;
         }
 
@@ -59,18 +101,11 @@ namespace services
                 if (!data.contains(key))
                     continue;
                 const auto &value = data.at(key);
-                wire::require(value.is_object() && value.contains("rating") &&
-                              value.contains("columns") && value["columns"].is_array() &&
-                              value["columns"].size() <= maximumStoredColumns);
+                leaderboard_row::validate(value);
                 Row row;
                 row.user = user;
                 if (!value["rating"].is_null())
-                {
-                    wire::require(value["rating"].is_number_integer() &&
-                                  (!value["rating"].is_number_unsigned() ||
-                                   value["rating"].get<uint64_t>() <= uint64_t{INT64_MAX}));
                     row.rating = value["rating"].get<int64_t>();
-                }
                 row.updated = value.value("updated", uint64_t{});
                 row.name = value.value("name", user == id.userId ? id.name : std::string{});
                 wire::require(row.name.size() < 64);
@@ -79,14 +114,7 @@ namespace services
                     if (column.is_null())
                         row.columns.push_back(0);
                     else
-                    {
-                        wire::require(column.is_number_integer() &&
-                                      (!column.is_number_unsigned() ||
-                                       column.get<uint64_t>() <= uint64_t{INT32_MAX}) &&
-                                      column.get<int64_t>() >= INT32_MIN &&
-                                      column.get<int64_t>() <= INT32_MAX);
                         row.columns.push_back(column.get<int32_t>());
-                    }
                 }
                 if (row.columns.size() < maximumResponseColumns)
                     row.columns.resize(maximumResponseColumns, 0);
@@ -139,46 +167,30 @@ namespace services
             return result;
         }
 
-        std::optional<std::vector<size_t>> projection(const std::filesystem::path &directory,
-                                                       uint32_t title,
-                                                       uint32_t board,
+        std::optional<std::vector<size_t>> projection(const std::optional<Definition> &definition,
                                                        const std::vector<std::string> &requested,
                                                        bool included)
         {
             if (requested.empty())
                 return ordinaryColumns();
             // Column names are asset data, not SDK layout. Do not guess their indices.
-            const auto path = directory / "leaderboard-definitions" / std::to_string(title) /
-                              (std::to_string(board) + ".json");
-            if (!std::filesystem::exists(path))
+            if (!definition)
                 return std::nullopt;
-            const auto definition = document(path);
-            wire::require(definition.contains("columns") && definition["columns"].is_array() &&
-                          !definition["columns"].empty() &&
-                          definition["columns"].size() <= maximumStoredColumns);
-            std::set<std::string> names;
-            for (const auto &column : definition["columns"])
-            {
-                wire::require(column.is_string());
-                const auto name = column.get<std::string>();
-                wire::require(!name.empty() && name.size() < 65 &&
-                              name.find('\0') == std::string::npos && names.insert(name).second);
-            }
             std::vector<size_t> indices;
             for (const auto &name : requested)
             {
                 auto found = std::find(
-                    definition["columns"].begin(), definition["columns"].end(), Json(name));
-                if (found == definition["columns"].end())
+                    definition->columns.begin(), definition->columns.end(), name);
+                if (found == definition->columns.end())
                     return std::nullopt;
-                indices.push_back(static_cast<size_t>(found - definition["columns"].begin()));
+                indices.push_back(static_cast<size_t>(found - definition->columns.begin()));
             }
             if (included)
                 return indices;
             else
             {
                 std::vector<size_t> retained;
-                for (size_t i = 0; i < definition["columns"].size(); ++i)
+                for (size_t i = 0; i < definition->columns.size(); ++i)
                     if (std::find(indices.begin(), indices.end(), i) == indices.end())
                         retained.push_back(i);
                 // Excluded-column reads retain numeric schema order. Included
@@ -259,8 +271,16 @@ namespace services
         p.end();
         Reply reply{0, {}, "leaderboard-rows-read"};
         std::vector<std::vector<Row>> datasets;
+        std::vector<std::optional<Definition>> definitions;
         for (const auto board : boards)
-            datasets.push_back(rows(directory, id, board));
+        {
+            definitions.push_back(definition(directory, id.titleId, board));
+            // Native writers use base/tracked IDs. Read namespaces resolve only
+            // through published layouts; never subtract a prefix from arbitrary
+            // client IDs or change the requested board ID in the reply.
+            datasets.push_back(rows(directory, id,
+                                    definitions.back() ? definitions.back()->storageBoard : board));
+        }
         if (task == 11)
         {
             for (const auto user : users)
@@ -289,7 +309,7 @@ namespace services
         // Replay constructors 0x142128100/0x142128500 are the included-column
         // entity/rank variants (16/17); 13/4 are the excluded-column variants.
         const auto selected =
-            projection(directory, id.titleId, boards[0], excluded, task == 16 || task == 17);
+            projection(definitions[0], excluded, task == 16 || task == 17);
         if (!selected)
             return Reply{108, {}, "leaderboard-column-definition-required"};
         if (task == 13 || task == 16)
