@@ -75,10 +75,12 @@ def ordinary(client, task, params=b""):
     return client.task(145, task, params, structured=False)
 
 
-subprocess.run(
-    [str(EXE), str(data), "--provision-profile", "peer", "Team Fixture 2"],
-    check=True, stdout=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
-)
+for profile, name in (("peer", "Team Fixture 2"), ("third", "Team Fixture 3"),
+                      ("fourth", "Team Fixture 4")):
+    subprocess.run(
+        [str(EXE), str(data), "--provision-profile", profile, name],
+        check=True, stdout=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
+    )
 offset = spare_offset()
 output = (fixture / "stdout.log").open("wb")
 process = subprocess.Popen(
@@ -99,8 +101,11 @@ try:
         raise RuntimeError("Isolated backend did not become ready")
     with NativeClient(fixture, port_offset=offset) as host, NativeClient(
         fixture, profile="peer", port_offset=offset
-    ) as peer:
-        for client in (host, peer):
+    ) as peer, NativeClient(fixture, profile="third", port_offset=offset) as third, NativeClient(
+        fixture, profile="fourth", port_offset=offset
+    ) as fourth:
+        clients = (host, peer, third, fourth)
+        for client in clients:
             info = {
                 "listen_server": {
                     "local_address": base64.b64encode(bytes(84)).decode(),
@@ -110,9 +115,9 @@ try:
                 "game_state": {"map_packs": ["MP_ORIGINAL_MAPS"]}, "hardware": "pc",
             }
             assert ordinary(client, 2, text(json.dumps(info))) == b""
-        tokens = [struct.unpack_from("<Q", ordinary(c, 3), 1)[0] for c in (host, peer)]
+        tokens = [struct.unpack_from("<Q", ordinary(c, 3), 1)[0] for c in clients]
         query = {
-            "members": [host.user, peer.user], "tokens": tokens,
+            "members": [host.user, peer.user], "tokens": tokens[:2],
             "lobby_slots": {"min": 1, "max": 4}, "team_balance": {"num_teams": 2},
             "ruleset_payload": {"filter": {
                 "playlist_id": 1, "netcode_version": 66514,
@@ -143,9 +148,30 @@ try:
             current = documents(update[23:])
             assert current[1]["team_balance"]["teams"] == expected
             assert documents(ordinary(peer, 13, u64(lobby))) == current
+            if split:
+                joining = {
+                    **query, "members": [third.user, fourth.user], "tokens": tokens[2:],
+                    "ruleset_payload": {**query["ruleset_payload"],
+                                        "only_join_existing_lobbies": True},
+                }
+                joined_mm = documents(ordinary(third, 18, text(json.dumps(joining))))[0]["mm_id"]
+                kind, joined = receive(third)
+                assert kind == 2 and joined.startswith(u32(2001) + u64(joined_mm) + u64(lobby))
+                assert receive(fourth) == (kind, joined)
+                joined_docs = documents(joined[23:])
+                assert joined_docs[1]["team_balance"]["teams"] == {
+                    "0": [host.user, third.user], "1": [peer.user, fourth.user],
+                }
+                for observer in (host, peer):
+                    kind, changed = receive(observer)
+                    assert kind == 2 and changed.startswith(u32(2006) + u64(lobby))
+                    assert documents(changed[23:]) == joined_docs
+                checks.append("joining party balances each primary and retains existing team assignments")
             assert ordinary(host, 10, u64(lobby)) == b""
             ended = (2, u32(2002) + u64(lobby) + u64(0))
             assert receive(host) == ended and receive(peer) == ended
+            if split:
+                assert receive(third) == ended and receive(fourth) == ended
             checks.append("player-balanced 1v1" if split else "normal party grouping preserved")
         policy(1)
         try:
