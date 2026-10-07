@@ -47,7 +47,17 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
     def publish(path, value):
         pending = path.with_suffix(path.suffix + ".pending")
         pending.write_text(json.dumps(value))
-        pending.replace(path)
+        deadline = time.monotonic() + 1.0
+        while True:
+            try:
+                pending.replace(path)
+                return
+            except PermissionError:
+                # Windows denies replacement while a backend reader briefly
+                # owns a non-delete-sharing handle. Keep atomic publication.
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
 
     def all_updates():
         return updates([connection for _, connection in clients])
