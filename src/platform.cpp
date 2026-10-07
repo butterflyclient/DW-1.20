@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "platform_account_store.h"
 #include "platform_resources.h"
+#include "services.h"
 #include "crypto.h"
 #include "../integration/replay/dw_platform_protocol.h"
 #include "../integration/replay/dw_client_identity.h"
@@ -625,11 +626,24 @@ namespace platform
 
     std::string clientLogin(const std::string &bytes)
     {
-        if (bytes.size() != sizeof(DWLocalClientLoginRequest))
+        const bool extended = bytes.size() == sizeof(DWLocalClientLoginRequestV2);
+        if (!extended && bytes.size() != sizeof(DWLocalClientLoginRequest))
             throw std::runtime_error("Invalid machine login request size");
         DWLocalClientLoginRequest request{};
-        std::memcpy(&request, bytes.data(), sizeof(request));
-        if (request.magic != DW_LOCAL_CLIENT_MAGIC || request.version != DW_LOCAL_CLIENT_VERSION ||
+        DWLocalClientLoginRequestV2 local{};
+        if (extended)
+        {
+            std::memcpy(&local, bytes.data(), sizeof(local));
+            std::memcpy(&request, &local, offsetof(DWLocalClientLoginRequest, signature));
+            std::memcpy(request.signature, local.signature, sizeof(request.signature));
+            if (local.options > 1 || local.startingRank > 55 || local.reserved ||
+                (!(local.options & 1) && (local.localUserId || local.playerXp)))
+                throw std::runtime_error("Invalid local progression login fields");
+        }
+        else
+            std::memcpy(&request, bytes.data(), sizeof(request));
+        if (request.magic != DW_LOCAL_CLIENT_MAGIC ||
+            request.version != (extended ? DW_LOCAL_CLIENT_LOGIN_VERSION : DW_LOCAL_CLIENT_VERSION) ||
             request.name[35] || !nonzero(request.nonce))
             throw std::runtime_error("Invalid machine login layout");
         const std::string name(request.name);
@@ -641,7 +655,7 @@ namespace platform
         ClientKey publicKey;
         publicKey.import(request.publicKey);
         const auto id = fingerprint(request.publicKey);
-        std::lock_guard lock(mutex);
+        std::unique_lock lock(mutex);
         const auto foundChallenge = challenges.find(id);
         if (foundChallenge == challenges.end())
             throw std::runtime_error("Machine challenge missing");
@@ -651,8 +665,8 @@ namespace platform
             !crypto::equal(challenge.value, request.challenge))
             throw std::runtime_error("Machine challenge invalid or expired");
         auto digest = crypto::sha256(
-            std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(&request),
-                                     offsetof(DWLocalClientLoginRequest, signature)));
+            std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(bytes.data()),
+                                     bytes.size() - sizeof(request.signature)));
         check(BCryptVerifySignature(publicKey.handle,
                                     nullptr,
                                     digest.data(),
@@ -692,11 +706,18 @@ namespace platform
             write(path, &account, sizeof(account));
             existing = clientProfiles.emplace(id, account).first;
         }
-        return issueSession(std::string(reinterpret_cast<const char *>(request.nonce), 32),
-                            &existing->second,
-                            path,
-                            name,
-                            true);
+        const auto user = existing->second.userId;
+        if (extended && (local.options & 1) && local.localUserId != user)
+            throw std::runtime_error("Local progression belongs to a different identity");
+        auto response = issueSession(std::string(reinterpret_cast<const char *>(request.nonce), 32),
+                                     &existing->second, path, name, true);
+        // Service dispatch takes storeMutex before consulting platform sessions.
+        // Release the issuer lock before restoring its service mirror.
+        lock.unlock();
+        if (extended)
+            services::restoreLocalProgression(5800, user, local.playerXp,
+                                               (local.options & 1) != 0, local.startingRank);
+        return response;
     }
 
     void provisionProfile(const std::filesystem::path &directory,

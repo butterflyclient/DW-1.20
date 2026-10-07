@@ -52,6 +52,8 @@ namespace services
     };
 
     void initialize(const std::filesystem::path &directory);
+    void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,
+                                 bool restore, unsigned startingRank);
     void maintainTournamentPublications(const std::function<void(const std::string &)> &log);
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user);
     bool deliveryValid(uint32_t title, const Delivery &delivery);

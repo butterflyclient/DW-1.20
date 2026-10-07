@@ -18,6 +18,7 @@
 #include <thread>
 #include <vector>
 #include "platform.h"
+#include "../integration/replay/dw_client_identity.h"
 #include "platform_resources.h"
 #include "lobby.h"
 #include "services.h"
@@ -455,7 +456,10 @@ namespace
                  (path == "/platform/client/challenge" || path == "/platform/client/login"))
         {
             const bool challenge = path == "/platform/client/challenge";
-            if (!hasLength || length != (challenge ? 104U : 244U))
+            if (!hasLength ||
+                (challenge ? length != sizeof(DWLocalClientChallengeRequest)
+                           : (length != sizeof(DWLocalClientLoginRequest) &&
+                              length != sizeof(DWLocalClientLoginRequestV2))))
             {
                 reply(socket, 400, "{\"error\":\"invalid_client_identity_request\"}");
                 return;

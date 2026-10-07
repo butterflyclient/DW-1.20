@@ -873,6 +873,11 @@ namespace
     }
 } // namespace
 
+extern "C" uint64_t DW_LocalPlatform_UserId()
+{
+    return DW_LocalBackend_IsEnabled() && Valid() ? s_reply.payload.userId : 0;
+}
+
 // ACCOUNT initialize/sign-in/frame: these are the actual SDK request boundaries.
 namespace
 {
@@ -888,17 +893,17 @@ namespace
     }
 }
 
-extern "C" bool func_14165D550(const DWPlatformAccount *account)
+extern "C" uint64_t func_14165D550(const DWPlatformAccount *account)
 {
     return CanCommunicate(account);
 }
 
-extern "C" bool func_14165D5E0(const DWPlatformAccount *account)
+extern "C" uint64_t func_14165D5E0(const DWPlatformAccount *account)
 {
     return CanCommunicate(account);
 }
 
-extern "C" bool func_14165DDB0(const DWPlatformAccount *account)
+extern "C" uint64_t func_14165DDB0(const DWPlatformAccount *account)
 {
     return !CanCommunicate(account);
 }

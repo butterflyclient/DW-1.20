@@ -26,6 +26,27 @@ static_assert(sizeof(DWLocalClientChallengeRequest) == 104);
 static_assert(sizeof(DWLocalClientLoginRequest) == 244);
 static_assert(offsetof(DWLocalClientLoginRequest, signature) == 180);
 
+// Version 2 signs the locally owned progression and INI starting-rank fields.
+// Keep version 1's wire and identity-file format valid for older clients.
+struct DWLocalClientLoginRequestV2
+{
+    uint32_t magic;
+    uint32_t version;
+    uint8_t nonce[32];
+    uint8_t challenge[32];
+    uint8_t publicKey[72];
+    char name[36];
+    uint32_t options; // bit 0: restore a locally stored progression record
+    uint64_t localUserId;
+    uint64_t playerXp;
+    uint32_t startingRank; // 0 automatic; 1..55 is Replay's career rank floor
+    uint32_t reserved;
+    uint8_t signature[64];
+};
+static_assert(sizeof(DWLocalClientLoginRequestV2) == 272);
+static_assert(offsetof(DWLocalClientLoginRequestV2, signature) == 208);
+constexpr uint32_t DW_LOCAL_CLIENT_LOGIN_VERSION = 2;
+
 using DWLocalIdentityPost = bool (*)(const wchar_t *, void *, unsigned, void *, unsigned);
 extern "C"
 {

@@ -26,6 +26,8 @@ namespace
     char s_testCommand[112] = "replay-dw-test.command";
     char s_testEnabled[112] = "replay-dw-test.enabled";
     bool s_fieldOverflow = false;
+    bool s_unlockAll = false;
+    unsigned s_rank = 0;
 
     bool IPv4(const char *value)
     {
@@ -136,7 +138,7 @@ namespace
                 file = CreateFileA("replay-dw.ini", 0x80000000, 3, nullptr, 3, 0x80, nullptr);
             if (file != reinterpret_cast<void *>(~uintptr_t{0}))
             {
-                char text[1025]{};
+                char text[2049]{};
                 unsigned long count = 0;
                 const bool read = ReadFile(file, text, sizeof(text) - 1, &count, nullptr) != 0;
                 CloseHandle(file);
@@ -157,6 +159,27 @@ namespace
                         Field(text + at, "local_address", s_local, sizeof(s_local));
                         Field(text + at, "game_port", port, sizeof(port));
                         Field(text + at, "player_name", s_playerName, sizeof(s_playerName));
+                        char unlock[8]{}, rank[8]{};
+                        if (Field(text + at, "unlock_all", unlock, sizeof(unlock)))
+                        {
+                            if ((unlock[0] != '0' && unlock[0] != '1') || unlock[1])
+                                s_fieldOverflow = true;
+                            else
+                                s_unlockAll = unlock[0] == '1';
+                        }
+                        if (Field(text + at, "rank", rank, sizeof(rank)))
+                        {
+                            unsigned value = 0;
+                            for (unsigned i = 0; rank[i]; ++i)
+                                if (rank[i] < '0' || rank[i] > '9')
+                                    s_fieldOverflow = true;
+                                else
+                                    value = value * 10 + unsigned(rank[i] - '0');
+                            if (value > 55)
+                                s_fieldOverflow = true;
+                            else
+                                s_rank = value;
+                        }
                         customCommand |= Field(
                             text + at, "test_command_file", s_testCommand, sizeof(s_testCommand));
                         customEnabled |= Field(
@@ -375,4 +398,16 @@ extern "C" const char *DW_LocalConfig_PlayerName()
 {
     Load();
     return s_playerName;
+}
+
+extern "C" bool DW_LocalConfig_UnlockAll()
+{
+    Load();
+    return s_unlockAll;
+}
+
+extern "C" unsigned DW_LocalConfig_Rank()
+{
+    Load();
+    return s_rank;
 }

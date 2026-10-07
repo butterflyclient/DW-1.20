@@ -29,8 +29,13 @@ for offset in range(0, len(values), 8):
 lines.extend(["};", ""])
 target = ROOT / "src/progression_ranks.h"
 target.write_text("\n".join(lines), encoding="utf-8")
+native = ROOT / "integration/replay/dw_progression_ranks.h"
+native.write_text("\n".join(lines).replace("#include <array>\n", "").replace(
+    f"std::array<uint64_t, {len(values)}> replayPlayerRankMinimumXp",
+    "uint64_t dwReplayPlayerRankMinimumXp[]"), encoding="utf-8")
 receipt = dict(source=str(source), source_sha256=digest, native_asset="mp/ranktable.csv",
-               maximum_rank=maximum, header_sha256=hashlib.sha256(target.read_bytes()).hexdigest())
+               maximum_rank=maximum, header_sha256=hashlib.sha256(target.read_bytes()).hexdigest(),
+               native_header_sha256=hashlib.sha256(native.read_bytes()).hexdigest())
 (ROOT / "validation/20261006-replay-progression-ranks.json").write_text(
     json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
 )

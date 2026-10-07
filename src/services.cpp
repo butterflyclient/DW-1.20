@@ -494,6 +494,13 @@ namespace services
         relay::initialize(directory);
     }
 
+    void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,
+                                 bool restore, unsigned startingRank)
+    {
+        std::lock_guard lock(storeMutex);
+        restoreAchievementProgression(directory, title, user, xp, restore, startingRank);
+    }
+
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user)
     {
         std::lock_guard lock(storeMutex);

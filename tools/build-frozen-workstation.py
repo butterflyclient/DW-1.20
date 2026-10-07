@@ -286,6 +286,9 @@ if debug_text.count(platform_marker) != 1 or debug_text.count(branch_marker) != 
     raise RuntimeError("Overlay platform test insertion points changed")
 debug_text = debug_text.replace(
     platform_marker,
+    '    if report.get("optimized"):\n'
+    '        for name in ("Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration", "Dvar_RegisterInt"):\n'
+    '            intercepted[symbols[name]] = name\n'
     '    if "DW_LocalBackend_Frame" in symbols:\n'
     "        filename_thunk = arena + 0x39200\n"
     '        write(symbols["__imp_GetModuleFileNameA"], filename_thunk, "<Q")\n'
@@ -298,8 +301,20 @@ debug_text = debug_text.replace(
     "            assert args[0] == 0 and args[2] > len(path)\n"
     '            machine.mem_write(args[1], path + b"\\0")\n'
     "            ret(len(path))\n"
+    '        elif name == "Dvar_RegisterInt":\n'
+    '            assert string(args[0]) == "com_optimized" and args[1:4] == [0, 0, 2]\n'
+    '            write(arena + 0x7080 + 29, 5, "<B")\n'
+    '            ret(arena + 0x7080)\n'
     '        elif name == "Sys_IsMainThread":',
 )
+if args.optimized:
+    first_frame = '    run("ScrPlace_EndFrame")\n    expected_commands ='
+    if debug_text.count(first_frame) != 1:
+        raise RuntimeError("Optimized overlay fixture insertion point changed")
+    # The optimized image intentionally starts with diagnostic text disabled.
+    # Exercise its explicit command while retaining the actual frame/draw checks.
+    debug_text = debug_text.replace(first_frame,
+        '    if report.get("optimized"):\n        command("1")\n' + first_frame)
 debug_path.write_text(debug_text)
 debug_record = next(item for item in records if Path(item["snapshot"]) == debug_path)
 debug_record["original_sha256"] = debug_record["sha256"]

@@ -1142,6 +1142,29 @@ namespace services
         }
     } // namespace
 
+    void restoreAchievementProgression(const std::filesystem::path &root,
+                                       uint32_t title, uint64_t user, uint64_t xp,
+                                       bool restore, unsigned startingRank)
+    {
+        wire::require(title == 5800 && user && startingRank <= replayPlayerRankMinimumXp.size());
+        if (!restore && !startingRank)
+            return;
+        const auto path = root / "achievements" / std::to_string(title) /
+                          std::to_string(title) / std::to_string(user) / "events.json";
+        auto journal = document(path, Json{{"schema", 1}, {"next", uint64_t{1}},
+                                          {"events", Json::array()}, {"requests", Json::array()}});
+        wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
+                      journal.at("requests").is_array() &&
+                      journal.at("next").is_number_unsigned());
+        if (!restore)
+            xp = journal.contains("player_xp") ? integer(journal, "player_xp")
+                                              : initialPlayerXp(path);
+        if (startingRank)
+            xp = replayPlayerRankMinimumXp[startingRank - 1];
+        journal["player_xp"] = xp;
+        publish(path, journal);
+    }
+
     Reply achievementEventsRest(const std::filesystem::path &root,
                                 const platform::LobbyIdentity &id,
                                 const std::string &context,

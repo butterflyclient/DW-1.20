@@ -1,4 +1,6 @@
 #include "dw_client_identity.h"
+#include "DW_LocalConfig.h"
+#include "DW_LocalProgression.h"
 
 extern "C"
 {
@@ -366,7 +368,7 @@ namespace
             return true;
         }
 
-        bool Sign(DWLocalClientLoginRequest &request)
+        bool Sign(DWLocalClientLoginRequestV2 &request)
         {
             void *hashAlgorithm = nullptr, *hash = nullptr;
             uint8_t digest[32]{};
@@ -376,7 +378,7 @@ namespace
                 api.BCryptCreateHash(hashAlgorithm, &hash, nullptr, 0, nullptr, 0, 0) >= 0 &&
                 api.BCryptHashData(hash,
                                    reinterpret_cast<uint8_t *>(&request),
-                                   offsetof(DWLocalClientLoginRequest, signature),
+                                   offsetof(DWLocalClientLoginRequestV2, signature),
                                    0) >= 0 &&
                 api.BCryptFinishHash(hash, digest, sizeof(digest), 0) >= 0 &&
                 api.BCryptSignHash(key,
@@ -429,9 +431,14 @@ extern "C" bool DW_LocalIdentity_Login(const char *name,
     if (!key.Load())
         return false;
     DWLocalClientChallengeRequest challenge{};
-    DWLocalClientLoginRequest request{};
+    DWLocalClientLoginRequestV2 request{};
     request.magic = DW_LOCAL_CLIENT_MAGIC;
-    request.version = DW_LOCAL_CLIENT_VERSION;
+    request.version = DW_LOCAL_CLIENT_LOGIN_VERSION;
+    unsigned appliedRank = 0;
+    request.options = DW_LocalProgression_LoginFields(
+        &request.localUserId, &request.playerXp, &appliedRank) ? 1U : 0U;
+    const auto configuredRank = DW_LocalConfig_Rank();
+    request.startingRank = configuredRank && appliedRank != configuredRank ? configuredRank : 0;
     if (!key.Public(request.publicKey))
         return false;
     unsigned length = 0;

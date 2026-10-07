@@ -205,6 +205,9 @@ try:
         from multiplayer_progression_fixtures import exercise
         exercise(host, peer, third, data, query, tokens, policy, ordinary,
                  receive, documents, text, checks)
+    # Machine-identity fixtures use fresh keys on this isolated backend only.
+    from local_progression_fixtures import exercise as exercise_local_progression
+    exercise_local_progression(ROOT, data, offset, checks)
     receipt = {
         "schema": 1, "passed": True, "native_game_verified": False,
         "scope": "focused team allocation, native lobby wire and playlist policy regression",

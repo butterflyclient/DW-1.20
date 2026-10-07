@@ -104,7 +104,7 @@ def expand(key, info, size):
 class NativeClient:
     def __init__(
         self, root: Path, title=5800, profile="", host="127.0.0.1", access_key="",
-        player_name="", port_offset=0
+        player_name="", port_offset=0, platform_reply=None
     ):
         self.socket = None
         self.title = title
@@ -132,10 +132,13 @@ class NativeClient:
             or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for c in profile)
         ):
             raise ValueError("Invalid local profile key")
-        with post(
-            "/platform/login" + ("/" + profile if profile else ""), os.urandom(32)
-        ) as reply:
-            platform = reply.read()
+        if platform_reply is None:
+            with post(
+                "/platform/login" + ("/" + profile if profile else ""), os.urandom(32)
+            ) as reply:
+                platform = reply.read()
+        else:
+            platform = platform_reply
         if len(platform) != 512:
             raise ValueError("Platform reply size")
         self.user = struct.unpack_from("<Q", platform, 56)[0]

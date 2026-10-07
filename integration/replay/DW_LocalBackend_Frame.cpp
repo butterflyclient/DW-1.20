@@ -2,6 +2,7 @@
 // Only the *_dw.exe build selects local endpoints. Other builds retain native values.
 #include "com_debugstates.h"
 #include "DW_LocalConfig.h"
+#include "DW_LocalProgression.h"
 
 extern "C"
 {
@@ -272,6 +273,7 @@ extern "C" void DW_LocalBackend_Frame()
 {
     if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread())
         return;
+    DW_LocalProgression_Frame();
     if (!s_registered)
     {
         // DW runs before Com_DebugStates_Frame. Initialize its default once;
