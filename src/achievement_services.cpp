@@ -462,7 +462,7 @@ namespace services
             // then each bdRewardEventJSONV2 (Int32 format + typed string).
             const auto achievementId = row ? uint64_t{2000000} + row->id : uint64_t{1000000};
             const Json event = {
-                {"type", "achievement"}, {"name", row ? std::string(row->reference) : "player_xp"},
+                {"type", "ACHIEVEMENT"}, {"name", row ? std::string(row->reference) : "player_xp"},
                 {"reason", rankedUp ? "completed" : "inProgress"},
                 {"kind", row ? 5 : 0}, {"id_", achievementId},
                 {"multiProgress", {{"xp", {{"value", xp}}},

@@ -31,7 +31,7 @@ def decode_reward(packet, user=None):
     assert number(7, "<i") == 1 and number(8, "<I") == 1 and number(7, "<i") == 1
     event = json.loads(text())
     assert position == len(packet)
-    assert event["type"] == "achievement"
+    assert event["type"] == "ACHIEVEMENT"
     if event["kind"] == 0:
         assert event["id_"] == 1000000 and event["name"] == "player_xp"
     else:
