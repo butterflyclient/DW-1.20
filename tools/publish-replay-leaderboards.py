@@ -22,6 +22,7 @@ def atomic(path, data):
         stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
+    os.chmod(pending, 0o600)
     os.replace(pending, path)
 
 
