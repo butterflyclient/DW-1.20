@@ -1,0 +1,69 @@
+REPLAY DW BACKEND IMPLEMENTATION PROGRESS - 2026-10-07
+
+No game runs performed in this iteration. The shipping DW game executable was
+not rebuilt or changed. Only the backend was compiled, deployed and restarted.
+
+CURRENT DEPLOYMENT
+Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
+SHA256: fbff2f7d05921761bfad0c6fd289157b2e30086969d9aae9e1888b4205374f05
+Shipping game SHA256: b09a9ba25f733960dd1f8c569f566979804c2a1a247a9753e2c6e7a50556c138
+Readiness: validation/20261007-playlist-package-readiness.json
+Native startup for this backend: pending, with no old observation inherited.
+
+IMPLEMENTED
+The immutable owner TU19 playlist contains 63 playlists, 43 game types,
+60 map names and 588 entries. Its original compressed bytes are unchanged.
+Installed declared root/zone/main FF packages are indexed into packages.json,
+with bounded header/optional companion metadata and a content revision.
+The selector binds that inventory to the exact catalog hash/version, rejects
+stale/duplicate/invalid inventories, and intersects package and local-policy
+eligibility. Root overrides take precedence over zone/main candidates.
+All 12 installed declared main packages now appear in the local map policy.
+The existing two-player minimum, 60-second wait and party split policy remain.
+
+Plunder playlist 104 has 161 dvars. Replay's backend reader holds 128 overrides.
+The full rules are retained in match_selection metadata and supplied by the
+unchanged native playlist publication. Only explicit backend overrides go into
+the smaller backend document. Native weighted entry and weight-reader limits
+remain 20. The sole 25-entry publication has no installed maps beyond that
+window, so this build's package eligibility is not lost by respecting it.
+Mixed-mode metadata retains every eligible game type; incompatible future
+team/FFA layouts are rejected instead of inheriting the first entry's layout.
+
+VALIDATION
+7 focused compiled production-selector groups passed across all 63 playlists.
+63 encrypted-wire playlist requests passed: 44 eligible lobby documents and
+19 unavailable responses, with native document/weight/override capacities,
+readback, stored complete rules and owner disband delivery checked.
+15 encrypted-wire party, invitation, chat and progression regression groups
+passed on this same backend hash. All profiles/listeners were isolated.
+The freshly deployed server health check and launch-game.ps1 -ValidateOnly
+passed. No game image was launched, no map was loaded and no transient
+completeness or native gameplay claim is made by these fixtures.
+
+SUBSYSTEM INVENTORY
+Readable: docs/replay-dw-subsystems.txt
+Detailed: data/replay-dw-subsystems.json
+The 29 service domains and nine non-task domains cover every service family
+in the recovered target constructor set, including real REST resource/operation
+bindings. Caller addresses, ambiguous labels, unresolved dynamic paths,
+source/build drift and native completion limits remain explicit.
+Coverage: 140 known/reviewed task routes, 134 registered, six missing:
+  50/22 and 58/22 - live/multipart download response reader binding.
+  193/9 and 193/10 - paginated category listing response reader binding.
+  193/12 and 193/24 - large-object upload/commit native workflow.
+Those routes are not filled with guessed success replies. Indirect/inlined SDK
+routes, publication-dependent reward/quest definitions and further native
+callbacks remain part of the active full-backend implementation goal.
+
+ROLLBACK
+Previous backend, playlist publication and readiness selector are preserved at
+  data/subsystem-integration-20261007/previous-deployment
+Stop the server before restoring that saved executable and publication, then
+start it in a separate step. Do not replace player identities or profile data.
+
+SOURCE SCOPE
+Backend build came from committed revision ea93a85. Subsequent inventory/test
+and readiness documentation commits do not change that compiled runtime.
+Unrelated dirty migration, tournament and Replay compiler changes were left
+intact and excluded from this backend's frozen compilation.

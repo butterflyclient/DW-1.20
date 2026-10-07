@@ -1,0 +1,347 @@
+REPLAY DEMONWARE SUBSYSTEM MAP
+
+Target constructor, handler, protocol and native completion are separate evidence.
+Full backend implementation remains in progress. No game runs in this inventory phase.
+
+Player profiles
+  Services: 8
+  Contract: Native public/private profile CRUD
+  Persistence: profiles
+  Backend: src/services.cpp
+  Registered routes: 8/1, 8/2, 8/3, 8/4, 8/5, 8/6, 8/7, 8/8
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Full native positive CRUD roundtrip still needs observation.
+
+Contextual storage
+  Services: 10
+  Contract: User files, backups and publisher files
+  Persistence: storage
+  Backend: src/services.cpp
+  Registered routes: 10/10, 10/11, 10/12, 10/17, 10/21
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Full native positive editing/deletion/backup roundtrip still needs observation.
+
+String policy and server time
+  Services: 12
+  Contract: Native validation/sanitization and time
+  Persistence: policy
+  Backend: src/services.cpp, src/startup_services.cpp
+  Registered routes: 12/1, 12/6, 12/12, 12/13
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Native utility methods outside the recovered request set remain unclassified.
+
+Leaderboard and validated stats
+  Services: 4
+  Contract: Owner/stat batch writes and ranked reads
+  Persistence: leaderboards, validated-stats
+  Backend: src/account_services.cpp, src/leaderboard_services.cpp
+  Registered routes: 4/1, 4/4, 4/11, 4/13, 4/14, 4/16, 4/17
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Task 14 applies explicitly trusted local token-hash/stat-batch authorizations with atomic retry receipts. Retail opaque token payload validation and a positive native callback remain unverified. Verified game leaderboard asset column publication remains open.
+
+Instant messaging and invitations
+  Services: 6
+  Contract: Native INV session-info and party invitation transport
+  Persistence: channels
+  Backend: src/channel_services.cpp
+  Registered routes: 6/14
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Offline delivery is unavailable; no unsolicited invented recipient identity.
+
+Text channels and whispers
+  Services: 198
+  Contract: Party/match/private messages and membership pushes
+  Persistence: channels
+  Backend: src/channel_services.cpp
+  Registered routes: 198/1, 198/2, 198/3, 198/4, 198/5, 198/6, 198/7, 198/12
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Complete persisted channel layouts, Replay's 200-member limit and native event-24/25 member/channel-info DTOs are implemented. Signed clients cover owned join/category unsubscribe, last-live-socket departure, rapid rejoin generation revocation, concurrent joins and failed atomic publication. Field 8 is native UInt32 dataVersion. The serialized endpoint publishes a real sender join before its first message and coalesces the delayed duplicate. Native private-party creation, real peer join/leave and first incoming-message history are recorded in hash-bound proofs. A second game's subscribe/unsubscribe/send task callbacks and multi-game chat remain open.
+
+Friends, lists and presence
+  Services: 255
+  Contract: REST friendships, invitations, subscriptions and online status
+  Persistence: social, presence
+  Backend: src/rest_services.cpp, src/social_services.cpp
+  Registered routes: 255/10
+  REST resources: Friends/get_friends, Friends/get_pending_friend_requests, Friends/invite_friend, Friends/reject_friend_request, UserLists/add_or_update_users_in_user_list, UserLists/create_user_list, UserLists/get_user_list, UserLists/remove_users_from_user_list, UserPresence/set_user_presence, UsersPresence/get_users_presence, UsersPresence/subscribe_to_users, UsersPresence/unsubscribe_from_users
+  Known missing routes: none in recovered constructor set
+  Open contracts: Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Four exact-target account upgrade/auth/link/Umbrella routes persist optional credentials on the existing signed owner; per-session UNO grants, credential-change revocation and recoverable account/profile publication are covered by encrypted fixtures. Native account-menu/crossplay-login callbacks and two-network lifecycle remain unverified; other account/objectstore REST mutations need explicit request/result/domain contracts. Bulk username hydration has a target-bound 200-record reader, exact numeric-title query contract and registered UNO/Battle.net aliases; malformed/oversized requests and duplicate REST singleton fields are rejected. Repeated SDK fields remain valid. Native username-resolver task completion is still a separate unverified scope.
+
+Accounts, names and regulations
+  Services: 197, 255
+  Contract: Signed local accounts, aliases, UNO/Umbrella and preferences
+  Persistence: profiles, platform, regulations
+  Backend: src/clan_services.cpp, src/identity_rest_services.cpp, src/identity_services.cpp, src/platform_resources.cpp, src/regulation_services.cpp, src/rest_services.cpp
+  Registered routes: 197/10, 197/11, 197/20, 197/21, 197/22, 197/23, 197/24, 197/25, 197/26, 197/27, 197/28, 197/29, 197/30, 197/31, 197/32, 197/37, 255/10
+  REST resources: Regulations/fetchRegulations, Regulations/getUserPreference, Regulations/setUserPreference, Umbrella/updateUmbrellaAccount, UnoRes/updatesecuredfields, UserResource/authenticateUser, UserResource/linkUser, UserResource/renameUsername, UserResource/usernamesearch, Users/get_usernames
+  Known missing routes: none in recovered constructor set
+  Open contracts: Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open. Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Four exact-target account upgrade/auth/link/Umbrella routes persist optional credentials on the existing signed owner; per-session UNO grants, credential-change revocation and recoverable account/profile publication are covered by encrypted fixtures. Native account-menu/crossplay-login callbacks and two-network lifecycle remain unverified; other account/objectstore REST mutations need explicit request/result/domain contracts. Bulk username hydration has a target-bound 200-record reader, exact numeric-title query contract and registered UNO/Battle.net aliases; malformed/oversized requests and duplicate REST singleton fields are rejected. Repeated SDK fields remain valid. Native username-resolver task completion is still a separate unverified scope.
+
+Clans and groups
+  Services: 3, 197
+  Contract: Membership, proposals, roles, replacement, cooldowns and notifications
+  Persistence: teams, clans
+  Backend: src/clan_services.cpp, src/identity_services.cpp, src/team_services.cpp
+  Registered routes: 3/46, 197/10, 197/11, 197/20, 197/21, 197/22, 197/23, 197/24, 197/25, 197/26, 197/27, 197/28, 197/29, 197/30, 197/31, 197/32, 197/37
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Only published legacy team data; broader clan/team SDK families require target evidence. Current family implemented; deeper native callback coverage and distributed/multi-profile lifecycle remain open.
+
+Shared counters
+  Services: 23
+  Contract: Signed increments and shared totals
+  Persistence: counters
+  Backend: src/counter_services.cpp
+  Registered routes: 23/1, 23/2
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Full native positive signed increment/read roundtrip still needs observation.
+
+Geography
+  Services: 27
+  Contract: Configured local DML metadata
+  Persistence: geography.json
+  Backend: src/startup_services.cpp
+  Registered routes: 27/2
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Configured geography is local metadata, not real IP geolocation.
+
+Mail
+  Services: 29
+  Contract: Send, duration, headers/body, deletion, expiration and event 18
+  Persistence: mail
+  Backend: src/mail_services.cpp
+  Registered routes: 29/4, 29/5, 29/7, 29/9, 29/10
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Original sendMail 0x14212D970 forwards to sendMailWithDuration 0x14212D9D0, whose raw conditional-move/stack-save path selects task 7 for an explicit sender and task 9 otherwise; that forwarding method is not evidence for task 2. Categorized/status SDK variants not recovered in Replay remain unclassified. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.
+
+Auth and anti-cheat reports
+  Services: 38
+  Contract: Durable native reports; not a retail attestation verdict
+  Persistence: auth-reports, anticheat
+  Backend: src/anticheat_services.cpp, src/services.cpp
+  Registered routes: 38/2, 38/6, 38/7, 38/8
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Reports are durable acknowledgements, not a retail attestation/security verdict.
+
+Content streaming
+  Services: 50, 58
+  Contract: Whole file, copy, summary and multipart HTTP lifecycles
+  Persistence: content
+  Backend: src/content_services.cpp
+  Registered routes: 50/2, 50/3, 50/5, 50/6, 50/9, 50/10, 50/15, 50/16, 50/18, 50/19, 50/20, 58/5, 58/6, 58/18, 58/20, 58/21
+  REST resources: none in recovered writer set
+  Known missing routes: 50/22, 58/22
+  Open contracts: Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved. Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native multipart upload/commit remains unverified.
+
+Telemetry
+  Services: 67
+  Contract: Native event filter and durable batches
+  Persistence: event-log
+  Backend: src/engagement_services.cpp, src/startup_services.cpp
+  Registered routes: 67/5, 67/6
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Positive native telemetry batch completion beyond startup filter initialization.
+
+Marketplace and inventory
+  Services: 80
+  Contract: Tokens, balances, orders, gifting and native result layouts
+  Persistence: marketplace, inventory-validation
+  Backend: src/inventory_validation_services.cpp, src/marketplace_services.cpp
+  Registered routes: 80/58, 80/69, 80/106, 80/125, 80/132, 80/134, 80/243, 80/245
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Task106 recipient SKU orders support published gifting to existing local accounts with full owner/buyer coupon DTOs, flushed multi-account intents, conflicting-image preflight and disk/process recovery. Native gift/purchase callbacks, discount rules, other variants and loot generation remain open.
+
+Code redemption
+  Services: 123
+  Contract: Owned, retry-safe published reward grants
+  Persistence: redemption
+  Backend: src/marketplace_services.cpp
+  Registered routes: 123/1, 123/2
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Positive native redemption callbacks and game reward consumers still need validation.
+
+Publisher configuration
+  Services: 95
+  Contract: Replay title 5800/build namespaces, revisions and native dvars
+  Persistence: publisher
+  Backend: src/services.cpp
+  Registered routes: 95/1, 95/3
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.
+
+Marketing
+  Services: 104
+  Contract: Localized scheduled messages and owned view receipts
+  Persistence: marketing
+  Backend: src/engagement_services.cpp
+  Registered routes: 104/6, 104/7
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.
+
+Progression, achievements and quests
+  Services: 125
+  Contract: Event ingestion, career XP/rank; deeper definitions remain publication-dependent
+  Persistence: achievements
+  Backend: src/account_services.cpp, src/achievement_services.cpp, src/rest_services.cpp
+  Registered routes: 125/1, 125/2, 125/3, 125/4, 125/5, 125/6, 125/9
+  REST resources: user_events/report_user_events_batch
+  Known missing routes: none in recovered constructor set
+  Open contracts: Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.
+
+Lobby and public matchmaking
+  Services: 145
+  Contract: Party tokens, matching, membership, admission and host documents
+  Persistence: matchmaking
+  Backend: src/matchmaking_services.cpp, src/qos_services.cpp, src/relay_services.cpp, src/tournament_services.cpp
+  Registered routes: 145/2, 145/3, 145/4, 145/8, 145/9, 145/10, 145/13, 145/15, 145/16, 145/18, 145/19, 145/20, 145/21, 145/22, 145/23, 145/24, 145/25, 145/26, 145/28, 145/29
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Native tournament task-18 searches now use authenticated party tokens, published same-team enrollment and recoverable formation-search/index transactions; exact event-2009 join pushes bind the returned search ID, with retry/deduplication/cancellation/expiry checks covered by two encrypted clients. Capacity-based tournament publications now accept unassigned registrations and allocate real authenticated parties without splitting them; native teams/rounds are generated and PLAYING requires every slot and live-session acknowledgement. Formation/enrollment/search/index changes share flushed recoverable transactions with an explicitly fixed cross-domain enrollment target. Forming-party withdrawal releases slots, resets peer acceptance while retaining registration and emits exact event-2011 with durable catch-up/revocation. Capacity publications with pinned round rules now allocate closed native round lobbies through the shared playlist/map policy and document builder after complete session-bound readiness. Exact create/join pushes retain actual party search IDs and native tournament/team/round metadata; formation, lobby, searches, account index and enrollment share one recoverable transaction. Eight signed machine accounts verify map-policy waiting, interrupted publication, four independent first-round lobbies, temporary same-session join catch-up and all seven result-driven matches. Canonical tournament map pools supply both native publisher dvar strings and backend round selection, with durable revision/hash protection and immutable competition snapshots. The compiled selector matches original Replay x64 instructions across 32 cases; four native strings and their revision survive same-process backend reconnect. Native join/formation/round callback validation, forfeits and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open. Globally unavailable managed publications now retire forming/playing searches and allocated lobbies, remove account assignments and clear readiness in one recoverable transaction. A validated system terminal record preserves actual results, prevents re-published IDs from resurrecting the old competition and enables native event-2012 catch-up for accepted and pending registrations. Cleanup runs on an enrolled client's idle update, authenticated tournament request or once-per-second service-store maintenance. Maintenance visits persisted enrollments independently of sockets, including server startup with no authenticated clients. A missing personal bracket slot does not cancel a globally live publication; other tournaments and newer assignments are preserved. Offline withdrawal, blocked-transaction recovery, reconnect notification and real-clock startup expiry with malformed-realm isolation have exact-binary fixture evidence. Native allocated-round retirement, orphan formations without enrollment and retail disconnect/forfeit policy remain separate gates. Managed unfinished tournament withdrawal now has a complete persistent cancellation layout and shared enrollment/lobby/search/account-index transaction. Native tasks 145/22 and 145/23 false cancel a still-competing participant's tournament; idle event-2012 retires peer state. Eliminated and completed-final departures release old matchmaking assignments while preserving actual results and winning-team searches. Signed encrypted fixtures cover both tasks, allocation, reconnect, source validation, interrupted terminal publication, retry and stale-task denial. Native positive withdrawal callbacks, retail forfeits and disconnect timeouts remain unverified/unimplemented.
+
+Host migration
+  Services: 145
+  Contract: Session-bound successor claims and recoverable shared state
+  Persistence: matchmaking
+  Backend: src/matchmaking_services.cpp, src/qos_services.cpp, src/relay_services.cpp, src/tournament_services.cpp
+  Registered routes: 145/2, 145/3, 145/4, 145/8, 145/9, 145/10, 145/13, 145/15, 145/16, 145/18, 145/19, 145/20, 145/21, 145/22, 145/23, 145/24, 145/25, 145/26, 145/28, 145/29
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Native tournament task-18 searches now use authenticated party tokens, published same-team enrollment and recoverable formation-search/index transactions; exact event-2009 join pushes bind the returned search ID, with retry/deduplication/cancellation/expiry checks covered by two encrypted clients. Capacity-based tournament publications now accept unassigned registrations and allocate real authenticated parties without splitting them; native teams/rounds are generated and PLAYING requires every slot and live-session acknowledgement. Formation/enrollment/search/index changes share flushed recoverable transactions with an explicitly fixed cross-domain enrollment target. Forming-party withdrawal releases slots, resets peer acceptance while retaining registration and emits exact event-2011 with durable catch-up/revocation. Capacity publications with pinned round rules now allocate closed native round lobbies through the shared playlist/map policy and document builder after complete session-bound readiness. Exact create/join pushes retain actual party search IDs and native tournament/team/round metadata; formation, lobby, searches, account index and enrollment share one recoverable transaction. Eight signed machine accounts verify map-policy waiting, interrupted publication, four independent first-round lobbies, temporary same-session join catch-up and all seven result-driven matches. Canonical tournament map pools supply both native publisher dvar strings and backend round selection, with durable revision/hash protection and immutable competition snapshots. The compiled selector matches original Replay x64 instructions across 32 cases; four native strings and their revision survive same-process backend reconnect. Native join/formation/round callback validation, forfeits and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open. Globally unavailable managed publications now retire forming/playing searches and allocated lobbies, remove account assignments and clear readiness in one recoverable transaction. A validated system terminal record preserves actual results, prevents re-published IDs from resurrecting the old competition and enables native event-2012 catch-up for accepted and pending registrations. Cleanup runs on an enrolled client's idle update, authenticated tournament request or once-per-second service-store maintenance. Maintenance visits persisted enrollments independently of sockets, including server startup with no authenticated clients. A missing personal bracket slot does not cancel a globally live publication; other tournaments and newer assignments are preserved. Offline withdrawal, blocked-transaction recovery, reconnect notification and real-clock startup expiry with malformed-realm isolation have exact-binary fixture evidence. Native allocated-round retirement, orphan formations without enrollment and retail disconnect/forfeit policy remain separate gates. Managed unfinished tournament withdrawal now has a complete persistent cancellation layout and shared enrollment/lobby/search/account-index transaction. Native tasks 145/22 and 145/23 false cancel a still-competing participant's tournament; idle event-2012 retires peer state. Eliminated and completed-final departures release old matchmaking assignments while preserving actual results and winning-team searches. Signed encrypted fixtures cover both tasks, allocation, reconnect, source validation, interrupted terminal publication, retry and stale-task denial. Native positive withdrawal callbacks, retail forfeits and disconnect timeouts remain unverified/unimplemented.
+
+Tournaments
+  Services: 145
+  Contract: Registration, formation, native bracket/round publication and results
+  Persistence: tournaments
+  Backend: src/matchmaking_services.cpp, src/qos_services.cpp, src/relay_services.cpp, src/tournament_services.cpp
+  Registered routes: 145/2, 145/3, 145/4, 145/8, 145/9, 145/10, 145/13, 145/15, 145/16, 145/18, 145/19, 145/20, 145/21, 145/22, 145/23, 145/24, 145/25, 145/26, 145/28, 145/29
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Native tournament task-18 searches now use authenticated party tokens, published same-team enrollment and recoverable formation-search/index transactions; exact event-2009 join pushes bind the returned search ID, with retry/deduplication/cancellation/expiry checks covered by two encrypted clients. Capacity-based tournament publications now accept unassigned registrations and allocate real authenticated parties without splitting them; native teams/rounds are generated and PLAYING requires every slot and live-session acknowledgement. Formation/enrollment/search/index changes share flushed recoverable transactions with an explicitly fixed cross-domain enrollment target. Forming-party withdrawal releases slots, resets peer acceptance while retaining registration and emits exact event-2011 with durable catch-up/revocation. Capacity publications with pinned round rules now allocate closed native round lobbies through the shared playlist/map policy and document builder after complete session-bound readiness. Exact create/join pushes retain actual party search IDs and native tournament/team/round metadata; formation, lobby, searches, account index and enrollment share one recoverable transaction. Eight signed machine accounts verify map-policy waiting, interrupted publication, four independent first-round lobbies, temporary same-session join catch-up and all seven result-driven matches. Canonical tournament map pools supply both native publisher dvar strings and backend round selection, with durable revision/hash protection and immutable competition snapshots. The compiled selector matches original Replay x64 instructions across 32 cases; four native strings and their revision survive same-process backend reconnect. Native join/formation/round callback validation, forfeits and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open. Globally unavailable managed publications now retire forming/playing searches and allocated lobbies, remove account assignments and clear readiness in one recoverable transaction. A validated system terminal record preserves actual results, prevents re-published IDs from resurrecting the old competition and enables native event-2012 catch-up for accepted and pending registrations. Cleanup runs on an enrolled client's idle update, authenticated tournament request or once-per-second service-store maintenance. Maintenance visits persisted enrollments independently of sockets, including server startup with no authenticated clients. A missing personal bracket slot does not cancel a globally live publication; other tournaments and newer assignments are preserved. Offline withdrawal, blocked-transaction recovery, reconnect notification and real-clock startup expiry with malformed-realm isolation have exact-binary fixture evidence. Native allocated-round retirement, orphan formations without enrollment and retail disconnect/forfeit policy remain separate gates. Managed unfinished tournament withdrawal now has a complete persistent cancellation layout and shared enrollment/lobby/search/account-index transaction. Native tasks 145/22 and 145/23 false cancel a still-competing participant's tournament; idle event-2012 retires peer state. Eliminated and completed-final departures release old matchmaking assignments while preserving actual results and winning-team searches. Signed encrypted fixtures cover both tasks, allocation, reconnect, source validation, interrupted terminal publication, retry and stale-task denial. Native positive withdrawal callbacks, retail forfeits and disconnect timeouts remain unverified/unimplemented.
+
+Scheduled matches
+  Services: 150
+  Contract: Explicit schedules, members and events
+  Persistence: scheduled-matches
+  Backend: src/scheduled_services.cpp
+  Registered routes: 150/1, 150/2, 150/3, 150/4
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Positive native scheduled match operations; local publication required.
+
+Esports registration
+  Services: 151
+  Contract: Published local registration
+  Persistence: esports
+  Backend: src/startup_services.cpp
+  Registered routes: 151/1
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Published local registration only; retail esports registration workflow is not emulated.
+
+Performance samples
+  Services: 152
+  Contract: Game-type samples attributed to each player
+  Persistence: performance
+  Backend: src/scheduled_services.cpp
+  Registered routes: 152/1
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Positive native performance write completion.
+
+Object store
+  Services: 193
+  Contract: Owned profile blobs, publisher metadata/content and REST envelopes
+  Persistence: objectstore
+  Backend: src/objectstore_services.cpp
+  Registered routes: 193/6, 193/7, 193/8, 193/16
+  REST resources: ObjectsResourcePublishers/get_metadata, ObjectsVectorizedResourceUsers/get_objects, ObjectsVectorizedResourceUsers/put_objects
+  Known missing routes: 193/9, 193/10, 193/12, 193/24
+  Open contracts: Verified user-object PUT/read and publisher metadata/content retain native envelopes. Complete multi-object upload windows use flushed per-title/account intents, full namespace/content/tag preflight and blocked-read/process-restart recovery; native profile-window recovery still needs a targeted client failure run. Tasks 3/9/10/12/24 category/list/large-upload families remain open; response binding is unresolved for some recovered writers. The same native REST vector GET/PUT routes now share the struct-buffer domain, complete account-owned storage and journal recovery. Matching cache version/checksum hints use the target NotModified reader; REST body windows retain their 256 KiB cap. Native REST method callbacks remain unverified. The alias at 0x1420F1890 is not an upload-completion reader; see validation/20261006-target-consumer-alias-correction.json.
+
+Experiments and treatments
+  Services: 194
+  Contract: Deterministic cohorts, native allocations and active treatments
+  Persistence: ab-testing
+  Backend: src/abtesting_services.cpp
+  Registered routes: 194/1
+  REST resources: abtesting/enroll
+  Known missing routes: none in recovered constructor set
+  Open contracts: Published deterministic weighted cohorts and active treatments use the exact native eight-enrollment/one-treatment/1024-byte engine allocation. Full catalog/state validation, title/account/context ownership, revision rollback protection, schedule filtering, failed atomic publication and restart persistence are implemented. A positive native dvar treatment and same-process backend restart/refetch have a hash-bound receipt; current-image completion is evaluated separately. Automatic future native schedule polling, other modifier types and retail experiment rules remain separate unverified scopes. Both transports preflight the original legacy reader's 8096-byte buffer including its terminator before publication. The explicit abtesting/enroll REST handler shares account-owned cohorts and token state with task 194/1; encrypted fixtures cover the exact 8095-byte boundary and overflow. Original Replay's REST writer leaves serviceName empty and its own validator rejects that request before transport; the explicit backend route does not fix or establish completion of that native REST path.
+
+Scripted loot
+  Services: 195
+  Contract: Native proxy requests and explicitly published response rules
+  Persistence: scripted-loot
+  Backend: src/engagement_services.cpp
+  Registered routes: 195/1
+  REST resources: none in recovered writer set
+  Known missing routes: none in recovered constructor set
+  Open contracts: Full task-1 proxy request/result and published deterministic script responses with ordered owned task journals. Constant native clientData is not used as retry identity. Retail script/reward rules and positive native callback/game consumers remain unverified; no fabricated inventory grants.
+
+NON-TASK DOMAINS
+Local platform and Battle.net boundary
+  Signed machine identity/session, local names, licenses, account policy and native completion
+  src/platform.cpp, integration/replay/DW_LocalPlatform.cpp
+
+Authentication and encrypted lobby
+  Native auth/legacy tickets, protocol-210 challenge, directional crypto and session expiry
+  src/lobby.cpp, src/crypto.cpp, src/traffic_kdf.h
+
+Local profile and XP persistence
+  Player-owned local XP/INI and native settings; server-side SDK state remains a mirror
+  integration/replay/DW_LocalProgression.cpp, integration/replay/DW_LocalConfig.cpp
+
+UDP NAT and QoS
+  Real bounded native NAT introductions and security-ID-bound QoS packets
+  src/qos_provider.cpp, src/qos_services.cpp
+
+Authenticated UDP relay
+  Native credentials, BIND/JOIN/VERIFY/ESTABLISHED, DATA forwarding and replay windows
+  src/relay_provider.cpp, src/relay_services.cpp
+
+Bandwidth probe
+  Native bounded probe transport
+  src/bandwidth.cpp
+
+Voice permission and transport integration
+  Signed account permissions; codec, capture, mute and native game voice remain engine consumers
+  integration/replay/DW_LocalPlatform.cpp, src/relay_provider.cpp
+
+Playlist and installed-map contracts
+  Owner publication, native weights/rules, package inventory and matchmaking eligibility
+  src/playlist_catalog.cpp, tools/prepare-playlist-catalog.py, tools/playlist_packages.py
+
+Signed update manifests
+  Exact Replay no-update manifest/signature and immutable publisher-object download
+  tools/prepare-replay-publisher-content.py, src/objectstore_services.cpp
+
+PLAYLIST CONTRACT
+{
+  "playlists": 63,
+  "game_types": 43,
+  "declared_maps": 60,
+  "match_entries": 588,
+  "installed_main_packages": 12,
+  "native_weighted_entry_limit": 20,
+  "native_weight_reader_slot_limit": 20,
+  "primary_package_presence_is_not_transient_or_gameplay_validation": true
+}
+
+The JSON companion retains target caller addresses, ambiguous labels, unresolved paths,
+REST inventory, source/build drift and each recovered task route. Direct constructor
+coverage does not imply all virtual/inlined SDK methods or positive native completion.
