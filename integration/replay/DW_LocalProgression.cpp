@@ -8,24 +8,52 @@ extern "C"
 {
     uint64_t DW_LocalPlatform_UserId();
     void *func_14105BC30(); // Original OnlineProgression::GetInstance
-    __declspec(dllimport) unsigned long __stdcall GetEnvironmentVariableW(
-        const wchar_t *, wchar_t *, unsigned long);
-    __declspec(dllimport) int __stdcall CreateDirectoryW(const wchar_t *, void *);
-    __declspec(dllimport) void *__stdcall CreateFileW(
-        const wchar_t *, unsigned long, unsigned long, void *, unsigned long, unsigned long, void *);
-    __declspec(dllimport) int __stdcall ReadFile(
-        void *, void *, unsigned long, unsigned long *, void *);
-    __declspec(dllimport) int __stdcall WriteFile(
-        void *, const void *, unsigned long, unsigned long *, void *);
-    __declspec(dllimport) int __stdcall FlushFileBuffers(void *);
-    __declspec(dllimport) int __stdcall CloseHandle(void *);
-    __declspec(dllimport) int __stdcall MoveFileExW(const wchar_t *, const wchar_t *, unsigned long);
-    __declspec(dllimport) unsigned long __stdcall GetTickCount();
+    __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
+    __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
+    __declspec(dllimport) int __stdcall FreeLibrary(void *);
     void Com_Printf(int, const char *, ...);
 }
 
 namespace
 {
+    struct API
+    {
+        unsigned long(__stdcall *GetEnvironmentVariableW)(const wchar_t *, wchar_t *, unsigned long);
+        int(__stdcall *CreateDirectoryW)(const wchar_t *, void *);
+        void *(__stdcall *CreateFileW)(const wchar_t *, unsigned long, unsigned long, void *,
+                                      unsigned long, unsigned long, void *);
+        int(__stdcall *ReadFile)(void *, void *, unsigned long, unsigned long *, void *);
+        int(__stdcall *WriteFile)(void *, const void *, unsigned long, unsigned long *, void *);
+        int(__stdcall *FlushFileBuffers)(void *);
+        int(__stdcall *CloseHandle)(void *);
+        int(__stdcall *MoveFileExW)(const wchar_t *, const wchar_t *, unsigned long);
+        unsigned long(__stdcall *GetTickCount)();
+
+        bool Load()
+        {
+            if (GetEnvironmentVariableW)
+                return CreateDirectoryW && CreateFileW && ReadFile && WriteFile &&
+                       FlushFileBuffers && CloseHandle && MoveFileExW && GetTickCount;
+            auto library = LoadLibraryA("kernel32.dll");
+            if (!library)
+                return false;
+#define DW_LOAD(name) name = reinterpret_cast<decltype(name)>(GetProcAddress(library, #name))
+            DW_LOAD(CreateDirectoryW);
+            DW_LOAD(CreateFileW);
+            DW_LOAD(ReadFile);
+            DW_LOAD(WriteFile);
+            DW_LOAD(FlushFileBuffers);
+            DW_LOAD(CloseHandle);
+            DW_LOAD(MoveFileExW);
+            DW_LOAD(GetTickCount);
+            DW_LOAD(GetEnvironmentVariableW);
+#undef DW_LOAD
+            FreeLibrary(library); // Kernel32 stays loaded by the EXE's existing imports.
+            return GetEnvironmentVariableW && CreateDirectoryW && CreateFileW && ReadFile &&
+                   WriteFile && FlushFileBuffers && CloseHandle && MoveFileExW && GetTickCount;
+        }
+    };
+    API s_api{};
     struct DWLocalProgressionRecord
     {
         uint32_t magic, version;
@@ -37,7 +65,8 @@ namespace
     static_assert(offsetof(DWLocalProgressionRecord, checksum) == 32);
 
     // Same Replay constructor and UpdateProgression: the complete player-array
-    // prefix is 64 bytes followed by eight native (XP, rank) pairs.
+    // prefix is 64 bytes followed by this Windows build's one (XP, rank) pair.
+    // Its season array starts at +80; the Xbox source's eight players do not.
     struct DWReplayPlayerProgression
     {
         uint64_t xp, rank;
@@ -45,10 +74,10 @@ namespace
     struct DWReplayProgressionPrefix
     {
         uint8_t native[64];
-        DWReplayPlayerProgression players[8];
+        DWReplayPlayerProgression players[1];
     };
     static_assert(offsetof(DWReplayProgressionPrefix, players) == 64);
-    static_assert(sizeof(DWReplayProgressionPrefix) == 192);
+    static_assert(sizeof(DWReplayProgressionPrefix) == 80);
 
     DWLocalProgressionRecord s_record{};
     uint64_t s_savedUser = 0, s_savedXp = 0;
@@ -79,7 +108,9 @@ namespace
         if (s_loaded)
             return;
         s_loaded = true;
-        const auto length = GetEnvironmentVariableW(L"LOCALAPPDATA", s_directory, 900);
+        if (!s_api.Load())
+            return;
+        const auto length = s_api.GetEnvironmentVariableW(L"LOCALAPPDATA", s_directory, 900);
         if (!length || length >= 900)
             return;
         Append(s_directory + length, L"\\ReplayDW");
@@ -91,16 +122,16 @@ namespace
         }
         Append(s_path + end, L"\\player-progression.bin");
         Append(s_pending + end, L"\\player-progression.pending");
-        auto file = CreateFileW(s_path, 0x80000000, 1, nullptr, 3, 0x80, nullptr);
+        auto file = s_api.CreateFileW(s_path, 0x80000000, 1, nullptr, 3, 0x80, nullptr);
         if (file == reinterpret_cast<void *>(~uintptr_t{0}))
             return;
         DWLocalProgressionRecord record{};
         unsigned long received = 0, extraCount = 0;
         uint8_t extra = 0;
-        const bool read = ReadFile(file, &record, sizeof(record), &received, nullptr) &&
+        const bool read = s_api.ReadFile(file, &record, sizeof(record), &received, nullptr) &&
                           received == sizeof(record) &&
-                          ReadFile(file, &extra, 1, &extraCount, nullptr) && !extraCount;
-        CloseHandle(file);
+                          s_api.ReadFile(file, &extra, 1, &extraCount, nullptr) && !extraCount;
+        s_api.CloseHandle(file);
         s_valid = read && record.magic == 0x31505852 && record.version == 1 &&
                   record.user && record.appliedRank <= 55 && !record.reserved &&
                   record.checksum == Checksum(record);
@@ -121,17 +152,17 @@ namespace
     {
         if (!s_path[0] || s_corrupt)
             return false;
-        CreateDirectoryW(s_directory, nullptr);
+        s_api.CreateDirectoryW(s_directory, nullptr);
         DWLocalProgressionRecord record{0x31505852, 1, user, xp, DW_LocalConfig_Rank(), 0, 0};
         record.checksum = Checksum(record);
-        auto file = CreateFileW(s_pending, 0x40000000, 0, nullptr, 2, 0x80, nullptr);
+        auto file = s_api.CreateFileW(s_pending, 0x40000000, 0, nullptr, 2, 0x80, nullptr);
         if (file == reinterpret_cast<void *>(~uintptr_t{0}))
             return false;
         unsigned long written = 0;
-        const bool saved = WriteFile(file, &record, sizeof(record), &written, nullptr) &&
-                           written == sizeof(record) && FlushFileBuffers(file);
-        CloseHandle(file);
-        if (!saved || !MoveFileExW(s_pending, s_path, 9))
+        const bool saved = s_api.WriteFile(file, &record, sizeof(record), &written, nullptr) &&
+                           written == sizeof(record) && s_api.FlushFileBuffers(file);
+        s_api.CloseHandle(file);
+        if (!saved || !s_api.MoveFileExW(s_pending, s_path, 9))
             return false;
         s_record = record;
         s_valid = true;
@@ -159,7 +190,9 @@ extern "C" void DW_LocalProgression_Frame()
     const auto user = DW_LocalPlatform_UserId();
     if (!user)
         return;
-    const auto now = GetTickCount();
+    if (!s_api.Load())
+        return;
+    const auto now = s_api.GetTickCount();
     if (now - s_poll < 250)
         return;
     s_poll = now;
