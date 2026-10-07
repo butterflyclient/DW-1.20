@@ -1,4 +1,3 @@
-* text=auto eol=lf
-# Preserve the exact engine source bytes used by retained compiler receipts.
-integration/** -text whitespace=cr-at-eol
-third_party/nlohmann/LICENSE.MIT whitespace=-blank-at-eol
+# Validation receipts are hash-bound by local readiness pointers. A Windows
+# checkout must preserve their bytes when moving between development branches.
+validation/*.json text eol=lf
