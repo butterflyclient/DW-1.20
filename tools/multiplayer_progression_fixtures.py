@@ -51,7 +51,7 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
         return integer(1, client.user) + proto_text(2, "uno")
 
     def batch(client, xp):
-        event = proto_text(1, "mp_addxp") + integer(2, int(time.time()))
+        event = proto_text(1, "mp_addxp") + integer(2, int(time.time())) + integer(4, 0)
         event += binary(3, proto_text(1, "Param0") + integer(2, xp))
         first_party = integer(1, client.platform_account_id) + proto_text(2, "bnet")
         return binary(1, account(client)) + binary(2, event) + binary(3, first_party) + integer(4, 113)
