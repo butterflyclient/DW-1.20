@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "services.h"
 #include "inventory_validation_services.h"
 #include "protobuf.h"

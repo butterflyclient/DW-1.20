@@ -1,0 +1,83 @@
+REPLAY DW PRIMARY DROPLET - 2026-10-07
+
+Primary address: 162.243.115.160
+Branch: codex/dw-remaining-services
+Native binary SHA256:
+a2b2a38e8e2064d334c0850696dfa52029c2fe1e5dd7332db714b9ddb09c5e07
+Shipping game remains b09a9ba25f733960dd1f8c569f566979804c2a1a247a9753e2c6e7a50556c138.
+The game EXE was not recompiled or patched for this migration.
+
+HOST LAYOUT
+Ubuntu 24.04 x64. GCC 13.3, OpenSSL 3.0.13, CMake/Ninja.
+Non-root service account: replay-dw.
+Persistent runtime state: /var/lib/replay-dw, directories 0700, files 0600.
+Versioned binaries/source: /opt/replay-dw/releases; /opt/replay-dw/current selects one release.
+Service: replay-dw.service, enabled at boot, restart on failure, graceful SIGTERM.
+Read-only filesystem boundary except runtime data; no new privileges; bounded
+tasks, memory and file descriptors. 2 GiB swap accommodates native compilation.
+Logs: systemd journal and /var/lib/replay-dw/server.log, daily/20 MiB rotation.
+Backups: /var/backups/replay-dw, daily timer near 08:00 UTC, seven-day retention.
+The backup briefly stops the writer to obtain a consistent state snapshot.
+These are on-droplet backups; they are not a claim of provider/offsite backups.
+
+NETWORK
+TCP 8085: signed platform/auth, resources, legacy login, object/content HTTP.
+TCP 3075: encrypted native protocol 210 lobby and task transport.
+TCP 8443: retained explicit unsupported TLS listener; native TLS remains open work.
+UDP 3076: native QoS/NAT introduction.
+UDP 3077: authenticated encrypted relay.
+UDP 3078..3109: bounded concurrent bandwidth-test sessions.
+TCP 22: administrator SSH. UFW otherwise denies inbound traffic.
+Matches remain peer hosted on player machines; UDP game port 3074 belongs to
+the game host, not the droplet. Existing home game-port forwarding is retained.
+
+MIGRATION AND TRUST
+1112 curated runtime files were hash verified after transfer. Build snapshots,
+research databases, frontend assets and unrelated test archives were excluded.
+The original server issuer/public key and relay issuer were preserved.
+Machine private identities, settings and XP stay on player machines.
+The cloud network config advertises this droplet and sets bandwidth_port_count=32.
+No player provisioning or new initial friendships were introduced.
+Initial recovery snapshot: /var/backups/replay-dw/initial-migration.tar.gz.
+Local original INI: data/droplet-20261007/game-ini.before.
+Local Windows backend/data remain available as an explicit rollback baseline.
+Administrator private SSH key and pinned host file are ignored local artifacts;
+neither credentials nor private player/server keys were committed or packaged.
+
+VALIDATION
+Linux and Windows native backend builds passed. The real bandwidth session
+contract passed on both: parallel allocation, exhaustion, token isolation,
+actual UDP byte accounting, port reclamation and invalid-pool rejection.
+Linux isolated suite: 297 protocol/service checks passed.
+Public endpoint suite: 12 checks passed, including actual Windows CNG verifier,
+independent encrypted transport, exact native profile save/read and UDP intro.
+Consistent backup, checked archive, service restart and restored issuer load passed.
+One root-folder game reached native Multiplayer and rendered the shipped scene:
+connected HSM state 33, all 27 fences passing, online network state 4/error 0,
+zero lobby failures. No map or two-game test was performed during migration.
+Receipt: validation/20261007-primary-droplet-readiness.json.
+Immutable evidence: data/droplet-20261007.
+
+OPERATION
+start-server.ps1 / stop-server.ps1 / status-server.ps1 target the droplet when
+data/primary-backend.json exists. launch-game.ps1 and observe-game.ps1 verify
+the live remote ELF through pinned SSH and bind the unchanged game to it.
+Remote control: python tools/control-primary-server.py start|stop|restart|status.
+Ad hoc command: python tools/droplet-ssh.py exec 'systemctl status replay-dw'.
+Server source is frozen from committed/index-owned changes before compilation;
+unrelated migration/tournament/compiler edits are excluded and preserved.
+Update the Linux binary, restart its service, then perform controlled native
+tests with one game instance at a time. Keep evidence bound to the new hash.
+
+CLIENTS
+Root game INI now selects host=162.243.115.160 and retains the owner's other fields.
+data/Replay-DW-Client-Test.zip has the unchanged game EXE and new endpoint INI,
+without proxy DLLs, player keys or saves. Existing clients only need to update
+host in their EXE-specific INI. Preserve their player_name and local profiles.
+
+REMAINING WORK
+The complete-backend goal remains active. Migration is not full completion.
+Remaining native bindings include 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24.
+Post-HTTP upload completion must not be confused with initial upload creation.
+The Store has a real missing native Lua widget/factory path to identify before
+choosing publisher/catalog changes. Do not substitute guessed success replies.

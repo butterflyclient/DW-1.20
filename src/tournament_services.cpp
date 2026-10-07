@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "tournament_services.h"
 #include "matchmaking_store.h"
 #include "lobby.h"

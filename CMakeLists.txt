@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 project(iw8_demonware LANGUAGES CXX)
-if(NOT WIN32)
-  message(FATAL_ERROR "This initial server targets Windows")
-endif()
 add_executable(iw8-dw-server
     src/server.cpp
+    src/host_os.cpp
+    src/crypto_provider.cpp
     src/network.cpp
     src/platform.cpp
     src/platform_account_store.cpp
@@ -49,12 +48,33 @@ add_executable(iw8-dw-server
 )
 target_compile_features(iw8-dw-server PRIVATE cxx_std_20)
 target_compile_definitions(iw8-dw-server PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0601)
-target_link_libraries(iw8-dw-server PRIVATE ws2_32 bcrypt)
+if(WIN32)
+  target_link_libraries(iw8-dw-server PRIVATE ws2_32 bcrypt)
+else()
+  find_package(OpenSSL 3 REQUIRED)
+  find_package(Threads REQUIRED)
+  target_link_libraries(iw8-dw-server PRIVATE OpenSSL::Crypto Threads::Threads)
+  target_compile_options(iw8-dw-server PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 add_executable(iw8-playlist-contract-test tools/test-playlist-contract.cpp
-    src/playlist_catalog.cpp src/crypto.cpp)
+    src/playlist_catalog.cpp src/crypto.cpp src/crypto_provider.cpp src/host_os.cpp)
 target_compile_features(iw8-playlist-contract-test PRIVATE cxx_std_20)
 target_compile_definitions(iw8-playlist-contract-test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(iw8-playlist-contract-test PRIVATE bcrypt)
+if(WIN32)
+  target_link_libraries(iw8-playlist-contract-test PRIVATE bcrypt)
+else()
+  target_link_libraries(iw8-playlist-contract-test PRIVATE OpenSSL::Crypto Threads::Threads)
+endif()
+add_executable(iw8-bandwidth-contract-test tools/test-bandwidth-port-pool.cpp
+    src/bandwidth.cpp src/network.cpp src/crypto.cpp src/host_os.cpp src/crypto_provider.cpp)
+target_compile_features(iw8-bandwidth-contract-test PRIVATE cxx_std_20)
+target_compile_definitions(iw8-bandwidth-contract-test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+if(WIN32)
+  target_link_libraries(iw8-bandwidth-contract-test PRIVATE ws2_32 bcrypt)
+else()
+  target_link_libraries(iw8-bandwidth-contract-test PRIVATE OpenSSL::Crypto Threads::Threads)
+endif()
+if(WIN32)
 add_library(iw8-dw-platform-client SHARED integration/replay/DW_LocalPlatformCrypto.cpp
     integration/replay/DW_LocalIdentity.cpp tools/identity-test-adapter.cpp)
 target_compile_features(iw8-dw-platform-client PRIVATE cxx_std_20)
@@ -63,6 +83,7 @@ add_executable(iw8-dw-identity-check tools/identity-file-diagnostic.cpp
     integration/replay/DW_LocalIdentity.cpp tools/identity-test-adapter.cpp)
 target_compile_features(iw8-dw-identity-check PRIVATE cxx_std_20)
 target_link_libraries(iw8-dw-identity-check PRIVATE bcrypt crypt32)
+endif()
 if(MSVC)
   target_compile_options(iw8-dw-server PRIVATE /W4 /WX /EHsc)
   target_compile_options(iw8-playlist-contract-test PRIVATE /W4 /WX /EHsc)

@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "regulation_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>

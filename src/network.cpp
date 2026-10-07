@@ -1,5 +1,4 @@
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "host_os.h"
 #include "network.h"
 #include "wire.h"
 #include "../third_party/nlohmann/json.hpp"
@@ -14,6 +13,7 @@ namespace network
         uint32_t bindIp = htonl(INADDR_LOOPBACK), publicIp = htonl(INADDR_LOOPBACK);
         std::string publicHost = "127.0.0.1";
         uint16_t qos = 0, relay = 0, bandwidth = 0;
+        unsigned bandwidthCount = 1;
         std::map<std::string, std::string> clients;
         thread_local bool loopbackPeer = false;
 
@@ -30,6 +30,7 @@ namespace network
         bindIp = publicIp = htonl(INADDR_LOOPBACK);
         publicHost = "127.0.0.1";
         qos = relay = bandwidth = 0;
+        bandwidthCount = 1;
         clients.clear();
         const auto path = directory / "network.json";
         if (!std::filesystem::exists(path))
@@ -52,6 +53,14 @@ namespace network
         qos = port("qos_port");
         relay = port("relay_port");
         bandwidth = port("bandwidth_port");
+        bandwidthCount = config.value("bandwidth_port_count", 1u);
+        wire::require(bandwidthCount >= 1 && bandwidthCount <= 32 &&
+                      unsigned(bandwidth) + bandwidthCount - 1 <= 65535);
+        const auto occupied = [&](uint16_t candidate)
+        {
+            return candidate >= bandwidth && candidate < unsigned(bandwidth) + bandwidthCount;
+        };
+        wire::require(!occupied(qos) && !occupied(relay));
         wire::require(qos != relay && qos != bandwidth && relay != bandwidth);
         const auto entries = config.at("clients");
         wire::require(entries.is_object() && entries.size() <= 63);
@@ -118,6 +127,11 @@ namespace network
     uint16_t bandwidthPort()
     {
         return bandwidth;
+    }
+
+    unsigned bandwidthPortCount()
+    {
+        return bandwidthCount;
     }
 
     bool permittedPeer(uint32_t address)

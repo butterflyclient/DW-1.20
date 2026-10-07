@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "channel_store.h"
 #include <charconv>
 #include <memory>

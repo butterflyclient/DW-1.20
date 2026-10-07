@@ -1,4 +1,10 @@
 $ErrorActionPreference = 'Stop'
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'data\primary-backend.json')) {
+    & 'C:\Users\achar\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' (Join-Path $PSScriptRoot 'tools\control-primary-server.py') start
+    if ($LASTEXITCODE) { throw 'Primary droplet operation failed.' }
+    return
+}
+
 $executable = Join-Path $PSScriptRoot 'build\Release\iw8-dw-server.exe'
 $data = Join-Path $PSScriptRoot 'data'
 if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'Build the server with build-server.ps1 first.' }

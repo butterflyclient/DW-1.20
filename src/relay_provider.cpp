@@ -1,5 +1,4 @@
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "host_os.h"
 #include "relay_provider.h"
 #include "network.h"
 #include "relay_services.h"

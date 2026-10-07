@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "counter_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <charconv>

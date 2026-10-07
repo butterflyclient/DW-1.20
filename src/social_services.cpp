@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "social_services.h"
 #include "crypto.h"
 #include "lobby.h"

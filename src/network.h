@@ -28,6 +28,7 @@ namespace network
     uint16_t qosPort();
     uint16_t relayPort();
     uint16_t bandwidthPort();
+    unsigned bandwidthPortCount();
     bool permittedPeer(uint32_t address);
     bool loginPermitted(bool loopback, const std::string &profile, const std::string &credential);
 } // namespace network

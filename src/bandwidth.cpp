@@ -1,5 +1,4 @@
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "host_os.h"
 #include "bandwidth.h"
 #include "wire.h"
 #include "network.h"
@@ -65,14 +64,30 @@ namespace bandwidth
             sockaddr_in address{};
             address.sin_family = AF_INET;
             address.sin_addr.s_addr = network::bindAddress();
-            address.sin_port = htons(network::bandwidthPort());
+            const auto firstPort = network::bandwidthPort();
+            const auto candidates = firstPort ? network::bandwidthPortCount() : 1;
+            bool bound = false;
+            for (unsigned index = 0; index < candidates; ++index)
+            {
+                address.sin_port = htons(static_cast<uint16_t>(firstPort + index));
+                if (!bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)))
+                {
+                    bound = true;
+                    break;
+                }
+#ifdef _WIN32
+                if (WSAGetLastError() != WSAEADDRINUSE)
+#else
+                if (WSAGetLastError() != EADDRINUSE)
+#endif
+                    break;
+            }
             int addressSize = sizeof(address);
-            if (bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) ||
-                getsockname(socket, reinterpret_cast<sockaddr *>(&address), &addressSize))
+            if (!bound || getsockname(socket, reinterpret_cast<sockaddr *>(&address), &addressSize))
             {
                 closesocket(socket);
                 socket = INVALID_SOCKET;
-                throw std::runtime_error("Bandwidth UDP loopback bind failed");
+                throw std::runtime_error("Bandwidth UDP port pool exhausted or bind failed");
             }
             port = ntohs(address.sin_port);
             const int receiveBytes = 512 * 1024;

@@ -119,7 +119,11 @@ try:
         raise RuntimeError("Process image is not the verified DW deployment")
     server_deployment = None
     server_receipt_path = root / "data/server-process.json"
-    if server_receipt_path.exists():
+    if deployment.get("remote_backend"):
+        from remote_backend import verify
+        receipt = verify()
+        server_deployment = dict(receipt, launch_receipt_matches=bool(launch and launch.get("server_process") == receipt))
+    elif server_receipt_path.exists():
         receipt = json.loads(server_receipt_path.read_text(encoding="utf-8-sig"))
         server_process = kernel.OpenProcess(0x1000, False, receipt["pid"])
         if not server_process:
@@ -821,7 +825,8 @@ try:
                 "native_methods": methods,
             }
         )
-    with urllib.request.urlopen("http://127.0.0.1:8085/status", timeout=3) as response:
+    backend_host = deployment.get("remote_backend", {}).get("host", "127.0.0.1")
+    with urllib.request.urlopen(f"http://{backend_host}:8085/status", timeout=10) as response:
         status = json.load(response)
     client_path = path.parent / "replay-dw-client.log"
     with client_path.open("rb") as log:
@@ -848,13 +853,20 @@ try:
     server_log_reset = False
     server_log_file_size = None
     if connection and "server_log_offset" in connection:
-        with (root / "data" / "server.log").open("rb") as log:
-            server_log_reset = (
-                root / "data" / "server.log"
-            ).stat().st_size < connection["server_log_offset"]
-            log.seek(0 if server_log_reset else connection["server_log_offset"])
-            server_lines = log.read().decode(errors="replace").splitlines()
-            server_log_file_size = log.tell()
+        if deployment.get("remote_backend"):
+            from remote_backend import read_log
+            remote_log = read_log(connection["server_log_offset"])
+            server_log_reset = remote_log["reset"]
+            server_lines = remote_log["text"].splitlines()
+            server_log_file_size = remote_log["size"]
+        else:
+            with (root / "data" / "server.log").open("rb") as log:
+                server_log_reset = (
+                    root / "data" / "server.log"
+                ).stat().st_size < connection["server_log_offset"]
+                log.seek(0 if server_log_reset else connection["server_log_offset"])
+                server_lines = log.read().decode(errors="replace").splitlines()
+                server_log_file_size = log.tell()
         if server_log_reset:
             cutoff = datetime.fromisoformat(
                 connection.get("requested_utc", connection.get("launched_utc")).replace(

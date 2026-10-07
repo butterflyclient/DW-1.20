@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "rest_services.h"
 #include "protobuf.h"
 #include "achievement_services.h"

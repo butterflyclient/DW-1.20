@@ -12,7 +12,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 
 root = Path(__file__).resolve().parents[1]
-exe = root / "build" / "Release" / "iw8-dw-server.exe"
+exe = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build" / "Release" / "iw8-dw-server.exe")))
+# Imported fixture modules share this subprocess module. The Windows window
+# suppression flag has no purpose on Linux; zero retains normal POSIX launch.
+if os.name != "nt":
+    subprocess.CREATE_NO_WINDOW = 0
 directory = root / "data" / ("protocol-fixture-" + str(time.time_ns()))
 directory.mkdir()
 # Provision a real second identity with the server's issuer. This is not a

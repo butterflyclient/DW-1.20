@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "clan_services.h"
 #include "protobuf.h"
 #include "lobby.h"

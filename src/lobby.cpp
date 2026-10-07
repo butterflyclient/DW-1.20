@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "lobby.h"
 #include "platform.h"
 #include "wire.h"

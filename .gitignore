@@ -8,3 +8,5 @@ __pycache__/
 *.pending
 *.log
 *.user
+
+/.toolchains/

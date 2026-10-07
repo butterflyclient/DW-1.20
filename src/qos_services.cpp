@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "qos_services.h"
 #include "qos_provider.h"
 #include "relay_provider.h"

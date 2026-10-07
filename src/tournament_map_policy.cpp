@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "tournament_map_policy.h"
 #include "crypto.h"
 #include <algorithm>

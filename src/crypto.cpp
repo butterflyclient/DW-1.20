@@ -1,5 +1,5 @@
-#include <windows.h>
-#include <bcrypt.h>
+#include "host_os.h"
+#include "crypto_provider.h"
 #include "crypto.h"
 #include <algorithm>
 #include <array>

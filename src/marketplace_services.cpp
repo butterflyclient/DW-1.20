@@ -1,4 +1,4 @@
-#include <windows.h>
+#include "host_os.h"
 #include "marketplace_services.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
