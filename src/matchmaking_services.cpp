@@ -393,6 +393,27 @@ namespace services
                 for (uint64_t team = 1; team < count.get<uint64_t>(); ++team)
                     backend["team_balance"]["teams"][std::to_string(team)] = Json::array();
             }
+            if (selection.splitPartiesForTeamBalance)
+            {
+                auto &teams = backend["team_balance"]["teams"];
+                if (!query.contains("team_balance") || !query["team_balance"].contains("num_teams"))
+                    for (unsigned i = 1; i < selection.teamCount; ++i)
+                        teams[std::to_string(i)] = Json::array();
+                // Local low-population policy may separate a searching party.
+                // Native Replay ReadyTeams compares the actual assigned teams;
+                // two friends on one TDM team otherwise cannot start a 1v1.
+                for (auto &team : teams)
+                    team = Json::array();
+                for (const auto &user : query.at("members"))
+                {
+                    auto destination = teams.begin();
+                    for (auto team = teams.begin(); team != teams.end(); ++team)
+                        if (occupiedSlots(team.value(), backend["player_id_to_slots"]) <
+                            occupiedSlots(destination.value(), backend["player_id_to_slots"]))
+                            destination = team;
+                    destination.value().push_back(user);
+                }
+            }
             if (query.contains("private_lobby"))
                 backend["private_lobby"] = query["private_lobby"];
             Json host = {
@@ -561,11 +582,14 @@ namespace services
             auto rules = selection.rules;
             // This is a search instruction, not a different match ruleset.
             rules.erase("only_join_existing_lobbies");
-            return {{"rules", rules},
+            Json pool = {{"rules", rules},
                     {"dedicated_server", query.value("dedicated_server", Json::object())},
                     {"performance", query.value("performance", Json{{"game_type", 1}})},
                     {"team_balance", query.value("team_balance", Json::object())},
                     {"maximum_members", requestCapacity(query)}};
+            if (selection.splitPartiesForTeamBalance)
+                pool["split_parties_for_team_balance"] = true;
+            return pool;
         }
 
         Reply assignMembers(const std::filesystem::path &directory,
@@ -620,7 +644,19 @@ namespace services
                     backend["players"][key] = "connected";
                     backend["player_id_to_service_level"][key] = "paid";
                     backend["listen_server"]["lobby_host_order"].push_back(user);
-                    // Keep a joining party together on the least populated team.
+                    if (lobby.value("match_selection", Json::object())
+                             .value("split_parties_for_team_balance", false))
+                    {
+                        // Existing members retain their assignments. Balance
+                        // each new primary together with its reserved guests.
+                        team = teams.begin();
+                        for (auto destination = teams.begin(); destination != teams.end();
+                             ++destination)
+                            if (occupiedSlots(destination.value(), reservations) <
+                                occupiedSlots(team.value(), reservations))
+                                team = destination;
+                    }
+                    // The normal policy keeps a joining party on one team.
                     team.value().push_back(user);
                 }
                 backend["player_id_to_mm_id"][key] = mmId;

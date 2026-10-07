@@ -40,7 +40,7 @@ destination.mkdir()
 for name in ("tools", "src", "integration", "third_party"):
     shutil.copytree(source / name, destination / name)
 shutil.copy2(source / "CMakeLists.txt", destination / "CMakeLists.txt")
-fixture_revision = build.get("source_revision")
+fixture_revision = build.get("committed_revision")
 if args.fixture_revision:
     fixture_revision = subprocess.check_output(
         ["git", "rev-parse", "--verify", args.fixture_revision + "^{commit}"], cwd=ROOT

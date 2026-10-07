@@ -104,12 +104,14 @@ def expand(key, info, size):
 class NativeClient:
     def __init__(
         self, root: Path, title=5800, profile="", host="127.0.0.1", access_key="",
-        player_name=""
+        player_name="", port_offset=0
     ):
         self.socket = None
         self.title = title
         self.pushes = []
-        base = f"http://{host}:8085"
+        if not isinstance(port_offset, int) or not 0 <= port_offset <= 40000:
+            raise ValueError("Invalid local fixture port offset")
+        base = f"http://{host}:{8085 + port_offset}"
 
         def post(path, value):
             data = value if isinstance(value, bytes) else json.dumps(value).encode()
@@ -185,7 +187,7 @@ class NativeClient:
         ) as reply:
             if json.load(reply)["umbrellaID"] != self.user:
                 raise ValueError("Legacy identity binding")
-        self.socket = socket.create_connection((host, 3075), timeout=5)
+        self.socket = socket.create_connection((host, 3075 + port_offset), timeout=5)
         self.incoming = self.outgoing = 1
         try:
             hello = struct.pack("<5I", 200, 200, 210, 220, 1024 * 1024) + os.urandom(8)

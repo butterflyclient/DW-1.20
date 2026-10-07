@@ -219,6 +219,13 @@ namespace matchmaking_store
                         members.insert(member.get<uint64_t>()).second);
             require(members.contains(state["owner"].get<uint64_t>()));
             validatePendingJoins(state);
+            if (state.contains("match_selection"))
+            {
+                const auto &selection = state.at("match_selection");
+                require(selection.is_object());
+                if (selection.contains("split_parties_for_team_balance"))
+                    require(selection["split_parties_for_team_balance"].is_boolean());
+            }
             if (state["backend_doc"].contains("tournament"))
             {
                 // Exact Replay 0x1410451D0: UInt64 ID, two UInt32 global team

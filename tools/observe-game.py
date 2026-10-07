@@ -1334,6 +1334,9 @@ try:
         # and UpdateLobbyDocument (+79664/+79672) for this Replay build.
         "native_matchmaking_lobby": (
             {
+                "ready_to_start": bool(
+                    read(symbols["OnlineMatchmakerOmniscient::ms_instance"] + 79632, 1)[0]
+                ),
                 "state": struct.unpack(
                     "<I", read(symbols["OnlineMatchmakerOmniscient::ms_instance"], 4)
                 )[0],
@@ -1365,6 +1368,10 @@ try:
         "native_party_test_settings": {
             "private_match": dvar_current("gl_14D386820", "<?"),
             "maximum_players": dvar_current("gl_14D386840", "<i"),
+            # Original Replay PartyHost_IsReadyToLaunch / ReadyTeams gates.
+            "minimum_players": dvar_current("gl_14D386838", "<i"),
+            "team_count": dvar_current("gl_14C796328", "<i"),
+            "maximum_team_difference": dvar_current("gl_14C796340", "<i"),
             "private_match_registration": dvar_details("gl_14D386820"),
         },
         "native_tournament_request": (

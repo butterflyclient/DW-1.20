@@ -130,6 +130,8 @@ namespace services
         }
         const auto policy = document(root / "policy.json", 16384, Json::object());
         wire::require(policy.is_object());
+        if (policy.contains("split_parties_for_team_balance"))
+            wire::require(policy["split_parties_for_team_balance"].is_boolean());
         if (policy.contains("preferred_playlist_id"))
         {
             const auto preferred = number(policy["preferred_playlist_id"], 127);
@@ -222,6 +224,8 @@ namespace services
             rules["filter"]["playlist_version"] = version;
             PlaylistSelection selected;
             selected.rules = rules;
+            selected.splitPartiesForTeamBalance =
+                policy.value("split_parties_for_team_balance", false);
             if (mode.contains("teamCount"))
                 selected.teamCount = number(mode["teamCount"], 200);
             selected.metadata = {{"playlist_id", id},
@@ -232,6 +236,8 @@ namespace services
                                  {"time_limit", playlist.value("time_limit", Json())},
                                  {"flags", playlist.value("flags", Json::array())},
                                  {"game_types", Json::object()}};
+            if (selected.splitPartiesForTeamBalance)
+                selected.metadata["split_parties_for_team_balance"] = true;
             for (const auto &entry : eligible)
                 selected.metadata["game_types"][entry["gametype"].get<std::string>()] =
                     modes.at(entry["gametype"].get<std::string>());
