@@ -394,7 +394,7 @@ receipt = {
     "build_directory": str(build),
     "compiler_source_root": str(source_root),
     "source_snapshot_receipt": (
-        str(ROOT / "data" / "compiler-snapshot-receipt.json")
+        str(args.snapshot_receipt.resolve())
         if snapshot_receipt
         else None
     ),
