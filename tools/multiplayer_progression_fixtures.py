@@ -124,3 +124,22 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
     ordinary(host, 10, u64(lobby))
     ended = (2, u32(2002) + u64(lobby) + u64(0))
     assert receive(host) == ended and receive(peer) == ended
+
+    # The real Replay host writer emits an empty state before a match starts.
+    # Its accepted host document must remain available to another solo search.
+    mm = documents(ordinary(host, 18, text(json.dumps(create))))[0]["mm_id"]
+    _, created = receive(host)
+    lobby = struct.unpack_from("<Q", created, 15)[0]
+    docs = documents(created[32:])
+    docs[0]["game_state"] = {"state": ""}
+    assert ordinary(host, 15, u64(lobby) + u64(docs[1]["update_id"])
+                    + text(json.dumps(docs[0]))) == b"\x01\x01"
+    receive(host)
+    joined_mm = documents(ordinary(peer, 18, text(json.dumps(join))))[0]["mm_id"]
+    _, joined = receive(peer)
+    assert joined.startswith(u32(2001) + u64(joined_mm) + u64(lobby))
+    receive(host)
+    checks.append("Replay's empty waiting-state host document admits a compatible independent party")
+    ordinary(host, 10, u64(lobby))
+    ended = (2, u32(2002) + u64(lobby) + u64(0))
+    assert receive(host) == ended and receive(peer) == ended

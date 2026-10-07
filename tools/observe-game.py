@@ -1410,6 +1410,9 @@ try:
             else None
         ),
         "native_party_test_settings": {
+            # Same-Replay Playlist_RunRules reads this selector, which differs
+            # from the UI's displayed playlistID value.
+            "playlist_selector": dvar_details("gl_14D386948"),
             "private_match": dvar_current("gl_14D386820", "<?"),
             "maximum_players": dvar_current("gl_14D386840", "<i"),
             # Original Replay PartyHost_IsReadyToLaunch / ReadyTeams gates.
