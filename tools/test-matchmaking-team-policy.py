@@ -208,6 +208,31 @@ try:
     # Machine-identity fixtures use fresh keys on this isolated backend only.
     from local_progression_fixtures import exercise as exercise_local_progression
     exercise_local_progression(fixture, data, offset, checks)
+    from progression_restart_fixtures import exercise as exercise_progression_restart
+
+    def restart_fixture_backend():
+        global process
+        previous = process.pid
+        process.terminate()
+        process.wait(timeout=5)
+        process = subprocess.Popen(
+            [str(EXE), str(data), "--port-offset", str(offset)],
+            stdout=output, stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        for _ in range(100):
+            if process.poll() is not None:
+                raise RuntimeError("Restarted progression fixture exited")
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{8085 + offset}/health", timeout=0.3
+                ):
+                    return previous, process.pid
+            except OSError:
+                time.sleep(0.05)
+        raise RuntimeError("Restarted progression fixture did not become ready")
+
+    exercise_progression_restart(fixture, data, offset, restart_fixture_backend, checks)
     receipt = {
         "schema": 1, "passed": True, "native_game_verified": False,
         "scope": "focused team allocation, native lobby wire and playlist policy regression",
