@@ -751,7 +751,10 @@ namespace services
                                 }))
                     continue;
                 const auto state = host.at("game_state").value("state", std::string{});
-                if (state != "intermission" && !(inProgress && state == "in_game"))
+                // Replay's accepted initial host snapshots use an empty state
+                // while waiting for players. They are open pre-game lobbies;
+                // the owner/session/capacity checks above still apply.
+                if (!state.empty() && state != "intermission" && !(inProgress && state == "in_game"))
                     continue;
                 candidates.push_back(std::move(candidate));
             }
