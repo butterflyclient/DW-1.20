@@ -261,9 +261,17 @@ def exercise_results(
     # The native push contains typed UInt32 event, UInt64 search, UInt64 lobby.
     assert push[14] == 10
     lobby = int.from_bytes(push[15:23], "little")
+    revision = int.from_bytes(push[24:32], "little")
+    host_end = push.index(0, 33)
+    host_doc = json.loads(push[33:host_end])
+    assert client.task(
+        145, 15, u64(lobby) + u64(revision) + text(json.dumps(host_doc))
+    ) == boolean(True)
+    kind, update = client.receive()
+    assert kind == 2 and update.startswith(b"\x08" + (2006).to_bytes(4, "little"))
     assert peer.receive() == (
         2,
-        b"\x08" + (2001).to_bytes(4, "little") + push[5:23] + push[32:],
+        b"\x08" + (2001).to_bytes(4, "little") + push[5:23] + update[23:],
     )
     lobby_path = directory / "matchmaking" / str(title) / "lobbies" / f"{lobby}.json"
     lobby_bytes = lobby_path.read_bytes()

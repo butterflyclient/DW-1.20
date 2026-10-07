@@ -145,6 +145,49 @@ namespace platform
             return value;
         }
 
+        std::string networkName(const std::string &requested)
+        {
+            validateName(requested);
+            auto name = requested;
+            // Exact Replay Com_CleanName (0x1413F18A0), consumed by
+            // G_ClientMP_UserinfoChanged (0x1411F2390). The signed local name
+            // must equal the server's cleaned name or CG_MainMP drops the game.
+            // Reach a fixed point: removing an escape can expose another one.
+            for (;;)
+            {
+                std::string cleaned;
+                cleaned.reserve(name.size());
+                unsigned spaces = 0;
+                for (size_t i = 0; i < name.size(); ++i)
+                {
+                    const auto c = name[i];
+                    const auto next = i + 1 < name.size() ? name[i + 1] : '\0';
+                    if (c == '^')
+                    {
+                        if (next >= '\'' && next <= '>')
+                            ++i;
+                    }
+                    else if ((c == '[' && next == '{') || (c == '}' && next == ']'))
+                        ++i;
+                    else if (c == ' ')
+                    {
+                        if (!cleaned.empty() && ++spaces <= 3)
+                            cleaned += c;
+                    }
+                    else
+                    {
+                        spaces = 0;
+                        cleaned += c;
+                    }
+                }
+                if (cleaned == name)
+                    break;
+                name = std::move(cleaned);
+            }
+            validateName(name);
+            return name;
+        }
+
         void availableName(const std::string &name, uint64_t own = 0, bool machineOwned = false)
         {
             validateName(name);
@@ -426,12 +469,13 @@ namespace platform
                           });
             if (issuedSessions.size() >= 1024)
                 throw std::runtime_error("Platform session capacity reached");
-            if (!playerName.empty() && playerName != selected->name)
+            const auto name = networkName(playerName.empty() ? selected->name : playerName);
+            if (name != selected->name)
             {
-                availableName(playerName, selected->userId, machineOwned);
+                availableName(name, selected->userId, machineOwned);
                 auto renamed = *selected;
                 std::memset(renamed.name, 0, sizeof(renamed.name));
-                std::memcpy(renamed.name, playerName.data(), playerName.size());
+                std::memcpy(renamed.name, name.data(), name.size());
                 write(path, &renamed, sizeof(renamed));
                 *selected = renamed;
             }
@@ -711,9 +755,11 @@ namespace platform
         const auto persisted = readIdentity(selected.path);
         if (std::memcmp(&persisted, selected.value, sizeof(persisted)) != 0)
             throw std::runtime_error("Persisted platform identity changed during the live session");
+        std::string cleanedName;
         try
         {
-            availableName(name, owner.userId, selected.machineOwned);
+            cleanedName = networkName(name);
+            availableName(cleanedName, owner.userId, selected.machineOwned);
         }
         catch (const std::runtime_error &error)
         {
@@ -723,11 +769,11 @@ namespace platform
                 return RenameResult::NameUnavailable;
             throw;
         }
-        if (name == selected.value->name)
+        if (cleanedName == selected.value->name)
             return RenameResult::Unchanged;
         auto changed = *selected.value;
         std::memset(changed.name, 0, sizeof(changed.name));
-        std::memcpy(changed.name, name.data(), name.size());
+        std::memcpy(changed.name, cleanedName.data(), cleanedName.size());
         write(selected.path, &changed, sizeof(changed));
         *selected.value = changed;
         return RenameResult::Changed;

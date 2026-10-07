@@ -2,6 +2,7 @@
 
 import copy
 import json
+import select
 import struct
 import time
 
@@ -38,16 +39,47 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         assert kind == 2 and packet.startswith(u32(2005) + u64(mm))
         if party:
             lobby = struct.unpack_from("<Q", packet, 15)[0]
+            documents = strings(packet[32:])
+            path = root / "lobbies" / f"{lobby}.json"
+            before = path.read_bytes()
+            assert json.loads(before)["pending_join_members"] == [peer_user]
+            assert not select.select([peer.s], [], [], 0.35)[0]
+            peer.task(
+                145, 15, u64(lobby) + u64(documents[1]["update_id"])
+                + text(json.dumps(documents[0])), error=101,
+            )
+            assert host.task(
+                145, 15, u64(lobby) + u64(0) + text(json.dumps(documents[0]))
+            ) == boolean(False)
+            assert path.read_bytes() == before
+            assert not select.select([peer.s], [], [], 0.35)[0]
+            assert host.task(
+                145, 15, u64(lobby) + u64(documents[1]["update_id"])
+                + text(json.dumps(documents[0]))
+            ) == boolean(True)
+            kind, update = host.receive()
+            assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+            documents = strings(update[23:])
             # The non-searching party member needs JoinLobby, whose native
-            # envelope omits the create event's update-ID field.
+            # envelope omits the update-ID field, after the host installs keys.
             assert peer.receive() == (
                 2,
-                u32(2001) + u64(mm) + u64(lobby) + packet[32:],
+                u32(2001) + u64(mm) + u64(lobby) + update[23:],
             )
-            assert strings(peer.task(145, 13, u64(lobby))) == strings(packet[32:])
+            assert strings(peer.task(145, 13, u64(lobby))) == documents
+            assert "pending_join_members" not in json.loads(path.read_bytes())
+            # A second host update must be a document event, never another Join.
+            assert host.task(
+                145, 15, u64(lobby) + u64(documents[1]["update_id"])
+                + text(json.dumps(documents[0]))
+            ) == boolean(True)
+            kind, update = host.receive()
+            assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+            assert peer.receive() == (kind, update)
             checks.append(
-                "new party lobby sends create only to its searching host and join to its peer, with the same assigned search ID and readable shared documents"
+                "party JoinLobby waits for an accepted owner host document; stale/non-owner updates do not release it, shared documents match and later updates cannot repeat the join"
             )
+            return lobby, mm, strings(update[23:])
         return struct.unpack_from("<Q", packet, 15)[0], mm, strings(packet[32:])
 
     def join(lobby):

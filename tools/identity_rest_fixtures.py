@@ -115,6 +115,11 @@ def exercise(
     baseline = profile.read_bytes(), profile.stat().st_mtime_ns
     assert call(original) == (200, {"success": True})
     assert (profile.read_bytes(), profile.stat().st_mtime_ns) == baseline
+    for decorated in ("^3" + original, "^'" + original, "^>" + original,
+                      "[{" + original + "}]", "^^" + original):
+        assert call(decorated) == (200, {"success": True})
+        assert (profile.read_bytes(), profile.stat().st_mtime_ns) == baseline
+    assert call("^3Fixture Peer")[0] == 409
     assert call(changed, access=foreign_token)[0] == 403
     assert response(default.task(255, 10, packet(changed)))[0] == 403
     assert call(changed, route=uri.replace(str(owner), str(owner + 1)))[0] == 403
@@ -128,6 +133,9 @@ def exercise(
         "a\nb",
         "é",
         "x" * 36,
+        "^3",
+        "[{}]",
+        "a ^3",
     ):
         assert call(invalid)[0] == 400
     assert call("Fixture Peer")[0] == 409
@@ -168,7 +176,7 @@ def exercise(
         assert profile.read_bytes() == baseline[0] and lookup() == original + "#0"
     finally:
         blocker.rmdir()
-    assert call(changed) == (200, {"success": True})
+    assert call("^3" + changed) == (200, {"success": True})
     assert lookup() == changed + "#0"
     saved = profile.read_bytes(), profile.stat().st_mtime_ns
     assert saved[0][:20] == baseline[0][:20] and len(saved[0]) == len(baseline[0]) == 56

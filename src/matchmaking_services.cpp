@@ -126,6 +126,7 @@ namespace services
                     throw std::runtime_error("Invalid persisted lobby membership");
             if (!members.contains(state["owner"].get<uint64_t>()))
                 throw std::runtime_error("Persisted lobby host is not a member");
+            matchmaking_store::validatePendingJoins(state);
             if (state["backend_doc"].contains("player_id_to_slots"))
             {
                 const auto &slots = state["backend_doc"]["player_id_to_slots"];
@@ -880,6 +881,10 @@ namespace services
                                                  sessionFingerprint(id));
                 if (!query.contains("private_lobby"))
                     lobby["public_pool"] = publicPool(query, *selection);
+                auto pendingMembers = query.at("members");
+                eraseUsers(pendingMembers, {id.userId});
+                if (!pendingMembers.empty())
+                    lobby["pending_join_members"] = pendingMembers;
                 const auto assignments =
                     prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
                 const std::array<matchmaking_store::Write, 3> writes = {
@@ -895,9 +900,10 @@ namespace services
                 // state. Other party members enter through JoinLobby instead.
                 const std::set<uint64_t> creator{id.userId};
                 notify(reply, lobby, 2005, mmId, &creator);
-                auto joiningMembers = users;
-                joiningMembers.erase(id.userId);
-                notify(reply, lobby, 2001, mmId, &joiningMembers);
+                // The first accepted host document acknowledges that Replay's
+                // CreateLobby callback installed the new native DTLS session.
+                // Sending JoinLobby here lets a faster peer connect before that
+                // key is registered, failing native PartyAtomic connectivity.
                 return reply;
             }
             if (task == 8 || task == 9)
@@ -1141,7 +1147,18 @@ namespace services
                 matchmaking_store::commit(root, id.titleId, writes);
                 reply.operation = migration ? "matchmaker-lobby-host-migrated"
                                             : "matchmaker-host-document-updated";
-                notify(reply, lobby, 2006);
+                for (const auto user : joiningMembers)
+                {
+                    const std::set<uint64_t> recipient{user};
+                    const auto mmId = lobby.at("backend_doc").at("player_id_to_mm_id")
+                                          .at(std::to_string(user)).get<uint64_t>();
+                    notify(reply, lobby, 2001, mmId, &recipient);
+                }
+                std::set<uint64_t> observers;
+                for (const auto &user : lobby.at("members"))
+                    if (!joiningMembers.contains(user.get<uint64_t>()))
+                        observers.insert(user.get<uint64_t>());
+                notify(reply, lobby, 2006, 0, &observers);
                 return reply;
             }
             return std::nullopt;
@@ -1184,6 +1201,15 @@ namespace services
             {
                 const auto user = search["query"]["members"][position].get<uint64_t>();
                 const auto key = std::to_string(user);
+                std::set<uint64_t> joiningMembers;
+                if (lobby.contains("pending_join_members"))
+                {
+                    for (const auto &user : lobby.at("pending_join_members"))
+                        if (user.get<uint64_t>() != id.userId &&
+                            member(lobby, user.get<uint64_t>()))
+                            joiningMembers.insert(user.get<uint64_t>());
+                    lobby.erase("pending_join_members");
+                }
                 wire::require(users.insert(user).second);
                 platform::LobbyIdentity identity;
                 identity.titleId = title;

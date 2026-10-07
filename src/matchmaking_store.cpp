@@ -218,6 +218,7 @@ namespace matchmaking_store
                 require(member.is_number_unsigned() && member.get<uint64_t>() &&
                         members.insert(member.get<uint64_t>()).second);
             require(members.contains(state["owner"].get<uint64_t>()));
+            validatePendingJoins(state);
             if (state["backend_doc"].contains("tournament"))
             {
                 // Exact Replay 0x1410451D0: UInt64 ID, two UInt32 global team
@@ -343,6 +344,21 @@ namespace matchmaking_store
     void validateWrite(const Write &write, uint32_t title)
     {
         validateEntry(write, title);
+    }
+
+    void validatePendingJoins(const nlohmann::json &lobby)
+    {
+        if (!lobby.contains("pending_join_members"))
+            return;
+        const auto &pending = lobby.at("pending_join_members");
+        const auto &members = lobby.at("members");
+        require(pending.is_array() && pending.size() < members.size());
+        std::set<uint64_t> unique;
+        for (const auto &user : pending)
+            require(user.is_number_unsigned() && user.get<uint64_t>() &&
+                    user != lobby.at("owner") &&
+                    std::find(members.begin(), members.end(), user) != members.end() &&
+                    unique.insert(user.get<uint64_t>()).second);
     }
 
     void commit(const std::filesystem::path &root, uint32_t title, std::span<const Write> writes)

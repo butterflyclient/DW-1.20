@@ -3183,12 +3183,12 @@ try:
 
     import tournament_formation_fixtures
 
-    def new_tournament_client(index):
+    def new_tournament_client(index, *, signer=None, player_name=None, expected_name=None):
         from cryptography.hazmat.primitives.asymmetric import ec, utils
 
         # Use the production machine-owned registration flow. No development
         # profile provisioning, copied identity, credentials or seeded account ID.
-        signer = ec.generate_private_key(ec.SECP256R1())
+        signer = signer or ec.generate_private_key(ec.SECP256R1())
         numbers = signer.public_key().public_numbers()
         public_key = (
             struct.pack("<II", 0x31534345, 32)
@@ -3199,7 +3199,7 @@ try:
         with post("/platform/client/challenge", public_key + nonce) as response:
             challenge = response.read()
         assert len(challenge) == 32
-        name = ("Tournament Fixture " + str(index)).encode().ljust(36, b"\0")
+        name = (player_name or "Tournament Fixture " + str(index)).encode().ljust(36, b"\0")
         prefix = (
             struct.pack("<II", 0x31494452, 1) + nonce + challenge + public_key + name
         )
@@ -3211,6 +3211,8 @@ try:
         with post("/platform/client/login", prefix + signature) as response:
             issued = response.read()
         assert len(issued) == 512 and issued[8:40] == nonce
+        if expected_name is not None:
+            assert issued[72:108].split(b"\0", 1)[0].decode() == expected_name
         identity = struct.unpack_from("<Q", issued, 56)[0]
         credentials = {
             "session_token": issued[112:176].decode(),
@@ -3226,6 +3228,10 @@ try:
                 base64.b64decode(auth["client_ticket"])[97:121],
             )
         )
+
+    import platform_name_fixtures
+
+    platform_name_fixtures.exercise(new_tournament_client, checks)
 
     tournament_formation_fixtures.exercise(
         client,

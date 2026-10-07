@@ -125,6 +125,13 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         "private_lobby": {"initial_party_id": 29},
     }
     lobby, documents = created(party)
+    assert host.task(
+        145, 15, u64(lobby) + u64(documents[1]["update_id"])
+        + text(json.dumps(documents[0]))
+    ) == boolean(True)
+    kind, update = host.receive()
+    assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+    documents = strings(update[23:])
     kind, packet = peer.receive()
     assert kind == 2 and packet.startswith(u32(2001))
     assert struct.unpack_from("<Q", packet, 6)[0] == documents[1][
