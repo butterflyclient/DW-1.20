@@ -48,7 +48,15 @@ def exercise(
         mm = start(host, value)
         kind, packet = host.receive()
         assert kind == 2 and packet.startswith(u32(2005) + u64(mm))
-        return struct.unpack_from("<Q", packet, 15)[0], strings(packet[32:])
+        lobby = struct.unpack_from("<Q", packet, 15)[0]
+        docs = strings(packet[32:])
+        # A native owner acknowledges its initial host document before it can
+        # accept new peers. Deferred pre-ACK joins have a separate focused test.
+        assert host.task(145, 15, u64(lobby) + u64(docs[1]["update_id"])
+                         + text(json.dumps(docs[0]))) == boolean(True)
+        kind, updated = host.receive()
+        assert kind == 2 and updated.startswith(u32(2006) + u64(lobby))
+        return lobby, strings(updated[23:])
 
     def disband(lobby, joined=False):
         assert host.task(145, 10, u64(lobby)) == []
@@ -110,7 +118,7 @@ def exercise(
         2,
         u32(2006)
         + u64(lobby)
-        + u64(2)
+        + u64(initial[1]["update_id"] + 1)
         + text(json.dumps(joined[0], separators=(",", ":")))
         + text(json.dumps(joined[1], separators=(",", ":"))),
     )
@@ -139,9 +147,9 @@ def exercise(
     lobby, initial = created()
     closed = {**initial[0], "lobby_open": False}
     assert host.task(
-        145, 15, u64(lobby) + u64(1) + text(json.dumps(closed))
+        145, 15, u64(lobby) + u64(initial[1]["update_id"]) + text(json.dumps(closed))
     ) == boolean(True)
-    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(2))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(initial[1]["update_id"] + 1))
     unchanged_reject(lobby, join)
     disband(lobby)
     checks.append(
@@ -151,9 +159,9 @@ def exercise(
     lobby, initial = created()
     playing = {**initial[0], "game_state": {"state": "in_game"}}
     assert host.task(
-        145, 15, u64(lobby) + u64(1) + text(json.dumps(playing))
+        145, 15, u64(lobby) + u64(initial[1]["update_id"]) + text(json.dumps(playing))
     ) == boolean(True)
-    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(2))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(initial[1]["update_id"] + 1))
     unchanged_reject(lobby, join)
     # Replay's native UpdateHostDoc writes in_game, rather than playing.
     disband(lobby)
@@ -162,9 +170,9 @@ def exercise(
     lobby, initial = created(progress)
     playing = {**initial[0], "game_state": {"state": "in_game"}}
     assert host.task(
-        145, 15, u64(lobby) + u64(1) + text(json.dumps(playing))
+        145, 15, u64(lobby) + u64(initial[1]["update_id"]) + text(json.dumps(playing))
     ) == boolean(True)
-    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(2))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(initial[1]["update_id"] + 1))
     progress_join = {
         **copy.deepcopy(progress),
         "members": [peer_user],
@@ -174,7 +182,7 @@ def exercise(
     progress_join["ruleset_payload"]["only_join_existing_lobbies"] = True
     mm = start(peer, progress_join)
     assert peer.receive()[1].startswith(u32(2001) + u64(mm) + u64(lobby))
-    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(3))
+    assert host.receive()[1].startswith(u32(2006) + u64(lobby) + u64(initial[1]["update_id"] + 2))
     disband(lobby, True)
     checks.append(
         "native in_game lobbies honor join-in-progress policy and retain the same assigned game instead of spawning a second match"
