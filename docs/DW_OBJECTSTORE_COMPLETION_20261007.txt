@@ -1,0 +1,52 @@
+REPLAY POST-HTTP OBJECT-STORE COMPLETION CONTRACTS - 2026-10-07
+
+Target: original game_dx12_ship_replay.exe, SHA256
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+The target image and growing SQLite were read only. No game process was launched.
+No backend/game binary was changed for this research step.
+
+VERIFIED ORIGINAL INSTRUCTIONS
+Original function 0x14215FFE0 has two task-manager call sites:
+  0x142160335: service 193/task 12 after the single-upload HTTP branch (mode 2).
+  0x1421600E3: service 193/task 24 after the multiple-upload HTTP branch (mode 4).
+These are upload-session completion operations, not initial upload creation.
+
+The bounded VM executes the original function and native stack probe. It uses
+an ABI-aligned Windows x64 stack and supplies the TIB stack base/limit. Only
+HTTP stop/release callbacks and the task manager's output handle are modeled.
+The multiple-upload hasMoreObjectsToUpload helper executes its original bytes
+against the empty fixture record. Mode fields are initialized by the fixture;
+this does not prove how the shipped application initiates either mode.
+
+Both calls pass the request cached at stream +0xA0, response cached at +0xA8,
+and lobby service cached at +0x20 unchanged through the Windows stack arguments.
+The completed task handle is retained at +0x18, stream state changes to 4, and
+the returned task error reaches the parent task. Both original-instruction
+cases passed. Cached request/response serializers were not executed.
+
+REJECTED DATABASE LABELS
+0x1420F1890: labeled CompleteUploadSessionsResponse::deserialize, but the
+original body performs a 20-byte SHA1/HMAC operation; it is not a JSON reader.
+0x142241BA4: labeled UploadMultipleLargeObjectsResponse::deserialize, but the
+original body manages CRT floating-point status/exception bits.
+0x140CC35F0: labeled an upload-session request destructor, but reads MSG bits.
+0x1421F9998: labeled initUserSummaryUpload, but resolves the Windows
+InitializeCriticalSectionEx API and its compatibility fallback.
+The receipt retains these aliases and hashes of their original function bytes.
+They are not edited in the continuously updated database by this audit.
+
+STILL OPEN
+The concrete cached serializer classes and initial upload initiation paths are
+not verified. The recovered IW8 source describes initial tasks 11 and 23 and
+completion tasks 12 and 24, but source-oracle IDs/types cannot automatically be
+assigned to Replay. Original-image searches did not find the source-oracle
+uploadUrl/sessionID/finalContentLength/uploadSessions literals; that absence
+is corroborating evidence, not proof that every indirect serializer is absent.
+No guessed upload-start handler or completion success response was registered.
+The service coverage ledger retains the conditional completion evidence without
+crediting it as an implemented response contract or native method completion.
+
+Tool: tools/research-objectstore-completion-target.py
+Receipt: validation/20261007-objectstore-completion-target.json
+Current live backend remains 26e8b34b93de4842f70636e8e37c7f08f5fd723372cb6562d4690179fd30641b.
+The full backend implementation goal remains active.

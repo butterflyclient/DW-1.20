@@ -754,13 +754,58 @@ def private_pair_evidence(server_hash):
     )
 
 
+def current_protocol_fixture(server_hash):
+    fallback = DATA / "lobby-verification.json"
+    fixture = json.loads(fallback.read_bytes())
+    if fixture.get("passed") and fixture.get("server_sha256") == server_hash:
+        return fixture, fallback.relative_to(ROOT).as_posix()
+    latest = DATA / "backend-readiness-latest.json"
+    if not latest.exists():
+        return fixture, fallback.relative_to(ROOT).as_posix()
+
+    def referenced(row):
+        path = (ROOT / row["path"]).resolve()
+        if not path.is_relative_to(ROOT) or digest(path) != row["sha256"]:
+            raise ValueError("Backend readiness evidence changed or escaped the project")
+        return path, json.loads(path.read_bytes())
+
+    _, readiness = referenced(json.loads(latest.read_bytes()))
+    if readiness.get("passed") and readiness.get("backend_sha256") == server_hash:
+        full = readiness.get("full_protocol_evidence")
+        if full:
+            path, candidate = referenced(full)
+            if candidate.get("passed") and candidate.get("server_sha256") == server_hash:
+                return candidate, path.relative_to(ROOT).as_posix()
+    return fixture, fallback.relative_to(ROOT).as_posix()
+
+
+def objectstore_completion_evidence():
+    path = ROOT / "validation/20261007-objectstore-completion-target.json"
+    if not path.exists():
+        return None
+    proof = json.loads(path.read_bytes())
+    tool = ROOT / "tools/research-objectstore-completion-target.py"
+    assert proof["tool_sha256"] == digest(tool)
+    assert proof["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    assert all(row["passed"] for row in proof["completion_calls"])
+    assert {(row["mode"], row["call"]["task"]) for row in proof["completion_calls"]} == {(2, 12), (4, 24)}
+    return dict(
+        receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
+        scope="Original conditional post-HTTP task-manager bindings; fixture initializes modes",
+        task_semantics=proof["interpretation"],
+        cached_serializer_binding_verified=False,
+        rejected_analysis_aliases=proof["rejected_analysis_aliases"],
+        native_method_completion_verified=False,
+    )
+
+
 def main():
     graph = json.loads((DATA / "native-service-callgraph.json").read_bytes())
     byte_evidence, byte_calls = native_byte_task_evidence()
     deployment = json.loads((DATA / "deployment.json").read_bytes())
-    fixture = json.loads((DATA / "lobby-verification.json").read_bytes())
     executable = ROOT / "build/Release/iw8-dw-server.exe"
     current_hash = digest(executable)
+    fixture, fixture_path = current_protocol_fixture(current_hash)
     valid_fixture = bool(fixture["passed"] and fixture["server_sha256"] == current_hash)
     routes = {}
     domains = {}
@@ -1062,6 +1107,8 @@ def main():
         target_database_mtime_ns=graph["database_mtime_ns"],
         callgraph_sha256=digest(DATA / "native-service-callgraph.json"),
         native_byte_task_inventory=byte_evidence,
+        objectstore_completion_target_evidence=objectstore_completion_evidence(),
+        selected_protocol_fixture=fixture_path,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),
         target_database_changed_during_inventory=graph.get(

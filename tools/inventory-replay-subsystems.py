@@ -176,6 +176,7 @@ report = {
         "full_audit_complete": rest["full_rest_audit_complete"],
     },
     "coverage_ledger": {"path": "data/backend-coverage-inventory.json", "sha256": digest(DATA / "backend-coverage-inventory.json"), "counts": coverage["counts"]},
+    "objectstore_completion_target_evidence": coverage.get("objectstore_completion_target_evidence"),
     "playlist_contract": {
         "playlists": len(catalog["playlists"]), "game_types": len(catalog["gametypes"]),
         "declared_maps": len({e["map"] for p in catalog["playlists"] for e in p["maps"]}),
