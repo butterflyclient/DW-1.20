@@ -1,5 +1,6 @@
 #include "leaderboard_services.h"
 #include "leaderboard_row.h"
+#include "achievement_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <chrono>
@@ -7,6 +8,8 @@
 #include <set>
 #include <charconv>
 #include <numeric>
+#include <bit>
+#include <map>
 
 namespace services
 {
@@ -20,6 +23,8 @@ namespace services
         {
             uint32_t storageBoard = 0;
             std::vector<std::string> columns;
+            std::optional<size_t> xpColumn;
+            std::string progressionContext;
         };
 
         struct Row
@@ -73,52 +78,98 @@ namespace services
                               name.find('\0') == std::string::npos && names.insert(name).second);
                 result.columns.push_back(name);
             }
+            if (data.contains("progression"))
+            {
+                const auto &progression = data["progression"];
+                wire::require(data.contains("schema") && data["schema"] == 2 &&
+                              progression.is_object() && progression.size() == 3 &&
+                              progression.at("type") == "player_xp" &&
+                              progression.at("context").is_string() &&
+                              progression.at("xp_column").is_number_unsigned());
+                result.progressionContext = progression["context"].get<std::string>();
+                wire::require(result.progressionContext == std::to_string(title) ||
+                              result.progressionContext == "iw8");
+                const auto index = progression["xp_column"].get<uint64_t>();
+                wire::require(index < result.columns.size());
+                result.xpColumn = static_cast<size_t>(index);
+            }
             return result;
         }
 
         std::vector<Row> rows(const std::filesystem::path &directory,
                               const platform::LobbyIdentity &id,
-                              uint32_t board)
+                              uint32_t board,
+                              const std::optional<Definition> &definition)
         {
             std::vector<Row> result;
             const auto root = directory / "leaderboard-stats" / std::to_string(id.titleId);
-            if (!std::filesystem::exists(root))
-                return result;
             size_t files = 0;
-            for (const auto &entry : std::filesystem::directory_iterator(root))
+            if (std::filesystem::exists(root))
             {
-                if (!entry.is_regular_file() || entry.path().extension() != L".json")
-                    continue;
-                wire::require(++files <= 10000);
-                const auto owner = entry.path().stem().string();
-                uint64_t user = 0;
-                const auto parsed =
-                    std::from_chars(owner.data(), owner.data() + owner.size(), user);
-                wire::require(parsed.ec == std::errc{} &&
-                              parsed.ptr == owner.data() + owner.size() && user != 0);
-                const auto data = document(entry.path());
-                const auto key = std::to_string(board);
-                if (!data.contains(key))
-                    continue;
-                const auto &value = data.at(key);
-                leaderboard_row::validate(value);
-                Row row;
-                row.user = user;
-                if (!value["rating"].is_null())
-                    row.rating = value["rating"].get<int64_t>();
-                row.updated = value.value("updated", uint64_t{});
-                row.name = value.value("name", user == id.userId ? id.name : std::string{});
-                wire::require(row.name.size() < 64);
-                for (const auto &column : value["columns"])
+                for (const auto &entry : std::filesystem::directory_iterator(root))
                 {
-                    if (column.is_null())
-                        row.columns.push_back(0);
-                    else
-                        row.columns.push_back(column.get<int32_t>());
+                    if (!entry.is_regular_file() || entry.path().extension() != L".json")
+                        continue;
+                    wire::require(++files <= 10000);
+                    const auto owner = entry.path().stem().string();
+                    uint64_t user = 0;
+                    const auto parsed =
+                        std::from_chars(owner.data(), owner.data() + owner.size(), user);
+                    wire::require(parsed.ec == std::errc{} &&
+                                  parsed.ptr == owner.data() + owner.size() && user != 0);
+                    const auto data = document(entry.path());
+                    const auto key = std::to_string(board);
+                    if (!data.contains(key))
+                        continue;
+                    const auto &value = data.at(key);
+                    leaderboard_row::validate(value);
+                    Row row;
+                    row.user = user;
+                    if (!value["rating"].is_null())
+                        row.rating = value["rating"].get<int64_t>();
+                    row.updated = value.value("updated", uint64_t{});
+                    row.name = value.value("name", user == id.userId ? id.name : std::string{});
+                    wire::require(row.name.size() < 64);
+                    for (const auto &column : value["columns"])
+                    {
+                        if (column.is_null())
+                            row.columns.push_back(0);
+                        else
+                            row.columns.push_back(column.get<int32_t>());
+                    }
+                    if (row.columns.size() < maximumResponseColumns)
+                        row.columns.resize(maximumResponseColumns, 0);
+                    result.push_back(std::move(row));
                 }
-                if (row.columns.size() < maximumResponseColumns)
-                    row.columns.resize(maximumResponseColumns, 0);
-                result.push_back(std::move(row));
+            }
+            if (definition && definition->xpColumn)
+            {
+                std::map<uint64_t, size_t> owners;
+                for (size_t i = 0; i < result.size(); ++i)
+                    owners.emplace(result[i].user, i);
+                for (const auto &progression : achievementProgressionSnapshot(
+                         directory, id.titleId, definition->progressionContext))
+                {
+                    // Native LB_VR_GetXUserColExt interprets physical columns as
+                    // UInt32. The transport stores Int32 bits; preserve the entire
+                    // native unsigned range rather than narrowing or clamping XP.
+                    wire::require(progression.xp <= UINT32_MAX);
+                    if (!owners.contains(progression.user))
+                    {
+                        owners[progression.user] = result.size();
+                        Row row;
+                        row.user = progression.user;
+                        row.columns.resize(maximumResponseColumns, 0);
+                        result.push_back(std::move(row));
+                    }
+                    auto &row = result[owners.at(progression.user)];
+                    row.rating = static_cast<int64_t>(progression.xp);
+                    row.name = progression.name;
+                    if (row.columns.size() <= *definition->xpColumn)
+                        row.columns.resize(*definition->xpColumn + 1, 0);
+                    row.columns[*definition->xpColumn] =
+                        std::bit_cast<int32_t>(static_cast<uint32_t>(progression.xp));
+                }
             }
             std::sort(result.begin(),
                       result.end(),
@@ -279,7 +330,8 @@ namespace services
             // through published layouts; never subtract a prefix from arbitrary
             // client IDs or change the requested board ID in the reply.
             datasets.push_back(rows(directory, id,
-                                    definitions.back() ? definitions.back()->storageBoard : board));
+                                    definitions.back() ? definitions.back()->storageBoard : board,
+                                    definitions.back()));
         }
         if (task == 11)
         {

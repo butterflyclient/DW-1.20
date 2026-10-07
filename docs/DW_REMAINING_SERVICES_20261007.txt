@@ -11,8 +11,8 @@ and native startup evidence are separate; this is not a full gameplay claim.
 
 All remaining implementation belongs on this branch, including object store,
 live content and the player-facing store. The primary backend has moved to the
-Linux droplet at 162.243.115.160. Current release is the f874f8b215c5 image; see
-docs/DW_REPLAY_LEADERBOARD_STORAGE_20261007.txt and hash-bound deployment receipts.
+Linux droplet at 162.243.115.160. Current release is the ea48acdbb063 image, preserving the public dashboard; see
+docs/DW_REPLAY_XP_LEADERBOARD_20261007.txt and hash-bound deployment receipts.
 The owner requested no more game tests after the final PID 29832 run. Continue
 with target research and protocol fixtures; do not launch another game.
 Use controlled root-folder launches; preserve player identity/profile data and
@@ -56,7 +56,12 @@ Schema 2 now explicitly resolves native read namespaces to base/tracked stored
 boards. Reads/writes share the entire 240-column persistent layout, while native
 packets keep their ten-column limit. Partial writes preserve wide tails, and
 actual write -> both namespace read roundtrips survive backend/session restart.
-Current f874f8b215c5 has protocol/deployment evidence only; no new game run.
+Current ea48acdbb063 has protocol/deployment evidence only; no new game run.
+The three Total XP publications now read accepted cumulative progression, with
+unsigned physical-column bits and transaction recovery before cross-account
+ranking. Other virtual stat aggregation remains open. Windows/Linux fixtures
+cover XP, retry identity, blocked/recovered writes and restart persistence.
+Current source preserves the dashboard independently deployed by another chat.
 
 Content SDK methods with missing original response bindings remain explicitly
 unimplemented. Request wrappers or misleading SQLite names do not prove a usable

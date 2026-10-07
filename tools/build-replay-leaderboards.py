@@ -118,9 +118,23 @@ def native_columns(pe, definition, source):
         assert vm.reg_read(UC_X86_REG_RIP) == halt and actual == expected
         ui_reads.append({"column": column["id"], "expected": expected,
                          "actual": actual, "passed": True})
+    unsigned_xp_reads = []
+    if definition["name"] == "lb_vr_totalxp":
+        index = next(i for i, column in enumerate(definition["columns"]) if column["id"] == 1)
+        slot = result.index("col_1")
+        for expected in (0x80000000, 0xFFFFFFFF):
+            put32(row + 144 + slot * 4, expected)
+            put64(stack + 0xF008, halt)
+            vm.reg_write(UC_X86_REG_RSP, stack + 0xF008)
+            vm.reg_write(UC_X86_REG_RCX, row)
+            vm.reg_write(UC_X86_REG_RDX, column_array + index * 56)
+            vm.emu_start(0x1419B5D80, halt, count=2000)
+            actual = vm.reg_read(UC_X86_REG_RAX)
+            assert actual == expected and vm.reg_read(UC_X86_REG_RIP) == halt
+            unsigned_xp_reads.append({"expected": expected, "actual": actual, "passed": True})
     return {"name": definition["name"], "id": definition["id"],
             "columns": result, "passed": True, "modeled_calls": calls,
-            "original_ui_column_reads": ui_reads}
+            "original_ui_column_reads": ui_reads, "unsigned_xp_reads": unsigned_xp_reads}
 
 
 def main():
@@ -175,6 +189,11 @@ def main():
         width = source_width(source)
         for scope in (0, 140000, 150000):
             add(row["id"] + scope, row["id"], width, row["name"], "shipped-virtual")
+            if row["name"] == "lb_vr_totalxp":
+                assert row["id"] == 3 and source["name"] == "lb_mr_mp"
+                assert any(c["id"] == 1 and c["name"] == "Total XP" for c in row["columns"])
+                definitions[str(row["id"] + scope)]["progression"] = {
+                    "type": "player_xp", "context": "5800", "xp_column": 1}
     args.output.mkdir(parents=True, exist_ok=True)
     result = {"schema": 1, "title": 5800, "generated_utc": datetime.now(timezone.utc).isoformat(),
               "asset_export_sha256": hashlib.sha256(raw).hexdigest(),

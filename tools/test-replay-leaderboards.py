@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.request
 
-from native_wire_client import NativeClient, u32, u64
+from native_wire_client import NativeClient, u32, u64, binary, integer, structure, text as proto_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +30,7 @@ def write_row(board, owner, rating, values, mode=0):
     return u32(board) + u64(owner) + b"\x03" + bytes([mode]) + score + columns
 
 
-def columns(raw, count):
+def columns(raw, count, metadata=False):
     offset = 0
 
     def read(tag, fmt):
@@ -41,15 +41,18 @@ def columns(raw, count):
         offset += struct.calcsize(fmt)
         return value
 
-    read(10, "<Q")  # owner
-    read(9, "<q")  # rating
-    read(10, "<Q")  # rank
+    owner = read(10, "<Q")
+    rating = read(9, "<q")
+    rank = read(10, "<Q")
     assert raw[offset] == 16
-    offset = raw.index(0, offset + 1) + 1
+    end = raw.index(0, offset + 1)
+    name = raw[offset + 1:end].decode()
+    offset = end + 1
     read(8, "<I")  # age
     result = [read(7, "<i") for _ in range(count)]
     assert offset == len(raw)
-    return result
+    return {"owner": owner, "rating": rating, "rank": rank, "name": name, "columns": result} \
+        if metadata else result
 
 
 def main():
@@ -238,6 +241,80 @@ def main():
                 stats["7000"]["columns"] = list(range(10))
                 path.write_text(json.dumps(stats))
                 before = path.read_bytes()
+
+                def xp_event(delta, request_id):
+                    event = proto_text(1, "mp_addxp") + integer(2, int(time.time()))
+                    event += binary(3, proto_text(1, "Param0") + integer(2, delta)) + integer(4, 0)
+                    return structure(proto_text(1, "5800") + binary(2, event) +
+                                     proto_text(3, request_id))
+
+                packet = xp_event(1500, "xp-board-earned")
+                assert client.task(125, 1, packet) == b""
+                journal = data / "achievements/5800/5800" / str(client.user) / "events.json"
+                journal_before = journal.read_bytes()
+                for board in (3, 140003, 150003):
+                    result = client.task(4, 17, request(board, ["col_1", "col_2"]), structured=False)
+                    row = columns(result, 2, metadata=True)
+                    assert row["rating"] == 1500 and row["rank"] == 1
+                    assert row["columns"] == [1500, 1002] and row["owner"] == client.user
+                    assert row["name"] == "Leaderboard Fixture"
+                assert path.read_bytes() == before and journal.read_bytes() == journal_before
+                assert client.task(125, 1, packet) == b""
+                assert journal.read_bytes() == journal_before
+                checks.append("earned XP feeds all Total XP namespaces with current account name, preserves other columns and does not double-award retries")
+                assert client.task(125, 1, xp_event(2**31, "xp-board-unsigned")) == b""
+                result = client.task(4, 17, request(150003, ["col_1"]), structured=False)
+                row = columns(result, 1, metadata=True)
+                assert row["rating"] == 2**31 + 1500
+                assert row["columns"] == [-(2**31) + 1500]
+                assert row["columns"][0] & 0xFFFFFFFF == row["rating"]
+                checks.append("unsigned native XP column preserves its 32-bit transport representation with an exact Int64 ranking value")
+                pending = journal.with_name("events.json.pending")
+                pending.mkdir()
+                try:
+                    blocked = xp_event(25, "xp-board-recovery")
+                    try:
+                        client.task(125, 1, blocked)
+                    except RuntimeError as failure:
+                        assert str(failure) == "Native task 125/1 returned 102"
+                    else:
+                        raise AssertionError("Blocked event publication accepted")
+                    rejected(17, request(150003, ["col_1"]), 102)
+                finally:
+                    pending.rmdir()
+                result = client.task(4, 17, request(150003, ["col_1"]), structured=False)
+                row = columns(result, 1, metadata=True)
+                assert row["rating"] == 2**31 + 1525
+                assert row["columns"] == [-(2**31) + 1525]
+                recovered = journal.read_bytes()
+                assert client.task(125, 1, blocked) == b""
+                assert journal.read_bytes() == recovered and path.read_bytes() == before
+                checks.append("XP ranking blocks partial event transactions, then recovers the accepted snapshot and retains retry identity without another award")
+                saved_journal = journal.read_bytes()
+                states = journal.with_name("states.json")
+                prior_states = states.read_bytes() if states.exists() else None
+                try:
+                    journal.unlink()
+                    legacy = [{"id": 1000000, "name": "player_xp", "kind": 0,
+                               "status": 1, "progress": 0, "target": 0,
+                               "multiProgress": [{"name": "xp", "current": 77, "target": 0},
+                                                 {"name": "rank", "current": 0, "target": 0}]}]
+                    states.write_text(json.dumps(legacy))
+                    result = client.task(4, 17, request(150003, ["col_1"]), structured=False)
+                    row = columns(result, 1, metadata=True)
+                    assert row["rating"] == 77 and row["columns"] == [77]
+                    states.write_text("[]")
+                    result = client.task(4, 17, request(150003, ["col_1"]), structured=False)
+                    row = columns(result, 1, metadata=True)
+                    assert row["rating"] == 42 and row["columns"] == [1001]
+                finally:
+                    journal.write_bytes(saved_journal)
+                    if prior_states is None:
+                        states.unlink()
+                    else:
+                        states.write_bytes(prior_states)
+                assert path.read_bytes() == before
+                checks.append("explicit legacy XP states remain readable and absent XP preserves the ordinary stored row without provisioning")
             process.terminate()
             process.wait(timeout=10)
             process = subprocess.Popen([str(args.server), str(data), "--port-offset", str(offset)],
@@ -257,6 +334,9 @@ def main():
                                      structured=False)
                 assert columns(result, 3) == [1016, 14, 1013]
                 assert path.read_bytes() == before
+                result = client.task(4, 17, request(140003, ["col_1"]), structured=False)
+                row = columns(result, 1, metadata=True)
+                assert row["rating"] == 2**31 + 1525 and row["columns"] == [-(2**31) + 1525]
             checks.append("fresh backend/session retains canonical rows, wide tails and published namespace resolution")
         finally:
             if process.poll() is None:

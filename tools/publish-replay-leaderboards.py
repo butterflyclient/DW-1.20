@@ -62,6 +62,10 @@ def main():
         assert isinstance(definition["storage_board"], int) and \
             not isinstance(definition["storage_board"], bool) and \
             0 <= definition["storage_board"] < 2**32 - 1
+        if "progression" in definition:
+            assert definition["assets"] == ["lb_vr_totalxp"] and \
+                definition["storage_board"] == 3 and \
+                definition["progression"] == {"type": "player_xp", "context": "5800", "xp_column": 1}
         data = (source / f"{board}.json").read_bytes()
         assert json.loads(data) == definition
         files[f"leaderboard-definitions/5800/{board}.json"] = data

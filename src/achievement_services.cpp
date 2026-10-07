@@ -1175,6 +1175,64 @@ namespace services
         }
     } // namespace
 
+    std::vector<StoredProgression> achievementProgressionSnapshot(
+        const std::filesystem::path &root, uint32_t title, const std::string &context)
+    {
+        wire::require(title == 5800 && (context == std::to_string(title) || context == "iw8"));
+        // Service dispatch owns the common store mutex. Recover any accepted
+        // multi-account intent before exposing a cross-account ranking snapshot.
+        achievement_store::recover(root, title, validateEventWrite);
+        const auto directory = root / "achievements" / std::to_string(title) / context;
+        std::vector<StoredProgression> result;
+        if (!std::filesystem::exists(directory))
+            return result;
+        wire::require(std::filesystem::is_directory(directory) &&
+                      !std::filesystem::is_symlink(directory));
+        size_t count = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(directory))
+        {
+            if (!entry.is_directory())
+                continue;
+            wire::require(++count <= 10000 && !entry.is_symlink());
+            const auto key = entry.path().filename().string();
+            uint64_t owner = 0;
+            const auto parsed = std::from_chars(key.data(), key.data() + key.size(), owner);
+            wire::require(parsed.ec == std::errc{} && parsed.ptr == key.data() + key.size() &&
+                          owner != 0 && owner != UINT64_MAX && std::to_string(owner) == key);
+            const auto name = platform::accountName(owner);
+            if (!name)
+                continue; // A persisted record never provisions an account.
+            const auto journal = document(entry.path() / "events.json", Json::object());
+            if (journal.contains("player_xp"))
+            {
+                wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
+                              journal.at("events").size() <= 1024 &&
+                              journal.at("requests").is_array() &&
+                              journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
+                result.push_back({owner, integer(journal, "player_xp"), *name});
+                continue;
+            }
+            // Older accepted progression publications live in states.json.
+            // Distinguish an explicit zero XP state from no XP state at all.
+            const auto states = document(entry.path() / "states.json", Json::array());
+            wire::require(states.is_array() && states.size() <= 15000);
+            bool found = false;
+            for (const auto &state : states)
+            {
+                if (integer(state, "id") != 1000000)
+                    continue;
+                for (const auto &progress : array(state, "multiProgress", 4))
+                    if (string(progress, "name", 32) == "xp")
+                    {
+                        wire::require(!found);
+                        found = true;
+                        result.push_back({owner, integer(progress, "current"), *name});
+                    }
+            }
+        }
+        return result;
+    }
+
     void restoreAchievementProgression(const std::filesystem::path &root,
                                        uint32_t title, uint64_t user, uint64_t xp,
                                        bool restore, unsigned startingRank)

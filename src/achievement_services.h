@@ -1,8 +1,17 @@
 #pragma once
 #include "services.h"
+#include <vector>
 
 namespace services
 {
+    struct StoredProgression
+    {
+        uint64_t user = 0, xp = 0;
+        std::string name;
+    };
+
+    std::vector<StoredProgression> achievementProgressionSnapshot(
+        const std::filesystem::path &, uint32_t title, const std::string &context);
     void restoreAchievementProgression(const std::filesystem::path &,
                                        uint32_t title, uint64_t user, uint64_t xp,
                                        bool restore, unsigned startingRank);

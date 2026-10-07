@@ -1,0 +1,52 @@
+REPLAY EARNED-XP LEADERBOARD INTEGRATION - 2026-10-07
+
+ISSUE AND NATIVE CONTRACT
+The achievement service accepts native mp_addxp events and persists cumulative
+player XP. The Total XP leaderboard previously used only separately stored stat
+rows, so accepted progression was not reflected in its ranking.
+
+The shipped lb_vr_totalxp definition selects physical column 1 from lb_mr_mp,
+board 3. Explicit publications resolve the 140003/150003 read namespaces to the
+same stored board. The original Replay column builder and UI accessor execute
+in the existing focused VM. The UI accessor reads its physical XP value as
+UInt32; the native stat transport carries those bits in an Int32 column.
+
+IMPLEMENTATION
+Only the three published Total XP definitions bind the player_xp progression
+source, context 5800 and XP column 1. Other boards retain their existing stat
+sources. Ranking reads recover accepted achievement transaction intents before
+forming a cross-account snapshot. The snapshot includes existing registered
+accounts with explicit progression records; it does not create new accounts or
+zero-XP records for absent progression.
+
+The Int64 ranking value uses the cumulative earned XP. The physical XP column
+preserves all 32 native bits, including values above INT32_MAX. Values exceeding
+UINT32_MAX return the existing invalid-data error rather than wrapping or
+silently clamping the native UI value. The achievement API itself remains UInt64.
+An explicit older player XP state remains supported when a journal has no XP.
+Current account names replace stale stat-row names. Other recorded columns and
+ordinary stat files remain intact; reads do not write synthetic stat records.
+
+XP award and local-profile persistence remain in their existing native/event
+paths. Binary/REST request identity and retry receipts remain authoritative.
+The native engine's FlushXPCache produces mp_addxp.Param0 as the earned delta;
+start_match/end_match alone do not identify an XP amount. This integration does
+not infer wins, kills, scores, weapon XP or prestige from incomplete match events.
+
+VALIDATION AND DEPLOYMENT
+The readiness receipt records frozen source/input hashes, both compiled backend
+hashes, 80 encrypted projections, XP/retry/recovery/restart contract groups,
+public endpoint checks and the exact published definitions. A deliberately
+blocked journal write prevents ranking reads from exposing a partial accepted
+transaction. Removing the blocker recovers its XP and retained retry identity.
+Replaying that request does not award the delta again.
+
+The combined source preserves the independently deployed public dashboard by
+its recorded file hashes. Unrelated compiler, migration and tournament working
+changes are excluded from the frozen build. The game executable is unchanged.
+No game runs were performed: positive native leaderboard menu callbacks on this
+server image remain unverified. Protocol/VM proof is not live game proof.
+
+The complete Demonware backend goal remains open. Other virtual stat aggregation,
+durable push recovery/acknowledgement and the unresolved content response bindings
+are separate implementation and validation scopes.
