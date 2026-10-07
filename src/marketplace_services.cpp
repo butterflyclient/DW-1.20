@@ -1161,8 +1161,14 @@ namespace services
                                                              : found->at("2").get<uint32_t>();
                     if (delta > UINT32_MAX || before > UINT32_MAX - delta)
                         return {102, {}, "marketplace-inventory-overflow"};
-                    const auto limit = found == items.end() ? grant.value("18", uint64_t{0})
-                                                            : found->value("18", uint64_t{0});
+                    const auto publishedLimit = grant.value("18", uint64_t{0});
+                    const auto storedLimit =
+                        found == items.end() ? uint64_t{0} : found->value("18", uint64_t{0});
+                    // Existing inventory can predate this offer and omit a limit.
+                    // It cannot relax the current publication's ownership policy.
+                    const auto limit = publishedLimit && storedLimit
+                                           ? std::min(publishedLimit, storedLimit)
+                                           : std::max(publishedLimit, storedLimit);
                     if (limit && before + delta > limit)
                         return {102, {}, "marketplace-inventory-limit"};
                     if (found == items.end())

@@ -23,6 +23,12 @@ def main():
     parser.add_argument('--host', required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    process_before = None
+    if args.host == '162.243.115.160':
+        from remote_backend import live
+        process_before = live()
+        assert process_before['active'] == 'active'
+        assert process_before['sha256'] == process_before['process_sha256']
     base = 'http://' + args.host + ':8085'
     checks = []
     private = ec.generate_private_key(ec.SECP256R1())
@@ -98,6 +104,11 @@ def main():
     receipt = dict(schema=1, passed=True, endpoint=args.host, checked_utc=time.time(), checks=checks,
                    issuer_sha256=hashlib.sha256((ROOT / 'data/platform-public.blob').read_bytes()).hexdigest(),
                    health=health, native_game_verified=False, native_tls_supported=False)
+    if process_before is not None:
+        process_after = live()
+        assert process_before == process_after, 'Backend changed during public protocol checks'
+        receipt['server_sha256'] = process_after['process_sha256']
+        receipt['server_process_verified'] = process_after
     args.output.write_bytes((json.dumps(receipt, indent=2) + '\n').encode())
     print('PASS remote backend:', len(checks), 'focused authentication/transport checks')
 

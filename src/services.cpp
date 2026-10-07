@@ -349,6 +349,10 @@ namespace services
         {
             const auto path = directory / "publisher-variables" / std::to_string(id.titleId) /
                               safe(context, true) / (name + ".json");
+            const bool replayNamespace =
+                id.titleId == 5800 && (context == "iw8" || context.empty()) &&
+                (name == "general" || name == "pc" || name == "f2p" || name == "general_8_19" ||
+                 name == "pc_8_19" || name == "f2p_8_19" || name == "autobuild");
             auto content = read(path);
             // Replay's signed native auth reports establish title 5800 / game version
             // 967. Namespace initialization at 0x14107B7D0 also requests the build
@@ -357,9 +361,7 @@ namespace services
             // Other builds/namespaces require an explicit document, never guessed data.
             // DWLobbyService::getPublisherVariables in this Replay passes the empty
             // context string. Keep its default store separate from named contexts.
-            if (!content && id.titleId == 5800 && (context == "iw8" || context.empty()) &&
-                (name == "general" || name == "pc" || name == "f2p" || name == "general_8_19" ||
-                 name == "pc_8_19" || name == "f2p_8_19" || name == "autobuild"))
+            if (!content && replayNamespace)
             {
                 const auto defaults = Json{{"MajorVersion", "1"}, {"MinorVersion", "0"}}.dump();
                 write(
@@ -390,7 +392,11 @@ namespace services
                 wire::require(!it.key().empty() && it.key().size() < 64 &&
                               it.key().find('\0') == std::string::npos && it.value().is_string());
                 const auto value = it.value().get<std::string>();
-                wire::require(value.size() < 1024 && value.find('\0') == std::string::npos);
+                // Original Replay 14107BB50 supplies 64/128-byte name/value
+                // buffers to the iterator. Reject a native tuning publication
+                // that would silently truncate a value before dvar assignment.
+                const size_t valueCapacity = replayNamespace ? 128 : 1024;
+                wire::require(value.size() < valueCapacity && value.find('\0') == std::string::npos);
             }
             return json;
         }

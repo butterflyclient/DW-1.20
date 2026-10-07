@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+import math
 import struct
 import time
 
@@ -209,11 +210,24 @@ def exercise(
 
 def after_restart(client, fixture, rest_response, fields, checks):
     rest_packet, legacy_packet, token = fixture
+    started = time.monotonic()
     status, result = rest_response(client.task(255, 10, rest_packet))
     assert status == 200 and result["ABToken"] == token
     legacy = fields(client.task(194, 1, legacy_packet, structured=True))
     value = json.loads(next(body for tag, kind, body in legacy if tag == 3))
-    assert value["ABToken"] == token and value["enrollments"] == result["enrollments"]
+    assert value["ABToken"] == token
+    first, second = result["enrollments"], deepcopy(value["enrollments"])
+    assert len(first) == len(second)
+    for rest_row, native_row in zip(first, second):
+        assert len(rest_row["clientTreatments"]) == len(native_row["clientTreatments"])
+        for rest_treatment, native_treatment in zip(
+                rest_row["clientTreatments"], native_row["clientTreatments"]):
+            # These are independently timed requests. Crossing a wall-clock
+            # second legitimately decreases the remaining treatment lifetime.
+            elapsed = rest_treatment["endsIn"] - native_treatment["endsIn"]
+            assert 0 <= elapsed <= math.ceil(time.monotonic() - started) + 1
+            native_treatment["endsIn"] = rest_treatment["endsIn"]
+    assert second == first
     checks.append(
         "AB REST/legacy shared cohort and owner token survive actual backend process restart"
     )

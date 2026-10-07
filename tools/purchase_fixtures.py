@@ -130,6 +130,26 @@ def exercise(client, other, directory, title, user, helpers, checks):
     )
     saved = inventory.read_bytes()
     assert client.task(80, 106, params) == result and inventory.read_bytes() == saved
+    # A pre-existing inventory record with a higher (or omitted) limit cannot
+    # bypass a newly published single-ownership policy. No wallet/item mutation.
+    for existing_limit in (100000, None):
+        state = json.loads(saved)
+        item = next(row for row in state["items"] if row["1"] == 850)
+        if existing_limit is None:
+            item.pop("18", None)
+        else:
+            item["18"] = existing_limit
+        inventory.write_text(json.dumps(state))
+        unchanged = inventory.read_bytes()
+        restricted = copy.deepcopy(rules)
+        restricted["rules"][0]["items"][0]["18"] = item["2"]
+        rules_path.write_text(json.dumps(restricted))
+        client.task(80, 106, request(transaction="owned-limit", ids=(50011,),
+                                   quantities=(1,)), error=102)
+        assert inventory.read_bytes() == unchanged
+    rules_path.write_text(json.dumps(rules))
+    inventory.write_bytes(saved)
+    checks.append("published ownership limits override weaker or missing existing inventory limits")
     for changed in [
         request(metadata=(b"changed", b"")),
         request(quantities=(1, 3), metadata=(b"native coupon data", b"")),

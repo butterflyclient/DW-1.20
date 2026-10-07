@@ -1,0 +1,72 @@
+REPLAY NATIVE STORE IMPLEMENTATION - 2026-10-07
+
+Branch: codex/dw-remaining-services
+Primary backend: 162.243.115.160
+Game executable is unchanged; publisher data and the backend implement this pass.
+
+CONFIRMED ROOT FAILURE
+The earlier store_v2.json published categories/layouts but omitted layoutType.
+Original native decoder 0x1419F8710 exports only that root layout selector.
+Shipped MPStoreMenu chooses only BILLBOARD_LIST=3 or BILLBOARD_GRID=4; the
+missing field led to an empty widget name and a nil constructor in MenuBuilder.
+Publishing layoutType=3 made the native Store open without modifying any Lua.
+
+TARGET DATA
+Read-only export of the hash-verified running game recovered its LuaFile and
+StringTable pools through linked symbols and ASLR. luashared/csvutils.lua gives
+the complete 40-column loot/bundle_ids.csv definition. Original purchase
+completion 0x141B3DB20 separately confirms visible count/start 13/14 and hidden
+count/start 24/25. See validation/20261007-replay-store-target.json.
+
+PUBLICATION
+build-replay-store-catalog.py builds marketplace SKUs, permanent ownership
+rules, root/category publisher objects and the native online_store_* variables
+from this table. The current export has 306 bundles: 264 regular stock offers
+are supported; 42 first-party, Battle Pass or expired offers are excluded.
+Four native categories use existing category IDs, shipped artwork and localization.
+Each visible listing contains at most 18 complete six-digit IDs. All 264 supported
+offers remain in the marketplace catalog; category lists can be republished. Free offers retain zero cost;
+paid offers retain their shipped COD Points price. No points are awarded to real
+players automatically. Shared child items accumulate; the bundle ownership is
+limited to one. Sale/smart-discount variants require separate verified rules.
+
+publish-replay-store-catalog.py requires the server HTTP listener to be stopped,
+checks the entire input manifest and matching SKU/rule identities, takes a
+precise recovery snapshot, preserves unrelated publisher variables, increments
+the versioned general_8_19 namespace and installs all pieces together before
+writing its receipt. A failed install restores each affected original file.
+Run it as the server account on Linux so generated data remains writable.
+
+BACKEND FIX
+An existing item with no limit or a larger limit previously overrode an offer's
+published limit. The effective limit now uses the stricter positive bound.
+Old binary accepted the repeat purchase in the focused test; new binary rejects
+it without changing the wallet or inventory. Fixtures verify both missing and
+weaker saved limits, exact hidden grants, free/paid stock purchases and a later
+session's idempotent transaction retry. Both Linux and Windows builds passed. The complete unchanged-domain regression
+passed 298 checks before the final native publisher-buffer correction; the final
+binary has nine focused stock-catalog/buffer checks and twelve public transport
+checks. The AB restart fixture now compares remaining lifetime with measured
+elapsed seconds rather than requiring identical sequential timestamps.
+
+NATIVE PUBLISHER BUFFER FIX
+Original 0x14107BB50 passes 64-byte name and 128-byte value buffers to the
+publisher iterator. The first populated listing was truncated to 127 bytes,
+leaving a partial bundle ID and causing the native preview's missing-row error.
+The generator now packs whole IDs within that bound. Known native tuning
+namespaces reject values of 128 bytes or more; other SDK namespaces retain
+existing capacity. The exact 127/128-byte boundary is tested independently.
+
+NATIVE CLAIM
+One root-folder game, unchanged executable, claimed stock free bundle 400060
+through its native confirmation menu. The backend completed 80/106, persisted
+visible/hidden grants, and native purchaseSkus completion displayed Purchased.
+No real currency or money was spent. The restart/persistence observation is
+recorded separately in validation/20261007-replay-store-readiness.json.
+
+KNOWN LIMITS
+Native browsing and purchase validation are recorded separately from wire
+checks. This is a local catalog of stock Replay offers, not the retail commerce
+service or a real-money purchase path. First-party, Battle Pass, smart discounts,
+sale variants and the remaining content task bindings are not claimed complete.
+Full Demonware implementation remains active.
