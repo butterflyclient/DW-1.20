@@ -54,7 +54,7 @@
   "native_match_gameplay_verified": false,
   "main_baseline_commit": "33e4c68f2499a2cf329bb0dea40d62675badd73e",
   "native_debug_capture": {
-    "path": "data/main-validation-20261007/debug.jsonl",
-    "sha256": "56653f92b8c9083c5d50fec3cf85b055cb11a719a9f857dc2c2c11c74d0720b6"
+    "path": "data/main-validation-20261007/main-debug-baseline.jsonl",
+    "sha256": "87ff8dc98bcbb2be373640be0473f80c60990abedf4a1cfcf8ae41e8856ee15b"
   }
 }
