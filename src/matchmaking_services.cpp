@@ -1143,6 +1143,15 @@ namespace services
                 lobby["host_doc"] = host;
                 lobby["backend_doc"]["update_id"] = revision + 1;
                 lobby["backend_doc"]["update_time"] = documentTime;
+                std::set<uint64_t> joiningMembers;
+                if (lobby.contains("pending_join_members"))
+                {
+                    for (const auto &user : lobby.at("pending_join_members"))
+                        if (user.get<uint64_t>() != id.userId &&
+                            member(lobby, user.get<uint64_t>()))
+                            joiningMembers.insert(user.get<uint64_t>());
+                    lobby.erase("pending_join_members");
+                }
                 writes.insert(writes.begin(), {"lobbies/" + path.filename().string(), lobby});
                 matchmaking_store::commit(root, id.titleId, writes);
                 reply.operation = migration ? "matchmaker-lobby-host-migrated"
@@ -1201,15 +1210,6 @@ namespace services
             {
                 const auto user = search["query"]["members"][position].get<uint64_t>();
                 const auto key = std::to_string(user);
-                std::set<uint64_t> joiningMembers;
-                if (lobby.contains("pending_join_members"))
-                {
-                    for (const auto &user : lobby.at("pending_join_members"))
-                        if (user.get<uint64_t>() != id.userId &&
-                            member(lobby, user.get<uint64_t>()))
-                            joiningMembers.insert(user.get<uint64_t>());
-                    lobby.erase("pending_join_members");
-                }
                 wire::require(users.insert(user).second);
                 platform::LobbyIdentity identity;
                 identity.titleId = title;
