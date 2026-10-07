@@ -8,6 +8,7 @@ import shutil
 import os
 import sys
 import struct
+import argparse
 from datetime import datetime, timezone
 import pefile
 
@@ -17,7 +18,15 @@ sys.path[:0] = [str(COMPILER / "tools"), str(COMPILER)]
 from workstation.config import load_paths
 
 paths = load_paths(COMPILER)
-dispatch = json.loads((ROOT / "data" / "workstation-job.json").read_text())
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--job-receipt", type=Path, default=ROOT / "data/workstation-job.json")
+parser.add_argument("--snapshot-receipt", type=Path,
+                    default=ROOT / "data/compiler-snapshot-receipt.json")
+args = parser.parse_args()
+for receipt_path in (args.job_receipt, args.snapshot_receipt):
+    if not receipt_path.resolve().is_relative_to((ROOT / "data").resolve()):
+        raise RuntimeError("Use an owned private build receipt inside data")
+dispatch = json.loads(args.job_receipt.read_text())
 job_path = paths["cache"] / "jobs" / dispatch["id"] / "job.json"
 job = json.loads(job_path.read_text())
 if job.get("status") != "succeeded" or job.get("profile") != "engine":
@@ -54,7 +63,7 @@ source_root = Path(report["source_root"]).resolve()
 snapshot_receipt = None
 if source_root != COMPILER.resolve():
     snapshot_receipt = json.loads(
-        (ROOT / "data" / "compiler-snapshot-receipt.json").read_text()
+        args.snapshot_receipt.read_text()
     )
     if source_root != Path(snapshot_receipt["snapshot"]).resolve():
         raise RuntimeError(
@@ -147,7 +156,9 @@ if (
         "Local platform signing/validation proof is unavailable or stale"
     )
 private_objects = []
-for path in sorted((ROOT / "integration" / "replay").glob("DW_Local*.cpp")):
+private_sources = sorted((ROOT / "integration" / "replay").glob("DW_Local*.cpp"))
+private_sources.append(ROOT / "integration/replay/DW_Multiplayer.cpp")
+for path in private_sources:
     if path.name == "DW_LocalBackend_Frame.cpp":
         continue
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
