@@ -20,6 +20,10 @@ parser.add_argument(
 parser.add_argument("--state-root", type=Path, default=STATE)
 parser.add_argument("--profiles-root", type=Path, default=STATE)
 parser.add_argument("--server-receipt", type=Path)
+parser.add_argument("--instances", nargs="+", choices=("alpha", "bravo"),
+                    default=("alpha", "bravo"))
+parser.add_argument("--preserve-ini", action="store_true",
+                    help="Keep an owned test instance's name and endpoint settings")
 args = parser.parse_args()
 STATE = args.state_root.resolve()
 profiles_root = args.profiles_root.resolve()
@@ -79,7 +83,8 @@ assert (
     hashlib.sha256(Path(normal["executable"]).read_bytes()).hexdigest()
     == normal["sha256"]
 )
-for index, instance in enumerate(("alpha", "bravo")):
+for instance in dict.fromkeys(args.instances):
+    index = 0 if instance == "alpha" else 1
     state = STATE / instance
     state.mkdir(parents=True, exist_ok=True)
     profile = profiles_root / instance
@@ -95,13 +100,15 @@ for index, instance in enumerate(("alpha", "bravo")):
     enabled_file = f"replay-dw-test-{instance}.enabled"
     ini = executable.with_suffix(".ini")
     assert not ini.exists() or receipt.exists(), "Refusing to replace an unowned INI"
-    ini.write_text(
-        "host=127.0.0.1\n"
-        f"player_name=DW Pair {instance.title()} 1006\n"
-        f"game_port={3074 + index * 5}\n"
-        "public_address=127.0.0.1\nlocal_address=127.0.0.1\n"
-        f"test_command_file={command_file}\ntest_enabled_file={enabled_file}\n"
-    )
+    if not (args.preserve_ini and ini.exists()):
+        ini.write_text(
+            "host=127.0.0.1\n"
+            f"player_name=DW Pair {instance.title()} 1006\n"
+            f"game_port={3074 + index * 5}\n"
+            "public_address=127.0.0.1\nlocal_address=127.0.0.1\n"
+            "unlock_all=0\nrank=0\n"
+            f"test_command_file={command_file}\ntest_enabled_file={enabled_file}\n"
+        )
     executable.write_bytes(image)
     record = copy.deepcopy(normal)
     record.update(
