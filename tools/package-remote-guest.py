@@ -23,7 +23,7 @@ router = json.loads((ROOT / "data/host-network-receipt.json").read_text())
 if network["advertised_address"] != router["public_address"]:
     raise RuntimeError("Backend and verified router address differ")
 
-ini = f"host={router['public_address']}\nplayer_name=\n"
+ini = f"host={router['public_address']}\nplayer_name=\nunlock_all=0\nrank=0\n"
 launcher = (
     '@echo off\r\ncd /d "%~dp0"\r\nstart "" "%~dp0game_dx12_ship_replay_dw.exe"\r\n'
 )
@@ -54,6 +54,14 @@ instead of dw_leave. Online/Away/Busy/Offline use the local platform session.
 
 Settings save locally under Documents\Call of Duty Modern Warfare Replay\players:
 config.cfg and settings.<platformId>.iw8. Native cloud sync is disabled for DW.
+Earned player XP saves locally in %LOCALAPPDATA%\ReplayDW\player-progression.bin.
+Keep it with the local identity when preserving progress. The server restores
+your signed local total when you reconnect.
+INI unlock_all=1 selects Replay's native unlock controls; 0 uses normal unlocks.
+INI rank=0 restores saved progress. Values 1..55 select that career rank once
+when the value changes, then earned XP continues normally. Restart after edits.
+com_optimized defaults to 0. Set the dvar to 1 for optimizations preserving the
+3D scene's appearance, or 2 for the experimental aggressive visual/CPU profile.
 No backend signing keys, access keys or player identities are in this package.
 This is the current multiplayer test build, not a completed DW replacement.
 
