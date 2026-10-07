@@ -1,0 +1,42 @@
+REPLAY REMAINING SERVICES BRANCH - 2026-10-07
+
+Branch: codex/dw-remaining-services
+Private remote: IDARETW/IW8-Replay-DW
+Verified main baseline: 16a858b
+Main readiness: validation/20261007-main-native-startup-readiness.json
+Main executable/backend pair remains the existing shipping game and the
+26e8b34b93de backend. One native game instance reached Multiplayer with all
+27 startup fences passing, no network error and no lobby failures. Protocol
+and native startup evidence are separate; this is not a full gameplay claim.
+
+All remaining implementation belongs on this branch, including object store,
+live content and the player-facing store. Game tests are authorized one
+instance at a time. Do not start a second game while the first exists.
+Use controlled root-folder launches; preserve player identity/profile data and
+unrelated dirty compiler, migration and tournament sources. Freeze builds from
+committed sources plus an explicit owned overlay. Rebuild the game only when
+backend/data changes cannot implement the required native contract.
+
+KNOWN TASK CONTRACTS STILL OPEN
+50/22 and 58/22: live/multipart download response bindings.
+193/9 and 193/10: paginated category listing response bindings.
+193/12 and 193/24: post-HTTP single/multiple upload-session completion.
+Initial upload task/serializer bindings are separate from those completions.
+Do not use misleading SQLite names as proof or add guessed success replies.
+
+STORE NAVIGATION BASELINE
+Single game PID 20740 traversed Weapons, Operators, Challenges, Barracks and
+Battle Pass through native input. Entering Store triggered a Lua nil-call:
+  ui/MenuBuilder.lua - BuildRegisteredType
+  ui/frontEnd/MPStoreMenu.lua
+  ui/utils/TabUtils.lua - UpdateBuiltWidgetOnTabChange
+  ui/frontEnd/MPTabsMenu.lua
+The interface returned to Play. This is a real frontend construction failure;
+it is not yet established as an object-store RPC failure or missing catalog.
+Trace the requested widget/registered factory and required publisher inputs
+before choosing a fix. Preserve native menu, purchase, inventory and ownership
+consumers instead of presenting an unrelated replacement shop.
+
+Evidence: validation/20261007-store-navigation-baseline.json
+Debug capture: data/remaining-store-20261007/debug.jsonl (capture stopped/frozen).
+The full backend implementation goal remains active.
