@@ -80,7 +80,15 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
                 "party JoinLobby waits for an accepted owner host document; stale/non-owner updates do not release it, shared documents match and later updates cannot repeat the join"
             )
             return lobby, mm, strings(update[23:])
-        return struct.unpack_from("<Q", packet, 15)[0], mm, strings(packet[32:])
+        lobby = struct.unpack_from("<Q", packet, 15)[0]
+        documents = strings(packet[32:])
+        assert client.task(
+            145, 15, u64(lobby) + u64(documents[1]["update_id"])
+            + text(json.dumps(documents[0]))
+        ) == boolean(True)
+        kind, update = client.receive()
+        assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+        return lobby, mm, strings(update[23:])
 
     def join(lobby):
         request = {

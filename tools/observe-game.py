@@ -1571,6 +1571,11 @@ try:
                 struct.unpack("<Q", read(symbols["gl_144493DE0"] + 112, 8))[0]
             ),
         },
+        "native_player_progression": {
+            "xp": struct.unpack("<Q", read(symbols["gl_144483CE0"] + 64, 8))[0],
+            "rank_zero_based": struct.unpack("<Q", read(symbols["gl_144483CE0"] + 72, 8))[0],
+            "layout": "Replay Windows singleton player progression at +64/+72",
+        } if "gl_144483CE0" in symbols else None,
         "native_account_service_state": struct.unpack_from("<I", account, 16)[0],
         "native_account_service_group": struct.unpack_from("<I", account, 20)[0],
         "native_account_country": struct.unpack_from("<I", account, 140)[0],
