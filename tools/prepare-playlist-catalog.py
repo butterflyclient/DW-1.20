@@ -6,11 +6,12 @@ import json
 from pathlib import Path
 import re
 import zlib
+from playlist_packages import inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def prepare(directory, available_maps=None, minimum_players=None):
+def prepare(directory, available_maps=None, minimum_players=None, game_directory=None):
     source = ROOT / "data" / "unified_large_playlist_tu19.aggr"
     packed = source.read_bytes()
     decoder = zlib.decompressobj()
@@ -48,22 +49,27 @@ def prepare(directory, available_maps=None, minimum_players=None):
         )
     )
     target = directory / "playlists" / "5800"
-    target.mkdir(parents=True, exist_ok=True)
-    # Same bytes and version as the native publisher object. The matcher reads
-    # all 63 playlists, rather than creating a separate one-playlist universe.
-    (target / "catalog.json").write_bytes(raw)
-    (target / "native-dvar-names.json").write_text(
-        json.dumps(names, separators=(",", ":")) + "\n"
-    )
-    if available_maps is not None or minimum_players is not None:
-        policy = {}
+    # Preflight the complete window before replacing any existing publication.
+    packages = None
+    if game_directory is not None:
+        packages = inventory(catalog, raw, game_directory)
+        installed = {row["name"] for row in packages["maps"] if row["available"]}
+        if available_maps is not None and not set(available_maps) <= installed:
+            raise RuntimeError("Explicit map policy references an absent main package")
+    policy = None
+    if available_maps is not None or minimum_players is not None or packages is not None:
+        policy_file = target / "policy.json"
+        policy = json.loads(policy_file.read_text()) if policy_file.exists() else {}
+        if not isinstance(policy, dict):
+            raise RuntimeError("Playlist policy must be an object")
         if available_maps is not None:
             policy["available_maps"] = available_maps
+        elif packages is not None:
+            policy["available_maps"] = sorted(installed)
         if minimum_players is not None:
             if not 1 <= minimum_players <= 200:
                 raise RuntimeError("Invalid local minimum player count")
             policy["minimum_players"] = minimum_players
-        (target / "policy.json").write_text(json.dumps(policy, indent=2) + "\n")
     receipt = {
         "schema": 1,
         "title": 5800,
@@ -82,8 +88,27 @@ def prepare(directory, available_maps=None, minimum_players=None):
             "choose_entry": "0x1410CBD20",
         },
         "policy_is_separate_from_publication": True,
+        "package_inventory_revision": packages["revision"] if packages else None,
+        "installed_main_packages": len(installed) if packages else None,
     }
-    (target / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    target.mkdir(parents=True, exist_ok=True)
+    # Same bytes/version as the native publisher object, with independent local
+    # eligibility. Run publication while the backend is stopped; replacements
+    # are individually atomic, rather than a cross-file transaction.
+    payloads = {
+        "catalog.json": raw,
+        "native-dvar-names.json": (json.dumps(names, separators=(",", ":")) + "\n").encode(),
+        "provenance.json": (json.dumps(receipt, indent=2) + "\n").encode(),
+    }
+    if packages is not None:
+        payloads["packages.json"] = (json.dumps(packages, indent=2) + "\n").encode()
+    if policy is not None:
+        payloads["policy.json"] = (json.dumps(policy, indent=2) + "\n").encode()
+    for name, payload in payloads.items():
+        destination = target / name
+        pending = destination.with_suffix(destination.suffix + ".pending")
+        pending.write_bytes(payload)
+        pending.replace(destination)
     return receipt
 
 
@@ -92,7 +117,13 @@ if __name__ == "__main__":
     parser.add_argument("--directory", type=Path, default=ROOT / "data")
     parser.add_argument("--available-maps", nargs="+")
     parser.add_argument("--minimum-players", type=int)
+    parser.add_argument(
+        "--game-directory", type=Path,
+        help="Index declared root/zone/main packages and refresh map eligibility",
+    )
     args = parser.parse_args()
     print(
-        json.dumps(prepare(args.directory, args.available_maps, args.minimum_players))
+        json.dumps(prepare(
+            args.directory, args.available_maps, args.minimum_players, args.game_directory
+        ))
     )

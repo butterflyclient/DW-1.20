@@ -1,8 +1,10 @@
 #include "playlist_catalog.h"
+#include "crypto.h"
 #include "wire.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <set>
 
@@ -17,9 +19,28 @@ namespace services
             std::filesystem::file_time_type modified;
             uintmax_t size = 0;
             Json value;
+            std::string sha256;
         };
 
-        Json document(const std::filesystem::path &path, uintmax_t maximum, const Json &fallback)
+        std::string digest(const std::string &bytes)
+        {
+            const auto hash = crypto::sha256({reinterpret_cast<const uint8_t *>(bytes.data()),
+                                             bytes.size()});
+            constexpr char digits[] = "0123456789abcdef";
+            std::string result;
+            result.reserve(hash.size() * 2);
+            for (const auto value : hash)
+            {
+                result.push_back(digits[value >> 4]);
+                result.push_back(digits[value & 15]);
+            }
+            return result;
+        }
+
+        Json document(const std::filesystem::path &path,
+                      uintmax_t maximum,
+                      const Json &fallback,
+                      std::string *sha256 = nullptr)
         {
             if (!std::filesystem::exists(path))
                 return fallback;
@@ -31,12 +52,21 @@ namespace services
             const auto found = cache.find(path);
             if (found != cache.end() && found->second.modified == modified &&
                 found->second.size == size)
+            {
+                if (sha256)
+                    *sha256 = found->second.sha256;
                 return found->second.value;
-            std::ifstream in(path);
+            }
+            std::ifstream in(path, std::ios::binary);
             if (!in)
                 throw std::runtime_error("Playlist catalog read failed");
-            auto value = Json::parse(in);
-            cache[path] = {modified, size, value};
+            const std::string bytes((std::istreambuf_iterator<char>(in)), {});
+            wire::require(bytes.size() <= maximum);
+            auto value = Json::parse(bytes);
+            const auto hash = digest(bytes);
+            cache[path] = {modified, size, value, hash};
+            if (sha256)
+                *sha256 = hash;
             return value;
         }
 
@@ -100,7 +130,8 @@ namespace services
         const auto root = directory / "playlists" / std::to_string(title);
         if (!requiredMap.empty())
             (void)identifier(requiredMap, 24);
-        const auto catalog = document(root / "catalog.json", 409600, Json());
+        std::string catalogHash;
+        const auto catalog = document(root / "catalog.json", 409600, Json(), &catalogHash);
         if (catalog.is_null())
             return std::nullopt;
         wire::require(catalog.is_object() && catalog.at("playlists").is_array() &&
@@ -150,6 +181,37 @@ namespace services
         const auto bindings =
             document(root / "native-dvar-names.json", 1024 * 1024, Json::object());
         wire::require(bindings.is_object());
+        const auto packages = document(root / "packages.json", 512 * 1024, Json());
+        std::optional<std::set<std::string>> installedMaps;
+        if (!packages.is_null())
+        {
+            wire::require(packages.is_object() && packages.at("schema") == 1 &&
+                          packages.at("title") == title &&
+                          packages.at("playlist_version") == version &&
+                          packages.at("catalog_sha256") == catalogHash &&
+                          packages.at("maps").is_array() &&
+                          packages["maps"].size() <= 256);
+            const auto revision = packages.at("revision").get<std::string>();
+            wire::require(revision.size() == 64 &&
+                          revision.find_first_not_of("0123456789abcdef") == std::string::npos);
+            auto revisionPayload = packages;
+            revisionPayload.erase("revision");
+            wire::require(digest(revisionPayload.dump()) == revision);
+            std::set<std::string> known;
+            installedMaps.emplace();
+            for (const auto &map : packages["maps"])
+            {
+                const auto name = identifier(map.at("name"), 24);
+                wire::require(map.at("available").is_boolean() && known.insert(name).second);
+                if (map["available"].get<bool>())
+                    installedMaps->insert(name);
+            }
+            std::set<std::string> declared;
+            for (const auto &playlist : catalog["playlists"])
+                for (const auto &entry : playlist.at("maps"))
+                    declared.insert(identifier(entry.at("map"), 24));
+            wire::require(known == declared);
+        }
         std::set<std::string> maps;
         if (policy.contains("available_maps"))
         {
@@ -199,6 +261,7 @@ namespace services
                 const auto &entry = playlist["maps"][i];
                 const auto map = entry["map"].get<std::string>();
                 const bool allowed = (!policy.contains("available_maps") || maps.contains(map)) &&
+                                     (!installedMaps || installedMaps->contains(map)) &&
                                      (requiredMap.empty() || requiredMap == map) &&
                                      entry["weight"].get<double>() > 0;
                 weights[map] = allowed ? entry["weight"] : Json(0);
@@ -207,14 +270,25 @@ namespace services
             }
             if (eligible.empty())
                 continue;
-            const auto &mode = modes.at(eligible.front()["gametype"].get<std::string>());
+            std::set<unsigned> teamCounts;
+            for (const auto &entry : eligible)
+            {
+                const auto &mode = modes.at(entry["gametype"].get<std::string>());
+                if (mode.contains("teamCount"))
+                    teamCounts.insert(number(mode.at("teamCount"), 200));
+            }
+            // The current mixed-mode publications agree on team count. A future
+            // mixed team/FFA publication cannot safely inherit its first entry's
+            // team layout before the native client selects the actual mode.
+            wire::require(teamCounts.size() <= 1);
             Json rules = query.at("ruleset_payload"),
                  dvars = rules.value("dvar_overrides", Json::object());
             wire::require(dvars.is_object());
-            // Replay applies each selected entry's game-type dvars from the same
-            // published catalog. Do not pre-apply the first mode to a mixed-mode
-            // playlist; that would leak one mode's rules into the next choice.
-            overrides(dvars, playlist.value("dvars", Json::object()), bindings);
+            // Replay Playlist_RunRules already applies the complete native
+            // publication. The backend document is a separate, 128-entry override
+            // window, not a second copy of that publication (Plunder has 161).
+            // Preserve the caller's backend rules and explicit local policy here;
+            // keep catalog rules in match metadata for every selected entry.
             assign(dvars, bindings, "online_matchmaking_use_map_weights", 1);
             if (policy.contains("minimum_players"))
             {
@@ -245,8 +319,8 @@ namespace services
             selected.rules = rules;
             selected.splitPartiesForTeamBalance =
                 policy.value("split_parties_for_team_balance", false);
-            if (mode.contains("teamCount"))
-                selected.teamCount = number(mode["teamCount"], 200);
+            if (!teamCounts.empty())
+                selected.teamCount = *teamCounts.begin();
             selected.metadata = {{"playlist_id", id},
                                  {"playlist_version", version},
                                  {"context", playlist.value("context", std::string{})},
@@ -254,7 +328,10 @@ namespace services
                                  {"score_limit", playlist.value("score_limit", Json())},
                                  {"time_limit", playlist.value("time_limit", Json())},
                                  {"flags", playlist.value("flags", Json::array())},
+                                 {"playlist_dvars", playlist.value("dvars", Json::object())},
                                  {"game_types", Json::object()}};
+            if (!packages.is_null())
+                selected.metadata["map_package_revision"] = packages.at("revision");
             if (selected.splitPartiesForTeamBalance)
                 selected.metadata["split_parties_for_team_balance"] = true;
             for (const auto &entry : eligible)
