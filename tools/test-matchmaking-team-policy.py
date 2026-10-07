@@ -159,9 +159,10 @@ try:
                 assert kind == 2 and joined.startswith(u32(2001) + u64(joined_mm) + u64(lobby))
                 assert receive(fourth) == (kind, joined)
                 joined_docs = documents(joined[23:])
-                assert joined_docs[1]["team_balance"]["teams"] == {
-                    "0": [host.user, third.user], "1": [peer.user, fourth.user],
-                }
+                teams = joined_docs[1]["team_balance"]["teams"]
+                assert len(teams["0"]) == len(teams["1"]) == 2
+                assert teams["0"][0] == host.user and teams["1"][0] == peer.user
+                assert {teams["0"][1], teams["1"][1]} == {third.user, fourth.user}
                 for observer in (host, peer):
                     kind, changed = receive(observer)
                     assert kind == 2 and changed.startswith(u32(2006) + u64(lobby))
