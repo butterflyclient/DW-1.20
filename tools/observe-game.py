@@ -1257,6 +1257,31 @@ try:
             .split(b"\0", 1)[0]
             .decode("ascii"),
         }
+    game_party = None
+    if "gl_14C73ADE0" in symbols:
+        # Same Replay Lobby_GetPartyData 0x141187EE0 / Party_CountTeamMembers
+        # 0x14118AD10: 200 members, stride 488, team +2584, status +2594.
+        # Resolve the party through linked symbols and report no session keys.
+        party = symbols["gl_14C73ADE0"]
+        members = read(party + 2584, 488 * 199 + 11)
+        statuses, teams = {}, {}
+        for index in range(200):
+            status = members[index * 488 + 10]
+            if status:
+                statuses[str(status)] = statuses.get(str(status), 0) + 1
+            if status >= 5:
+                team = str(struct.unpack_from("<i", members, index * 488)[0])
+                teams[team] = teams.get(team, 0) + 1
+        flags = struct.unpack("<I", read(party + 311200, 4))[0]
+        game_party = {
+            "in_party": bool(struct.unpack("<i", read(party + 311116, 4))[0]),
+            "flags": flags,
+            "preload_complete": bool(flags & 0x200),
+            "waiting_for_start": flags & 0x64 == 0x20,
+            "present_team_counts": teams,
+            "member_status_counts": statuses,
+        }
+
     result = {
         "schema": 6,
         "pid": pid,
@@ -1374,6 +1399,7 @@ try:
             "maximum_team_difference": dvar_current("gl_14C796340", "<i"),
             "private_match_registration": dvar_details("gl_14D386820"),
         },
+        "native_game_party": game_party,
         "native_tournament_request": (
             {
                 "pending_task": struct.unpack("<I", read(symbols["gl_14C3BBBB4"], 4))[
