@@ -65,6 +65,29 @@ NON_TASK_DOMAINS = [
      "Exact Replay no-update manifest/signature and immutable publisher-object download"),
 ]
 
+# REST uses one gateway task, but the resource/operation owns the domain.
+# Keep those actual bindings visible instead of crediting every 255/10 call
+# to both friends and accounts merely because they share a transport.
+REST_DOMAINS = {
+    "Friends, lists and presence": (
+        {"Friends", "UserLists", "UserPresence", "UsersPresence"},
+        ["src/social_services.cpp"],
+    ),
+    "Accounts, names and regulations": (
+        {"UserResource", "Users", "UnoRes", "Umbrella", "Regulations"},
+        ["src/identity_rest_services.cpp", "src/identity_services.cpp",
+         "src/regulation_services.cpp", "src/platform_resources.cpp"],
+    ),
+    "Progression, achievements and quests": (
+        {"user_events"}, ["src/achievement_services.cpp", "src/rest_services.cpp"],
+    ),
+    "Experiments and treatments": ({"abtesting"}, ["src/abtesting_services.cpp"]),
+    "Object store": (
+        {"ObjectsResourcePublishers", "ObjectsVectorizedResourceUsers"},
+        ["src/objectstore_services.cpp"],
+    ),
+}
+
 
 def load(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -102,12 +125,18 @@ for name, services, persistence, contract in DOMAINS:
         for task in graph["families"].get(str(service), [])
     })
     sources = sorted({routes[service][task] for service, task in tasks})
+    resources, rest_sources = REST_DOMAINS.get(name, (set(), []))
+    requests = [request for request in rest["requests"] if any(
+        resource in resources for resource, operation in request["resource_operations"]
+    )]
+    sources = sorted(set(sources + rest_sources))
     rows.append({
         "name": name, "services": services, "contract": contract,
         "persistence": persistence.split(","), "handler_sources": sources,
         "registered_task_routes": [list(pair) for pair in tasks],
         "target_known_missing_routes": [list(pair) for pair in native_tasks if pair not in tasks],
         "target_constructor_entries": [entry for service in services for entry in calls[service]],
+        "rest_request_routes": requests,
         "implementation_limits": {str(service): definitions["GAPS"].get(str(service), "Unclassified") for service in services},
         "working_sources_differ_from_recorded_build": [
             path for path in sources if build["inputs"].get(path) != digest(ROOT / path)
@@ -142,6 +171,7 @@ report = {
     "rest_request_inventory": {
         "path": "data/native-rest-callgraph.json", "sha256": digest(DATA / "native-rest-callgraph.json"),
         "request_functions": len(rest["requests"]), "unresolved": rest["unresolved"],
+        "resource_operation_writers": sum(bool(row["resource_operations"]) for row in rest["requests"]),
         "full_audit_complete": rest["full_rest_audit_complete"],
     },
     "coverage_ledger": {"path": "data/backend-coverage-inventory.json", "sha256": digest(DATA / "backend-coverage-inventory.json"), "counts": coverage["counts"]},
@@ -165,6 +195,10 @@ for row in rows:
         "  Contract: " + row["contract"], "  Persistence: " + ", ".join(row["persistence"]),
         "  Backend: " + ", ".join(row["handler_sources"]),
         "  Registered routes: " + ", ".join(f"{s}/{t}" for s, t in row["registered_task_routes"]),
+        "  REST resources: " + (", ".join(sorted({
+            resource + "/" + operation for request in row["rest_request_routes"]
+            for resource, operation in request["resource_operations"]
+        })) or "none in recovered writer set"),
         "  Known missing routes: " + (", ".join(f"{s}/{t}" for s, t in row["target_known_missing_routes"]) or "none in recovered constructor set"),
         "  Open contracts: " + " ".join(row["implementation_limits"].values()), "",
     ])

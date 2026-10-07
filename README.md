@@ -355,8 +355,8 @@ so later evidence cannot silently attach old game observations to a new server.
 `tools/inventory-backend-coverage.py` joins that target evidence with reviewed
 handler registrations, static fixture call sites and hash-bound native proofs.
 It writes `data/backend-coverage-inventory.json` and a plain-text counterpart.
-The current ledger has 140 known or explicitly reviewed task routes, 133
-registered handlers and 7 known target tasks without handlers. The two copy
+The current ledger has 140 known or explicitly reviewed task routes, 134
+registered handlers and 6 known target tasks without handlers. The two copy
 preparation routes are explicitly labeled as source-oracle contracts rather
 than recovered target constructors. These counts do not include every indirect
 SDK or REST operation; these gaps remain explicit. Fixture source references
@@ -365,6 +365,28 @@ Indirect/dynamic calls remain explicit audit gaps. Unsupported tasks return
 native errors, without generic success replies or forced fences. Conservative
 overall /health matchmaking/native_game_verified flags remain false; refer to
 feature-specific evidence for the native results already validated.
+
+`tools/inventory-replay-subsystems.py` joins those task constructors with the
+actual REST resource/operation bindings into 29 service domains and nine
+platform, transport and persistence domains. `docs/replay-dw-subsystems.txt`
+is the readable index; `data/replay-dw-subsystems.json` retains caller addresses,
+response-contract gaps and source/build drift. Unknown indirect SDK paths
+remain open; this inventory does not declare the whole backend complete.
+
+`tools/prepare-playlist-catalog.py --game-directory E:\IW8\Builds\1.20-replay`
+records the declared root/zone/main package headers and preserves the existing
+minimum-player, waiting-time and party-balancing policy. It publishes a
+catalog-bound `packages.json` and admits only maps in both that inventory and
+the local policy. Run publication while the server is stopped. The owner's
+original compressed playlist stays unchanged; the map inventory proves package
+presence, not transient completeness or native map loading.
+
+Replay's weighted playlist selector has a 20-entry window and its backend dvar
+reader has a separate 128-entry window. The full playlist rules belong to
+Replay's native publication loader. The backend stores them in match metadata
+and sends only explicit matchmaking overrides, avoiding the Plunder playlist's
+161-rule overflow. The standalone compiled selector checks and encrypted
+matchmaking checks cover all 63 owner playlists without starting a game.
 
 `refresh-game-connection.ps1` dispatches `dw_restart` and saves a separate
 connection receipt for the current server PID/hash/log offsets. It preserves the
