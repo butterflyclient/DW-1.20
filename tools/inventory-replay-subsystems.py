@@ -79,7 +79,8 @@ REST_DOMAINS = {
          "src/regulation_services.cpp", "src/platform_resources.cpp"],
     ),
     "Progression, achievements and quests": (
-        {"user_events"}, ["src/achievement_services.cpp", "src/rest_services.cpp"],
+        {"user_events"}, ["src/achievement_services.cpp", "src/achievement_store.cpp",
+                          "src/rest_services.cpp"],
     ),
     "Experiments and treatments": ({"abtesting"}, ["src/abtesting_services.cpp"]),
     "Object store": (

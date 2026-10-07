@@ -5,9 +5,9 @@ not rebuilt or changed. Only the backend was compiled, deployed and restarted.
 
 CURRENT DEPLOYMENT
 Backend: E:\DW\IW8\build\Release\iw8-dw-server.exe
-SHA256: fbff2f7d05921761bfad0c6fd289157b2e30086969d9aae9e1888b4205374f05
+SHA256: 26e8b34b93de4842f70636e8e37c7f08f5fd723372cb6562d4690179fd30641b
 Shipping game SHA256: b09a9ba25f733960dd1f8c569f566979804c2a1a247a9753e2c6e7a50556c138
-Readiness: validation/20261007-playlist-package-readiness.json
+Readiness: validation/20261007-playlist-progression-readiness.json
 Native startup for this backend: pending, with no old observation inherited.
 
 IMPLEMENTED
@@ -35,8 +35,9 @@ VALIDATION
 63 encrypted-wire playlist requests passed: 44 eligible lobby documents and
 19 unavailable responses, with native document/weight/override capacities,
 readback, stored complete rules and owner disband delivery checked.
-15 encrypted-wire party, invitation, chat and progression regression groups
-passed on this same backend hash. All profiles/listeners were isolated.
+20 encrypted-wire party, invitation, chat and progression regression groups
+passed on this same backend hash. One broader regression pass also completed
+all 297 protocol/service checks. All profiles/listeners were isolated.
 The freshly deployed server health check and launch-game.ps1 -ValidateOnly
 passed. No game image was launched, no map was loaded and no transient
 completeness or native gameplay claim is made by these fixtures.
@@ -63,7 +64,40 @@ Stop the server before restoring that saved executable and publication, then
 start it in a separate step. Do not replace player identities or profile data.
 
 SOURCE SCOPE
-Backend build came from committed revision ea93a85. Subsequent inventory/test
+Backend build came from committed revision 83a20f5. Subsequent inventory/test
 and readiness documentation commits do not change that compiled runtime.
 Unrelated dirty migration, tournament and Replay compiler changes were left
 intact and excluded from this backend's frozen compilation.
+
+PROGRESSION BATCH IMPLEMENTATION
+A confirmed late-recipient retry conflict previously committed an earlier
+recipient before rejecting the submission. Every recipient's retry receipt,
+event journal and XP arithmetic now passes preflight before any new snapshot
+is published. The complete intent reaches stable storage using FlushFileBuffers
+before the first write. Recipient journals and evicted receipt archives share
+that same recoverable window. Typed native state queries and local-profile
+restoration recover the window before reading or modifying progression.
+
+Implementation: src/achievement_store.cpp/.h and src/achievement_services.cpp.
+Managed layout: achievements/5800/{5800|iw8}/{owner}/events.json and
+receipts/{64-character hash}.json. The title-level event-transaction.json
+stores the explicit owner/platform/context/destination kind, complete after
+snapshot, SHA256 before/after images and checksum for the whole write set.
+Recovery validates all snapshots and destinations, rejects duplicate keys,
+escaping contexts/receipt keys, mismatched before/after images or bad checksums,
+and rolls forward only files that still match a declared image. Invalid or
+blocked windows are retained and are not presented as successful empty state.
+No game RVA, executable patch, remote player provisioning or proxy DLL was used.
+
+Focused fixtures reproduced a real second-file failure, checked blocked native
+state reads, poisoned later recovery entries, and recovered an actual archive/
+journal interruption across a distinct backend process restart. A retry after
+commit did not award XP again. This is protocol and persistence evidence; native
+scored-match XP callback consumption remains a separate game validation gate.
+
+Current immutable evidence copies are in:
+  data/subsystem-integration-20261007/26e8b34b93de
+The prior playlist backend is saved in:
+  data/subsystem-integration-20261007/before-progression-transactions
+Rollback executable/data copies are retained; hash-bound readiness must be
+reselected against the restored pair before launching any future game test.

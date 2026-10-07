@@ -15,8 +15,6 @@ fixture = args.fixture_root.resolve(strict=True)
 output = args.output.resolve()
 assert fixture.is_relative_to(ROOT / "data")
 assert output.is_relative_to(ROOT / "validation") and output.suffix == ".json"
-state = ROOT / "data/subsystem-integration-20261007"
-state.mkdir(exist_ok=True)
 
 
 def load(path):
@@ -33,6 +31,8 @@ def reference(path):
 
 build = load(ROOT / "data/backend-build-latest.json")
 assert build["compile_passed"]
+state = ROOT / "data/subsystem-integration-20261007" / build["sha256"][:12]
+state.mkdir(parents=True, exist_ok=True)
 backend = ROOT / "build/Release/iw8-dw-server.exe"
 assert digest(backend) == build["sha256"]
 for name, expected in build["inputs"].items():
@@ -59,6 +59,28 @@ packages = load(packages_path)
 assert wire["package_revision"] == packages["revision"]
 assert len(wire["results"]) == contract["playlists"]
 assert sum(row["eligible"] for row in wire["results"]) == contract["eligible_playlists"]
+full_path = fixture / "data/lobby-verification.json"
+full = load(full_path) if full_path.exists() else None
+if full is not None:
+    assert full["passed"] and full["server_sha256"] == build["sha256"]
+# Latest-pointer tools can refresh their output later. Bind readiness to
+# immutable copies for this specific backend instead of those moving paths.
+def preserve(source, name):
+    target = state / name
+    contents = source.read_bytes()
+    if target.exists():
+        assert target.read_bytes() == contents, "Readiness evidence changed for this backend"
+    else:
+        target.write_bytes(contents)
+    return target
+
+
+contract_path = preserve(contract_path, "compiled-selector.json")
+wire_path = preserve(wire_path, "playlist-wire.json")
+focused_path = preserve(focused_path, "multiplayer-progression-wire.json")
+packages_path = preserve(packages_path, "installed-packages.json")
+if full is not None:
+    full_path = preserve(full_path, "full-protocol.json")
 
 proof = {
     "schema": 1,
@@ -73,6 +95,8 @@ proof = {
     "compiled_selector_evidence": reference(contract_path),
     "package_inventory": reference(packages_path),
     "protocol_checks": len(focused["checks"]),
+    "full_protocol_evidence": reference(full_path) if full is not None else None,
+    "full_protocol_checks": len(full["checks"]) if full is not None else None,
     "playlists_checked": len(wire["results"]),
     "eligible_playlists": contract["eligible_playlists"],
     "installed_main_packages": contract["installed_main_packages"],

@@ -197,11 +197,11 @@ Progression, achievements and quests
   Services: 125
   Contract: Event ingestion, career XP/rank; deeper definitions remain publication-dependent
   Persistence: achievements
-  Backend: src/account_services.cpp, src/achievement_services.cpp, src/rest_services.cpp
+  Backend: src/account_services.cpp, src/achievement_services.cpp, src/achievement_store.cpp, src/rest_services.cpp
   Registered routes: 125/1, 125/2, 125/3, 125/4, 125/5, 125/6, 125/9
   REST resources: user_events/report_user_events_batch
   Known missing routes: none in recovered constructor set
-  Open contracts: Publish progression/reward/quest rules; native positive binary event/activation paths. Ingestion alone does not fabricate rewards.
+  Open contracts: Native mp_addxp deltas update career XP and Replay rank thresholds. Every recipient journal/retry receipt is preflighted before a complete flushed event intent; conflicting retries make no changes, interrupted writes roll forward before queries or local-profile restoration, and state/journal/archive checks reject malformed or conflicting snapshots. Encrypted fixtures cover late recipient conflicts, real second-file interruptions, snapshot validation and a backend process restart without double awards. Further progression/reward/quest definitions require explicit publication; native scored match XP/reward/activation callback consumption remains unverified. Ingestion alone does not fabricate rewards.
 
 Lobby and public matchmaking
   Services: 145
