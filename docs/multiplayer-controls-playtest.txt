@@ -1,0 +1,62 @@
+REPLAY DW MULTIPLAYER AND LOCAL PROGRESSION PLAYTEST
+
+Use game_dx12_ship_replay_dw.exe from the compatible root game folder.
+The universal client ZIP supplies this EXE, its INI, a launcher and instructions.
+No Replay proxy DLL is required. Keep each player's existing local identity.
+The backend must be running. Test Shipment; other map package completeness varies.
+
+INI controls, read at full game startup:
+  unlock_all=0  Normal native unlock controls.
+  unlock_all=1  Enable the available native unlock overrides.
+  rank=0        Use saved progression and allow earned XP to continue.
+  rank=1..55    Select that career rank's native XP threshold once when changed.
+                Keeping the same setting does not reset earned XP each launch.
+
+Keep the normal defaults unlock_all=0 and rank=0 for the progression test.
+Player XP saves to %LOCALAPPDATA%\ReplayDW\player-progression.bin on that PC.
+Settings continue to use the player's native local Replay settings/profile.
+Restart after changing the INI; changing it while the game runs is not a reload.
+
+One gameplay run:
+1. Add/accept a friend through Social if needed. Send a party invitation. Confirm
+   the recipient sees it, accepts it, and both players appear in the party roster.
+2. Leave the party through the menus, then search Quick Play independently with
+   compatible filters. Both players should enter one shared lobby on opposing
+   teams. The native minimum lobby wait is 60 seconds from the lobby's wait period;
+   it is not an additional 60 seconds for each arriving player.
+3. Load Shipment and select loadouts. Confirm movement, combat and both players
+   in the scoreboard. Let both clients remain active during the test.
+4. Send text in match/lobby chat. Confirm the remote client displays the sender
+   and message. Also test a private whisper through Social.
+5. Enable the game's desired microphone/push-to-talk settings, check that neither
+   player is muted, and test speech in both directions. Confirm actual audibility.
+6. Compare each player's scoreboard ping. Values should be sampled per client,
+   rather than both being copied from the local player's connection.
+7. Earn a kill/objective and finish the match. Record both players' XP totals.
+   Confirm the totals increase. The local progression file should update after
+   the native XP notification. No server-side player provisioning is needed.
+8. Compare com_optimized 0, 1 and 2 in the console. Zero disables the experimental
+   profiles. One preserves the 3D scene's appearance; two is the aggressive profile.
+   Return to 0 after comparison. The fresh build registers 0 by default.
+
+Persistence/config check after the match:
+9. Fully stop and relaunch the game. Each player should retain their own earned
+   XP, rank, name and settings. Keep player-identity.bin and player-progression.bin.
+10. On one test profile only, set rank=5 and unlock_all=1, restart, and inspect
+    rank and available unlocks. Set rank=0 and unlock_all=0 and restart again.
+    Rank 5's XP should remain stored while normal unlock restrictions return.
+
+Current evidence:
+- Fresh C++ game compilation, symbol/relocation/unwind validation and deployment pass.
+- All 27 native startup fences pass on the current backend.
+- Native invitation receipt/display passes; invitation acceptance needs playtest.
+- Independent-party native matching, shared ready roster, map preload and actual
+  gameplay snapshot transport pass on two private test clients in the root folder.
+- Local XP restoration, rank selection and unlock controls pass after restart.
+- Backend earned-XP/retry and text-channel fixtures pass. This automated game run
+  ended in inactivity forfeits before a scored XP event; earned native match XP,
+  text display, audible voice and distinct scoreboard ping are not claimed passed.
+
+Use controlled restarts. The current dw_leave command remains unsuitable for tests.
+The direct xstartlobby command faulted in this build; normal Quick Play menu entry
+successfully matched and loaded both clients. Use the normal menus for this test.

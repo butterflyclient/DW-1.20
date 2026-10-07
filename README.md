@@ -125,6 +125,16 @@ rank's native XP threshold once when the configured value changes. It does
 not reset subsequently earned XP each launch. Restart the game after editing
 the INI. These settings do not affect another player's local profile.
 
+The 2026-10-07 build and native checks are bound by
+`validation/20261007-multiplayer-controls-local-xp-readiness.json`. The test
+verified rank 5, local XP restoration after a controlled restart, unlock controls
+enabled then disabled, invitation display, and two independent native clients
+matching into the same Shipment lobby and exchanging gameplay snapshots.
+The same backend passed 297 independent protocol checks and 15 focused checks.
+Scored match XP, native text display, audible voice, and distinct scoreboard ping
+remain explicit playtest gates; the receipt does not mark the full backend complete.
+Use [the multiplayer/config playtest](docs/multiplayer-controls-playtest.txt).
+
 `Replay-DW-Diagnostics.zip` contains a portable existing-identity checker and
 read-only client/INI/network/log checks. It reports the precise failed Win32,
 DPAPI or P-256 import stage without deleting or replacing an identity. The game
@@ -316,7 +326,7 @@ packages remain a deferred game-build concern.
 - Remaining streaming tasks 50/22 and 58/22 live/multipart download. Whole-user post and copy are implemented, but preparation IDs 50/5, 15 and 20 are source-oracle contracts without target writer proofs, and positive native upload/copy callbacks remain unobserved. Multipart download's exact bound result reader remains unresolved.
 - Marketplace discount publication, retail inventory-token semantics, CouponOrderV2 redemption, quests and loot generation. Task 80/58 is Replay's `validateInventoryItemsToken`, with a filename and validation-token result; it is separate from a SKU purchase. Owner SKU purchases (80/106 and 80/125), full result layouts, explicit catalog grants and code redemption are implemented. Task-106 cross-account purchases now require published gifting rules and existing realm accounts, and recover the buyer debit/recipient grants through a flushed multi-account journal. Native positive gift/purchase callbacks remain unverified.
 - Object-store category/list and large-upload completion families, including 193/3, 9, 10, 12 and 24. User metadata accompanies the implemented task-6 object read; source-oracle task 3 is a separate user-object listing route and remains unimplemented. Request writers for 9/10 are recovered; their exact response bindings still need resolution.
-- Published achievement progression/reward rules. Replay requests achievement 1500 with no local publication, so it correctly returns unavailable. Changed-payload retry conflicts are rejected; event ingestion itself does not fabricate XP targets, quest definitions or rewards.
+- General achievement, weapon, season and quest progression/reward rules remain publication-dependent. Career XP achievement 1000000 is implemented using native `mp_addxp` deltas and Replay rank thresholds. Achievement 1500 remains unavailable without a matching local definition. Changed-payload retry conflicts are rejected.
 - Categorized mail/status and other service-family gaps require same-build constructor/reader confirmation. [Server-validated stats](docs/validated-stats.md) implement task 4/14 with trusted local authorization and atomic retries; retail token payload validation and its native positive callback remain unverified. The ordinary mail methods and esports registration result are implemented.
 - Native positive completion for scheduled/performance and deeper inventory/achievement/content operations; current evidence for those is wire-level.
 - Challenge reports and the full clan replacement/cooldown/push family have independent encrypted-wire and restart coverage; feature-specific native observations describe the game paths actually exercised.
