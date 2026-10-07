@@ -136,6 +136,10 @@ try:
                 "0": [host.user, peer.user], "1": [],
             }
             assert docs[1]["team_balance"]["teams"] == expected
+            names = json.loads((data / "playlists/5800/native-dvar-names.json").read_text())
+            guard = names["online_matchmaking_ignore_partition_value"]
+            overrides = docs[1]["ruleset_payload"]["dvar_overrides"]
+            assert overrides.get(guard) == 1 if split else guard not in overrides
             assert docs[1]["ruleset_payload"]["map_weights"]["mp_shipment"] > 0
             assert all(
                 weight == 0 for name, weight in docs[1]["ruleset_payload"]["map_weights"].items()
@@ -183,6 +187,21 @@ try:
             assert "returned 106" in str(error)
         checks.extend(["Shipment-only native weights", "host-ready peer join and shared documents",
                        "invalid policy rejected", "normal disband delivery"])
+        invitation = b"INV:\0\x02Team Sender\0" + struct.pack("<IQ", int(time.time()), host.user)
+        for body, kind in ((b"INV:\0\x00", "join_info_request"),
+                           (b"INV:\0\x01\x01", "join_info_response"),
+                           (invitation, "invitation")):
+            blob = b"\x13" + u32(len(body)) + body
+            assert host.task(6, 14, u64(peer.user) + blob, structured=False) == b""
+            push_kind, pushed = receive(peer)
+            assert push_kind == 2 and pushed.startswith(u32(21) + u64(host.user))
+            assert pushed[14] == 16
+            name_end = pushed.index(0, 15)
+            assert pushed[name_end + 1:] == blob
+            log = (data / "server.log").read_text(errors="replace")
+            assert "message_kind=" + kind in log
+        assert "invitation_layout=valid inviter_matches_sender=1" in log
+        checks.append("exact native invitation/request/response bytes preserved with typed routing diagnostics")
     receipt = {
         "schema": 1, "passed": True, "native_game_verified": False,
         "scope": "focused team allocation, native lobby wire and playlist policy regression",

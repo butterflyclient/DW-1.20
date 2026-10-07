@@ -1277,10 +1277,29 @@ try:
             "in_party": bool(struct.unpack("<i", read(party + 311116, 4))[0]),
             "flags": flags,
             "preload_complete": bool(flags & 0x200),
-            "waiting_for_start": flags & 0x64 == 0x20,
+            "waiting_for_start": flags & 0x64 == 4,
             "present_team_counts": teams,
             "member_status_counts": statuses,
         }
+
+    invitations = None
+    if "gl_14415B600" in symbols:
+        # Original GetInstance 0x140F5B1C0 / OnReceiveInvitation 0x140F5BFA0:
+        # manager +64 holds 16 complete 80-byte Online_Invitation records.
+        invitation_rows = read(symbols["gl_14415B600"] + 64, 16 * 80)
+        invitations = []
+        for index in range(16):
+            row = invitation_rows[index * 80 : (index + 1) * 80]
+            kind = struct.unpack_from("<I", row, 72)[0]
+            if not kind:
+                continue
+            invitations.append({
+                "slot": index, "type": kind,
+                "inviter_xuid": struct.unpack_from("<Q", row, 24)[0],
+                "inviter_name": row[32:68].split(b"\0", 1)[0].decode(errors="replace"),
+                "sent_utc": struct.unpack_from("<I", row, 68)[0],
+                "invitation_id": struct.unpack_from("<I", row, 76)[0],
+            })
 
     result = {
         "schema": 6,
@@ -1400,6 +1419,7 @@ try:
             "private_match_registration": dvar_details("gl_14D386820"),
         },
         "native_game_party": game_party,
+        "native_party_invitations": invitations,
         "native_tournament_request": (
             {
                 "pending_task": struct.unpack("<I", read(symbols["gl_14C3BBBB4"], 4))[

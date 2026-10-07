@@ -6,6 +6,7 @@
 #include <chrono>
 #include <algorithm>
 #include <charconv>
+#include <cstring>
 
 namespace services
 {
@@ -18,6 +19,45 @@ namespace services
             return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
                                              std::chrono::system_clock::now().time_since_epoch())
                                              .count());
+        }
+
+        std::string instantMessageDetail(uint64_t sender,
+                                         uint64_t recipient,
+                                         const wire::Bytes &message)
+        {
+            auto detail = " recipient=" + std::to_string(recipient) +
+                          " message_bytes=" + std::to_string(message.size());
+            // Original Replay SendDWInvite / OnDWInstantMessage use the
+            // five-byte INV:\0 header, followed by the one-byte message type.
+            // Keep opaque application bytes intact. Log no body or session keys.
+            if (message.size() < 6 || std::memcmp(message.data(), "INV:\0", 5) != 0)
+                return detail + " message_kind=opaque";
+            switch (message[5])
+            {
+            case 0:
+                return detail + " message_kind=join_info_request";
+            case 1:
+                return detail + " message_kind=join_info_response";
+            case 2:
+                break;
+            default:
+                return detail + " message_kind=unknown_invite_type";
+            }
+            detail += " message_kind=invitation";
+            // Exact 0x140F5A1C0: name (at most 35 bytes plus NUL), UInt32 UTC,
+            // UInt64 inviter XUID. 0x140F5A230 reads this complete layout.
+            const auto end = std::find(message.begin() + 6, message.end(), uint8_t{});
+            const auto nameSize = static_cast<size_t>(end - (message.begin() + 6));
+            if (end == message.end() || nameSize > 35 ||
+                message.size() != 6 + nameSize + 1 + 12)
+                return detail + " invitation_layout=invalid";
+            uint32_t timestamp = 0;
+            uint64_t inviter = 0;
+            std::memcpy(&timestamp, message.data() + 7 + nameSize, sizeof(timestamp));
+            std::memcpy(&inviter, message.data() + 11 + nameSize, sizeof(inviter));
+            return detail + " invitation_layout=valid inviter_matches_sender=" +
+                   (inviter == sender ? "1" : "0") + " invitation_age_seconds=" +
+                   std::to_string(static_cast<int64_t>(now()) - timestamp);
         }
 
         std::string category(const proto::Field &field)
@@ -231,6 +271,7 @@ namespace services
             push.text(id.name);
             push.blob(message);
             Reply reply{0, {}, "global-instant-message-routed"};
+            reply.detail = instantMessageDetail(id.userId, recipient, message);
             reply.deliveries.push_back({recipient, std::move(push.data)});
             return reply;
         }

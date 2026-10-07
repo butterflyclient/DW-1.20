@@ -215,6 +215,14 @@ namespace services
                 assign(dvars, bindings, "party_minplayers", minimum);
                 rules["min_slots_scale_percent"] = 0;
             }
+            if (policy.value("split_parties_for_team_balance", false))
+            {
+                // Replay ReadyTeams otherwise evaluates the original private
+                // subparty as an indivisible group, even after DW balances its
+                // primaries. This rule accompanies the explicit split policy;
+                // normal party grouping retains the native partition check.
+                assign(dvars, bindings, "online_matchmaking_ignore_partition_value", 1);
+            }
             if (policy.contains("dvar_overrides"))
                 overrides(dvars, policy["dvar_overrides"], bindings);
             wire::require(dvars.size() <= 128);
