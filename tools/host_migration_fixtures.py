@@ -151,7 +151,10 @@ def exercise(
             host["player_state"] = {}
         else:
             host["player_state"][str(user)] = 4
-        candidate.task(145, 15, u64(lobby) + u64(1) + text(json.dumps(host)), error=106)
+        candidate.task(
+            145, 15, u64(lobby) + u64(docs[1]["update_id"])
+            + text(json.dumps(host)), error=106,
+        )
         assert snapshot() == before
     checks.append(
         "host migration keeps get-documents readable, returns native false for stale CAS and rejects wrong native addresses or missing/removing successor"
@@ -192,7 +195,9 @@ def exercise(
     original = json.loads(path.read_bytes())
     assert claim(lobby, docs) == boolean(True)
     kind, packet = candidate.receive()
-    assert kind == 2 and packet.startswith(u32(2006) + u64(lobby) + u64(2))
+    assert kind == 2 and packet.startswith(
+        u32(2006) + u64(lobby) + u64(docs[1]["update_id"] + 1)
+    )
     current = strings(packet[23:])
     assert current == strings(candidate.task(145, 13, u64(lobby)))
     stored = json.loads(path.read_bytes())
@@ -233,7 +238,9 @@ def exercise(
         owner.task(145, 15, u64(lobby) + u64(1) + text(json.dumps(docs[0])), error=101)
         assert json.loads(path.read_bytes()) == stored
         assert claim(lobby, current) == boolean(True)
-        assert candidate.receive()[1].startswith(u32(2006) + u64(lobby) + u64(3))
+        assert candidate.receive()[1].startswith(
+            u32(2006) + u64(lobby) + u64(current[1]["update_id"] + 1)
+        )
         candidate.task(145, 10, u64(lobby))
         assert candidate.receive() == (2, u32(2002) + u64(lobby) + u64(0))
         checks.append(
@@ -261,7 +268,9 @@ def exercise(
         index = json.loads(index_path.read_bytes())["lobbies"]
         assert index[str(user)] == lobby and str(owner_user) not in index
         assert claim(lobby, recovered) == boolean(True)
-        assert candidate.receive()[1].startswith(u32(2006) + u64(lobby) + u64(3))
+        assert candidate.receive()[1].startswith(
+            u32(2006) + u64(lobby) + u64(recovered[1]["update_id"] + 1)
+        )
         candidate.task(145, 10, u64(lobby))
         assert candidate.receive() == (2, u32(2002) + u64(lobby) + u64(0))
         checks.append(

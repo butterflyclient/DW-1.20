@@ -2,10 +2,13 @@
 
 import argparse
 import hashlib
+import io
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import time
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -13,6 +16,7 @@ parser.add_argument(
     "--build-receipt", type=Path, default=ROOT / "data/backend-build-latest.json"
 )
 parser.add_argument("--overlay", nargs="*", default=[])
+parser.add_argument("--fixture-revision", help="Use tools from an explicit committed revision")
 args = parser.parse_args()
 
 
@@ -36,6 +40,20 @@ destination.mkdir()
 for name in ("tools", "src", "integration", "third_party"):
     shutil.copytree(source / name, destination / name)
 shutil.copy2(source / "CMakeLists.txt", destination / "CMakeLists.txt")
+fixture_revision = build.get("source_revision")
+if args.fixture_revision:
+    fixture_revision = subprocess.check_output(
+        ["git", "rev-parse", "--verify", args.fixture_revision + "^{commit}"], cwd=ROOT
+    ).decode().strip()
+    archive = subprocess.check_output(
+        ["git", "archive", "--format=zip", fixture_revision, "tools"], cwd=ROOT
+    )
+    with zipfile.ZipFile(io.BytesIO(archive)) as entries:
+        for entry in entries.infolist():
+            path = (destination / entry.filename).resolve()
+            if not path.is_relative_to(destination / "tools"):
+                raise ValueError("Fixture archive escapes its tools directory")
+        entries.extractall(destination)
 overlays = []
 for name in args.overlay:
     relative = Path(name)
@@ -59,6 +77,7 @@ metadata = dict(
     schema=1,
     root=str(destination),
     build_receipt=build,
+    fixture_source_revision=fixture_revision,
     explicit_fixture_overlays=overlays,
     frozen_input_hashes={
         path.relative_to(destination).as_posix(): digest(path)
