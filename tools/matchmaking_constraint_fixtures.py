@@ -55,7 +55,17 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         mm = start(host, request)
         kind, packet = host.receive()
         assert kind == 2 and packet.startswith(u32(2005) + u64(mm))
-        return struct.unpack_from("<Q", packet, 15)[0], strings(packet[32:])
+        lobby = struct.unpack_from("<Q", packet, 15)[0]
+        documents = strings(packet[32:])
+        if len(request["members"]) == 1:
+            assert host.task(
+                145, 15, u64(lobby) + u64(documents[1]["update_id"])
+                + text(json.dumps(documents[0]))
+            ) == boolean(True)
+            kind, update = host.receive()
+            assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+            documents = strings(update[23:])
+        return lobby, documents
 
     def joined(client, request, lobby, observer):
         mm = start(client, request)

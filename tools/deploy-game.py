@@ -187,6 +187,7 @@ required_private_sources = {
     "DW_LocalConfig.cpp",
     "DW_LocalIdentity.cpp",
     "DW_LocalProgression.cpp",
+    "DW_Multiplayer.cpp",
 }
 if {
     Path(item["source"]).name for item in private_objects
