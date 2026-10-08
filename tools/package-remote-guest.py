@@ -38,7 +38,8 @@ launcher = (
 )
 readme = rf"""REPLAY DW CLIENT TEST
 
-Extract all four files into your compatible 1.20 Replay root game folder.
+New players: extract all four files into the compatible 1.20 Replay root folder.
+Existing players: replace the EXE, launcher and READ_ME, keeping your own INI.
 The EXE and INI must stay together. Keep normal game assets/dependencies.
 Remove the optional XInput9_1_0.dll Replay proxy; this EXE needs no proxy.
 Close any old game instance before replacing the EXE and INI.
