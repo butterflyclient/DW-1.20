@@ -13,6 +13,7 @@ import runpy
 import shutil
 import socket
 import struct
+import sys
 import subprocess
 import time
 import urllib.request
@@ -214,6 +215,51 @@ try:
         for client in clients:
             assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
         checks.append("Verdansk BR uses its published squad size, preserves each party in one squad, and disables MP partition splitting")
+        squad_binding = names["online_matchmaking_update_party_team_squad_assignments"]
+        assert docs[1]["ruleset_payload"]["dvar_overrides"][squad_binding] == 1
+        for host_locked, joining_locked in ((True, False), (False, True), (False, False)):
+            initial = {**br, "team_balance": {"num_teams": 1, "lock_squad": host_locked},
+                       "ruleset_payload": {**br["ruleset_payload"], "filter": {
+                           "playlist_id": 89, "playlist_version": catalog["version"]}}}
+            mm = documents(ordinary(host, 18, text(json.dumps(initial))))[0]["mm_id"]
+            _, created = receive(host)
+            lobby = struct.unpack_from("<Q", created, 15)[0]
+            docs = documents(created[32:])
+            assert docs[1]["team_balance"]["squad_size"] == 4
+            ordinary(host, 15, u64(lobby) + u64(docs[1]["update_id"]) + text(json.dumps(docs[0])))
+            receive(host); receive(peer)
+            joining = {**initial, "members": [third.user, fourth.user], "tokens": tokens[2:],
+                       "team_balance": {"num_teams": 1, "lock_squad": joining_locked},
+                       "ruleset_payload": {**initial["ruleset_payload"], "only_join_existing_lobbies": True}}
+            joined_mm = documents(ordinary(third, 18, text(json.dumps(joining))))[0]["mm_id"]
+            _, joined = receive(third); receive(fourth)
+            assert joined.startswith(u32(2001) + u64(joined_mm) + u64(lobby))
+            squads = documents(joined[23:])[1]["team_balance"]["squads"]
+            assert squads["0"] == [host.user, peer.user] if host_locked or joining_locked else squads["0"] == [host.user, peer.user, third.user, fourth.user]
+            if host_locked or joining_locked:
+                assert squads["1"] == [third.user, fourth.user]
+            receive(host); receive(peer)
+            ordinary(host, 10, u64(lobby))
+            for client in clients:
+                assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
+        checks.append("Fill Off parties reserve separate squads; Fill On fills only consenting squads, mixed fill modes share lobbies and DW-to-native squad updates are enabled")
+        policy(True)
+        # This is a document-only fixture. The native S&D publication excludes
+        # Shipment, so use an eligible installed map without launching any map.
+        policy_path.write_text(json.dumps({"available_maps": ["mp_backlot2"],
+            "minimum_players": 1, "split_parties_for_team_balance": True}) + "\n")
+        quick = {**query, "playlist_config": [{"playlist_ids": [4]}]}
+        mm = documents(ordinary(host, 18, text(json.dumps(quick))))[0]["mm_id"]
+        _, created = receive(host)
+        lobby = struct.unpack_from("<Q", created, 15)[0]
+        quick_docs = documents(created[32:])
+        assert quick_docs[1]["ruleset_payload"]["filter"]["playlist_id"] == 4
+        assert quick_docs[1]["ruleset_payload"]["map_weights"]["mp_backlot2"] > 0
+        ordinary(host, 15, u64(lobby) + u64(quick_docs[1]["update_id"]) + text(json.dumps(quick_docs[0])))
+        receive(host); receive(peer)
+        ordinary(host, 10, u64(lobby))
+        assert receive(host) == receive(peer) == (2, u32(2002) + u64(lobby) + u64(0))
+        checks.append("Quick Play category anchor 1 with authoritative selected IDs [4] produces Search and Destroy rather than excluded TDM")
         policy(1)
         try:
             ordinary(host, 18, text(json.dumps(query)))
@@ -237,6 +283,14 @@ try:
             assert "message_kind=" + kind in log
         assert "invitation_layout=valid inviter_matches_sender=1" in log
         checks.append("exact native invitation/request/response bytes preserved with typed routing diagnostics")
+        if "--lobby-only" in sys.argv:
+            receipt = dict(schema=1, passed=True, native_game_verified=False,
+                           scope="focused lobby team/squad/filter wire regression",
+                           server_sha256=hashlib.sha256(EXE.read_bytes()).hexdigest(),
+                           fixture_directory=str(fixture), checks=checks)
+            (ROOT / "data/team-policy-verification.json").write_text(json.dumps(receipt, indent=2) + "\n")
+            print(f"PASS: {len(checks)} focused encrypted lobby/team-policy checks; no game launched")
+            raise SystemExit(0)
         from multiplayer_progression_fixtures import exercise
         exercise(host, peer, third, data, query, tokens, policy, ordinary,
                  receive, documents, text, checks)

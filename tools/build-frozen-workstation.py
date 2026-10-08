@@ -19,7 +19,11 @@ parser.add_argument(
 )
 parser.add_argument("--optimized", action="store_true",
                     help="Include the existing runtime com_optimized 0/1/2 controls in this private DW build")
+parser.add_argument("--receipt-directory", type=Path,
+                    help="Keep this private build's job and source receipts separate from concurrent workstation builds")
 args = parser.parse_args()
+receipts = args.receipt_directory.resolve() if args.receipt_directory else ROOT / "data"
+receipts.mkdir(parents=True, exist_ok=True)
 ORIGINAL = Path(r"E:\replay-compiler")
 snapshot = ROOT / "data" / ("compiler-snapshot-" + str(time.time_ns()))
 snapshot.mkdir(parents=True)
@@ -119,10 +123,14 @@ for directory in ("src", "source-workstation", "generated"):
             and "__pycache__" not in source.parts
             and "validation" not in source.parts
         ):
-            copy_file(
-                saved_dw_source(source) if directory == "src" else source,
-                snapshot / source.relative_to(ORIGINAL),
-            )
+            selected = saved_dw_source(source) if directory == "src" else source
+            # DW owns this optional scheduling replacement. Keep the shared
+            # compiler's implementation and other projects unchanged.
+            if args.optimized and source == ORIGINAL / "src/Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp":
+                override = ((args.integration_root or ROOT / "integration/replay") / source.name).resolve()
+                if override.is_file():
+                    selected = override
+            copy_file(selected, snapshot / source.relative_to(ORIGINAL))
 for directory in ("tools", "workstation"):
     for source in (ORIGINAL / directory).glob("*"):
         if source.is_file() and source.suffix in (".py", ".json", ".cpp", ".h", ".hpp"):
@@ -198,6 +206,11 @@ for source in sorted(private_sources.iterdir()):
     ):
         continue
     destination = snapshot / "src" / source.name
+    if source.name == "Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp":
+        # Already copied at its native optional-source association above.
+        if args.optimized and source.read_bytes() != destination.read_bytes():
+            raise RuntimeError("DW scheduler source changed during snapshot")
+        continue
     if destination.exists():
         raise RuntimeError(
             "Private DW source collides with shared source: " + source.name
@@ -426,7 +439,7 @@ for item in manifest["preparation_inputs"]:
         raise RuntimeError("Recovery source snapshot is stale: " + item["path"])
     item["path"] = str(new_path)
 manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-(ROOT / "data" / "compiler-snapshot-receipt.json").write_text(
+(receipts / "compiler-snapshot-receipt.json").write_text(
     json.dumps(
         {
             "schema": 1,
@@ -465,7 +478,7 @@ project = Project(
     recover_jobs=False,
 )
 job = project.start_build("engine")
-receipt = ROOT / "data" / "workstation-job.json"
+receipt = receipts / "workstation-job.json"
 receipt.write_text(json.dumps(job, indent=2) + "\n")
 print("Frozen saved-source workstation job:", job["id"], flush=True)
 phase = None

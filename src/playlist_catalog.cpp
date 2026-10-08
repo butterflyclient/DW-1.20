@@ -146,6 +146,9 @@ namespace services
         std::vector<unsigned> candidates{requested};
         if (query.contains("playlist_config"))
         {
+            // Quick Play's filter playlist_id is only the category anchor.
+            // playlist_config contains the actual modes selected in its UI.
+            candidates.clear();
             wire::require(query["playlist_config"].is_array() &&
                           query["playlist_config"].size() <= 128);
             for (const auto &group : query["playlist_config"])
@@ -158,6 +161,12 @@ namespace services
                     if (std::find(candidates.begin(), candidates.end(), id) == candidates.end())
                         candidates.push_back(id);
                 }
+            }
+            wire::require(!candidates.empty());
+            if (!preferredPlaylist)
+            {
+                const auto first = wire::at<uint64_t>(crypto::random(8), 0) % candidates.size();
+                std::rotate(candidates.begin(), candidates.begin() + first, candidates.end());
             }
         }
         const auto policy = document(root / "policy.json", 16384, Json::object());
@@ -303,6 +312,16 @@ namespace services
             // Preserve the caller's backend rules and explicit local policy here;
             // keep catalog rules in match metadata for every selected entry.
             assign(dvars, bindings, "online_matchmaking_use_map_weights", 1);
+            assign(dvars, bindings, "replay_dw_forceStart", 0);
+            assign(dvars, bindings, "replay_dw_fillBots", 0);
+            assign(dvars, bindings, "replay_dw_botCount", 0);
+            if (squadMode)
+            {
+                assign(dvars, bindings, "br_minplayers", 2);
+                // Replay otherwise retains the party host's local squad
+                // assignment after parsing a correct DW squad document.
+                assign(dvars, bindings, "online_matchmaking_update_party_team_squad_assignments", 1);
+            }
             if (policy.contains("minimum_players"))
             {
                 const auto minimum = number(policy["minimum_players"], 200);

@@ -14,12 +14,15 @@ import urllib.parse
 import zlib
 
 root = Path(__file__).resolve().parents[1]
+server = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build/Release/iw8-dw-server.exe")))
+proof_directory = Path(os.environ.get("IW8_DW_TEST_PROOF_DIRECTORY", str(root / "data")))
+client_dll = Path(os.environ.get("IW8_DW_TEST_CLIENT_DLL", str(root / "build/Release/iw8-dw-platform-client.dll")))
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--local-only", action="store_true",
                     help="Verify an isolated loopback issuer without a LAN listener")
 args = parser.parse_args()
 verify = ctypes.CDLL(
-    str(root / "build/Release/iw8-dw-platform-client.dll")
+    str(client_dll)
 ).DW_LocalPlatform_VerifyResourceReply
 verify.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64)
 verify.restype = ctypes.c_bool
@@ -108,7 +111,7 @@ receipt = {
     "schema": 1,
     "passed": True,
     "server_sha256": hashlib.sha256(
-        (root / "build/Release/iw8-dw-server.exe").read_bytes()
+        server.read_bytes()
     ).hexdigest(),
     "crypto_source_sha256": hashlib.sha256(
         (root / "integration/replay/DW_LocalPlatformCrypto.cpp").read_bytes()
@@ -129,7 +132,7 @@ receipt = {
     "external_transport_verified": False,
     "decoded_bytes": len(decoded),
 }
-(root / "data/platform-resource-verification.json").write_text(
+(proof_directory / "platform-resource-verification.json").write_text(
     json.dumps(receipt, indent=2) + "\n"
 )
 print(

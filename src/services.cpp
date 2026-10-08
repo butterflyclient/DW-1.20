@@ -1,4 +1,5 @@
 #include "host_os.h"
+#include "lobby.h"
 #include "services.h"
 #include "inventory_validation_services.h"
 #include "protobuf.h"
@@ -498,6 +499,44 @@ namespace services
         initializeStartup(directory);
         initializeChannels(directory);
         relay::initialize(directory);
+    }
+
+    nlohmann::json publicActivity()
+    {
+        const auto players = lobby::onlinePlayerList();
+        std::lock_guard lock(storeMutex);
+        return matchmakingPublicActivity(directory, players);
+    }
+
+    OperatorMatchStart operatorStartMatch(const std::string &credential,
+                                         const std::string &matchToken,
+                                         bool fillBots,
+                                         unsigned botCount)
+    {
+        // An independent operator secret never shares client identity credentials.
+        const auto path = directory / "operator-access.key";
+        if (!std::filesystem::is_regular_file(path) || std::filesystem::file_size(path) > 66)
+            return {503, "Operator controls are not configured."};
+        std::ifstream input(path, std::ios::binary);
+        std::string expected;
+        std::getline(input, expected);
+        if (!expected.empty() && expected.back() == '\r')
+            expected.pop_back();
+        if (expected.size() != 64 || expected.find_first_not_of("0123456789abcdef") != std::string::npos)
+            return {503, "Operator controls are not configured."};
+        unsigned difference = credential.size() == expected.size() ? 0U : 1U;
+        for (size_t i = 0; i < expected.size(); ++i)
+            difference |= static_cast<unsigned char>(expected[i]) ^
+                          (i < credential.size() ? static_cast<unsigned char>(credential[i]) : 0U);
+        if (difference)
+            return {403, "Operator key rejected."};
+        if (matchToken.size() != 64 || matchToken.find_first_not_of("0123456789abcdef") != std::string::npos)
+            return {400, "Invalid match selection."};
+        if ((fillBots && (!botCount || botCount > 199)) || (!fillBots && botCount))
+            return {400, "Bot count must be a whole number from 1 to 199."};
+        const auto players = lobby::onlinePlayerList();
+        std::lock_guard lock(storeMutex);
+        return matchmakingStartWaitingMatch(directory, players, matchToken, fillBots, botCount);
     }
 
     void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,

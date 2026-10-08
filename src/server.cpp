@@ -27,6 +27,13 @@
 #include "relay_services.h"
 #include "relay_provider.h"
 #include "network.h"
+#include "public_dashboard.h"
+#include "operator_controls.h"
+#include "../third_party/nlohmann/json.hpp"
+#ifndef _WIN32
+#include <sys/resource.h>
+#include <sys/sysinfo.h>
+#endif
 
 namespace
 {
@@ -35,6 +42,8 @@ namespace
     constexpr unsigned maxClients = 32;
     std::atomic<bool> stopping{false};
     std::atomic<unsigned> active{0}, probes{0}, authRequests{0};
+    const auto started = std::chrono::steady_clock::now();
+    std::filesystem::path runtimeDirectory;
     std::mutex logMutex;
     std::ofstream logFile;
 
@@ -102,10 +111,13 @@ namespace
                const std::string &extraHeaders = "")
     {
         const char *reason = status == 200   ? "OK"
+                             : status == 202 ? "Accepted"
+                             : status == 403 ? "Forbidden"
                              : status == 201 ? "Created"
                              : status == 206 ? "Partial Content"
                              : status == 400 ? "Bad Request"
                              : status == 404 ? "Not Found"
+                             : status == 405 ? "Method Not Allowed"
                              : status == 416 ? "Range Not Satisfiable"
                              : status == 409 ? "Conflict"
                              : status == 503 ? "Service Unavailable"
@@ -141,6 +153,85 @@ namespace
                ",\"local_qos_probes\":" + std::to_string(qos_provider::probes()) +
                ",\"local_nat_introductions\":" + std::to_string(qos_provider::traversals()) +
                ",\"relay\":" + relay_provider::status() + "}";
+    }
+
+    std::string publicStats()
+    {
+        using Json = nlohmann::json;
+        const auto elapsed =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+        const auto relay = Json::parse(relay_provider::status());
+        const auto activity = services::publicActivity();
+        Json stats{{"uptime_seconds", elapsed},
+                   {"online_players", activity.at("players").size()},
+                   {"activity", activity},
+                   {"transport_connections", active.load()},
+                   {"connection_limit", maxClients},
+                   {"logins", platform::logins()},
+                   {"auth_successes", platform::authentications()},
+                   {"lobby_authentications", lobby::authenticated.load()},
+                   {"tasks", lobby::tasks.load()},
+                   {"lobby_frames", lobby::frames.load()},
+                   {"lobby_failures", lobby::failures.load()},
+                   {"qos_enabled", qos_provider::enabled()},
+                   {"qos_probes", qos_provider::probes()},
+                   {"nat_introductions", qos_provider::traversals()},
+                   {"relay_enabled", relay.at("enabled")},
+                   {"relay_failure", relay.at("failure")},
+                   {"relay_associations", relay.at("active_associations")},
+                   {"relay_verified", relay.at("verified_associations")},
+                   {"relay_packets", relay.at("forwarded_packets")},
+                   {"relay_pings", relay.at("ping_replies")},
+                   {"relay_rejected", relay.at("rejected_packets")},
+                   {"cpu_seconds", nullptr},
+                   {"resident_bytes", nullptr},
+                   {"host_memory_bytes", nullptr},
+                   {"host_memory_available_bytes", nullptr},
+                   {"load_1m", nullptr},
+                   {"disk_total_bytes", nullptr},
+                   {"disk_available_bytes", nullptr}};
+#ifndef _WIN32
+        rusage usage{};
+        if (getrusage(RUSAGE_SELF, &usage) == 0)
+        {
+            stats["cpu_seconds"] = usage.ru_utime.tv_sec + usage.ru_stime.tv_sec +
+                                   (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000000.0;
+            // Current RSS, rather than getrusage's lifetime peak.
+            std::ifstream memory("/proc/self/statm");
+            uint64_t pages = 0, resident = 0;
+            if (memory >> pages >> resident)
+            {
+                const auto pageSize = sysconf(_SC_PAGESIZE);
+                if (pageSize > 0)
+                    stats["resident_bytes"] = resident * static_cast<uint64_t>(pageSize);
+            }
+        }
+        struct sysinfo host{};
+        if (sysinfo(&host) == 0)
+        {
+            stats["host_memory_bytes"] = static_cast<uint64_t>(host.totalram) * host.mem_unit;
+            stats["load_1m"] = host.loads[0] / 65536.0;
+        }
+        std::ifstream memoryInfo("/proc/meminfo");
+        std::string line;
+        while (std::getline(memoryInfo, line))
+            if (line.starts_with("MemAvailable:"))
+            {
+                std::istringstream value(line.substr(13));
+                uint64_t kib = 0;
+                if (value >> kib)
+                    stats["host_memory_available_bytes"] = kib * 1024;
+                break;
+            }
+#endif
+        std::error_code error;
+        const auto disk = std::filesystem::space(runtimeDirectory, error);
+        if (!error)
+        {
+            stats["disk_total_bytes"] = disk.capacity;
+            stats["disk_available_bytes"] = disk.available;
+        }
+        return stats.dump();
     }
 
     std::string lower(std::string value)
@@ -232,6 +323,7 @@ namespace
         std::optional<std::string> destinationHeader;
         std::optional<std::string> accessHeader;
         std::optional<std::string> playerNameHeader;
+        std::optional<std::string> operatorHeader;
         size_t at = firstLineEnd + 2;
         while (at < headerEnd)
         {
@@ -245,6 +337,15 @@ namespace
             const std::string key = lower(request.substr(at, colon - at));
             const size_t valueAt = request.find_first_not_of(" \t", colon + 1);
             const std::string value = valueAt < end ? request.substr(valueAt, end - valueAt) : "";
+            if (key == "x-replay-operator")
+            {
+                if (operatorHeader || value.size() > 64)
+                {
+                    reply(socket, 400, "{\"error\":\"invalid_operator_header\"}");
+                    return;
+                }
+                operatorHeader = value;
+            }
             if (key == "transfer-encoding")
             {
                 reply(socket, 400, "{\"error\":\"transfer_encoding_unsupported\"}");
@@ -372,6 +473,70 @@ namespace
                     return;
                 remaining -= count;
             }
+        }
+        else if (path == "/operator/start-match" || path == "/operator/fill-bots")
+        {
+            if (method != "POST")
+                reply(socket, 405, "{\"message\":\"Use POST.\"}", "application/json", "Allow: POST\r\n");
+            else if (!hasLength || length > 256 ||
+                     (path == "/operator/start-match" && length != 64))
+                reply(socket, 400, "{\"message\":\"Invalid match selection.\"}");
+            else
+            {
+                try
+                {
+                    const bool fill = path == "/operator/fill-bots";
+                    std::string token = request.substr(bodyAt, length);
+                    unsigned count = 0;
+                    if (fill)
+                    {
+                        const auto body = nlohmann::json::parse(token, nullptr, false);
+                        if (!body.is_object() || body.size() != 2 ||
+                            !body.contains("match_token") || !body["match_token"].is_string() ||
+                            !body.contains("bot_count") || !body["bot_count"].is_number_unsigned() ||
+                            body["bot_count"].get<uint64_t>() == 0 ||
+                            body["bot_count"].get<uint64_t>() >= 200)
+                        {
+                            reply(socket, 400, "{\"message\":\"Provide a match token and a whole bot count from 1 to 199.\"}");
+                            return;
+                        }
+                        token = body["match_token"].get<std::string>();
+                        count = body["bot_count"].get<unsigned>();
+                    }
+                    auto result = services::operatorStartMatch(operatorHeader.value_or(""),
+                                                               token, fill, count);
+                    if (!result.deliveries.empty())
+                        lobby::publishOperatorUpdates(result.title, result.deliveries);
+                    reply(socket, result.status, nlohmann::json{{"message", result.message}}.dump());
+                    log("OPERATOR start-match status=" + std::to_string(result.status));
+                }
+                catch (const std::exception &error)
+                {
+                    log("OPERATOR lobby-control failed: " + std::string(error.what()));
+                    reply(socket, 503, "{\"message\":\"Lobby update unavailable; refresh and retry.\"}");
+                }
+            }
+        }
+        else if (path == "/" || path == "/stats" || path == "/stats.json")
+        {
+            const std::string headers =
+                "X-Content-Type-Options: nosniff\r\n"
+                "Referrer-Policy: no-referrer\r\n"
+                "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; "
+                "style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; "
+                "base-uri 'none'; form-action 'none'\r\n";
+            if (method != "GET")
+                reply(socket,
+                      405,
+                      "{\"error\":\"read_only\"}",
+                      "application/json",
+                      headers + "Allow: GET\r\n");
+            else if (length)
+                reply(socket, 400, "{\"error\":\"unexpected_body\"}");
+            else if (path == "/stats.json")
+                reply(socket, 200, publicStats(), "application/json", headers);
+            else
+                reply(socket, 200, publicDashboard, "text/html; charset=utf-8", headers);
         }
         else if (method == "GET" && (path == "/health" || path == "/status"))
         {
@@ -823,6 +988,7 @@ int main(int argc, char **argv)
             return 1;
         }
     }
+    runtimeDirectory = directory;
     std::filesystem::create_directories(directory);
     logFile.open(directory / "server.log", std::ios::app);
     if (!logFile)

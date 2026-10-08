@@ -6,6 +6,8 @@
 #include <string>
 #include <atomic>
 
+namespace services { struct Delivery; }
+
 namespace lobby
 {
     struct IO
@@ -20,6 +22,16 @@ namespace lobby
     };
 
     void serve(const IO &io);
+    void publishOperatorUpdates(uint32_t title, std::span<const services::Delivery> deliveries);
+    struct OnlinePlayer
+    {
+        uint32_t title;
+        uint64_t user;
+        std::string name;
+    };
+
+    std::vector<OnlinePlayer> onlinePlayerList();
+    unsigned onlinePlayers();
     bool online(uint32_t title, uint64_t user);
     std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user);
     bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint);

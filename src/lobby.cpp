@@ -565,6 +565,43 @@ namespace lobby
         };
     } // namespace
 
+    void publishOperatorUpdates(uint32_t title, std::span<const services::Delivery> deliveries)
+    {
+        for (const auto &delivery : deliveries)
+            route(title, delivery);
+    }
+
+    std::vector<OnlinePlayer> onlinePlayerList()
+    {
+        std::vector<std::vector<platform::LobbyIdentity>> users;
+        {
+            std::lock_guard lock(onlineMutex);
+            for (const auto &[key, sessions] : onlineUsers)
+            {
+                auto &identities = users.emplace_back();
+                for (const auto &[fingerprint, session] : sessions)
+                    identities.push_back(session.identity);
+            }
+        }
+        std::vector<OnlinePlayer> players;
+        for (const auto &identities : users)
+            for (const auto &identity : identities)
+                if (platform::valid(identity))
+                {
+                    players.push_back(
+                        {identity.titleId,
+                         identity.userId,
+                         platform::accountName(identity.userId).value_or(identity.name)});
+                    break;
+                }
+        return players;
+    }
+
+    unsigned onlinePlayers()
+    {
+        return static_cast<unsigned>(onlinePlayerList().size());
+    }
+
     bool online(uint32_t title, uint64_t user)
     {
         std::vector<platform::LobbyIdentity> identities;

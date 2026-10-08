@@ -169,6 +169,31 @@ namespace services
                                         state["owner_session"].get<std::string>());
         }
 
+        std::string operatorMatchToken(const Json &state)
+        {
+            const auto value = state.at("title").dump() + ":" + state.at("id").dump() +
+                               ":" + state.at("owner_session").get<std::string>() + ":" +
+                               std::to_string(state.value("operator_start_cycle", uint64_t{0}));
+            const auto bytes = crypto::sha256({reinterpret_cast<const uint8_t *>(value.data()), value.size()});
+            std::string token;
+            for (const auto byte : bytes)
+            {
+                token += "0123456789abcdef"[byte >> 4];
+                token += "0123456789abcdef"[byte & 15];
+            }
+            return token;
+        }
+
+        bool operatorCanStart(const Json &state)
+        {
+            const auto phase = state.at("host_doc").at("game_state").value("state", std::string{});
+            return state.value("host_ready", false) && !state.value("disbanded", false) &&
+                   state.at("expires").get<uint64_t>() > now() &&
+                   (phase.empty() || phase == "intermission") &&
+                   !state.at("backend_doc").contains("tournament") &&
+                   !state.at("backend_doc").contains("private_lobby");
+        }
+
         void notify(Reply &reply,
                     const Json &lobby,
                     uint32_t event,
@@ -452,6 +477,9 @@ namespace services
                              query.value("acceptable_platforms", Json::array({"bnet"}))}}},
                           {"match_selection", selection.metadata}};
             lobby["maximum_members"] = requestCapacity(query);
+            if (selection.squadSize)
+                lobby["squad_fill"] = {{"0", !query.value("team_balance", Json::object())
+                                                      .value("lock_squad", false)}};
             wire::require(lobby["host_doc"].dump().size() < 16384 &&
                           lobby["backend_doc"].dump().size() < 16384);
             return lobby;
@@ -603,7 +631,11 @@ namespace services
             if (selection.splitPartiesForTeamBalance)
                 pool["split_parties_for_team_balance"] = true;
             if (selection.squadSize)
+            {
                 pool["squad_size"] = selection.squadSize;
+                // Fill is a party preference, not a separate matchmaking pool.
+                pool["team_balance"].erase("lock_squad");
+            }
             return pool;
         }
 
@@ -655,18 +687,40 @@ namespace services
                 auto &squads = backend["team_balance"]["squads"];
                 wire::require(squads.is_object());
                 Json additions = Json::array();
-                for (const auto user : users)
-                    if (!existing.contains(user))
+                for (const auto &user : query.at("members"))
+                    if (!existing.contains(user.get<uint64_t>()))
                         additions.push_back(user);
                 if (!additions.empty())
                 {
                     // Preserve the authenticated joining party as a unit. Never
                     // assign each primary to a separate default size-one squad.
                     wire::require(occupiedSlots(additions, reservations) <= squadSize);
-                    unsigned next = 0;
-                    while (squads.contains(std::to_string(next)))
-                        wire::require(++next < 200);
-                    squads[std::to_string(next)] = std::move(additions);
+                    const bool locked = query.value("team_balance", Json::object())
+                                            .value("lock_squad", false);
+                    auto &fill = lobby["squad_fill"];
+                    if (fill.is_null())
+                        fill = Json::object(); // Older squads remain reserved.
+                    std::string destination;
+                    if (!locked)
+                        for (const auto &squad : squads.items())
+                            if (fill.value(squad.key(), false) &&
+                                occupiedSlots(squad.value(), reservations) +
+                                    occupiedSlots(additions, reservations) <= squadSize)
+                            {
+                                destination = squad.key();
+                                break;
+                            }
+                    if (destination.empty())
+                    {
+                        unsigned next = 0;
+                        while (squads.contains(std::to_string(next)))
+                            wire::require(++next < 200);
+                        destination = std::to_string(next);
+                        squads[destination] = Json::array();
+                        fill[destination] = !locked;
+                    }
+                    for (const auto &user : additions)
+                        squads[destination].push_back(user);
                 }
             }
             for (const auto user : users)
@@ -680,7 +734,7 @@ namespace services
                     backend["player_id_to_service_level"][key] = "paid";
                     backend["listen_server"]["lobby_host_order"].push_back(user);
                     if (lobby.value("match_selection", Json::object())
-                             .value("split_parties_for_team_balance", false))
+                            .value("split_parties_for_team_balance", false))
                     {
                         // Existing members retain their assignments. Balance
                         // each new primary together with its reserved guests.
@@ -1227,6 +1281,32 @@ namespace services
                     order.insert(order.begin(), id.userId);
                 }
                 auto writes = reconcileMembers(root, id, lobby, host);
+                const auto oldPhase = lobby["host_doc"]["game_state"].value("state", std::string{});
+                const auto newPhase = host.value("game_state", Json::object()).value("state", std::string{});
+                if ((lobby.value("operator_start_requested", false) ||
+                     lobby.value("operator_bots_requested", false)) &&
+                    (oldPhase == "in_game" || oldPhase == "countdown") &&
+                    (newPhase.empty() || newPhase == "intermission"))
+                {
+                    auto &overrides = lobby["backend_doc"]["ruleset_payload"]["dvar_overrides"];
+                    for (const auto &saved : lobby.at("operator_start_overrides").items())
+                        if (saved.value().is_null())
+                            overrides.erase(saved.key());
+                        else
+                            overrides[saved.key()] = saved.value();
+                    const auto cycle = lobby.value("operator_start_cycle", uint64_t{0});
+                    wire::require(cycle != UINT64_MAX);
+                    lobby["operator_start_cycle"] = cycle + 1;
+                    lobby.erase("operator_start_requested");
+                    lobby.erase("operator_bots_requested");
+                    lobby.erase("operator_bot_count");
+                    if (lobby.contains("operator_bots_capacity"))
+                    {
+                        lobby["maximum_members"] = lobby.at("operator_bots_capacity");
+                        lobby.erase("operator_bots_capacity");
+                    }
+                    lobby.erase("operator_start_overrides");
+                }
                 lobby["update_id"] = revision + 1;
                 host["update_id"] = revision + 1;
                 host["update_time"] = documentTime;
@@ -1264,6 +1344,320 @@ namespace services
             return std::nullopt;
         }
     } // namespace
+
+    OperatorMatchStart matchmakingStartWaitingMatch(
+        const std::filesystem::path &directory,
+        const std::vector<lobby::OnlinePlayer> &players,
+        const std::string &matchToken,
+        bool fillBots,
+        unsigned botCount)
+    {
+        std::set<std::pair<uint32_t, uint64_t>> visited;
+        for (const auto &player : players)
+        {
+            const platform::LobbyIdentity identity{.titleId = player.title};
+            const auto root = directory / "matchmaking" / std::to_string(player.title);
+            const auto index = currentLobbies(root, identity);
+            const auto owner = std::to_string(player.user);
+            if (!index["lobbies"].contains(owner))
+                continue;
+            const auto lobbyId = index["lobbies"][owner].get<uint64_t>();
+            if (!visited.emplace(player.title, lobbyId).second)
+                continue;
+            const auto path = root / "lobbies" / (std::to_string(lobbyId) + ".json");
+            if (!std::filesystem::exists(path))
+                continue;
+            auto state = loadLobby(path, identity);
+            if (operatorMatchToken(state) != matchToken)
+                continue;
+            const auto hostKey = std::to_string(state.at("owner").get<uint64_t>());
+            if (!index["lobbies"].contains(hostKey) || index["lobbies"][hostKey] != lobbyId)
+                return {409, "The host has left this lobby."};
+            if (!hostSessionActive(state, player.title) || !operatorCanStart(state))
+                return {409, "This lobby is no longer waiting for a public match."};
+            const auto *requested = fillBots ? "operator_bots_requested" : "operator_start_requested";
+            if (state.value(requested, false))
+            {
+                if (fillBots && state.value("operator_bot_count", 0u) != botCount)
+                    return {409, "A different bot count was already requested for this round."};
+                Reply update;
+                notify(update, state, 2006);
+                return {200, fillBots ? "Bot fill already requested." : "Start already requested.",
+                        player.title, std::move(update.deliveries)};
+            }
+            const auto bindingPath = directory / "playlists" / std::to_string(player.title) /
+                                     "native-dvar-names.json";
+            wire::require(std::filesystem::file_size(bindingPath) <= 1024 * 1024);
+            std::ifstream bindingsFile(bindingPath);
+            Json bindings;
+            bindingsFile >> bindings;
+            auto &overrides = state["backend_doc"]["ruleset_payload"]["dvar_overrides"];
+            wire::require(overrides.is_object() && bindings.is_object());
+            const auto set = [&](const char *name, const Json &value)
+            {
+                // Use the target-build publication used by the playlist selector.
+                const auto key = bindings.contains(name) ? bindings.at(name).get<std::string>() : name;
+                wire::require(!key.empty() && key.size() <= 128);
+                if (!state["operator_start_overrides"].contains(key))
+                    state["operator_start_overrides"][key] = overrides.value(key, Json());
+                overrides[key] = value;
+            };
+            if (fillBots)
+            {
+                const auto slots = occupiedSlots(state.at("members"), state["backend_doc"]["player_id_to_slots"]);
+                const auto capacity = state.at("maximum_members").get<uint64_t>();
+                if (!botCount || botCount > 199 || slots + botCount > capacity)
+                    return {409, "Bot count exceeds the remaining playlist slots."};
+                state["operator_bot_count"] = uint64_t{botCount};
+                // The legacy boolean consumer changed party capacity to 12.
+                // Keep it clear; only the new count-aware game consumes this.
+                set("replay_dw_fillBots", 0);
+                set("replay_dw_botCount", botCount);
+            }
+            else
+            {
+                set("party_minLobbyTime", 0);
+                set("party_minVoteTime", 0);
+                set("party_minplayers", 1);
+                set("replay_dw_forceStart", 1);
+            }
+            wire::require(overrides.size() <= 128);
+            const auto revision = state.at("update_id").get<uint64_t>();
+            wire::require(revision != UINT64_MAX);
+            const auto documentTime = nextDocumentTime(state);
+            state["update_id"] = revision + 1;
+            for (auto *document : {&state["host_doc"], &state["backend_doc"]})
+            {
+                (*document)["update_id"] = revision + 1;
+                (*document)["update_time"] = documentTime;
+            }
+            state[requested] = true;
+            wire::require(state["host_doc"].dump().size() < 16384 &&
+                          state["backend_doc"].dump().size() < 16384);
+            const std::array<matchmaking_store::Write, 1> writes = {
+                matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", state}};
+            matchmaking_store::commit(root, player.title, writes);
+            Reply update;
+            notify(update, state, 2006);
+            return {202, fillBots ? "Requested " + std::to_string(botCount) + " native bots; playlist player limit preserved. The count-aware game build is required." : "Native start request sent to the host.",
+                    player.title, std::move(update.deliveries)};
+        }
+        return {404, "This lobby is no longer available. Refresh the panel."};
+    }
+
+    nlohmann::json matchmakingPublicActivity(const std::filesystem::path &directory,
+                                             const std::vector<lobby::OnlinePlayer> &online)
+    {
+        // Called under the service-store lock. Only explicitly selected display
+        // fields leave this snapshot; native documents contain addresses and keys.
+        using Json = nlohmann::json;
+        Json result{{"available", true},
+                    {"players", Json::array()},
+                    {"parties", Json::array()},
+                    {"matches", Json::array()}};
+        std::map<std::pair<uint32_t, uint64_t>, size_t> playerRows;
+        std::set<uint32_t> titles;
+        for (const auto &player : online)
+        {
+            playerRows[{player.title, player.user}] = result["players"].size();
+            titles.insert(player.title);
+            result["players"].push_back({{"name", player.name},
+                                         {"party", nullptr},
+                                         {"match", nullptr},
+                                         {"host", false},
+                                         {"state", "online"}});
+        }
+        try
+        {
+            for (const auto title : titles)
+            {
+                const auto root = directory / "matchmaking" / std::to_string(title);
+                const platform::LobbyIdentity identity{.titleId = title};
+                const auto index = currentLobbies(root, identity);
+                std::set<uint64_t> lobbyIds;
+                for (const auto &[key, row] : playerRows)
+                    if (key.first == title && index["lobbies"].contains(std::to_string(key.second)))
+                        lobbyIds.insert(
+                            index["lobbies"][std::to_string(key.second)].get<uint64_t>());
+                for (const auto lobbyId : lobbyIds)
+                {
+                    const auto path = root / "lobbies" / (std::to_string(lobbyId) + ".json");
+                    if (!std::filesystem::exists(path))
+                        continue;
+                    const auto state = loadLobby(path, identity);
+                    const auto owner = state.at("owner").get<uint64_t>();
+                    const auto ownerKey = std::to_string(owner);
+                    if (state.value("disbanded", false) ||
+                        state.at("expires").get<uint64_t>() <= now() ||
+                        !hostSessionActive(state, title) || !playerRows.contains({title, owner}) ||
+                        !index["lobbies"].contains(ownerKey) ||
+                        index["lobbies"][ownerKey] != lobbyId)
+                        continue;
+                    const auto label = "Match " + std::to_string(result["matches"].size() + 1);
+                    auto gameState = state["host_doc"]["game_state"].value("state", std::string{});
+                    if (!state.value("host_ready", false))
+                        gameState = "forming";
+                    else if (gameState.empty())
+                        gameState = "intermission";
+                    if (gameState != "in_game" && gameState != "countdown" &&
+                        gameState != "intermission" && gameState != "forming")
+                        gameState = "unknown";
+                    Json roster = Json::array();
+                    std::map<uint64_t, std::vector<uint64_t>> groups;
+                    const auto &backend = state.at("backend_doc");
+                    for (const auto &member : state.at("members"))
+                    {
+                        const auto user = member.get<uint64_t>();
+                        const auto key = std::to_string(user);
+                        const auto row = playerRows.find({title, user});
+                        if (row == playerRows.end() || !index["lobbies"].contains(key) ||
+                            index["lobbies"][key] != lobbyId)
+                            continue;
+                        auto &player = result["players"][row->second];
+                        player["match"] = label;
+                        player["host"] = user == owner;
+                        player["state"] = gameState;
+                        if (state.contains("pending_join_members") &&
+                            std::find(state["pending_join_members"].begin(),
+                                      state["pending_join_members"].end(),
+                                      member) != state["pending_join_members"].end())
+                            player["state"] = "joining";
+                        roster.push_back(row->second);
+                        if (backend.contains("player_id_to_mm_id") &&
+                            backend["player_id_to_mm_id"].contains(key))
+                            groups[backend["player_id_to_mm_id"][key].get<uint64_t>()].push_back(
+                                user);
+                    }
+                    for (const auto &[searchId, members] : groups)
+                    {
+                        const auto searchPath =
+                            root / "searches" / (std::to_string(searchId) + ".json");
+                        if (!std::filesystem::exists(searchPath) ||
+                            std::filesystem::file_size(searchPath) > 128 * 1024)
+                            continue;
+                        std::ifstream stream(searchPath);
+                        if (!stream)
+                            throw std::runtime_error("Public party snapshot unavailable");
+                        Json search;
+                        stream >> search;
+                        if (search.at("schema") != 1 || search.at("title") != title ||
+                            search.at("id") != searchId || search.at("lobby_id") != lobbyId ||
+                            search.at("expires").get<uint64_t>() <= now())
+                            continue;
+                        Json names = Json::array();
+                        std::vector<size_t> rows;
+                        for (const auto user : members)
+                        {
+                            const auto key = std::to_string(user);
+                            if (std::find(search.at("query").at("members").begin(),
+                                          search.at("query").at("members").end(),
+                                          Json(user)) == search.at("query").at("members").end())
+                                continue;
+                            auto memberIdentity = identity;
+                            memberIdentity.userId = user;
+                            const auto playerState =
+                                read(root / "players" / (key + ".json"), memberIdentity);
+                            // Ordinary searches bind members through their issued tokens;
+                            // tournament searches may additionally record session maps.
+                            const auto session = playerState.value("token_session", std::string{});
+                            if (playerState.value("token_expires", uint64_t{}) <= now() ||
+                                session.empty() || !lobby::sessionOnline(title, user, session))
+                                continue;
+                            bool tokenMatches = false;
+                            for (size_t i = 0; i < search["query"]["members"].size(); ++i)
+                                if (search["query"]["members"][i] == user &&
+                                    search["query"]["tokens"][i] == playerState.at("token"))
+                                    tokenMatches = true;
+                            if (!tokenMatches)
+                                continue;
+                            const auto row = playerRows.at({title, user});
+                            names.push_back(result["players"][row]["name"]);
+                            rows.push_back(row);
+                        }
+                        if (rows.empty())
+                            continue;
+                        const auto partyLabel =
+                            "Party " + std::to_string(result["parties"].size() + 1);
+                        Json leader = nullptr;
+                        for (const auto row : rows)
+                        {
+                            result["players"][row]["party"] = partyLabel;
+                            if (online[row].user == search.at("user").get<uint64_t>())
+                                leader = result["players"][row]["name"];
+                        }
+                        result["parties"].push_back({{"label", partyLabel},
+                                                     {"leader", leader},
+                                                     {"members", names},
+                                                     {"match", label},
+                                                     {"state", gameState}});
+                    }
+                    Json teams = Json::array();
+                    if (backend.contains("team_balance") &&
+                        backend["team_balance"].contains("teams"))
+                        for (const auto &team : backend["team_balance"]["teams"].items())
+                        {
+                            Json names = Json::array();
+                            for (const auto &user : team.value())
+                            {
+                                const auto row = playerRows.find({title, user.get<uint64_t>()});
+                                if (row != playerRows.end() &&
+                                    result["players"][row->second]["match"] == label)
+                                    names.push_back(result["players"][row->second]);
+                            }
+                            if (!names.empty())
+                                teams.push_back(
+                                    {{"label", "Team " + team.key()}, {"members", names}});
+                        }
+                    Json members = Json::array();
+                    for (const auto &row : roster)
+                        members.push_back(result["players"][row.get<size_t>()]);
+                    Json maps = Json::array(), modes = Json::array();
+                    if (state.contains("match_selection"))
+                        for (const auto &entry :
+                             state["match_selection"].value("eligible_entries", Json::array()))
+                        {
+                            for (const auto &[field, output] :
+                                 {std::pair{"map", &maps}, std::pair{"gametype", &modes}})
+                                if (entry.contains(field) && entry[field].is_string() &&
+                                    entry[field].get_ref<const std::string &>().size() <= 128 &&
+                                    std::find(output->begin(), output->end(), entry[field]) ==
+                                        output->end())
+                                    output->push_back(entry[field]);
+                        }
+                    result["matches"].push_back(
+                        {{"label", label},
+                         {"start_token", operatorMatchToken(state)},
+                         {"can_start", operatorCanStart(state)},
+                         {"bots_requested", state.value("operator_bots_requested", false)},
+                         {"bot_count", state.value("operator_bot_count", 0u)},
+                         {"occupied_slots", occupiedSlots(state.at("members"), lobbySlots(state))},
+                         {"start_requested", state.value("operator_start_requested", false)},
+                         {"state", gameState},
+                         {"host", result["players"][playerRows.at({title, owner})]["name"]},
+                         {"capacity", state.value("maximum_members", uint64_t{200})},
+                         {"maps", maps},
+                         {"modes", modes},
+                         {"members", members},
+                         {"teams", teams}});
+                }
+            }
+        }
+        catch (const std::exception &)
+        {
+            // Do not publish a partly read grouping as current truth.
+            result["available"] = false;
+            result["parties"] = Json::array();
+            result["matches"] = Json::array();
+            for (auto &player : result["players"])
+            {
+                player["party"] = nullptr;
+                player["match"] = nullptr;
+                player["host"] = false;
+                player["state"] = "online";
+            }
+        }
+        return result;
+    }
 
     std::optional<TournamentLobbyPlan> prepareTournamentRoundLobby(
         const std::filesystem::path &directory,
@@ -1491,8 +1885,8 @@ namespace services
             assignments.at(owner) != assignments.at(user))
             return std::nullopt;
         const std::array<uint64_t, 1> users{participant};
-        if (matchmakingHostAuthorized(directory, sender,
-                                     assignments.at(owner).get<uint64_t>(), users) != 0)
+        if (matchmakingHostAuthorized(
+                directory, sender, assignments.at(owner).get<uint64_t>(), users) != 0)
             return std::nullopt;
         // Native listen hosts submit match events for their remote members.
         // Validate their first-party claims against that member's live signed

@@ -1,10 +1,21 @@
 #pragma once
 #include "services.h"
+#include "lobby.h"
 #include "matchmaking_store.h"
+#include "operator_controls.h"
 #include <optional>
 
 namespace services
 {
+    OperatorMatchStart matchmakingStartWaitingMatch(
+        const std::filesystem::path &directory,
+        const std::vector<lobby::OnlinePlayer> &players,
+        const std::string &matchToken,
+        bool fillBots = false,
+        unsigned botCount = 0);
+    nlohmann::json matchmakingPublicActivity(const std::filesystem::path &directory,
+                                             const std::vector<lobby::OnlinePlayer> &players);
+
     struct TournamentLobbyPlan
     {
         uint64_t lobbyId = 0;

@@ -1,6 +1,7 @@
 #pragma once
 #include "platform.h"
 #include "wire.h"
+#include "../third_party/nlohmann/json.hpp"
 #include <filesystem>
 #include <optional>
 #include <functional>
@@ -57,6 +58,7 @@ namespace services
     };
 
     void initialize(const std::filesystem::path &directory);
+    nlohmann::json publicActivity();
     void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,
                                  bool restore, unsigned startingRank, uint32_t platformAccount = 0);
     void maintainTournamentPublications(const std::function<void(const std::string &)> &log);

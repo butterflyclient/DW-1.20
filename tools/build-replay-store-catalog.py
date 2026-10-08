@@ -50,7 +50,7 @@ def number(value, maximum=2**32 - 1, empty=0):
     return result
 
 
-def build(document, stamp, sale_ids=()):
+def build(document, stamp, sale_ids=(), zero_prices=False):
     if document.get("name") != "loot/bundle_ids.csv" or document.get("columns") != 40:
         raise ValueError("Expected Replay's 40-column loot/bundle_ids.csv")
     rows = document.get("rows")
@@ -146,7 +146,7 @@ def build(document, stamp, sale_ids=()):
                 "modified": stamp,
                 "coupon_enabled": 0,
                 "enabled": True,
-                "prices": [{"currency": bundle["currency"], "amount": bundle["price"]}],
+                "prices": [{"currency": bundle["currency"], "amount": 0 if zero_prices else bundle["price"]}],
             }
         )
         items = [
@@ -192,7 +192,7 @@ def build(document, stamp, sale_ids=()):
             offer.update(
                 id=variant_id,
                 original=sku,
-                prices=[{"currency": bundle["currency"], "amount": price}],
+                prices=[{"currency": bundle["currency"], "amount": 0 if zero_prices else price}],
             )
             skus.append(offer)
             rule = dict(base_rule, sku=variant_id)
@@ -256,6 +256,9 @@ def build(document, stamp, sale_ids=()):
             "asset": items[0]["row"][COLS["image"]],
             "numItemsShown": len(items),
             "idPubVar": variable,
+            # A missing timer falls back to the current time in shipped Lua.
+            # Its one-second change refreshes the carousel and resets selection.
+            "timerPubVar": "online_store_featured_timer",
             "items": [
                 {"order": 0, "layoutOnlyItem": True, "usesFirstPartyStore": False}
             ],
@@ -272,6 +275,9 @@ def build(document, stamp, sale_ids=()):
     variables["online_store_sales_items"] = variables[
         "online_store_sales_items_warzone"
     ] = sales
+    variables["online_store_featured_timer"] = variables[
+        "online_store_featured_timer_warzone"
+    ] = "2147483647"
     return {
         "root": {"layoutType": 3, "categories": list(categories)},
         "categories": categories,
@@ -287,6 +293,8 @@ def main():
     parser.add_argument("table", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timestamp", type=int, default=int(time.time()))
+    parser.add_argument("--zero-prices", action="store_true",
+                        help="Publish every supported local bundle/variant for zero COD points")
     parser.add_argument(
         "--sale-ids",
         type=int,
@@ -298,7 +306,7 @@ def main():
     if not 0 < args.timestamp < 2**32:
         parser.error("Invalid publication timestamp")
     original = args.table.read_bytes()
-    publication = build(json.loads(original), args.timestamp, args.sale_ids)
+    publication = build(json.loads(original), args.timestamp, args.sale_ids, args.zero_prices)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -333,6 +341,7 @@ def main():
         },
         "sku_count": len(publication["catalog"]["skus"]),
         "sale_bundle_ids": args.sale_ids,
+        "zero_prices": args.zero_prices,
         "excluded": publication["excluded"],
         "files": files,
         "native_purchase_verified": False,

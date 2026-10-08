@@ -274,6 +274,57 @@ namespace matchmaking_store
                 require(state["maximum_members"].is_number_unsigned() &&
                         state["maximum_members"].get<uint64_t>() <= 200 &&
                         members.size() <= state["maximum_members"].get<uint64_t>());
+            for (const auto *key : {"operator_start_requested", "operator_bots_requested"})
+                if (state.contains(key))
+                    require(state[key].is_boolean());
+            if (state.contains("operator_bot_count"))
+                require(state["operator_bot_count"].is_number_unsigned() &&
+                        state["operator_bot_count"].get<uint64_t>() > 0 &&
+                        state["operator_bot_count"].get<uint64_t>() < 200 &&
+                        state.value("operator_bots_requested", false));
+            if (state.contains("squad_fill"))
+            {
+                const auto &fill = state["squad_fill"];
+                const auto &balance = state["backend_doc"].at("team_balance");
+                const auto &squads = balance.at("squads");
+                const auto size = balance.at("squad_size").get<unsigned>();
+                require(fill.is_object() && fill.size() <= 200 &&
+                        squads.is_object() && squads.size() <= 200 && size > 0 && size <= 200);
+                std::set<uint64_t> assigned;
+                for (const auto &preference : fill.items())
+                    require(preference.value().is_boolean() && squads.contains(preference.key()));
+                for (const auto &squad : squads)
+                {
+                    require(squad.is_array());
+                    uint64_t occupied = 0;
+                    for (const auto &user : squad)
+                    {
+                        require(user.is_number_unsigned() && members.contains(user.get<uint64_t>()) &&
+                                assigned.insert(user.get<uint64_t>()).second);
+                        const auto key = std::to_string(user.get<uint64_t>());
+                        const auto &slots = state["backend_doc"].at("player_id_to_slots");
+                        occupied += 1 + slots.value(key, uint64_t{0});
+                    }
+                    require(occupied <= size);
+                }
+                require(assigned == members);
+            }
+            if (state.contains("operator_start_overrides"))
+            {
+                const auto &saved = state["operator_start_overrides"];
+                require(saved.is_object() && saved.size() <= 8);
+                for (const auto &setting : saved.items())
+                    require(!setting.key().empty() && setting.key().size() <= 128 &&
+                            (setting.value().is_null() || setting.value().is_boolean() ||
+                             setting.value().is_number_integer() || setting.value().is_number_float() ||
+                             (setting.value().is_string() && setting.value().get_ref<const std::string &>().size() < 128)));
+            }
+            if (state.contains("operator_bots_capacity"))
+                require(state["operator_bots_capacity"].is_number_unsigned() &&
+                        state["operator_bots_capacity"].get<uint64_t>() > 0 &&
+                        state["operator_bots_capacity"].get<uint64_t>() <= 200 &&
+                        state.value("operator_bots_requested", false) &&
+                        state.at("maximum_members") == 12);
         }
 
         std::vector<Write> validate(const Json &journal, uint32_t title)

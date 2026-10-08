@@ -1,8 +1,10 @@
 #include "DW_LocalProgression.h"
 #include "DW_LocalConfig.h"
 #include "replay_dvar.h"
+#include "com_optimized.h"
 #include "dw_progression_ranks.h"
 #include <stddef.h>
+#include <emmintrin.h>
 
 extern "C"
 {
@@ -103,6 +105,37 @@ namespace
     static_assert(offsetof(DWReplayLootInventoryPrefix, items) == 64);
     static_assert(offsetof(DWReplayLootInventoryPrefix, count) == 120064);
     extern "C" DWReplayLootInventoryPrefix gl_1459E05C0;
+
+    uint32_t InventoryQuantity(const DWReplayLootInventoryPrefix &inventory, uint32_t item)
+    {
+        const int count = inventory.count;
+        if (count < 0 || count > 15000)
+            return 0;
+        int index = 0;
+        if (Com_Optimized_IsEnabled())
+        {
+            const auto wanted = _mm_set1_epi32(static_cast<int32_t>(item));
+            // Four native (id, quantity) records, with no reads beyond count.
+            // Select ID lanes only: a quantity equal to item is not a match.
+            // SSE2 is baseline for this x64 executable; no AVX requirement.
+            for (; index + 4 <= count; index += 4)
+            {
+                const auto first = _mm_loadu_si128(
+                    reinterpret_cast<const __m128i *>(&inventory.items[index]));
+                const auto second = _mm_loadu_si128(
+                    reinterpret_cast<const __m128i *>(&inventory.items[index + 2]));
+                const auto ids = _mm_castps_si128(_mm_shuffle_ps(
+                    _mm_castsi128_ps(first), _mm_castsi128_ps(second), _MM_SHUFFLE(2, 0, 2, 0)));
+                const unsigned matches = _mm_movemask_ps(_mm_castsi128_ps(_mm_cmpeq_epi32(ids, wanted)));
+                if (matches)
+                    return inventory.items[index + (__builtin_ctz(matches))].quantity;
+            }
+        }
+        for (; index < count; ++index)
+            if (inventory.items[index].id == item)
+                return inventory.items[index].quantity;
+        return 0;
+    }
 
     DWLocalProgressionRecord s_record{};
     uint64_t s_savedUser = 0, s_savedXp = 0;
@@ -213,15 +246,13 @@ extern "C" int LUI_CoD_LuaCall_IsOwned(void *luaVM)
     uint32_t quantity = 0;
     if (controller >= 0 && controller < 8 && func_140D66C20(controller) == 0)
     {
-        const auto &inventory = gl_1459E05C0;
-        if (inventory.count >= 0 && inventory.count <= 15000)
-            for (int index = 0; index < inventory.count; ++index)
-                if (inventory.items[index].id == item)
-                {
-                    quantity = inventory.items[index].quantity;
-                    break;
-                }
-        if (item && item != UINT32_MAX && DW_LocalBackend_IsEnabled() &&
+        quantity = InventoryQuantity(gl_1459E05C0, item);
+        // Shipped loot_master.csv assigns bundles to 400000..409999 and
+        // Battle Pass products to 430000..439999. Store.BundleAvailable hides
+        // owned products: an unlock policy must not fabricate their purchases.
+        const bool product = (item >= 400000 && item <= 409999) ||
+                             (item >= 430000 && item <= 439999);
+        if (item && item != UINT32_MAX && !product && DW_LocalBackend_IsEnabled() &&
             DW_LocalConfig_UnlockAll() && !quantity)
             quantity = 1;
     }

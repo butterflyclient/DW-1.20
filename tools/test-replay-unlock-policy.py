@@ -74,6 +74,9 @@ def main():
         mapped=0,
         argc=2,
         numeric=True,
+        mode=0,
+        items=None,
+        inventory_count=None,
     ):
         vm = Uc(UC_ARCH_X86, UC_MODE_64)
         stack, lua, halt = 0x10000000, 0x11000000, 0x12000000
@@ -96,10 +99,18 @@ def main():
             page(address + size - 1)
             return True
 
-        for address in (inventory + 64, inventory + 120064):
+        entries = [(111, quantity)] if items is None else items
+        contents = b"".join(struct.pack("<II", *row) for row in entries)
+        count = len(entries) if inventory_count is None else inventory_count
+        for address in range(inventory & ~4095, inventory + 120068, 4096):
             page(address)
-        vm.mem_write(inventory + 64, struct.pack("<II", 111, quantity))
-        vm.mem_write(inventory + 120064, struct.pack("<i", 1))
+        if contents:
+            vm.mem_write(inventory + 64, contents)
+        vm.mem_write(inventory + 120064, struct.pack("<i", count))
+        mode_address = base + symbols["s_comOptimizedMode"]
+        page(mode_address)
+        vm.mem_write(mode_address, struct.pack("<I", mode))
+        before = bytes(vm.mem_read(inventory, 120068))
         sp = stack + 0xF008
         vm.mem_write(sp, struct.pack("<Q", halt))
         vm.reg_write(UC_X86_REG_RSP, sp)
@@ -153,14 +164,13 @@ def main():
 
         vm.hook_add(UC_HOOK_CODE, boundary)
         vm.hook_add(UC_HOOK_MEM_UNMAPPED, missing)
-        vm.emu_start(entry, halt, count=5000)
+        vm.emu_start(entry, halt, count=500000)
         if expected is None:
             assert errors and not pushed
         else:
             assert vm.reg_read(UC_X86_REG_RIP) == halt and not errors
             assert vm.reg_read(UC_X86_REG_RAX) == 1 and pushed == [float(expected)]
-        assert struct.unpack("<II", vm.mem_read(inventory + 64, 8)) == (111, quantity)
-        assert struct.unpack("<i", vm.mem_read(inventory + 120064, 4))[0] == 1
+        assert bytes(vm.mem_read(inventory, 120068)) == before
         return dict(
             enabled=enabled,
             item=item,
@@ -169,6 +179,8 @@ def main():
             mapped=mapped,
             argc=argc,
             numeric=numeric,
+            mode=mode,
+            inventory_count=count,
             passed=True,
             inventory_unchanged=True,
         )
@@ -178,6 +190,13 @@ def main():
         case(False, 222, 0),
         case(True, 111, 7),
         case(True, 222, 1),
+        case(True, 399999, 1),
+        case(True, 400000, 0),
+        case(True, 409999, 0),
+        case(True, 410000, 1),
+        case(True, 430000, 0),
+        case(True, 439999, 0),
+        case(True, 440000, 1),
         case(True, 0, 0),
         case(True, 0xFFFFFFFF, 0),
         case(True, 222, 0, mapped=-1),
@@ -185,6 +204,25 @@ def main():
         case(True, 222, None, argc=1),
         case(True, 222, None, numeric=False),
     ]
+    for mode in (0, 1, 2):
+        for length in (0, 1, 2, 3, 4, 5, 7, 8, 9, 14999, 15000):
+            entries = [(10000 + i, i + 1) for i in range(length)]
+            # Exercise each vector lane, a scalar tail, and a complete miss.
+            for index in sorted({0, 1, 2, 3, max(0, length - 1)}):
+                expected = index + 1 if index < length else 0
+                cases.append(case(False, 10000 + index, expected,
+                                  items=entries, mode=mode))
+            cases.append(case(False, 999, 0, items=entries, mode=mode))
+        cases.append(case(False, 111, 0, mode=mode,
+                          items=[(111, 0), (222, 111), (111, 7), (333, 111)]))
+        cases.append(case(False, 111, -1, mode=mode,
+                          items=[(222, 111), (333, 111), (444, 111), (111, 0xFFFFFFFF)]))
+        for count in (-1, 15001):
+            cases.append(case(False, 111, 0, mode=mode, inventory_count=count))
+        for item in (399999, 400000, 409999, 410000, 430000, 439999, 440000):
+            product = 400000 <= item <= 409999 or 430000 <= item <= 439999
+            cases.append(case(True, item, 0 if product else 1, mode=mode,
+                              items=[(111, item)] * 4))
     result = dict(
         schema=1,
         passed=True,

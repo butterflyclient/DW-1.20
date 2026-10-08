@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--server", type=Path, required=True)
     parser.add_argument("--publication", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--zero-prices", action="store_true")
     parser.add_argument(
         "--variants", action="store_true", help="Require sale and smart offer checks"
     )
@@ -184,9 +185,12 @@ def main():
                 free = next(
                     row for row in catalog["skus"] if row["prices"][0]["amount"] == 0
                 )
-                paid = next(
-                    row for row in catalog["skus"] if row["prices"][0]["amount"] > 0
-                )
+                if args.zero_prices:
+                    assert all(row["prices"] == [{"currency": 20, "amount": 0}] for row in catalog["skus"])
+                    paid = next(row for row in catalog["skus"] if row["product"] != free["product"])
+                    checks.append("Every published bundle and variant costs zero COD points")
+                else:
+                    paid = next(row for row in catalog["skus"] if row["prices"][0]["amount"] > 0)
                 for row in (free, paid):
                     request = text("5800") + b"\x06\x01\0\x01\x01" + u32(row["id"])
                     reply = client.task(80, 134, request, structured=False)
@@ -237,10 +241,9 @@ def main():
                         if item["1"] in selected
                     }
 
-                reject(buy(paid["id"]), 101)
-                checks.append(
-                    "native paid offer rejects insufficient currency without creating inventory"
-                )
+                if not args.zero_prices:
+                    reject(buy(paid["id"]), 101)
+                    checks.append("native paid offer rejects insufficient currency without creating inventory")
                 response = client.task(80, 106, buy(free["id"]), structured=False)
                 assert response[0] == 16 and len(response[1:].split(b"\0", 1)[0]) == 24
                 state = json.loads(inventory.read_bytes())
