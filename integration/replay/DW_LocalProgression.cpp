@@ -7,7 +7,14 @@
 extern "C"
 {
     uint64_t DW_LocalPlatform_UserId();
+    bool DW_LocalBackend_IsEnabled();
     void *func_14105BC30(); // Original OnlineProgression::GetInstance
+    int func_1420838B0(void *);               // lua_gettop
+    int func_1420839E0(void *, int);          // lua_isnumber
+    double func_142084A10(void *, int);       // lua_tonumber
+    void func_142084100(void *, double);     // lua_pushnumber
+    int func_142089FB0(void *, const char *, ...); // luaL_error
+    int func_140D66C20(int);                 // CL_Mgr_GetClientFromController
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
     __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
     __declspec(dllimport) int __stdcall FreeLibrary(void *);
@@ -78,6 +85,24 @@ namespace
     };
     static_assert(offsetof(DWReplayProgressionPrefix, players) == 64);
     static_assert(sizeof(DWReplayProgressionPrefix) == 80);
+
+    // Replay's Loot.IsOwned binding reads one Windows client, not the Xbox
+    // source's eight inventory arrays. Keep quantities separate from unlock
+    // policy; virtual ownership must not overwrite purchased/earned items.
+    struct DWReplayInventoryItem
+    {
+        uint32_t id, quantity;
+    };
+    struct DWReplayLootInventoryPrefix
+    {
+        uint8_t native[64];
+        DWReplayInventoryItem items[15000];
+        int32_t count;
+    };
+    static_assert(sizeof(DWReplayInventoryItem) == 8);
+    static_assert(offsetof(DWReplayLootInventoryPrefix, items) == 64);
+    static_assert(offsetof(DWReplayLootInventoryPrefix, count) == 120064);
+    extern "C" DWReplayLootInventoryPrefix gl_1459E05C0;
 
     DWLocalProgressionRecord s_record{};
     uint64_t s_savedUser = 0, s_savedXp = 0;
@@ -173,6 +198,37 @@ namespace
         Com_Printf(25, "[DW] Local player progression saved: XP %llu\n", xp);
         return true;
     }
+}
+
+// The shipped binding inlines the inventory lookup and has no
+// unlock_all_loot dvar branch. Recompile its existing registration target so
+// every Lua ownership query receives the configured local unlock policy.
+extern "C" int LUI_CoD_LuaCall_IsOwned(void *luaVM)
+{
+    if (func_1420838B0(luaVM) != 2 || !func_1420839E0(luaVM, 1) ||
+        !func_1420839E0(luaVM, 2))
+        return func_142089FB0(luaVM, "USAGE: Loot.IsOwned(<controller>, <item ID>)");
+    const int controller = static_cast<int>(func_142084A10(luaVM, 1));
+    const auto item = static_cast<uint32_t>(static_cast<int64_t>(func_142084A10(luaVM, 2)));
+    uint32_t quantity = 0;
+    if (controller >= 0 && controller < 8 && func_140D66C20(controller) == 0)
+    {
+        const auto &inventory = gl_1459E05C0;
+        if (inventory.count >= 0 && inventory.count <= 15000)
+            for (int index = 0; index < inventory.count; ++index)
+                if (inventory.items[index].id == item)
+                {
+                    quantity = inventory.items[index].quantity;
+                    break;
+                }
+        if (item && item != UINT32_MAX && DW_LocalBackend_IsEnabled() &&
+            DW_LocalConfig_UnlockAll() && !quantity)
+            quantity = 1;
+    }
+    func_142084100(luaVM, static_cast<double>(static_cast<int32_t>(quantity)));
+    if (func_1420838B0(luaVM) < 1)
+        return func_142089FB0(luaVM, "Loot.IsOwned return stack mismatch");
+    return 1;
 }
 
 extern "C" bool DW_LocalProgression_LoginFields(uint64_t *user, uint64_t *xp, unsigned *appliedRank)

@@ -79,3 +79,9 @@ PY'''.replace('OFFSET', str(offset))
         if output.channel.recv_exit_status():
             raise RuntimeError('Remote log read failed: ' + error.read().decode())
     return json.loads(payload)
+
+
+if __name__ == "__main__":
+    # Used by controlled native-pair launches, retaining an exact live process
+    # and log baseline without routing them through the shipping game's INI.
+    print(json.dumps(dict(server=verify(), log_offset=read_log(0)["size"])))

@@ -49,8 +49,24 @@ foreach ($process in $running) {
     }
     if (-not $verified) { throw 'An unrelated Replay game is running; leave it intact.' }
 }
-$status = Invoke-RestMethod -Uri 'http://127.0.0.1:8085/health' -TimeoutSec 3
-$server = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\server-process.json') -Raw | ConvertFrom-Json
+$remoteLogOffset = $null
+$backendHost = '127.0.0.1'
+if ($record.remote_backend) {
+    $python = 'C:\Users\achar\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+    $remoteSnapshot = & $python -B (Join-Path $PSScriptRoot 'tools\remote_backend.py')
+    if ($LASTEXITCODE) { throw 'Primary backend process verification failed.' }
+    $verified = $remoteSnapshot | ConvertFrom-Json
+    $server = $verified.server
+    $backendHost = [string]$server.host
+    $remoteLogOffset = [long]$verified.log_offset
+    $ini = [IO.File]::ReadAllText([IO.Path]::ChangeExtension($record.executable, '.ini'))
+    if ($ini -notmatch ('(?m)^host=' + [regex]::Escape($backendHost) + '\r?$')) {
+        throw 'Private client INI does not select the verified primary backend.'
+    }
+} else {
+    $server = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\server-process.json') -Raw | ConvertFrom-Json
+}
+$status = Invoke-RestMethod -Uri ('http://' + $backendHost + ':8085/health') -TimeoutSec 10
 if ($status.server -ne 'iw8-dw' -or $server.sha256 -ne $record.server_sha256) {
     throw 'Start the hash-matching backend first.'
 }
@@ -74,7 +90,7 @@ $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property
 $clientLog = Join-Path $folder 'replay-dw-client.log'
 $offset = if (Test-Path $clientLog) { (Get-Item $clientLog).Length } else { 0 }
 $serverLog = Join-Path $PSScriptRoot 'data\server.log'
-$serverOffset = (Get-Item $serverLog).Length
+$serverOffset = if ($null -ne $remoteLogOffset) { $remoteLogOffset } else { (Get-Item $serverLog).Length }
 $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
     CommandLine=('"' + $record.executable + '" +set LKOTRPTMKO ' + $record.game_port)
     CurrentDirectory=$folder; ProcessStartupInformation=$startup

@@ -20,6 +20,8 @@ parser.add_argument(
 parser.add_argument("--state-root", type=Path, default=STATE)
 parser.add_argument("--profiles-root", type=Path, default=STATE)
 parser.add_argument("--server-receipt", type=Path)
+parser.add_argument("--remote-backend", action="store_true",
+                    help="Use the hash-verified primary droplet for these private clients")
 parser.add_argument("--instances", nargs="+", choices=("alpha", "bravo"),
                     default=("alpha", "bravo"))
 parser.add_argument("--preserve-ini", action="store_true",
@@ -69,6 +71,13 @@ STATE.mkdir(parents=True, exist_ok=True)
 (STATE / "compiled-snapshot-receipt.json").write_bytes(snapshot_bytes)
 normal = json.loads((ROOT / "data/deployment.json").read_text())
 server_sha256 = normal["server_sha256"]
+remote = None
+if args.remote_backend:
+    if args.server_receipt:
+        raise ValueError("Choose a local server receipt or the primary remote backend")
+    from remote_backend import verify
+    remote = verify()
+    server_sha256 = remote["sha256"]
 if args.server_receipt:
     server_receipt = args.server_receipt.resolve()
     assert server_receipt.is_relative_to(ROOT / "data")
@@ -102,7 +111,7 @@ for instance in dict.fromkeys(args.instances):
     assert not ini.exists() or receipt.exists(), "Refusing to replace an unowned INI"
     if not (args.preserve_ini and ini.exists()):
         ini.write_text(
-            "host=127.0.0.1\n"
+            f"host={remote['host'] if remote else '127.0.0.1'}\n"
             f"player_name=DW Pair {instance.title()} 1006\n"
             f"game_port={3074 + index * 5}\n"
             "public_address=127.0.0.1\nlocal_address=127.0.0.1\n"
@@ -136,6 +145,10 @@ for instance in dict.fromkeys(args.instances):
     record.pop("workstation_artifact", None)
     record["source_snapshot_receipt"] = str(STATE / "compiled-snapshot-receipt.json")
     record["private_compiled_sources"] = report["cpp"]
+    if remote:
+        record["remote_backend"] = remote
+    else:
+        record.pop("remote_backend", None)
     receipt.write_text(json.dumps(record, indent=2) + "\n")
     (game / enabled_file).write_text("owned native pair development opt-in\n")
     print(

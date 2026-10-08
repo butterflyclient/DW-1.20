@@ -24,6 +24,11 @@ parser.add_argument("--snapshot-receipt", type=Path,
                     default=ROOT / "data/compiler-snapshot-receipt.json")
 parser.add_argument("--startup-receipt", type=Path,
                     help="Explicit focused encrypted startup gate; does not claim full backend coverage")
+parser.add_argument("--client-integration-receipt", type=Path,
+                    default=ROOT / "validation/20261007-playtest-client.json",
+                    help="Hash-bound linked client checks for this build, retaining earlier build evidence")
+parser.add_argument("--unlock-policy-receipt", type=Path,
+                    help="Hash-bound compiled Loot.IsOwned policy and Lua registration checks")
 args = parser.parse_args()
 for receipt_path in (args.job_receipt, args.snapshot_receipt):
     if not receipt_path.resolve().is_relative_to((ROOT / "data").resolve()):
@@ -193,9 +198,17 @@ required_private_sources = {
     "DW_Multiplayer.cpp",
     "DW_MapAvailability.cpp",
 }
-client_integration = json.loads((ROOT / "validation/20261007-playtest-client.json").read_bytes())
+client_integration = json.loads(args.client_integration_receipt.read_bytes())
 if not client_integration.get("passed") or client_integration["executable_sha256"] != actual:
     raise RuntimeError("Linked unlock/Verdansk integration proof is unavailable or stale")
+unlock_policy = None
+if args.unlock_policy_receipt:
+    unlock_policy = json.loads(args.unlock_policy_receipt.read_bytes())
+    if (not unlock_policy.get("passed") or unlock_policy["game_sha256"] != actual
+            or not unlock_policy.get("lua_registration_target_verified")
+            or not all(case.get("passed") for case in unlock_policy.get("cases", []))
+            or len(unlock_policy.get("cases", [])) < 10):
+        raise RuntimeError("Compiled Loot.IsOwned policy/registration proof is unavailable or stale")
 if {
     Path(item["source"]).name for item in private_objects
 } != required_private_sources or not all(
@@ -398,6 +411,15 @@ if hashlib.sha256(destination.read_bytes()).hexdigest() != actual:
     raise RuntimeError("Installed executable hash mismatch")
 receipt = {
     "schema": 1,
+    "linked_client_integration": {
+        "path": str(args.client_integration_receipt.resolve()),
+        "sha256": hashlib.sha256(args.client_integration_receipt.read_bytes()).hexdigest(),
+    },
+    "linked_unlock_policy": ({
+        "path": str(args.unlock_policy_receipt.resolve()),
+        "sha256": hashlib.sha256(args.unlock_policy_receipt.read_bytes()).hexdigest(),
+        "native_runtime_verified": False,
+    } if unlock_policy else None),
     "job_id": job["id"],
     "workstation_artifact": str(artifact),
     "build_directory": str(build),
