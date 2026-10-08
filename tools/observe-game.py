@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import urllib.request
 import argparse
 from native_loot_inventory import snapshot as loot_inventory_snapshot
+from native_quests import snapshot as quest_snapshot, table as quest_table
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -71,6 +72,16 @@ parser.add_argument(
     help="Read stable native loot quantities, without applying the unlock_all override",
 )
 parser.add_argument(
+    "--quests",
+    action="store_true",
+    help="Read native mission states and activation slots",
+)
+parser.add_argument(
+    "--quest-table",
+    action="store_true",
+    help="Read the loaded quest_challenges.csv asset",
+)
+parser.add_argument(
     "--ab-testing",
     action="store_true",
     help="Read native AB completion and bounded enrollment/treatment records",
@@ -127,8 +138,14 @@ try:
     server_receipt_path = root / "data/server-process.json"
     if deployment.get("remote_backend"):
         from remote_backend import verify
+
         receipt = verify()
-        server_deployment = dict(receipt, launch_receipt_matches=bool(launch and launch.get("server_process") == receipt))
+        server_deployment = dict(
+            receipt,
+            launch_receipt_matches=bool(
+                launch and launch.get("server_process") == receipt
+            ),
+        )
     elif server_receipt_path.exists():
         receipt = json.loads(server_receipt_path.read_text(encoding="utf-8-sig"))
         server_process = kernel.OpenProcess(0x1000, False, receipt["pid"])
@@ -837,7 +854,9 @@ try:
             }
         )
     backend_host = deployment.get("remote_backend", {}).get("host", "127.0.0.1")
-    with urllib.request.urlopen(f"http://{backend_host}:8085/status", timeout=10) as response:
+    with urllib.request.urlopen(
+        f"http://{backend_host}:8085/status", timeout=10
+    ) as response:
         status = json.load(response)
     client_path = path.parent / "replay-dw-client.log"
     with client_path.open("rb") as log:
@@ -866,6 +885,7 @@ try:
     if connection and "server_log_offset" in connection:
         if deployment.get("remote_backend"):
             from remote_backend import read_log
+
             remote_log = read_log(connection["server_log_offset"])
             server_log_reset = remote_log["reset"]
             server_lines = remote_log["text"].splitlines()
@@ -1316,13 +1336,18 @@ try:
             kind = struct.unpack_from("<I", row, 72)[0]
             if not kind:
                 continue
-            invitations.append({
-                "slot": index, "type": kind,
-                "inviter_xuid": struct.unpack_from("<Q", row, 24)[0],
-                "inviter_name": row[32:68].split(b"\0", 1)[0].decode(errors="replace"),
-                "sent_utc": struct.unpack_from("<I", row, 68)[0],
-                "invitation_id": struct.unpack_from("<I", row, 76)[0],
-            })
+            invitations.append(
+                {
+                    "slot": index,
+                    "type": kind,
+                    "inviter_xuid": struct.unpack_from("<Q", row, 24)[0],
+                    "inviter_name": row[32:68]
+                    .split(b"\0", 1)[0]
+                    .decode(errors="replace"),
+                    "sent_utc": struct.unpack_from("<I", row, 68)[0],
+                    "invitation_id": struct.unpack_from("<I", row, 76)[0],
+                }
+            )
 
     result = {
         "schema": 9,
@@ -1402,7 +1427,9 @@ try:
         "native_matchmaking_lobby": (
             {
                 "ready_to_start": bool(
-                    read(symbols["OnlineMatchmakerOmniscient::ms_instance"] + 79632, 1)[0]
+                    read(symbols["OnlineMatchmakerOmniscient::ms_instance"] + 79632, 1)[
+                        0
+                    ]
                 ),
                 "state": struct.unpack(
                     "<I", read(symbols["OnlineMatchmakerOmniscient::ms_instance"], 4)
@@ -1597,11 +1624,17 @@ try:
                 struct.unpack("<Q", read(symbols["gl_144493DE0"] + 112, 8))[0]
             ),
         },
-        "native_player_progression": {
-            "xp": struct.unpack("<Q", read(symbols["gl_144483CE0"] + 64, 8))[0],
-            "rank_zero_based": struct.unpack("<Q", read(symbols["gl_144483CE0"] + 72, 8))[0],
-            "layout": "Replay Windows singleton player progression at +64/+72",
-        } if "gl_144483CE0" in symbols else None,
+        "native_player_progression": (
+            {
+                "xp": struct.unpack("<Q", read(symbols["gl_144483CE0"] + 64, 8))[0],
+                "rank_zero_based": struct.unpack(
+                    "<Q", read(symbols["gl_144483CE0"] + 72, 8)
+                )[0],
+                "layout": "Replay Windows singleton player progression at +64/+72",
+            }
+            if "gl_144483CE0" in symbols
+            else None
+        ),
         "native_account_service_state": struct.unpack_from("<I", account, 16)[0],
         "native_account_service_group": struct.unpack_from("<I", account, 20)[0],
         "native_account_country": struct.unpack_from("<I", account, 140)[0],
@@ -1619,8 +1652,11 @@ try:
         "server_log_reset_detected": server_log_reset,
         "native_channels": native_channels() if args.channels else None,
         "native_loot_inventory": (
-            loot_inventory_snapshot(read, symbols)
-            if args.inventory else None
+            loot_inventory_snapshot(read, symbols) if args.inventory else None
+        ),
+        "native_quests": quest_snapshot(read, symbols) if args.quests else None,
+        "native_quest_table": (
+            quest_table(read, symbols, base) if args.quest_table else None
         ),
         "native_ab_testing": native_ab_testing() if args.ab_testing else None,
         "native_encrypted_lobby_task_completion": "not observed by this state reader",

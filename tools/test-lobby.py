@@ -1872,12 +1872,18 @@ try:
         )
 
     assert client.task(125, 3, achievement_query(), structured=True) == pb_text(2, "")
-    assert client.task(
-        125,
-        4,
-        structure(pb_text(1, str(title)) + pb_integer(3, 100) + pb_text(4, "")),
-        structured=True,
-    ) == pb_text(2, "")
+    default_definitions = pb_map(
+        client.task(
+            125,
+            4,
+            structure(pb_text(1, str(title)) + pb_integer(3, 100) + pb_text(4, "")),
+            structured=True,
+        )
+    )
+    assert len(default_definitions[1]) == 100 and default_definitions[2][0]
+    first_definition = pb_map(default_definitions[1][0])
+    assert first_definition[14] == [1500] and first_definition[3] == [15]
+    assert first_definition[1] == [b"ch_quest001_stage001"] and first_definition[7] == [1]
     achievement_path = (
         directory / "achievements" / str(title) / str(title) / str(user) / "states.json"
     )

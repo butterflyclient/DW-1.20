@@ -121,6 +121,12 @@ GAPS["125"] += (
     "local save, game-restart restoration and no duplicate award from an authenticated "
     "self-report retry. That independent-wire submission is not a game-issued report "
     "task, match-earned XP or an after-action animation test."
+    " The 232 native ALL/BR/CP mission stages now have real compiled definitions "
+    "and persistent activation/deactivation with independent mode selections. "
+    "All 447 table rows and all 32 initialized native mission groups were matched. "
+    "A hash-bound shipping-game proof verifies 125/5 callbacks and 125/3 restoration "
+    "of MP/co-op/BR selections across a new game process. Other platform/operator "
+    "mission eligibility, earned mission counters and reward rules remain open."
 )
 GAPS["198"] += (
     " The original outgoing text length excludes its NUL terminator. The backend "
@@ -948,6 +954,38 @@ def native_progression_callback_evidence(server_hash):
                 shipping_image_completion_inherited=False)
 
 
+def native_quest_management_evidence(server_hash, game_hash):
+    path = ROOT / "validation/20261008-native-quest-management-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed") and proof.get("server_sha256") == server_hash
+        and proof.get("game_sha256") == game_hash
+        and proof.get("native_activation_task_completion_verified")
+        and proof.get("native_saved_state_query_completion_verified")
+        and proof.get("native_state_restored_after_game_restart")
+        and proof.get("game_and_ini_unchanged")
+        and proof.get("native_mission_event_progression_verified") is False
+        and proof.get("recorder_sha256")
+        == digest(ROOT / "tools/record-native-quest-management-proof.py")
+        and proof.get("observer_sha256") == digest(ROOT / "tools/observe-game.py")
+        and proof.get("native_asset_receipt_sha256")
+        == digest(ROOT / "validation/20261008-replay-quest-assets.json")
+        and proof.get("original_target_research_sha256")
+        == digest(ROOT / "validation/20261008-replay-quest-target.json")
+    ):
+        return None
+    for name, expected in proof["evidence"].items():
+        evidence = (ROOT / name).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != expected:
+            raise ValueError("Native mission callback evidence changed")
+    reader = (ROOT / proof["native_quest_reader_source"]).resolve()
+    if not reader.is_relative_to(ROOT) or digest(reader) != proof["native_quest_reader_sha256"]:
+        raise ValueError("Native mission reader source changed")
+    return path.relative_to(ROOT).as_posix(), proof
+
+
 def live_streaming_layout_evidence():
     path = ROOT / "validation/20261008-live-streaming-target-layout.json"
     if not path.is_file():
@@ -1233,6 +1271,7 @@ def main():
         current_hash, deployment["sha256"]
     )
     private_store = private_store_variants_evidence(current_hash)
+    quest_evidence = native_quest_management_evidence(current_hash, deployment["sha256"])
     rest_requests = (
         rest_coverage(rest_inventory, friend_evidence, current_hash)
         if rest_inventory
@@ -1271,10 +1310,19 @@ def main():
             proof_filename, relay_proof = ab_evidence
         if (service, task) == (23, 1) and counter_evidence:
             proof_filename, relay_proof = counter_evidence
+        if service == 125 and task in (3, 5) and quest_evidence:
+            proof_filename, relay_proof = quest_evidence
         completion = bool(relay_proof and relay_proof.get("passed"))
         scope = None
         if (service, task) == (23, 1) and counter_evidence:
             scope = counter_evidence[1]["scope"]
+        if service == 125 and task in (3, 5) and quest_evidence:
+            scope = (
+                "Shipping game's native activation callbacks installed three MP/co-op/BR "
+                "mission records; a fresh game process restored all three through the "
+                "saved-state query without another activation. No earned mission "
+                "counter, completion, reward or other achievement-family claim"
+            )
         if (
             service == 145
             and task in (24, 26)

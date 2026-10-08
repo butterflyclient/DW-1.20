@@ -6,6 +6,7 @@
 #include "progression_ranks.h"
 #include "weapon_progression_data.h"
 #include "gunsmith_rank_unlock_data.h"
+#include "replay_quest_data.h"
 #include "marketplace_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
@@ -142,14 +143,20 @@ namespace services
             std::filesystem::create_directories(path.parent_path());
             auto pending = path;
             pending += ".pending";
-            const auto file = CreateFileW(pending.c_str(), GENERIC_WRITE, 0, nullptr,
-                                          CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            const auto file = CreateFileW(pending.c_str(),
+                                          GENERIC_WRITE,
+                                          0,
+                                          nullptr,
+                                          CREATE_ALWAYS,
+                                          FILE_ATTRIBUTE_NORMAL,
+                                          nullptr);
             if (file == INVALID_HANDLE_VALUE)
                 throw std::runtime_error("Achievement persistence failed");
             DWORD written = 0;
-            const bool saved = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()),
-                                         &written, nullptr) && written == bytes.size() &&
-                               FlushFileBuffers(file);
+            const bool saved =
+                WriteFile(
+                    file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) &&
+                written == bytes.size() && FlushFileBuffers(file);
             CloseHandle(file);
             if (!saved)
                 throw std::runtime_error("Achievement persistence flush failed");
@@ -342,28 +349,70 @@ namespace services
 
         uint64_t playerRank(uint64_t xp)
         {
-            return static_cast<uint64_t>(
-                std::upper_bound(replayPlayerRankMinimumXp.begin(),
-                                 replayPlayerRankMinimumXp.end(), xp) -
-                replayPlayerRankMinimumXp.begin() - 1);
+            return static_cast<uint64_t>(std::upper_bound(replayPlayerRankMinimumXp.begin(),
+                                                          replayPlayerRankMinimumXp.end(),
+                                                          xp) -
+                                         replayPlayerRankMinimumXp.begin() - 1);
         }
 
         Json playerState(uint64_t xp)
         {
             const auto rank = playerRank(xp);
-            return {{"id", uint64_t{1000000}}, {"name", "player_xp"}, {"kind", uint64_t{0}},
-                    {"status", uint64_t{1}}, {"progress", uint64_t{0}}, {"target", uint64_t{0}},
-                    {"multiProgress", Json::array({
-                        {{"name", "xp"}, {"current", xp}, {"target", uint64_t{0}}},
-                        {{"name", "rank"}, {"current", rank}, {"target", uint64_t{0}}}})}};
+            return {
+                {"id", uint64_t{1000000}},
+                {"name", "player_xp"},
+                {"kind", uint64_t{0}},
+                {"status", uint64_t{1}},
+                {"progress", uint64_t{0}},
+                {"target", uint64_t{0}},
+                {"multiProgress",
+                 Json::array({{{"name", "xp"}, {"current", xp}, {"target", uint64_t{0}}},
+                              {{"name", "rank"}, {"current", rank}, {"target", uint64_t{0}}}})}};
+        }
+
+        const ReplayQuest *quest(uint64_t id, const std::string &name = {})
+        {
+            const auto found = std::find_if(replayQuests.begin(),
+                                            replayQuests.end(),
+                                            [&](const ReplayQuest &row)
+                                            {
+                                                return id ? row.id == id : row.name == name;
+                                            });
+            return found == replayQuests.end() ? nullptr : &*found;
+        }
+
+        Json questState(const ReplayQuest &row)
+        {
+            return {{"id", uint64_t{row.id}},
+                    {"name", row.name},
+                    {"kind", uint64_t{15}},
+                    {"status", uint64_t{2}},
+                    {"progress", uint64_t{0}},
+                    {"target", uint64_t{row.target}}};
+        }
+
+        Json questDefinition(const ReplayQuest &row)
+        {
+            return {{"1", row.name},
+                    {"2", row.description},
+                    {"3", uint64_t{15}},
+                    {"5", uint64_t{1}},
+                    {"7", uint64_t{row.target}},
+                    {"9", true},
+                    {"14", uint64_t{row.id}},
+                    {"initialState", questState(row)}};
         }
 
         const ReplayWeaponProgression &weapon(uint64_t id)
         {
             wire::require(id < replayWeaponAliases.size() && replayWeaponAliases[id]);
             const auto canonical = replayWeaponAliases[id];
-            const auto found = std::find_if(replayWeapons.begin(), replayWeapons.end(),
-                [canonical](const auto &row) { return row.id == canonical; });
+            const auto found = std::find_if(replayWeapons.begin(),
+                                            replayWeapons.end(),
+                                            [canonical](const auto &row)
+                                            {
+                                                return row.id == canonical;
+                                            });
             wire::require(found != replayWeapons.end());
             return *found;
         }
@@ -389,11 +438,13 @@ namespace services
                 {
                     uint64_t id = 0;
                     const auto parsed = std::from_chars(key.data(), key.data() + key.size(), id);
-                    wire::require(parsed.ec == std::errc{} && parsed.ptr == key.data() + key.size() &&
+                    wire::require(parsed.ec == std::errc{} &&
+                                  parsed.ptr == key.data() + key.size() &&
                                   key == std::to_string(id) && weapon(id).id == id);
                     // UpdateWeaponStats persists XP through DDL_SetInt. Keep all
                     // UInt32 bits, but reject totals that would truncate locally.
-                    wire::require(value.is_number_unsigned() && value.get<uint64_t>() <= UINT32_MAX);
+                    wire::require(value.is_number_unsigned() &&
+                                  value.get<uint64_t>() <= UINT32_MAX);
                     result.emplace(static_cast<uint16_t>(id), value.get<uint64_t>());
                 }
                 return result;
@@ -473,9 +524,9 @@ namespace services
         };
 
         RankNotification rankNotification(const ReplayWeaponProgression *row,
-                                           uint64_t xp,
-                                           const RankInventory *inventory,
-                                           bool refresh)
+                                          uint64_t xp,
+                                          const RankInventory *inventory,
+                                          bool refresh)
         {
             RankNotification result;
             const auto selected = row ? rankItems({{row->id, xp}}) : playerRankItems(xp);
@@ -485,11 +536,13 @@ namespace services
             for (const auto item : selected)
             {
                 const auto found = std::lower_bound(inventory->quantities.begin(),
-                    inventory->quantities.end(), std::make_pair(item, uint32_t{0}));
+                                                    inventory->quantities.end(),
+                                                    std::make_pair(item, uint32_t{0}));
                 wire::require(found != inventory->quantities.end() && found->first == item);
                 quantities.push_back(Json::array({item, found->second}));
-                if (found->second && (refresh || std::binary_search(
-                    inventory->newlyOwned.begin(), inventory->newlyOwned.end(), item)))
+                if (found->second && (refresh || std::binary_search(inventory->newlyOwned.begin(),
+                                                                    inventory->newlyOwned.end(),
+                                                                    item)))
                     result.grants.push_back({{"id", item}, {"quantity", found->second}});
             }
             result.hash = fingerprint(quantities);
@@ -530,17 +583,19 @@ namespace services
             // ContextSerialization context, Int32 JSON format, count,
             // then each bdRewardEventJSONV2 (Int32 format + typed string).
             const auto achievementId = row ? uint64_t{2000000} + row->id : uint64_t{1000000};
-            Json event = {
-                {"type", "ACHIEVEMENT"}, {"name", row ? std::string(row->reference) : "player_xp"},
-                {"reason", rankedUp ? "completed" : "inProgress"},
-                {"kind", row ? 5 : 0}, {"id_", achievementId},
-                {"multiProgress", {{"xp", {{"value", xp}}},
-                                    {"rank", {{"value", row ? weaponRank(*row, xp) : playerRank(xp)}}}}}};
+            Json event = {{"type", "ACHIEVEMENT"},
+                          {"name", row ? std::string(row->reference) : "player_xp"},
+                          {"reason", rankedUp ? "completed" : "inProgress"},
+                          {"kind", row ? 5 : 0},
+                          {"id_", achievementId},
+                          {"multiProgress",
+                           {{"xp", {{"value", xp}}},
+                            {"rank", {{"value", row ? weaponRank(*row, xp) : playerRank(xp)}}}}}};
             const auto rewards = rankNotification(row, xp, inventory, refreshAwards);
             if (!rewards.grants.empty())
-                event["triggers"] = Json::array({
-                    {{"type", "GRANT_PRODUCT"},
-                     {"inventory", {{"granted_items", rewards.grants}}}}});
+                event["triggers"] =
+                    Json::array({{{"type", "GRANT_PRODUCT"},
+                                  {"inventory", {{"granted_items", rewards.grants}}}}});
             const auto body = event.dump();
             wire::require(body.size() < 16 * 1024);
             wire::Writer push;
@@ -574,6 +629,9 @@ namespace services
                                           : folder / std::to_string(id.userId) / "states.json";
             auto data = document(path, Json::array());
             wire::require(data.is_array() && data.size() <= 15000);
+            if (definitions && id.titleId == 5800 && data.empty())
+                for (const auto &row : replayQuests)
+                    data.push_back(questDefinition(row));
             if (!definitions)
             {
                 const auto journal = document(path.parent_path() / "events.json", Json::object());
@@ -581,15 +639,24 @@ namespace services
                 if (journal.contains("player_xp"))
                 {
                     const auto xp = integer(journal, "player_xp");
-                    data.erase(std::remove_if(data.begin(), data.end(), [](const Json &row)
-                                              { return integer(row, "id") == 1000000; }),
+                    data.erase(std::remove_if(data.begin(),
+                                              data.end(),
+                                              [](const Json &row)
+                                              {
+                                                  return integer(row, "id") == 1000000;
+                                              }),
                                data.end());
                     data.push_back(playerState(xp));
                 }
                 const auto weapons = storedWeaponXp(journal, path);
-                data.erase(std::remove_if(data.begin(), data.end(), [](const Json &row)
-                    { return integer(row, "kind") == 5 && integer(row, "id") > 2000000; }),
-                    data.end());
+                data.erase(std::remove_if(data.begin(),
+                                          data.end(),
+                                          [](const Json &row)
+                                          {
+                                              return integer(row, "kind") == 5 &&
+                                                     integer(row, "id") > 2000000;
+                                          }),
+                           data.end());
                 for (const auto &[weaponId, xp] : weapons)
                     data.push_back(weaponState(weapon(weaponId), xp));
             }
@@ -646,7 +713,7 @@ namespace services
                         2,
                         end < filtered.size() ? digest + ":" + std::to_string(end) : "");
             wire::require(reply.structure.size() <= 256 * 1024);
-            if (!std::filesystem::exists(path))
+            if (!definitions && !std::filesystem::exists(path))
                 publish(path, data);
             return reply;
         }
@@ -936,8 +1003,8 @@ namespace services
                 return;
             }
             const auto &archive = write.document;
-            wire::require(archive.is_object() && archive.size() == 6 &&
-                          archive.at("schema") == 1 && integer(archive, "title") == id.titleId &&
+            wire::require(archive.is_object() && archive.size() == 6 && archive.at("schema") == 1 &&
+                          integer(archive, "title") == id.titleId &&
                           integer(archive, "owner") == id.userId &&
                           archive.at("context") == write.context);
             const auto &receipt = archive.at("receipt");
@@ -991,9 +1058,15 @@ namespace services
                     throw std::runtime_error("Achievement receipt archive conflict");
                 return;
             }
-            writes.push_back({id.userId, id.platformAccountId, context, path.stem().string(),
-                              Json{{"schema", 1}, {"title", id.titleId}, {"owner", id.userId},
-                                   {"context", context}, {"receipt", receipt},
+            writes.push_back({id.userId,
+                              id.platformAccountId,
+                              context,
+                              path.stem().string(),
+                              Json{{"schema", 1},
+                                   {"title", id.titleId},
+                                   {"owner", id.userId},
+                                   {"context", context},
+                                   {"receipt", receipt},
                                    {"checksum", fingerprint(receipt)}}});
         }
 
@@ -1056,14 +1129,16 @@ namespace services
             if (accepted)
             {
                 Reply result{0, {}, "achievement-events-idempotent", true, {}};
-                const bool earnedXp = std::any_of(events.begin(), events.end(),
-                    [](const Json &event)
-                    {
-                        return event.at("name") == "mp_addxp" &&
-                               integer(event.at("values"), "Param0") > 0;
-                    });
-                const auto xp = data.contains("player_xp")
-                                    ? integer(data, "player_xp") : initialPlayerXp(path);
+                const bool earnedXp =
+                    std::any_of(events.begin(),
+                                events.end(),
+                                [](const Json &event)
+                                {
+                                    return event.at("name") == "mp_addxp" &&
+                                           integer(event.at("values"), "Param0") > 0;
+                                });
+                const auto xp =
+                    data.contains("player_xp") ? integer(data, "player_xp") : initialPlayerXp(path);
                 if (earnedXp)
                 {
                     // The original consumer assigns absolute XP/rank. Replay the
@@ -1097,23 +1172,27 @@ namespace services
                     std::vector<achievement_store::Write> local;
                     auto &writes = staged ? *staged : local;
                     writes.push_back({id.userId, id.platformAccountId, context, {}, data});
-                    writes.push_back({id.userId, id.platformAccountId, "5800", {},
-                        std::move(awards->document), achievement_store::Destination::inventory});
+                    writes.push_back({id.userId,
+                                      id.platformAccountId,
+                                      "5800",
+                                      {},
+                                      std::move(awards->document),
+                                      achievement_store::Destination::inventory});
                     if (!staged)
                         achievement_store::commit(root, id.titleId, writes, validateEventWrite);
                 }
                 if (earnedXp)
-                    result.deliveries.push_back(progressionUpdate(id, context, xp, false,
-                        nullptr, awards ? &*awards : nullptr));
+                    result.deliveries.push_back(progressionUpdate(
+                        id, context, xp, false, nullptr, awards ? &*awards : nullptr));
                 for (const auto &[weaponId, total] : snapshots)
-                    result.deliveries.push_back(progressionUpdate(id, context, total, false,
-                        &weapon(weaponId), awards ? &*awards : nullptr));
+                    result.deliveries.push_back(progressionUpdate(
+                        id, context, total, false, &weapon(weaponId), awards ? &*awards : nullptr));
                 if (!refreshed.empty())
                     result.operation = "achievement-events-idempotent-refresh";
                 return result;
             }
-            const auto previousXp = data.contains("player_xp")
-                                        ? integer(data, "player_xp") : initialPlayerXp(path);
+            const auto previousXp =
+                data.contains("player_xp") ? integer(data, "player_xp") : initialPlayerXp(path);
             auto xp = previousXp;
             const auto previousWeapons = storedWeaponXp(data, path);
             auto weapons = previousWeapons;
@@ -1179,29 +1258,44 @@ namespace services
             }
             writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
             if (awards && awards->changed)
-                writes.push_back({id.userId, id.platformAccountId, "5800", {},
-                    std::move(awards->document), achievement_store::Destination::inventory});
+                writes.push_back({id.userId,
+                                  id.platformAccountId,
+                                  "5800",
+                                  {},
+                                  std::move(awards->document),
+                                  achievement_store::Destination::inventory});
             if (!staged)
                 achievement_store::commit(root, id.titleId, writes, validateEventWrite);
             Reply result{0, {}, "achievement-events-recorded", true, {}};
             if (xp != previousXp)
             {
                 result.deliveries.push_back(
-                    progressionUpdate(id, context, xp, playerRank(xp) > playerRank(previousXp),
-                                      nullptr, awards ? &*awards : nullptr, false));
+                    progressionUpdate(id,
+                                      context,
+                                      xp,
+                                      playerRank(xp) > playerRank(previousXp),
+                                      nullptr,
+                                      awards ? &*awards : nullptr,
+                                      false));
                 result.detail = " progression_xp=" + std::to_string(xp) +
                                 " progression_rank=" + std::to_string(playerRank(xp));
             }
             for (const auto &[weaponId, total] : changedWeapons)
             {
                 const auto previous = previousWeapons.find(weaponId);
-                const auto oldXp = previous == previousWeapons.end() ? uint64_t{0} : previous->second;
+                const auto oldXp =
+                    previous == previousWeapons.end() ? uint64_t{0} : previous->second;
                 if (total == oldXp)
                     continue;
                 const auto &row = weapon(weaponId);
-                result.deliveries.push_back(progressionUpdate(id, context, total,
-                    weaponRank(row, total) > weaponRank(row, oldXp), &row,
-                    awards ? &*awards : nullptr, false));
+                result.deliveries.push_back(
+                    progressionUpdate(id,
+                                      context,
+                                      total,
+                                      weaponRank(row, total) > weaponRank(row, oldXp),
+                                      &row,
+                                      awards ? &*awards : nullptr,
+                                      false));
             }
             return result;
         }
@@ -1218,6 +1312,7 @@ namespace services
                 platform::LobbyIdentity recipient;
                 Json events = Json::array(), owners = Json::array();
             };
+
             std::map<uint64_t, Batch> batches;
             size_t offset = 0;
             // Validate every recipient before recording any part of the batch.
@@ -1225,9 +1320,9 @@ namespace services
             {
                 const auto user = integer(owner, "userID");
                 const auto recipient = matchmakingReportIdentity(root, sender, user);
-                if (!recipient ||
-                    !firstPartyOwner({integer(owner, "firstPartyUserID"),
-                                      string(owner, "firstPartyAccountType", 10)}, *recipient))
+                if (!recipient || !firstPartyOwner({integer(owner, "firstPartyUserID"),
+                                                    string(owner, "firstPartyAccountType", 10)},
+                                                   *recipient))
                     return {101, {}, "achievement-event-owner-denied"};
                 const auto count = integer(owner, "eventCount", 128);
                 wire::require(count && offset + count <= events.size());
@@ -1244,8 +1339,8 @@ namespace services
             {
                 // Preflight all retry receipts and XP arithmetic before changing
                 // any account. Late conflicts reject the whole submission.
-                auto recorded = recordEvents(root, batch.recipient, context, request,
-                                             batch.events, batch.owners, &writes);
+                auto recorded = recordEvents(
+                    root, batch.recipient, context, request, batch.events, batch.owners, &writes);
                 if (recorded.error)
                     return recorded;
                 for (auto &delivery : recorded.deliveries)
@@ -1367,7 +1462,8 @@ namespace services
                 }
             }
             wire::require(seen == 10 && !owners.empty());
-            return recordAttributedEvents(root, id, context, batchRequestId(request), events, owners);
+            return recordAttributedEvents(
+                root, id, context, batchRequestId(request), events, owners);
         }
 
         Reply activation(const std::filesystem::path &root,
@@ -1418,12 +1514,14 @@ namespace services
             {
                 const auto definitions = document(folder / "definitions.json", Json::array());
                 wire::require(definitions.is_array() && definitions.size() <= 15000);
+                bool published = false;
                 for (const auto &row : definitions)
                 {
                     (void)definition(row);
                     if ((selected && integer(row, "14") == selected) ||
                         (!selected && string(row, "1", 100) == name))
                     {
+                        published = true;
                         // Progression rules explicitly supply a complete initial state;
                         // unknown definition fields are not guessed into XP targets.
                         if (!row.contains("initialState"))
@@ -1437,6 +1535,13 @@ namespace services
                         break;
                     }
                 }
+                if (!found && !published && id.titleId == 5800)
+                    if (const auto *row = quest(selected, name))
+                    {
+                        wire::require((name.empty() || row->name == name) && data.size() < 15000);
+                        data.push_back(questState(*row));
+                        found = &data.back();
+                    }
             }
             if (!found)
             {
@@ -1451,6 +1556,25 @@ namespace services
             const auto status = integer(*found, "status", 5);
             if (activate && (status == 1 || status == 2))
             {
+                // Native StartQuest deactivates the current mission in this mode
+                // before selecting another. Preserve MP/BR/CP independence and
+                // reject neither a retry nor an interrupted deactivation sequence.
+                if (id.titleId == 5800 && integer(*found, "kind") == 15)
+                {
+                    if (const auto *selectedQuest = quest(integer(*found, "id")))
+                    {
+                        for (auto &row : data)
+                        {
+                            if (&row != found && integer(row, "kind") == 15 &&
+                                integer(row, "status") == 1)
+                            {
+                                if (const auto *previous = quest(integer(row, "id"));
+                                    previous && previous->category == selectedQuest->category)
+                                    row["status"] = uint64_t{2};
+                            }
+                        }
+                    }
+                }
                 (*found)["status"] = uint64_t{1};
                 if (status != 1)
                     (*found)["activationTimestamp"] = timestamp;
@@ -1469,14 +1593,15 @@ namespace services
             achievement_store::recover(root, title, validateEventWrite);
     }
 
-    bool achievementDeliveryValid(const std::filesystem::path &root, uint32_t title,
+    bool achievementDeliveryValid(const std::filesystem::path &root,
+                                  uint32_t title,
                                   const Delivery &delivery)
     {
         if (delivery.progressionContext.empty())
             return true;
-        wire::require(title == 5800 && delivery.user && delivery.user != UINT64_MAX &&
-                      (delivery.progressionContext == "5800" ||
-                       delivery.progressionContext == "iw8"));
+        wire::require(
+            title == 5800 && delivery.user && delivery.user != UINT64_MAX &&
+            (delivery.progressionContext == "5800" || delivery.progressionContext == "iw8"));
         // A second event or signed local restore can supersede an absolute
         // notification between dispatch and its serialized socket write.
         achievement_store::recover(root, title, validateEventWrite);
@@ -1506,11 +1631,12 @@ namespace services
             std::optional<RankInventory> inventory;
             if (!selected.empty())
                 inventory = prepareRankInventory(root, identity, selected, false);
-            return delivery.progressionRewardsHash == rankNotification(&row, found->second,
-                inventory ? &*inventory : nullptr, true).hash;
+            return delivery.progressionRewardsHash ==
+                   rankNotification(&row, found->second, inventory ? &*inventory : nullptr, true)
+                       .hash;
         }
-        const auto xp = journal.contains("player_xp") ? integer(journal, "player_xp")
-                                                     : initialPlayerXp(path);
+        const auto xp =
+            journal.contains("player_xp") ? integer(journal, "player_xp") : initialPlayerXp(path);
         if (delivery.progressionXp != xp)
             return false;
         if (delivery.progressionRewardsHash.empty())
@@ -1519,11 +1645,13 @@ namespace services
         identity.titleId = title;
         identity.userId = delivery.user;
         const auto inventory = prepareRankInventory(root, identity, playerRankItems(xp), false);
-        return delivery.progressionRewardsHash == rankNotification(nullptr, xp, &inventory, true).hash;
+        return delivery.progressionRewardsHash ==
+               rankNotification(nullptr, xp, &inventory, true).hash;
     }
 
     std::vector<Delivery> currentProgressionDeliveries(const std::filesystem::path &root,
-                                                      uint32_t title, uint64_t user)
+                                                       uint32_t title,
+                                                       uint64_t user)
     {
         if (title != 5800 || !user || user == UINT64_MAX || !platform::accountName(user))
             return {};
@@ -1531,39 +1659,44 @@ namespace services
         // Actual Replay login/event captures use the title context. Do not
         // merge independent legacy contexts into the one native player record.
         const auto context = std::to_string(title);
-        const auto path = root / "achievements" / context / context /
-                          std::to_string(user) / "events.json";
+        const auto path =
+            root / "achievements" / context / context / std::to_string(user) / "events.json";
         const auto journal = document(path, Json::object());
         validatePendingXp(journal);
         if (!journal.empty())
             wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
-                      journal.at("requests").is_array() &&
-                      journal.at("events").size() <= 1024 &&
-                      journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
+                          journal.at("requests").is_array() &&
+                          journal.at("events").size() <= 1024 &&
+                          journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
         platform::LobbyIdentity id;
         id.titleId = title;
         id.userId = user;
         std::vector<Delivery> result;
         const auto weapons = storedWeaponXp(journal, path);
-        const auto xp = journal.contains("player_xp") ? integer(journal, "player_xp")
-                                                     : initialPlayerXp(path);
+        const auto xp =
+            journal.contains("player_xp") ? integer(journal, "player_xp") : initialPlayerXp(path);
         const auto selected = rankItems(weapons, xp);
         std::optional<RankInventory> inventory;
         if (!selected.empty())
             inventory = prepareRankInventory(root, id, selected, false);
         if (journal.contains("player_xp"))
-            result.push_back(progressionUpdate(id, context, xp, false, nullptr,
-                                               inventory ? &*inventory : nullptr));
+            result.push_back(progressionUpdate(
+                id, context, xp, false, nullptr, inventory ? &*inventory : nullptr));
         for (const auto &[weaponId, weaponXp] : weapons)
-            result.push_back(progressionUpdate(id, context, weaponXp, false, &weapon(weaponId),
+            result.push_back(progressionUpdate(id,
+                                               context,
+                                               weaponXp,
+                                               false,
+                                               &weapon(weaponId),
                                                inventory ? &*inventory : nullptr));
         for (auto &delivery : result)
             delivery.progressionRefresh = true;
         return result;
     }
 
-    std::vector<StoredProgression> achievementProgressionSnapshot(
-        const std::filesystem::path &root, uint32_t title, const std::string &context)
+    std::vector<StoredProgression> achievementProgressionSnapshot(const std::filesystem::path &root,
+                                                                  uint32_t title,
+                                                                  const std::string &context)
     {
         wire::require(title == 5800 && (context == std::to_string(title) || context == "iw8"));
         // Service dispatch owns the common store mutex. Recover any accepted
@@ -1593,10 +1726,10 @@ namespace services
             validatePendingXp(journal);
             if (journal.contains("player_xp"))
             {
-                wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
-                              journal.at("events").size() <= 1024 &&
-                              journal.at("requests").is_array() &&
-                              journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
+                wire::require(
+                    journal.at("schema") == 1 && journal.at("events").is_array() &&
+                    journal.at("events").size() <= 1024 && journal.at("requests").is_array() &&
+                    journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
                 result.push_back({owner, integer(journal, "player_xp"), *name});
                 continue;
             }
@@ -1622,8 +1755,11 @@ namespace services
     }
 
     void restoreAchievementProgression(const std::filesystem::path &root,
-                                       uint32_t title, uint64_t user, uint64_t xp,
-                                       bool restore, unsigned startingRank,
+                                       uint32_t title,
+                                       uint64_t user,
+                                       uint64_t xp,
+                                       bool restore,
+                                       unsigned startingRank,
                                        uint32_t platformAccount)
     {
         wire::require(title == 5800 && user && user != UINT64_MAX &&
@@ -1638,25 +1774,31 @@ namespace services
             auto inventory = prepareRankInventory(root, identity, playerRankItems(0), true);
             if (inventory.changed)
             {
-                const achievement_store::Write write{user, platformAccount, "5800", {},
-                    std::move(inventory.document), achievement_store::Destination::inventory};
+                const achievement_store::Write write{user,
+                                                     platformAccount,
+                                                     "5800",
+                                                     {},
+                                                     std::move(inventory.document),
+                                                     achievement_store::Destination::inventory};
                 achievement_store::commit(root, title, {&write, 1}, validateEventWrite);
             }
             return;
         }
-        const auto path = root / "achievements" / std::to_string(title) /
-                          std::to_string(title) / std::to_string(user) / "events.json";
-        auto journal = document(path, Json{{"schema", 1}, {"next", uint64_t{1}},
-                                          {"events", Json::array()}, {"requests", Json::array()}});
+        const auto path = root / "achievements" / std::to_string(title) / std::to_string(title) /
+                          std::to_string(user) / "events.json";
+        auto journal = document(path,
+                                Json{{"schema", 1},
+                                     {"next", uint64_t{1}},
+                                     {"events", Json::array()},
+                                     {"requests", Json::array()}});
         wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
                       journal.at("requests").is_array() &&
-                      journal.at("next").is_number_unsigned() &&
-                      integer(journal, "next") > 0 && journal.at("events").size() <= 1024 &&
-                      journal.at("requests").size() <= 4096);
+                      journal.at("next").is_number_unsigned() && integer(journal, "next") > 0 &&
+                      journal.at("events").size() <= 1024 && journal.at("requests").size() <= 4096);
         validatePendingXp(journal);
         if (!restore)
             xp = journal.contains("player_xp") ? integer(journal, "player_xp")
-                                              : initialPlayerXp(path);
+                                               : initialPlayerXp(path);
         if (startingRank)
         {
             xp = replayPlayerRankMinimumXp[startingRank - 1];
@@ -1678,7 +1820,11 @@ namespace services
         // a custom displayed rank must not leave create-a-class still locked.
         writes.push_back({user, platformAccount, "5800", {}, std::move(journal)});
         if (inventory.changed)
-            writes.push_back({user, platformAccount, "5800", {}, std::move(inventory.document),
+            writes.push_back({user,
+                              platformAccount,
+                              "5800",
+                              {},
+                              std::move(inventory.document),
                               achievement_store::Destination::inventory});
         achievement_store::commit(root, title, writes, validateEventWrite);
     }

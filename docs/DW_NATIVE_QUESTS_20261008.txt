@@ -1,0 +1,86 @@
+REPLAY DW NATIVE MISSION MANAGEMENT - 2026-10-08
+
+Branch: codex/dw-remaining-services
+Primary backend: 162.243.115.160
+Linux SHA256: db5775f0786943449ffab7714c9a1b8cdea78ac7d7da30ad5e26f09da895507c
+Windows SHA256: dea927b44681027273b9d1ecc226058a83a6778e03ec9abaea83bc735b5c6300
+Shipping game SHA256: 638dab82f069be51f6450f9ed2744f0b049d34642c0b67ae30cde01b53ea16e5
+The game executable and INI were not changed. No client download is required.
+
+ISSUE AND TARGET EVIDENCE
+The stock game repeatedly requested activation of ID 1500 and received error
+108 because no achievement definition/initial state was published. The native
+quest cache remained empty. ID 1500 is Boot Camp stage 1, target 1.
+
+Original loader 0x1410627A0 uses quest_challenges.csv columns 0/1/6/16 for
+ID/stage name/progress target/mode. It initializes only ALL, BR and CP stages.
+All 447 loaded native StringTable rows match the retained Replay export. The
+32 initialized native groups contain exactly the same 232 selected stages.
+The publication excludes OPERATOR, INTEL and PS4 eligibility pending their
+separate rules; it does not invent entitlements or mark missions complete.
+Original AddProgression 0x1410625A0 and activation callback 0x141064060 establish
+the native ID/progress/mode/active cache. This Replay has one local-client
+cache of 640 records followed by count and activation mode, not two caches.
+Addresses in process observations resolve through the linked image symbols.
+
+IMPLEMENTATION
+prepare-replay-quests.py validates stage chains, capacities, names, mode/type
+and duplicate IDs against the read-only native table before generating
+src/replay_quest_data.h. No per-player server provisioning is required.
+
+Service 125/4 returns the real default mission definitions when no nonempty
+custom definition publication exists. It retains native pagination/filtering
+and does not save a generated default as a manual publication override.
+Service 125/5 lazily creates a known mission state with kind 15, target from
+the asset, zero progress and inactive status, then activates it. Selecting
+another known stage deactivates the previous active stage in the same mode.
+MP, BR and CP selections remain independent. Explicit custom initial-state
+publications take precedence; a matching publication without initialState
+continues to withhold activation rather than falling back to a default.
+Service 125/6 deactivates without resetting progress. Terminal states survive
+retries. Native structured parsing validates the whole request before saving.
+Saved selection changes have one flushed atomic states.json replacement.
+
+BUILD AND ISOLATED CHECKS
+Source snapshot: data/quest-management-20261008-v2/source.tar
+Source receipt: data/quest-management-20261008-v2/source.json
+Archive SHA256: 28c2ad85bb94e42a18e90dbc0f8441fc1bbfc53352d320ddf7b433b7ca581870
+Only achievement_services.cpp and its new generated header changed in the
+compiled runtime relative to the verified previous backend. Unrelated dirty
+matchmaking, dashboard, tournament and compiler work was excluded/preserved.
+Linux retained the unchanged compiled objects and rebuilt that one C++ source.
+
+Both platforms passed ten encrypted native-wire mission groups plus 102
+startup/social/profile-storage groups. The startup fixture now expects the
+new default mission publication instead of an empty definition list; that
+fixture-only overlay is separately hashed without changing compiled inputs.
+Checks cover all 232 definitions, pagination, name/ID selectors, mode switching,
+idempotent retries, account isolation, invalid/trailing input, explicit custom
+publications, atomic-write failure, terminal states and process persistence.
+The first candidate's redundant end check was rejected by these fixtures and
+removed; failed evidence remains separate from the passing v2 cohort.
+
+ACTUAL SHIPPING GAME VALIDATION
+One instance at a time, launched from E:\IW8\Builds\1.20-replay.
+PID 10412 completed three real 125/5 tasks and native callbacks, installing
+active MP 1500, CP 10057 and BR 50000 in the stock mission cache. All 27 startup
+fences passed. Backend states.json retained their real names/targets/timestamps.
+Fresh PID 21168 restored all three through native 125/3 state queries without
+another activation task. The persisted file was unchanged across that restart.
+Player XP 869220 and displayed rank 53 stayed unchanged. Backend PID 117159 and
+its running /proc image were verified against the deployed release hash.
+No map/match run, invented XP, grant or fabricated mission completion occurred.
+
+Primary native receipt:
+  validation/20261008-native-quest-management-readiness.json
+Target/asset receipts:
+  validation/20261008-replay-quest-target.json
+  validation/20261008-replay-quest-assets.json
+
+OPEN WORK
+Earned mission predicates/counters, completion, automatic next-stage rewards,
+and operator/intel/platform eligibility still need reconstruction. Native
+definition-query and deactivation callbacks were not exercised by this game
+test; their transport/storage paths passed the isolated fixtures. Six known
+SDK routes still lack original response bindings: 50/22, 58/22, 193/9, 193/10,
+193/12 and 193/24. The backend goal and broader per-domain audit remain active.
