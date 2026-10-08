@@ -117,6 +117,10 @@ GAPS["125"] += (
     "XP/retry transaction. Inventory delivery hashes track entitlement changes even "
     "without XP changes. Conditional camo/quest predicates and positive game UI "
     "completion remain separate requirements."
+    " A hash-bound private-game test verifies event-67 XP/rank callback consumption, "
+    "local save, game-restart restoration and no duplicate award from an authenticated "
+    "self-report retry. That independent-wire submission is not a game-issued report "
+    "task, match-earned XP or an after-action animation test."
 )
 GAPS["198"] += (
     " The original outgoing text length excludes its NUL terminator. The backend "
@@ -917,6 +921,33 @@ def private_store_variants_evidence(server_hash):
     return path.relative_to(ROOT).as_posix(), proof
 
 
+def native_progression_callback_evidence(server_hash):
+    path = ROOT / "validation/20261008-native-progression-callback-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed") and proof.get("server_sha256") == server_hash
+        and proof.get("native_player_xp_callback_verified")
+        and proof.get("native_rank_callback_verified")
+        and proof.get("native_progression_restored_after_game_restart")
+        and proof.get("durable_retry_did_not_award_again")
+        and proof.get("game_issued_report_task_completion_verified") is False
+        and proof.get("shipping_image_completion_inherited") is False
+        and proof.get("recorder_sha256")
+        == digest(ROOT / "tools/record-native-progression-callback-proof.py")
+    ):
+        return None
+    for name, expected in proof["evidence"].items():
+        evidence = (ROOT / name).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != expected:
+            raise ValueError("Native progression callback evidence changed")
+    return dict(receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
+                scope=proof["scope"], game_sha256=proof["game_sha256"],
+                native_report_task_completion_verified=False,
+                shipping_image_completion_inherited=False)
+
+
 def live_streaming_layout_evidence():
     path = ROOT / "validation/20261008-live-streaming-target-layout.json"
     if not path.is_file():
@@ -1351,6 +1382,7 @@ def main():
         objectstore_completion_target_evidence=objectstore_completion_evidence(),
         live_streaming_target_layout_evidence=live_streaming_layout_evidence(),
         private_native_counter_read_evidence=private_counter_read,
+        native_progression_callback_evidence=native_progression_callback_evidence(current_hash),
         selected_protocol_fixture=fixture_path,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),

@@ -1,0 +1,55 @@
+Replay DW native progression callback and local persistence — 2026-10-08
+
+Current server remains the freshly compiled native Linux backend:
+  SHA256 e5150218c9c44ee37f125a2acb975405060f610d4cb5a6951185ee5e41d9242f
+  Release /opt/replay-dw/releases/20261008-e5150218c9c4/iw8-dw-server
+  Runtime PID 108498, unchanged throughout this test.
+
+Purpose
+  Confirm that the corrected one-byte event-67 version reaches the actual player
+  progression consumer, not just the Store loot reader or a fixture decoder.
+  Confirm that the player's locally saved XP survives a controlled game restart.
+
+Method and results
+  Only one game instance ran at a time, from E:\IW8\Builds\1.20-replay.
+  The private Alpha image remained unchanged, SHA256
+  028d1f64588725672dc19256e866d1c9ed5313767a511fe6f1375e7a9be3e288.
+
+  The independent native-wire client resumed Alpha's already issued session;
+  it did not log in again, replace the game session, or write credentials.
+  The signed session-store image was verified before selecting the known private
+  owner. It sent an authenticated self-report of mp_addxp / Param0 = 3500.
+
+  Native game PID 912 changed XP 0 -> 3500 and zero-based rank 0 -> 1.
+  All 27 native startup fences passed before and after the notification.
+  The game wrote its normal 40-byte local player-progression.bin record.
+  Its owner, XP, magic/version and FNV checksum were independently verified.
+
+  After a controlled restart, private game PID 9960 restored XP 3500 / rank 2.
+  Replaying the same request ID and timestamp did not award another 3500 XP.
+  Durable server XP remains 3500, with one matching award event. The native XP
+  cache remains 3500, and the local progression record's complete bytes remain
+  identical across restart and retry.
+
+  Evidence: validation/20261008-native-progression-callback-readiness.json
+  Recorder: tools/record-native-progression-callback-proof.py
+  Raw observations and owned diagnostic scripts: data/native-progression-20261008
+
+Restoration and limits
+  The private instance was stopped. The normal shipping game is running again
+  as PID 9776: all 27 fences pass, XP 869220 / rank 53 unchanged.
+  Neither the game executable nor the backend required another rebuild.
+  No maps or matches were launched for this check.
+
+  This verifies the real XP/rank notification callback and native local save.
+  The report request originated in the independent authenticated wire client;
+  native game-issued report task completion, match-earned XP and after-action
+  animation timing are NOT claimed. The private image's result is not inherited
+  as completion evidence for every shipping-image method.
+
+Remaining native work
+  The full backend goal remains active. The six missing streaming/object-store
+  task routes still require their actual result bindings. Their request writers
+  and streaming consumers are present in Replay, but a declaration/layout alone
+  cannot establish their serialized response format. No guessed success handler
+  was registered while researching those paths.
