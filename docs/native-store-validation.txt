@@ -1,0 +1,35 @@
+NATIVE REPLAY STORE VALIDATION - 2026-10-08
+
+The primary Linux backend's native free-bundle path is now verified in the game,
+in addition to the encrypted-wire fixtures. The owned Alpha profile claimed
+Standard Issue I (SKU 400060) through the original Store UI at zero cost. Replay
+completed marketplace task 80/106, showed Purchased and checked all six contents.
+Its actual inventory gained the six items and the bundle record, quantity one.
+
+The backend saved one purchase receipt. A separate game process authenticated
+the same temporary identity and reloaded all seven grants through task 80/69.
+The native count changed from 224 to 231 and remained 231 after restarting. XP
+stayed zero and no wallet balance was seeded. Main-player inventory was not used.
+
+Proof: validation/20261008-native-store-purchase-readiness.json. Each input,
+observed process, backend binary and screenshot is hash-bound in that receipt.
+The native screenshot records the completed purchase and the six ownership ticks.
+This covers one free SKU; it does not certify paid/gifted purchases, first-party
+commerce, every SKU or the complete Demonware backend.
+
+tools/observe-game.py --inventory now reads real loot records independently of
+the Lua unlock_all policy. The reader resolves gl_1459E05C0 through the selected
+linked image and the live ASLR base. Same-target native readers establish the
+64-byte prefix, 15,000 eight-byte ID/quantity records and count at +120064.
+It rejects an excessive count and retries a changing count or record payload
+up to three times. This is a stable read sample, not a locked atomic snapshot.
+
+Run the boundary/concurrency checks with:
+  python -B tools/test-native-loot-inventory.py
+
+Record an already-observed free-bundle run with:
+  python -B tools/record-native-store-readiness.py --evidence data/store-native-20261008 --publication data/store-catalog-20261007 --sku 400060 --output validation/20261008-native-store-purchase-readiness.json
+
+The recorder never purchases, grants items or writes process memory. Native UI
+inspection plus actual inventory changes are separate from server acceptance.
+Protocol fixtures alone do not set the native completion flags.

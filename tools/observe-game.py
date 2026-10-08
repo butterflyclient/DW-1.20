@@ -9,6 +9,7 @@ import struct
 from datetime import datetime, timezone
 import urllib.request
 import argparse
+from native_loot_inventory import snapshot as loot_inventory_snapshot
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -63,6 +64,11 @@ parser.add_argument(
     "--channels",
     action="store_true",
     help="Read the exact Replay chat pool and bounded member records without changing them",
+)
+parser.add_argument(
+    "--inventory",
+    action="store_true",
+    help="Read stable native loot quantities, without applying the unlock_all override",
 )
 parser.add_argument(
     "--ab-testing",
@@ -1314,7 +1320,7 @@ try:
             })
 
     result = {
-        "schema": 6,
+        "schema": 7,
         "pid": pid,
         "executable": str(path),
         "sha256": deployment["sha256"],
@@ -1607,6 +1613,10 @@ try:
         "server_log_file_size": server_log_file_size,
         "server_log_reset_detected": server_log_reset,
         "native_channels": native_channels() if args.channels else None,
+        "native_loot_inventory": (
+            loot_inventory_snapshot(read, symbols)
+            if args.inventory else None
+        ),
         "native_ab_testing": native_ab_testing() if args.ab_testing else None,
         "native_encrypted_lobby_task_completion": "not observed by this state reader",
         "connection_receipt": connection,
