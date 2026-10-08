@@ -501,10 +501,10 @@ namespace services
     }
 
     void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,
-                                 bool restore, unsigned startingRank)
+                                 bool restore, unsigned startingRank, uint32_t platformAccount)
     {
         std::lock_guard lock(storeMutex);
-        restoreAchievementProgression(directory, title, user, xp, restore, startingRank);
+        restoreAchievementProgression(directory, title, user, xp, restore, startingRank, platformAccount);
     }
 
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user)

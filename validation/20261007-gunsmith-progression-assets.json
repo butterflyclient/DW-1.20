@@ -3,7 +3,12 @@
   "passed": true,
   "catalog_path": "data\\replay-gunsmith-progression.json",
   "catalog_sha256": "306b9fafd25d699cc099f7aba087b7d4e7783653fad24eea24047111644a407b",
-  "tool_sha256": "ee7aa65b82c892b44e36fba8768c911c8550ac7c4b87464bd29b07bcfae0a700",
+  "header_path": "src\\gunsmith_rank_unlock_data.h",
+  "header_sha256": "f0ab180e6f26cbe606bd59a7bc5de5049969c06999a25f3d76f8121bea15d441",
+  "compiled_rank_unlock_count": 2924,
+  "compiled_player_rank_unlock_count": 112,
+  "compiled_initial_item_count": 192,
+  "tool_sha256": "4137ef6421ca9b38fc9b8dda8c3080ca29769b4ac4cc1a4a0f7ee1fcc5ede21b",
   "inputs": {
     "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\luashared\\csvutils.lua.1.lua": "65ac2fbb044acd3ec22cb8ffd71fa51dfb12890e755b1bc65c7e2d571e140191",
     "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\utils\\progressionutils.lua.2223.lua": "79f9577587a775ac4982f0e86495210a95cfcb6724e4bb768dce9f44dc1ef72c",
@@ -59,7 +64,9 @@
     "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gunsmith\\sn_sksierra_progression.csv.430.csv": "6aef3d5aa8aa796aa6c37453c12cda66ac001315c3c5efc3fe97f6cd76a48d21",
     "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gunsmith\\lm_mkilo3_progression.csv.370.csv": "070d1aad2753b5bfb943cbc7ed6e5f3e0f14e07d2180a0f973e7d2bbf3b04ce5",
     "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gunsmith\\ar_galima_progression.csv.337.csv": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gunsmith\\sm_victor_progression.csv.414.csv": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gunsmith\\sm_victor_progression.csv.414.csv": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\progression\\progressionitems.csv.592.csv": "7088d58926ba71003fd527cdb773f346f754b708f8be9dada6060c5c2c52ea19",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\progression\\initialitems.csv.590.csv": "1115cf8efdfd03f24636550d87db9d8845b88294c0486490c17e01973a85470c"
   },
   "weapon_count": 51,
   "block_count": 3610,

@@ -1,5 +1,6 @@
 #include "host_os.h"
 #include "marketplace_services.h"
+#include "achievement_services.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
@@ -1677,6 +1678,57 @@ namespace services
         }
     } // namespace
 
+    void validateRankInventory(const nlohmann::json &document)
+    {
+        validateInventory(document);
+    }
+
+    RankInventory prepareRankInventory(const std::filesystem::path &directory,
+                                       const platform::LobbyIdentity &id,
+                                       std::span<const uint32_t> selected,
+                                       bool award)
+    {
+        wire::require(id.titleId == 5800 && id.userId && id.userId != UINT64_MAX &&
+                      selected.size() <= 15000);
+        recoverPurchase(directory, id);
+        RankInventory result;
+        result.document = read(store(directory, id));
+        auto &items = result.document["items"];
+        std::map<uint32_t, size_t> positions;
+        for (size_t index = 0; index < items.size(); ++index)
+            positions.emplace(items[index].at("1").get<uint32_t>(), index);
+        std::set<uint32_t> ids;
+        for (const auto item : selected)
+        {
+            wire::require(item && item <= INT32_MAX && ids.insert(item).second);
+            auto found = positions.find(item);
+            auto quantity = found == positions.end() ? uint32_t{0}
+                : items[found->second].at("2").get<uint32_t>();
+            // GRANT_PRODUCT's native reader uses getInt32 and stores a full,
+            // absolute positive cache quantity. Never truncate an owned stack.
+            wire::require(quantity <= INT32_MAX);
+            if (award && !quantity)
+            {
+                quantity = 1;
+                if (found == positions.end())
+                {
+                    wire::require(items.size() < 15000);
+                    positions[item] = items.size();
+                    items.push_back({{"1", item}, {"2", quantity}});
+                }
+                else
+                    items[found->second]["2"] = quantity;
+                result.changed = true;
+                result.newlyOwned.push_back(item);
+            }
+            result.quantities.emplace_back(item, quantity);
+        }
+        std::sort(result.quantities.begin(), result.quantities.end());
+        std::sort(result.newlyOwned.begin(), result.newlyOwned.end());
+        validateInventory(result.document);
+        return result;
+    }
+
     std::optional<Reply> marketplaceServices(const std::filesystem::path &directory,
                                              const platform::LobbyIdentity &id,
                                              uint8_t service,
@@ -1684,7 +1736,10 @@ namespace services
                                              wire::Reader &p)
     {
         if (service == 80 || service == 123)
+        {
+            recoverAchievementWrites(directory, id.titleId);
             recoverPurchase(directory, id);
+        }
         if (service == 80 && task == 243)
             return reconcile(directory, id, p);
         if (service == 80 && task == 69)

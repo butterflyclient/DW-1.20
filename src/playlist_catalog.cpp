@@ -271,16 +271,29 @@ namespace services
             if (eligible.empty())
                 continue;
             std::set<unsigned> teamCounts;
+            std::set<unsigned> squadSizes;
+            bool squadMode = false, ordinaryMode = false;
             for (const auto &entry : eligible)
             {
                 const auto &mode = modes.at(entry["gametype"].get<std::string>());
                 if (mode.contains("teamCount"))
                     teamCounts.insert(number(mode.at("teamCount"), 200));
+                if (mode.value("script", std::string{}) == "br")
+                {
+                    squadMode = true;
+                    const auto size = number(mode.at("teamSize"), 200);
+                    wire::require(size > 0);
+                    squadSizes.insert(size);
+                }
+                else
+                    ordinaryMode = true;
             }
             // The current mixed-mode publications agree on team count. A future
             // mixed team/FFA publication cannot safely inherit its first entry's
             // team layout before the native client selects the actual mode.
             wire::require(teamCounts.size() <= 1);
+            wire::require(!(squadMode && ordinaryMode) && squadSizes.size() <= 1);
+            const bool splitParties = policy.value("split_parties_for_team_balance", false) && !squadMode;
             Json rules = query.at("ruleset_payload"),
                  dvars = rules.value("dvar_overrides", Json::object());
             wire::require(dvars.is_object());
@@ -300,7 +313,7 @@ namespace services
             if (policy.contains("minimum_lobby_seconds"))
                 assign(dvars, bindings, "party_minLobbyTime",
                        number(policy["minimum_lobby_seconds"], 2147483));
-            if (policy.value("split_parties_for_team_balance", false))
+            if (splitParties)
             {
                 // Replay ReadyTeams otherwise evaluates the original private
                 // subparty as an indivisible group, even after DW balances its
@@ -310,6 +323,8 @@ namespace services
             }
             if (policy.contains("dvar_overrides"))
                 overrides(dvars, policy["dvar_overrides"], bindings);
+            if (squadMode)
+                assign(dvars, bindings, "online_matchmaking_ignore_partition_value", 0);
             wire::require(dvars.size() <= 128);
             rules["dvar_overrides"] = dvars;
             rules["map_weights"] = weights;
@@ -318,7 +333,9 @@ namespace services
             PlaylistSelection selected;
             selected.rules = rules;
             selected.splitPartiesForTeamBalance =
-                policy.value("split_parties_for_team_balance", false);
+                splitParties;
+            if (!squadSizes.empty())
+                selected.squadSize = *squadSizes.begin();
             if (!teamCounts.empty())
                 selected.teamCount = *teamCounts.begin();
             selected.metadata = {{"playlist_id", id},
@@ -334,6 +351,8 @@ namespace services
                 selected.metadata["map_package_revision"] = packages.at("revision");
             if (selected.splitPartiesForTeamBalance)
                 selected.metadata["split_parties_for_team_balance"] = true;
+            if (selected.squadSize)
+                selected.metadata["squad_size"] = selected.squadSize;
             for (const auto &entry : eligible)
                 selected.metadata["game_types"][entry["gametype"].get<std::string>()] =
                     modes.at(entry["gametype"].get<std::string>());

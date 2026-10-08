@@ -6,12 +6,19 @@
 
 namespace achievement_store
 {
+    enum class Destination : uint8_t
+    {
+        event,
+        inventory
+    };
+
     struct Write
     {
         uint64_t owner = 0;
         uint32_t platformAccount = 0;
         std::string context, receiptKey;
         nlohmann::json document;
+        Destination kind = Destination::event;
     };
 
     using Validator = std::function<void(const Write &)>;

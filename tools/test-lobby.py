@@ -5,6 +5,7 @@ transcript hashing, HKDF, AES record offsets, MAC direction and serializers.
 """
 
 import base64, hashlib, hmac, json, os, socket, struct, subprocess, time
+import argparse
 from pathlib import Path
 import urllib.request, urllib.error
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -12,6 +13,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--startup-only", action="store_true",
+                    help="Stop after encrypted startup, social, publisher and user-profile storage contracts")
+args = parser.parse_args()
 exe = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build" / "Release" / "iw8-dw-server.exe")))
 # Imported fixture modules share this subprocess module. The Windows window
 # suppression flag has no purpose on Linux; zero retains normal POSIX launch.
@@ -2792,6 +2797,341 @@ try:
     checks.append(
         "native Friends and pending-invitation REST response schema and bounded requested context"
     )
+    objects = [
+        {"owner": "replay", "name": "present.json"},
+        {"owner": "replay", "name": "absent.json"},
+    ]
+    objectpath = directory / "objectstore" / "publisher" / str(title) / "iw8" / "replay"
+    objectpath.mkdir(parents=True)
+    metadata = {
+        "name": "present.json",
+        "owner": "replay",
+        "context": "iw8",
+        "contentLength": 4,
+        "checksum": "0" * 32,
+        "objectVersion": "1",
+        "acl": "public",
+        "created": 0,
+        "modified": 0,
+        "expiresOn": 0,
+        "category": None,
+    }
+    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
+
+    def object_params(items):
+        header = pb_text(1, "DW-Objectstore-ObjectIDs") + pb_text(2, json.dumps(items))
+        return structure(
+            pb_text(1, "GET")
+            + pb_text(2, "/v2/core/publishers/objects/?context=iw8")
+            + pb_bytes(4, header)
+        )
+
+    raw = client.task(193, 16, object_params(objects), structured=True)
+    fields = pb_fields(raw)
+    header = dict(
+        (t, v) for t, k, v in pb_fields(next(v for t, k, v in fields if t == 1))
+    )
+    response = json.loads(next(v for t, k, v in fields if t == 3))
+    assert next(v for t, k, v in fields if t == 2) == 200
+    assert header[1] == b"Content-Length" and int(header[2]) == len(
+        next(v for t, k, v in fields if t == 3)
+    )
+    assert (
+        response["objects"][0]["requestIndex"] == 0
+        and response["objects"][0]["metadata"]["name"] == "present.json"
+    )
+    assert response["errors"] == [
+        {
+            "requestIndex": 1,
+            "owner": "replay",
+            "name": "absent.json",
+            "error": "Error:ClientError:NotFound",
+        }
+    ]
+    client.task(
+        193, 16, object_params([{"owner": "replay", "name": "../escape"}]), error=106
+    )
+    client.task(193, 16, object_params([]), error=106)
+    checks.append(
+        "vectorized publisher metadata, full HTTP/blob wrapper, per-object missing state and path rejection"
+    )
+    publisher_bytes = b"local-publisher-fixture\x00" + os.urandom(32000)
+    metadata.update(
+        contentLength=len(publisher_bytes),
+        checksum=base64.b64encode(hashlib.md5(publisher_bytes).digest()).decode(),
+    )
+    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
+    (objectpath / "present.json.content.bin").write_bytes(publisher_bytes)
+
+    def publisher_single(name):
+        return structure(
+            pb_text(1, "GET")
+            + pb_text(
+                2,
+                "/v1/core/publishers/replay/objects/"
+                + name
+                + "/metadata/?context=iw8&extra=contentURL",
+            )
+        )
+
+    fields = pb_fields(
+        client.task(193, 8, publisher_single("present.json"), structured=True)
+    )
+    document = json.loads(next(v for t, k, v in fields if t == 3))
+    assert next(v for t, k, v in fields if t == 2) == 200
+    assert (
+        len(document["checksum"]) < 29
+        and base64.b64decode(document["checksum"], validate=True)
+        == hashlib.md5(publisher_bytes).digest()
+    )
+    assert document["objectID"] == int.from_bytes(
+        hashlib.sha256(b"5800/iw8/replay/present.json").digest()[:8], "big"
+    )
+    authorization = [
+        dict((t, v) for t, k, v in pb_fields(h)) for t, k, h in fields if t == 1
+    ]
+    assert {1: b"Authorization", 2: b"public"} in authorization
+    assert [t for t, k, v in fields] == [
+        1,
+        1,
+        2,
+        3,
+    ]  # native reader's ordered repeated tags
+    assert (
+        document["contentURL"]
+        == base + "/objectstore/content/" + hashlib.sha256(publisher_bytes).hexdigest()
+    )
+    with urllib.request.urlopen(document["contentURL"]) as download:
+        assert (
+            download.read() == publisher_bytes
+            and download.headers["Content-Type"] == "application/octet-stream"
+        )
+    for value, first, last in (
+        ("bytes=7-1023", 7, 1023),
+        ("bytes=1024-", 1024, len(publisher_bytes) - 1),
+        ("bytes=-17", len(publisher_bytes) - 17, len(publisher_bytes) - 1),
+        ("bytes=0-999999", 0, len(publisher_bytes) - 1),
+    ):
+        range_request = urllib.request.Request(
+            document["contentURL"], headers={"Range": value}
+        )
+        with urllib.request.urlopen(range_request) as download:
+            assert (
+                download.status == 206
+                and download.read() == publisher_bytes[first : last + 1]
+            )
+            assert (
+                download.headers["Content-Range"]
+                == f"bytes {first}-{last}/{len(publisher_bytes)}"
+            )
+    for value in (
+        "bytes=999999-",
+        "bytes=4-2",
+        "bytes=-0",
+        "bytes=0-1,4-5",
+        "items=0-2",
+    ):
+        try:
+            urllib.request.urlopen(
+                urllib.request.Request(document["contentURL"], headers={"Range": value})
+            )
+            raise AssertionError("Malformed/unavailable byte range accepted")
+        except urllib.error.HTTPError as error:
+            assert (
+                error.code == 416
+                and error.headers["Content-Range"] == f"bytes */{len(publisher_bytes)}"
+            )
+    fields = pb_fields(client.task(193, 16, object_params(objects), structured=True))
+    assert (
+        json.loads(next(v for t, k, v in fields if t == 3))["objects"][0]["metadata"]
+        == document
+    )
+    missing = pb_fields(
+        client.task(193, 8, publisher_single("absent.json"), structured=True)
+    )
+    assert next(v for t, k, v in missing if t == 2) == 404
+    client.task(193, 8, publisher_single(".."), error=106)
+    (objectpath / "present.json.content.bin").write_bytes(b"corrupt")
+    client.task(193, 8, publisher_single("present.json"), error=106)
+    (objectpath / "present.json.content.bin").write_bytes(publisher_bytes)
+    metadata["acl"] = "private"
+    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
+    missing = pb_fields(
+        client.task(193, 8, publisher_single("present.json"), structured=True)
+    )
+    assert next(v for t, k, v in missing if t == 2) == 404
+    metadata["acl"] = "public"
+    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
+    for route in (
+        "/objectstore/content/../platform.json",
+        "/objectstore/content/" + "a" * 64,
+    ):
+        try:
+            urllib.request.urlopen(base + route)
+            raise AssertionError("Unpublished content accessible")
+        except urllib.error.HTTPError as error:
+            assert error.code == 404
+    checks.append(
+        "native publisher single/vector download metadata, required headers, immutable HTTP content, integrity and public ACL"
+    )
+
+    def object_reply(task, params):
+        fields = pb_fields(client.task(193, task, params, structured=True))
+        assert next(v for t, k, v in fields if t == 2) == 200
+        result = next(v for t, k, v in fields if t == 3)
+        headers = dict(
+            (t, v) for t, k, v in pb_fields(next(v for t, k, v in fields if t == 1))
+        )
+        assert int(headers[2]) == len(result)
+        return json.loads(result)
+
+    def user_read(items):
+        header = pb_text(1, "DW-Objectstore-ObjectIDs") + pb_text(2, json.dumps(items))
+        return structure(
+            pb_text(1, "GET")
+            + pb_text(2, "/v2/core/users/objects/?context=iw8")
+            + pb_bytes(4, header)
+        )
+
+    def user_upload(items):
+        header = pb_text(1, "Content-Type") + pb_text(2, "application/json")
+        return structure(
+            pb_text(1, "PUT")
+            + pb_text(2, "/v2/core/users/objects/?context=iw8")
+            + pb_text(3, json.dumps({"objects": items}))
+            + pb_bytes(4, header)
+        )
+
+    userobject = {"owner": "me", "name": "profile_stats.bin"}
+    missing = object_reply(6, user_read([userobject]))
+    assert not missing["objects"] and len(missing["errors"]) == 1
+    userstats = os.urandom(1536)
+    extra = os.urandom(37)
+    uploadobject = {
+        "metadata": {
+            **userobject,
+            "expiresOn": 0,
+            "checksum": "",
+            "acl": "private",
+            "category": "stats",
+            "extraData": base64.b64encode(extra).decode(),
+        },
+        "content": base64.b64encode(userstats).decode(),
+        "tags": [
+            {"key": "kind", "value": "profile"},
+            {"key": None, "value": "fixture"},
+        ],
+    }
+    saved = object_reply(7, user_upload([uploadobject]))
+    assert not saved["errors"] and saved["validationTokens"] == []
+    saved_metadata = saved["objects"][0]["metadata"]
+    assert saved_metadata["owner"] == "uno-" + str(user) and saved_metadata[
+        "contentLength"
+    ] == len(userstats)
+    assert saved_metadata["checksum"] == hashlib.md5(
+        userstats
+    ).hexdigest() and saved_metadata["extraDataSize"] == len(extra)
+    downloaded = object_reply(
+        6, user_read([userobject, {"owner": "me", "name": "not-present.bin"}])
+    )
+    assert base64.b64decode(downloaded["objects"][0]["content"]) == userstats
+    assert (
+        downloaded["objects"][0]["metadata"] == saved_metadata
+        and downloaded["objects"][0]["tags"] == uploadobject["tags"]
+    )
+    assert (
+        downloaded["objects"][0]["requestIndex"] == 0
+        and downloaded["errors"][0]["requestIndex"] == 1
+    )
+    original_created = saved_metadata["created"]
+    original_version = saved_metadata["objectVersion"]
+    userstats = os.urandom(2048)
+    uploadobject["content"] = base64.b64encode(userstats).decode()
+    saved = object_reply(7, user_upload([uploadobject]))
+    saved_metadata = saved["objects"][0]["metadata"]
+    assert (
+        saved_metadata["created"] == original_created
+        and saved_metadata["objectVersion"] != original_version
+    )
+    assert saved_metadata["checksum"] == hashlib.md5(userstats).hexdigest()
+    assert (
+        base64.b64decode(
+            object_reply(6, user_read([userobject]))["objects"][0]["content"]
+        )
+        == userstats
+    )
+    # The live Replay queue supplied platform=6 for all six profile blobs.
+    # Exercise that exact owner representation, rather than only the `me` alias.
+    native_owner = "uno-" + str(user)
+    nativeobject = {
+        **uploadobject,
+        "metadata": {**uploadobject["metadata"], "owner": native_owner},
+    }
+    saved = object_reply(7, user_upload([nativeobject]))
+    saved_metadata = saved["objects"][0]["metadata"]
+    assert saved_metadata["owner"] == native_owner
+    assert (
+        base64.b64decode(
+            object_reply(
+                6, user_read([{"owner": native_owner, "name": userobject["name"]}])
+            )["objects"][0]["content"]
+        )
+        == userstats
+    )
+    client.task(
+        193,
+        7,
+        user_upload(
+            [
+                {
+                    **nativeobject,
+                    "metadata": {
+                        **nativeobject["metadata"],
+                        "owner": "uno-" + str(user + 1),
+                    },
+                }
+            ]
+        ),
+        error=101,
+    )
+    client.task(
+        193,
+        7,
+        user_upload(
+            [
+                {
+                    **uploadobject,
+                    "metadata": {
+                        **uploadobject["metadata"],
+                        "owner": "bnet-" + str(user + 1),
+                    },
+                }
+            ]
+        ),
+        error=101,
+    )
+    client.task(193, 7, user_upload([{**uploadobject, "content": "AA=A"}]), error=106)
+    client.task(
+        193, 6, object_params(objects), error=106
+    )  # publisher task must not masquerade as user download
+    client.task(193, 7, user_upload([uploadobject, uploadobject]), error=106)
+    checks.append(
+        "native user-object read/upload, metadata/content/checksum/tags, missing indexes and caller ownership"
+    )
+    checks.append(
+        "live-Replay platform-6 universal-ID owner upload/read and cross-account rejection"
+    )
+
+    if args.startup_only:
+        receipt = {
+            "schema": 1, "passed": True, "scope": "startup", "native_game_verified": False,
+            "checks": checks, "server_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
+            "kdf_sha256": hashlib.sha256((root / "data/replay-traffic-kdf.bin").read_bytes()).hexdigest(),
+            "fixture_directory": str(directory),
+        }
+        (root / "data/lobby-startup-verification.json").write_text(json.dumps(receipt, indent=2) + "\n")
+        print(f"PASS: {len(checks)} encrypted startup/social/profile-storage groups; later domain tests were not run")
+        raise SystemExit(0)
     search_uri = "/v1.0/users/?client=replaylocal&searchType=username&username="
     for value in ("Fixture%20Peer", "fixture%20peer%230", "Fixture%25"):
         status, result = rest_response(
@@ -3926,330 +4266,6 @@ try:
     assert client.task(12, 1, text("")) == u32(2)
     checks.append(
         "native empty social lists, persisted caller-scoped presence and local string-verification policy"
-    )
-    objects = [
-        {"owner": "replay", "name": "present.json"},
-        {"owner": "replay", "name": "absent.json"},
-    ]
-    objectpath = directory / "objectstore" / "publisher" / str(title) / "iw8" / "replay"
-    objectpath.mkdir(parents=True)
-    metadata = {
-        "name": "present.json",
-        "owner": "replay",
-        "context": "iw8",
-        "contentLength": 4,
-        "checksum": "0" * 32,
-        "objectVersion": "1",
-        "acl": "public",
-        "created": 0,
-        "modified": 0,
-        "expiresOn": 0,
-        "category": None,
-    }
-    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
-
-    def object_params(items):
-        header = pb_text(1, "DW-Objectstore-ObjectIDs") + pb_text(2, json.dumps(items))
-        return structure(
-            pb_text(1, "GET")
-            + pb_text(2, "/v2/core/publishers/objects/?context=iw8")
-            + pb_bytes(4, header)
-        )
-
-    raw = client.task(193, 16, object_params(objects), structured=True)
-    fields = pb_fields(raw)
-    header = dict(
-        (t, v) for t, k, v in pb_fields(next(v for t, k, v in fields if t == 1))
-    )
-    response = json.loads(next(v for t, k, v in fields if t == 3))
-    assert next(v for t, k, v in fields if t == 2) == 200
-    assert header[1] == b"Content-Length" and int(header[2]) == len(
-        next(v for t, k, v in fields if t == 3)
-    )
-    assert (
-        response["objects"][0]["requestIndex"] == 0
-        and response["objects"][0]["metadata"]["name"] == "present.json"
-    )
-    assert response["errors"] == [
-        {
-            "requestIndex": 1,
-            "owner": "replay",
-            "name": "absent.json",
-            "error": "Error:ClientError:NotFound",
-        }
-    ]
-    client.task(
-        193, 16, object_params([{"owner": "replay", "name": "../escape"}]), error=106
-    )
-    client.task(193, 16, object_params([]), error=106)
-    checks.append(
-        "vectorized publisher metadata, full HTTP/blob wrapper, per-object missing state and path rejection"
-    )
-    publisher_bytes = b"local-publisher-fixture\x00" + os.urandom(32000)
-    metadata.update(
-        contentLength=len(publisher_bytes),
-        checksum=base64.b64encode(hashlib.md5(publisher_bytes).digest()).decode(),
-    )
-    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
-    (objectpath / "present.json.content.bin").write_bytes(publisher_bytes)
-
-    def publisher_single(name):
-        return structure(
-            pb_text(1, "GET")
-            + pb_text(
-                2,
-                "/v1/core/publishers/replay/objects/"
-                + name
-                + "/metadata/?context=iw8&extra=contentURL",
-            )
-        )
-
-    fields = pb_fields(
-        client.task(193, 8, publisher_single("present.json"), structured=True)
-    )
-    document = json.loads(next(v for t, k, v in fields if t == 3))
-    assert next(v for t, k, v in fields if t == 2) == 200
-    assert (
-        len(document["checksum"]) < 29
-        and base64.b64decode(document["checksum"], validate=True)
-        == hashlib.md5(publisher_bytes).digest()
-    )
-    assert document["objectID"] == int.from_bytes(
-        hashlib.sha256(b"5800/iw8/replay/present.json").digest()[:8], "big"
-    )
-    authorization = [
-        dict((t, v) for t, k, v in pb_fields(h)) for t, k, h in fields if t == 1
-    ]
-    assert {1: b"Authorization", 2: b"public"} in authorization
-    assert [t for t, k, v in fields] == [
-        1,
-        1,
-        2,
-        3,
-    ]  # native reader's ordered repeated tags
-    assert (
-        document["contentURL"]
-        == base + "/objectstore/content/" + hashlib.sha256(publisher_bytes).hexdigest()
-    )
-    with urllib.request.urlopen(document["contentURL"]) as download:
-        assert (
-            download.read() == publisher_bytes
-            and download.headers["Content-Type"] == "application/octet-stream"
-        )
-    for value, first, last in (
-        ("bytes=7-1023", 7, 1023),
-        ("bytes=1024-", 1024, len(publisher_bytes) - 1),
-        ("bytes=-17", len(publisher_bytes) - 17, len(publisher_bytes) - 1),
-        ("bytes=0-999999", 0, len(publisher_bytes) - 1),
-    ):
-        range_request = urllib.request.Request(
-            document["contentURL"], headers={"Range": value}
-        )
-        with urllib.request.urlopen(range_request) as download:
-            assert (
-                download.status == 206
-                and download.read() == publisher_bytes[first : last + 1]
-            )
-            assert (
-                download.headers["Content-Range"]
-                == f"bytes {first}-{last}/{len(publisher_bytes)}"
-            )
-    for value in (
-        "bytes=999999-",
-        "bytes=4-2",
-        "bytes=-0",
-        "bytes=0-1,4-5",
-        "items=0-2",
-    ):
-        try:
-            urllib.request.urlopen(
-                urllib.request.Request(document["contentURL"], headers={"Range": value})
-            )
-            raise AssertionError("Malformed/unavailable byte range accepted")
-        except urllib.error.HTTPError as error:
-            assert (
-                error.code == 416
-                and error.headers["Content-Range"] == f"bytes */{len(publisher_bytes)}"
-            )
-    fields = pb_fields(client.task(193, 16, object_params(objects), structured=True))
-    assert (
-        json.loads(next(v for t, k, v in fields if t == 3))["objects"][0]["metadata"]
-        == document
-    )
-    missing = pb_fields(
-        client.task(193, 8, publisher_single("absent.json"), structured=True)
-    )
-    assert next(v for t, k, v in missing if t == 2) == 404
-    client.task(193, 8, publisher_single(".."), error=106)
-    (objectpath / "present.json.content.bin").write_bytes(b"corrupt")
-    client.task(193, 8, publisher_single("present.json"), error=106)
-    (objectpath / "present.json.content.bin").write_bytes(publisher_bytes)
-    metadata["acl"] = "private"
-    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
-    missing = pb_fields(
-        client.task(193, 8, publisher_single("present.json"), structured=True)
-    )
-    assert next(v for t, k, v in missing if t == 2) == 404
-    metadata["acl"] = "public"
-    (objectpath / "present.json.metadata.json").write_text(json.dumps(metadata))
-    for route in (
-        "/objectstore/content/../platform.json",
-        "/objectstore/content/" + "a" * 64,
-    ):
-        try:
-            urllib.request.urlopen(base + route)
-            raise AssertionError("Unpublished content accessible")
-        except urllib.error.HTTPError as error:
-            assert error.code == 404
-    checks.append(
-        "native publisher single/vector download metadata, required headers, immutable HTTP content, integrity and public ACL"
-    )
-
-    def object_reply(task, params):
-        fields = pb_fields(client.task(193, task, params, structured=True))
-        assert next(v for t, k, v in fields if t == 2) == 200
-        result = next(v for t, k, v in fields if t == 3)
-        headers = dict(
-            (t, v) for t, k, v in pb_fields(next(v for t, k, v in fields if t == 1))
-        )
-        assert int(headers[2]) == len(result)
-        return json.loads(result)
-
-    def user_read(items):
-        header = pb_text(1, "DW-Objectstore-ObjectIDs") + pb_text(2, json.dumps(items))
-        return structure(
-            pb_text(1, "GET")
-            + pb_text(2, "/v2/core/users/objects/?context=iw8")
-            + pb_bytes(4, header)
-        )
-
-    def user_upload(items):
-        header = pb_text(1, "Content-Type") + pb_text(2, "application/json")
-        return structure(
-            pb_text(1, "PUT")
-            + pb_text(2, "/v2/core/users/objects/?context=iw8")
-            + pb_text(3, json.dumps({"objects": items}))
-            + pb_bytes(4, header)
-        )
-
-    userobject = {"owner": "me", "name": "profile_stats.bin"}
-    missing = object_reply(6, user_read([userobject]))
-    assert not missing["objects"] and len(missing["errors"]) == 1
-    userstats = os.urandom(1536)
-    extra = os.urandom(37)
-    uploadobject = {
-        "metadata": {
-            **userobject,
-            "expiresOn": 0,
-            "checksum": "",
-            "acl": "private",
-            "category": "stats",
-            "extraData": base64.b64encode(extra).decode(),
-        },
-        "content": base64.b64encode(userstats).decode(),
-        "tags": [
-            {"key": "kind", "value": "profile"},
-            {"key": None, "value": "fixture"},
-        ],
-    }
-    saved = object_reply(7, user_upload([uploadobject]))
-    assert not saved["errors"] and saved["validationTokens"] == []
-    saved_metadata = saved["objects"][0]["metadata"]
-    assert saved_metadata["owner"] == "uno-" + str(user) and saved_metadata[
-        "contentLength"
-    ] == len(userstats)
-    assert saved_metadata["checksum"] == hashlib.md5(
-        userstats
-    ).hexdigest() and saved_metadata["extraDataSize"] == len(extra)
-    downloaded = object_reply(
-        6, user_read([userobject, {"owner": "me", "name": "not-present.bin"}])
-    )
-    assert base64.b64decode(downloaded["objects"][0]["content"]) == userstats
-    assert (
-        downloaded["objects"][0]["metadata"] == saved_metadata
-        and downloaded["objects"][0]["tags"] == uploadobject["tags"]
-    )
-    assert (
-        downloaded["objects"][0]["requestIndex"] == 0
-        and downloaded["errors"][0]["requestIndex"] == 1
-    )
-    original_created = saved_metadata["created"]
-    original_version = saved_metadata["objectVersion"]
-    userstats = os.urandom(2048)
-    uploadobject["content"] = base64.b64encode(userstats).decode()
-    saved = object_reply(7, user_upload([uploadobject]))
-    saved_metadata = saved["objects"][0]["metadata"]
-    assert (
-        saved_metadata["created"] == original_created
-        and saved_metadata["objectVersion"] != original_version
-    )
-    assert saved_metadata["checksum"] == hashlib.md5(userstats).hexdigest()
-    assert (
-        base64.b64decode(
-            object_reply(6, user_read([userobject]))["objects"][0]["content"]
-        )
-        == userstats
-    )
-    # The live Replay queue supplied platform=6 for all six profile blobs.
-    # Exercise that exact owner representation, rather than only the `me` alias.
-    native_owner = "uno-" + str(user)
-    nativeobject = {
-        **uploadobject,
-        "metadata": {**uploadobject["metadata"], "owner": native_owner},
-    }
-    saved = object_reply(7, user_upload([nativeobject]))
-    saved_metadata = saved["objects"][0]["metadata"]
-    assert saved_metadata["owner"] == native_owner
-    assert (
-        base64.b64decode(
-            object_reply(
-                6, user_read([{"owner": native_owner, "name": userobject["name"]}])
-            )["objects"][0]["content"]
-        )
-        == userstats
-    )
-    client.task(
-        193,
-        7,
-        user_upload(
-            [
-                {
-                    **nativeobject,
-                    "metadata": {
-                        **nativeobject["metadata"],
-                        "owner": "uno-" + str(user + 1),
-                    },
-                }
-            ]
-        ),
-        error=101,
-    )
-    client.task(
-        193,
-        7,
-        user_upload(
-            [
-                {
-                    **uploadobject,
-                    "metadata": {
-                        **uploadobject["metadata"],
-                        "owner": "bnet-" + str(user + 1),
-                    },
-                }
-            ]
-        ),
-        error=101,
-    )
-    client.task(193, 7, user_upload([{**uploadobject, "content": "AA=A"}]), error=106)
-    client.task(
-        193, 6, object_params(objects), error=106
-    )  # publisher task must not masquerade as user download
-    client.task(193, 7, user_upload([uploadobject, uploadobject]), error=106)
-    checks.append(
-        "native user-object read/upload, metadata/content/checksum/tags, missing indexes and caller ownership"
-    )
-    checks.append(
-        "live-Replay platform-6 universal-ID owner upload/read and cross-account rejection"
     )
     import objectstore_transaction_fixtures
 

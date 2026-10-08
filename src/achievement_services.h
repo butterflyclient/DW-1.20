@@ -4,6 +4,7 @@
 
 namespace services
 {
+    void recoverAchievementWrites(const std::filesystem::path &, uint32_t title);
     struct StoredProgression
     {
         uint64_t user = 0, xp = 0;
@@ -18,7 +19,8 @@ namespace services
                                                       uint32_t title, uint64_t user);
     void restoreAchievementProgression(const std::filesystem::path &,
                                        uint32_t title, uint64_t user, uint64_t xp,
-                                       bool restore, unsigned startingRank);
+                                       bool restore, unsigned startingRank,
+                                       uint32_t platformAccount = 0);
     std::optional<Reply> achievementServices(const std::filesystem::path &,
                                              const platform::LobbyIdentity &,
                                              uint8_t,

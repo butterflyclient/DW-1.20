@@ -1,6 +1,7 @@
 """Real signed provider response, native-handle wire fields and resource codec."""
 
 import ctypes
+import argparse
 import hashlib
 import json
 import os
@@ -13,6 +14,10 @@ import urllib.parse
 import zlib
 
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--local-only", action="store_true",
+                    help="Verify an isolated loopback issuer without a LAN listener")
+args = parser.parse_args()
 verify = ctypes.CDLL(
     str(root / "build/Release/iw8-dw-platform-client.dll")
 ).DW_LocalPlatform_VerifyResourceReply
@@ -66,7 +71,7 @@ advertised = (
     else "127.0.0.1"
 )
 assert url.startswith("http://127.0.0.1:8085/platform/resources/")
-if network_file.exists():
+if network_file.exists() and not args.local_only:
     # A LAN-facing request must retain public publication even when a loopback
     # request is handled concurrently by another server connection thread.
     lan = json.loads((root / "data/host-network-receipt.json").read_text())[

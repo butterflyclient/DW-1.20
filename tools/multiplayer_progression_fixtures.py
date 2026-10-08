@@ -118,7 +118,7 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
     peer.task(198, 1, subscribe)
     kind, membership = receive(host)
     assert kind == 2 and membership.startswith(u32(24) + u64(peer.user))
-    body = b"Replay multiplayer chat fixture\0"
+    body = b"Replay multiplayer chat fixture"
     message = structure(proto_text(1, "chat") + integer(2, channel_id)
                         + binary(3, body) + integer(4, 0))
     assert host.task(198, 3, message) == b""

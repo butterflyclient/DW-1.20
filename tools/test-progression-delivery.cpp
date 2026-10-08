@@ -108,6 +108,23 @@ int main(int argc, char **argv)
         services::restoreAchievementProgression(root, 5800, 42, 50, true, 2);
         delivery.progressionXp = 3000;
         require(services::achievementDeliveryValid(root, 5800, delivery));
+        const auto owns = [&](uint32_t item)
+        {
+            nlohmann::json inventory;
+            std::ifstream input(root / "marketplace/5800/42/inventory.json");
+            input >> inventory;
+            for (const auto &entry : inventory.at("items"))
+                if (entry.at("1").get<uint32_t>() == item)
+                    return entry.at("2").get<uint32_t>() > 0;
+            return false;
+        };
+        require(!owns(350003)); // Replay create-a-class: native rank 3, UI level 4.
+        services::restoreAchievementProgression(root, 5800, 42, 0, false, 3);
+        require(!owns(350003));
+        services::restoreAchievementProgression(root, 5800, 42, 0, false, 4);
+        require(owns(350003));
+        services::restoreAchievementProgression(root, 5800, 42, 0, false, 53);
+        require(owns(350003) && owns(350004));
         std::cout << "PASS: " << checks << " compiled progression delivery checks\n";
         return 0;
     }

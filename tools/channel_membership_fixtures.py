@@ -243,19 +243,19 @@ def exercise(directory, title, new_client, helpers, checks):
             assert connection.receive() == (2, expected)
 
         peer.task(198, 1, request(channel), structured=True)
-        send(peer)
+        send(peer, content=message[:-1])
         receive(owner, peer_id, True, channel, 2)
         message_received(owner, peer_id)
         message_received(peer, peer_id)
         no_update(owner)  # The original delayed event-24 is now coalesced.
         third.task(198, 1, request(channel), structured=True)
-        send(third, whisper=True)
+        send(third, whisper=True, content=message[:-1])
         receive(owner, third_id, True, channel, 3)
         message_received(owner, third_id, whisper=True)
         receive(peer, third_id, True, channel, 3)
         no_update(owner)
         no_update(third)
-        for bad in (b"unterminated", b"early\0tail\0", b"x" * 500 + b"\0"):
+        for bad in (b"", b"\0", b"early\0tail\0", b"x" * 500, b"x" * 500 + b"\0"):
             payload = (
                 pb_text(1, category)
                 + pb_integer(2, channel)
@@ -265,7 +265,7 @@ def exercise(directory, title, new_client, helpers, checks):
             peer.task(198, 3, structure(payload), error=106)
         no_update(owner)
         checks.append(
-            "First broadcast and whisper publish the real sender join before the exact native message DTO, preserve sender privacy flags and coalesce the delayed join; unterminated, embedded-NUL and oversized native text are rejected without delivery"
+            "First broadcast and whisper publish the real sender join before the exact native message DTO, preserve sender privacy flags and coalesce the delayed join; empty, embedded-NUL and oversized native text are rejected without delivery"
         )
     finally:
         for _, connection in clients:

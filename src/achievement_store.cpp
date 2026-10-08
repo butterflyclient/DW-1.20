@@ -93,14 +93,16 @@ namespace achievement_store
 
         Write decode(const Json &row)
         {
-            wire::require(row.is_object() && row.size() == 7 &&
+            wire::require(row.is_object() && (row.size() == 7 || row.size() == 8) &&
                           row.at("owner").is_number_unsigned() &&
                           row.at("platform_account").is_number_unsigned());
             const auto platform = row.at("platform_account").get<uint64_t>();
             wire::require(platform <= UINT32_MAX && row.at("after").is_object());
+            const bool inventory = row.contains("kind");
+            wire::require(!inventory || row.at("kind") == "inventory");
             return {row.at("owner").get<uint64_t>(), static_cast<uint32_t>(platform),
                     row.at("context").get<std::string>(), row.at("receipt_key").get<std::string>(),
-                    row.at("after")};
+                    row.at("after"), inventory ? Destination::inventory : Destination::event};
         }
     } // namespace
 
@@ -111,6 +113,13 @@ namespace achievement_store
         wire::require(title == 5800 && write.owner && write.owner != UINT64_MAX &&
                       (write.context == "5800" || write.context == "iw8") &&
                       (write.receiptKey.empty() || hash(write.receiptKey)));
+        if (write.kind == Destination::inventory)
+        {
+            wire::require(write.context == "5800" && write.receiptKey.empty());
+            return root / "marketplace" / std::to_string(title) /
+                   std::to_string(write.owner) / "inventory.json";
+        }
+        wire::require(write.kind == Destination::event);
         const auto folder = root / "achievements" / std::to_string(title) /
                             write.context / std::to_string(write.owner);
         return write.receiptKey.empty() ? folder / "events.json"
@@ -176,6 +185,8 @@ namespace achievement_store
                                {"context", write.context}, {"receipt_key", write.receiptKey},
                                {"after", write.document}, {"after_digest", digest(write.document)},
                                {"before_digest", current.is_null() ? Json() : Json(digest(current))}});
+            if (write.kind == Destination::inventory)
+                entries.back()["kind"] = "inventory";
         }
         // The complete intent reaches stable storage before any account journal
         // or archived retry receipt is changed. Keep it on every failure.

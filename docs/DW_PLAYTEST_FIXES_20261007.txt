@@ -1,0 +1,35 @@
+REPLAY DW PLAYTEST FIXES - 2026-10-07
+
+Ready for the next owner playtest. No game was launched during this pass.
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Primary backend: 162.243.115.160; systemd service is running.
+Client package: E:\DW\IW8\data\Replay-DW-Client-Test.zip
+Game SHA256: ce152927aa50291258ad7cf8278becf656bc0f9092fdaf87e5ee5193500cbc21
+Backend SHA256: 34964efd76220b894fff7c5fe89924e7a9a961139676424aaa4cfd7763d83969
+
+CHANGES AND EVIDENCE
+Text chat: original SendMessageToChat uses strlen, without a terminator. The server now accepts that text and appends one terminator for the native 500-byte receiver. Empty, embedded-NUL and oversized text remains rejected. Real two-client encrypted broadcast/whisper fixtures passed.
+AAR/progression routing: the original event dispatcher requires ACHIEVEMENT in uppercase. That correction is now deployed, so native progression and AAR handlers receive the notification. Smooth UI animation itself still needs the game test.
+Unlock-all: the compiled client uses all six actual encoded Replay dvar identifiers instead of human labels. Linked execution tested both INI values and polling coalescing.
+Rank unlocks: shipped initial items, player-rank features and unconditional weapon-rank items now become owned inventory. XP, retry receipts and inventory share one recoverable transaction. Level-4 create-a-class and rank-53 ownership passed compiled checks. Stacked items, purchases and balances are preserved; reconnects/retries cannot double-grant XP or quantity.
+BR squads: native playlist teamSize determines squad_size; every private party stays together, including parties joining an existing public lobby. MP player balancing is disabled for BR. The native ignore-partition override is reset to zero for BR so a previous MP lobby cannot leave it enabled.
+Verdansk selection: mp_donetsk is available to DW MP local/custom selectors, using their currently loaded native game types. WZ publication already contains Verdansk.
+Verdansk collision loading: original mode 2 selects the absent zone/mp_donetsk_cg_ls_tr.ff. All 1024 numbered collision tiles are installed. The compiled native setter selects mode 1 only for DW Verdansk when the combined file is genuinely absent and a numbered tile is present. Native tile priorities, budgets, setup and unloading remain in use. Other maps, modes and permission errors retain the original selection. This addresses a confirmed package mismatch; it is not proof that every BR loading failure is resolved.
+
+VALIDATION
+Windows and Linux backend compilation; 56 focused Linux wire groups; 23 linked delivery checks; 12 public issuer/auth/lobby/profile/NAT checks and 6 public dashboard groups.
+Fresh game link and relocation audit; Windows image mapping; 419 Windows unwind cases; zero unresolved symbols. Five linked client integration groups include 12 Verdansk policy cases.
+Full tournament regression suite remains failing in separate retirement/recovery fixtures. This is a scoped readiness gate, not an all-green full backend claim.
+Linux state was backed up with the service stopped before switching releases. Unrelated deployed C++ work was preserved. Player stores and the local player's INI were retained.
+
+ONE PLAYTEST SESSION
+1. Both players fully close their old EXE, install the fresh EXE in the root Replay game folder and keep their own INI. The supplied generic INI uses host=162.243.115.160. No proxy DLL or identity file is distributed. Never replace/share player-identity.bin.
+2. First check unlock_all=1 and rank=53. Restart after INI edits. Verify Edit Loadouts is accessible and attachments/items are usable. rank=0 restores saved progress; unlock_all=0 uses earned ownership. Already granted inventory is persistent and is not erased by lowering rank.
+3. Invite/join as usual. Send lobby text in both directions, then match text in an available shipped map. Verify no send-failure message and that each receiver sees the message.
+4. Play one Shipment match. Check player and weapon XP/rank, earned attachment ownership and the AAR XP/level transition. Fully exit/relaunch once to verify persistence.
+5. Join the same party and select BR Verdansk. Check that both players are in the same squad before loading. If loading succeeds, traverse several regions to check streamed collision/world data. If it fails, retain the exact Fatal Error and requested filename; do not assume every failure is the same transient package.
+6. Check Verdansk in MP local/custom selectors, then test the intended available mode. The selector change does not manufacture missing packages.
+7. If the rare 2-10 FPS collapse recurs, note the map, host/client role, time, and whether leaving the match or restarting restores FPS. That issue has no confirmed cause/fix in this pass.
+
+com_optimized retains the existing 0/1/2 profiles and defaults off. Voice, invites and prior multiplayer controls remain in the current client/server.
+The broader Demonware backend goal remains in progress. This update implements unconditional rank ownership, not a full camo/quest challenge rule engine.

@@ -18,12 +18,21 @@ if not any(
     raise RuntimeError(
         "Deployed image does not contain automatic local identity support"
     )
-network = json.loads((ROOT / "data/network.json").read_text())
-router = json.loads((ROOT / "data/host-network-receipt.json").read_text())
-if network["advertised_address"] != router["public_address"]:
-    raise RuntimeError("Backend and verified router address differ")
+primary_path = ROOT / "data/primary-backend.json"
+primary = json.loads(primary_path.read_bytes()) if primary_path.exists() else {}
+if primary.get("kind") == "linux-systemd":
+    from remote_backend import verify
 
-ini = f"host={router['public_address']}\nplayer_name=\nunlock_all=0\nrank=0\n"
+    remote = verify()
+    endpoint = remote["host"]
+else:
+    network = json.loads((ROOT / "data/network.json").read_text())
+    router = json.loads((ROOT / "data/host-network-receipt.json").read_text())
+    if network["advertised_address"] != router["public_address"]:
+        raise RuntimeError("Backend and verified router address differ")
+    endpoint = router["public_address"]
+
+ini = f"host={endpoint}\nplayer_name=\nunlock_all=0\nrank=0\n"
 launcher = (
     '@echo off\r\ncd /d "%~dp0"\r\nstart "" "%~dp0game_dx12_ship_replay_dw.exe"\r\n'
 )
@@ -60,6 +69,8 @@ your signed local total when you reconnect.
 INI unlock_all=1 selects Replay's native unlock controls; 0 uses normal unlocks.
 INI rank=0 restores saved progress. Values 1..55 select that career rank once
 when the value changes, then earned XP continues normally. Restart after edits.
+Earned item ownership persists. Lowering rank or disabling unlock_all does not
+erase inventory items already granted by the backend.
 com_optimized defaults to 0. Set the dvar to 1 for optimizations preserving the
 3D scene's appearance, or 2 for the experimental aggressive visual/CPU profile.
 No backend signing keys, access keys or player identities are in this package.
@@ -82,7 +93,7 @@ receipt = {
     "archive": str(archive),
     "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
     "game_sha256": digest,
-    "public_address": router["public_address"],
+    "public_address": endpoint,
     "universal_client": True,
     "player_provisioning_required": False,
     "proxy_dll_included": False,

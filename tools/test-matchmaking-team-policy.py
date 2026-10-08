@@ -20,7 +20,8 @@ import urllib.request
 from native_wire_client import NativeClient, u32, u64
 
 ROOT = Path(__file__).resolve().parents[1]
-EXE = ROOT / "build/Release/iw8-dw-server.exe"
+EXE = Path(os.environ.get("IW8_DW_TEST_SERVER", str(ROOT / "build/Release/iw8-dw-server.exe")))
+WINDOW_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 fixture = ROOT / "data" / ("team-policy-fixture-" + str(time.time_ns()))
 data = fixture / "data"
 data.mkdir(parents=True)
@@ -79,13 +80,13 @@ for profile, name in (("peer", "Team Fixture 2"), ("third", "Team Fixture 3"),
                       ("fourth", "Team Fixture 4")):
     subprocess.run(
         [str(EXE), str(data), "--provision-profile", profile, name],
-        check=True, stdout=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW,
+        check=True, stdout=subprocess.DEVNULL, creationflags=WINDOW_FLAGS,
     )
 offset = spare_offset()
 output = (fixture / "stdout.log").open("wb")
 process = subprocess.Popen(
     [str(EXE), str(data), "--port-offset", str(offset)], stdout=output,
-    stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW,
+    stderr=subprocess.STDOUT, creationflags=WINDOW_FLAGS,
 )
 checks = []
 try:
@@ -179,6 +180,40 @@ try:
             if split:
                 assert receive(third) == ended and receive(fourth) == ended
             checks.append("player-balanced 1v1" if split else "normal party grouping preserved")
+        policy_path.write_text(json.dumps({"available_maps": ["mp_donetsk"],
+            "minimum_players": 1, "split_parties_for_team_balance": True}) + "\n")
+        br = {**query, "team_balance": {"num_teams": 1, "lock_squad": True},
+              "lobby_slots": {"min": 1, "max": 150},
+              "ruleset_payload": {**query["ruleset_payload"], "filter": {
+                  "playlist_id": 25, "playlist_version": catalog["version"]}}}
+        mm = documents(ordinary(host, 18, text(json.dumps(br))))[0]["mm_id"]
+        kind, created = receive(host)
+        assert kind == 2 and created.startswith(u32(2005) + u64(mm))
+        lobby = struct.unpack_from("<Q", created, 15)[0]
+        docs = documents(created[32:])
+        assert docs[1]["team_balance"]["squad_size"] == 3
+        assert docs[1]["team_balance"]["squads"] == {"0": [host.user, peer.user]}
+        assert docs[1]["ruleset_payload"]["dvar_overrides"][guard] == 0
+        assert ordinary(host, 15, u64(lobby) + u64(docs[1]["update_id"])
+                        + text(json.dumps(docs[0]))) == b"\x01\x01"
+        _, update = receive(host)
+        receive(peer)
+        joining = {**br, "members": [third.user, fourth.user], "tokens": tokens[2:],
+                   "ruleset_payload": {**br["ruleset_payload"], "only_join_existing_lobbies": True}}
+        joined_mm = documents(ordinary(third, 18, text(json.dumps(joining))))[0]["mm_id"]
+        kind, joined = receive(third)
+        assert kind == 2 and joined.startswith(u32(2001) + u64(joined_mm) + u64(lobby))
+        assert receive(fourth) == (kind, joined)
+        joined_docs = documents(joined[23:])
+        assert {k: set(v) for k, v in joined_docs[1]["team_balance"]["squads"].items()} == {
+            "0": {host.user, peer.user}, "1": {third.user, fourth.user}}
+        for observer in (host, peer):
+            _, changed = receive(observer)
+            assert documents(changed[23:]) == joined_docs
+        assert ordinary(host, 10, u64(lobby)) == b""
+        for client in clients:
+            assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
+        checks.append("Verdansk BR uses its published squad size, preserves each party in one squad, and disables MP partition splitting")
         policy(1)
         try:
             ordinary(host, 18, text(json.dumps(query)))
@@ -218,7 +253,7 @@ try:
         process = subprocess.Popen(
             [str(EXE), str(data), "--port-offset", str(offset)],
             stdout=output, stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=WINDOW_FLAGS,
         )
         for _ in range(100):
             if process.poll() is not None:

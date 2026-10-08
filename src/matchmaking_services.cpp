@@ -416,6 +416,13 @@ namespace services
                     destination.value().push_back(user);
                 }
             }
+            if (selection.squadSize)
+            {
+                wire::require(occupiedSlots(query.at("members"), backend["player_id_to_slots"]) <=
+                              selection.squadSize);
+                backend["team_balance"]["squad_size"] = selection.squadSize;
+                backend["team_balance"]["squads"] = {{"0", query.at("members")}};
+            }
             if (query.contains("private_lobby"))
                 backend["private_lobby"] = query["private_lobby"];
             Json host = {
@@ -589,12 +596,14 @@ namespace services
             // Native solo/party searches can disagree on it in the same playlist.
             rules.erase("join_in_progress");
             Json pool = {{"rules", rules},
-                    {"dedicated_server", query.value("dedicated_server", Json::object())},
-                    {"performance", query.value("performance", Json{{"game_type", 1}})},
-                    {"team_balance", query.value("team_balance", Json::object())},
-                    {"maximum_members", requestCapacity(query)}};
+                         {"dedicated_server", query.value("dedicated_server", Json::object())},
+                         {"performance", query.value("performance", Json{{"game_type", 1}})},
+                         {"team_balance", query.value("team_balance", Json::object())},
+                         {"maximum_members", requestCapacity(query)}};
             if (selection.splitPartiesForTeamBalance)
                 pool["split_parties_for_team_balance"] = true;
+            if (selection.squadSize)
+                pool["squad_size"] = selection.squadSize;
             return pool;
         }
 
@@ -640,6 +649,26 @@ namespace services
             std::set<uint64_t> existing;
             for (const auto &user : lobby.at("members"))
                 existing.insert(user.get<uint64_t>());
+            const auto squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+            if (squadSize)
+            {
+                auto &squads = backend["team_balance"]["squads"];
+                wire::require(squads.is_object());
+                Json additions = Json::array();
+                for (const auto user : users)
+                    if (!existing.contains(user))
+                        additions.push_back(user);
+                if (!additions.empty())
+                {
+                    // Preserve the authenticated joining party as a unit. Never
+                    // assign each primary to a separate default size-one squad.
+                    wire::require(occupiedSlots(additions, reservations) <= squadSize);
+                    unsigned next = 0;
+                    while (squads.contains(std::to_string(next)))
+                        wire::require(++next < 200);
+                    squads[std::to_string(next)] = std::move(additions);
+                }
+            }
             for (const auto user : users)
             {
                 const auto key = std::to_string(user);

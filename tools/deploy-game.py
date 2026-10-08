@@ -22,6 +22,8 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--job-receipt", type=Path, default=ROOT / "data/workstation-job.json")
 parser.add_argument("--snapshot-receipt", type=Path,
                     default=ROOT / "data/compiler-snapshot-receipt.json")
+parser.add_argument("--startup-receipt", type=Path,
+                    help="Explicit focused encrypted startup gate; does not claim full backend coverage")
 args = parser.parse_args()
 for receipt_path in (args.job_receipt, args.snapshot_receipt):
     if not receipt_path.resolve().is_relative_to((ROOT / "data").resolve()):
@@ -158,6 +160,7 @@ if (
 private_objects = []
 private_sources = sorted((ROOT / "integration" / "replay").glob("DW_Local*.cpp"))
 private_sources.append(ROOT / "integration/replay/DW_Multiplayer.cpp")
+private_sources.append(ROOT / "integration/replay/DW_MapAvailability.cpp")
 for path in private_sources:
     if path.name == "DW_LocalBackend_Frame.cpp":
         continue
@@ -188,7 +191,11 @@ required_private_sources = {
     "DW_LocalIdentity.cpp",
     "DW_LocalProgression.cpp",
     "DW_Multiplayer.cpp",
+    "DW_MapAvailability.cpp",
 }
+client_integration = json.loads((ROOT / "validation/20261007-playtest-client.json").read_bytes())
+if not client_integration.get("passed") or client_integration["executable_sha256"] != actual:
+    raise RuntimeError("Linked unlock/Verdansk integration proof is unavailable or stale")
 if {
     Path(item["source"]).name for item in private_objects
 } != required_private_sources or not all(
@@ -287,7 +294,9 @@ if (
     ).hexdigest()
 ):
     raise RuntimeError("Server changed after signed-session/auth protocol verification")
-lobby_proof = json.loads((ROOT / "data" / "lobby-verification.json").read_text())
+lobby_proof = json.loads((args.startup_receipt or ROOT / "data/lobby-verification.json").read_text())
+if args.startup_receipt and lobby_proof.get("scope") != "startup":
+    raise RuntimeError("Expected an explicitly scoped startup verification receipt")
 if (
     not lobby_proof.get("passed")
     or lobby_proof["server_sha256"] != auth_proof["server_sha256"]

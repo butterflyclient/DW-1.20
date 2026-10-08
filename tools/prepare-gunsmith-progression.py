@@ -110,8 +110,42 @@ def main():
                backend_rewards_implemented=False, native_game_verified=False)
     destination = ROOT / "data/replay-gunsmith-progression.json"
     destination.write_text(json.dumps(out, indent=2) + "\n")
+    rank_unlocks = sorted({(b["weapon_id"], b["rank"], item) for b in blocks
+                           if b["challenge"] is None and b["rank_activation_supported"]
+                           for item in b["items"]})
+    header = ["#pragma once", "#include <array>", "#include <cstdint>", "",
+              "// Generated from complete four-column groups in shipped Replay Gunsmith tables.",
+              "// Challenge-dependent and negative-gate groups are deliberately excluded.",
+              "struct ReplayRankUnlock", "{", "    uint16_t weapon, rank;", "    uint32_t item;", "};", "",
+              f"inline constexpr std::array<ReplayRankUnlock, {len(rank_unlocks)}> replayRankUnlocks = {{{{"]
+    header.extend(f"    {{{weapon}, {rank}, {item}}}," for weapon, rank, item in rank_unlocks)
+    header.extend(["}};", ""])
+    # Native UI unlocks are inventory-backed, including rank-selected local
+    # profiles. Keep the complete shipped initial/player-rank publication.
+    player_rows = rows(next(ASSETS.glob("mp/progression/progressionitems.csv.*.csv")))
+    assert len(player_rows) == 55 and [int(row[0]) for row in player_rows] == list(range(55))
+    player_unlocks = sorted({(int(row[0]), int(item))
+        for index, row in enumerate(player_rows)
+        for item in row[2:34 if index == 0 else 9] if item})
+    initial_items = sorted({int(row[0])
+        for row in rows(next(ASSETS.glob("mp/progression/initialitems.csv.*.csv"))) if row[0]})
+    assert all(0 < item <= 2**31 - 1 for _, item in player_unlocks)
+    assert all(0 < item <= 2**31 - 1 for item in initial_items)
+    header.extend(["struct ReplayPlayerRankUnlock", "{", "    uint16_t rank;", "    uint32_t item;", "};", "",
+        f"inline constexpr std::array<ReplayPlayerRankUnlock, {len(player_unlocks)}> replayPlayerRankUnlocks = {{{{"])
+    header.extend(f"    {{{rank}, {item}}}," for rank, item in player_unlocks)
+    header.extend(["}};", "", f"inline constexpr std::array<uint32_t, {len(initial_items)}> replayInitialItems = {{{{"])
+    header.extend(f"    {item}," for item in initial_items)
+    header.extend(["}};", ""])
+    header_path = ROOT / "src/gunsmith_rank_unlock_data.h"
+    header_path.write_text("\n".join(header))
     receipt = dict(schema=1, passed=True, catalog_path=str(destination.relative_to(ROOT)),
                    catalog_sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),
+                   header_path=str(header_path.relative_to(ROOT)),
+                   header_sha256=hashlib.sha256(header_path.read_bytes()).hexdigest(),
+                   compiled_rank_unlock_count=len(rank_unlocks),
+                   compiled_player_rank_unlock_count=len(player_unlocks),
+                   compiled_initial_item_count=len(initial_items),
                    tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                    inputs=inputs, weapon_count=len(weapons), block_count=len(blocks),
                    unconditional_blocks=sum(b["challenge"] is None for b in blocks),

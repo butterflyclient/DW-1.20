@@ -43,7 +43,7 @@ namespace lobby
             uint64_t lastTournamentRoundLobby = 0, lastTournamentRoundSearch = 0;
             std::string lastTournamentHash;
             std::map<std::string, uint64_t> lastMail;
-            std::map<std::pair<std::string, uint64_t>, uint64_t> lastProgression;
+            std::map<std::pair<std::string, uint64_t>, std::pair<uint64_t, std::string>> lastProgression;
             // This is transport publication history, not a guessed native state.
             // Each serialized writer publishes a required join before a message
             // and coalesces the same join still pending in the delayed queue.
@@ -182,7 +182,8 @@ namespace lobby
                     const auto previous = endpoint->lastProgression.find(
                         {delivery.progressionContext, delivery.progressionId});
                     if (previous != endpoint->lastProgression.end() &&
-                        previous->second == delivery.progressionXp)
+                        previous->second == std::make_pair(delivery.progressionXp,
+                                                          delivery.progressionRewardsHash))
                         continue;
                 }
                 // Validate after taking the serialized writer lock. A newer presence
@@ -249,7 +250,7 @@ namespace lobby
                             endpoint->lastMail[delivery.mailContext] = delivery.mailId;
                         else if (!delivery.progressionContext.empty())
                             endpoint->lastProgression[{delivery.progressionContext, delivery.progressionId}] =
-                                delivery.progressionXp;
+                                {delivery.progressionXp, delivery.progressionRewardsHash};
                         else if (delivery.tournamentRoundLobby)
                         {
                             endpoint->lastTournamentRoundLobby = delivery.lobbyId;

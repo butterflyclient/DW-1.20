@@ -5,6 +5,8 @@
 #include "matchmaking_services.h"
 #include "progression_ranks.h"
 #include "weapon_progression_data.h"
+#include "gunsmith_rank_unlock_data.h"
+#include "marketplace_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <algorithm>
@@ -431,6 +433,69 @@ namespace services
             return result;
         }
 
+        std::vector<uint32_t> rankItems(const WeaponXp &weapons)
+        {
+            std::set<uint32_t> items;
+            for (const auto &[id, xp] : weapons)
+            {
+                const auto rank = weaponRank(weapon(id), xp);
+                for (const auto &unlock : replayRankUnlocks)
+                    if (unlock.weapon == id && unlock.rank <= rank)
+                        items.insert(unlock.item);
+            }
+            return {items.begin(), items.end()};
+        }
+
+        std::vector<uint32_t> playerRankItems(uint64_t xp)
+        {
+            std::set<uint32_t> items(replayInitialItems.begin(), replayInitialItems.end());
+            const auto rank = playerRank(xp);
+            for (const auto &unlock : replayPlayerRankUnlocks)
+                if (unlock.rank <= rank)
+                    items.insert(unlock.item);
+            return {items.begin(), items.end()};
+        }
+
+        std::vector<uint32_t> rankItems(const WeaponXp &weapons, uint64_t playerXp)
+        {
+            auto items = rankItems(weapons);
+            const auto player = playerRankItems(playerXp);
+            items.insert(items.end(), player.begin(), player.end());
+            std::sort(items.begin(), items.end());
+            items.erase(std::unique(items.begin(), items.end()), items.end());
+            return items;
+        }
+
+        struct RankNotification
+        {
+            Json grants = Json::array();
+            std::string hash;
+        };
+
+        RankNotification rankNotification(const ReplayWeaponProgression *row,
+                                           uint64_t xp,
+                                           const RankInventory *inventory,
+                                           bool refresh)
+        {
+            RankNotification result;
+            const auto selected = row ? rankItems({{row->id, xp}}) : playerRankItems(xp);
+            if (selected.empty() || !inventory)
+                return result;
+            auto quantities = Json::array();
+            for (const auto item : selected)
+            {
+                const auto found = std::lower_bound(inventory->quantities.begin(),
+                    inventory->quantities.end(), std::make_pair(item, uint32_t{0}));
+                wire::require(found != inventory->quantities.end() && found->first == item);
+                quantities.push_back(Json::array({item, found->second}));
+                if (found->second && (refresh || std::binary_search(
+                    inventory->newlyOwned.begin(), inventory->newlyOwned.end(), item)))
+                    result.grants.push_back({{"id", item}, {"quantity", found->second}});
+            }
+            result.hash = fingerprint(quantities);
+            return result;
+        }
+
         void validatePendingXp(const Json &journal)
         {
             if (journal.contains("player_xp_pending"))
@@ -455,18 +520,27 @@ namespace services
                                    const std::string &context,
                                    uint64_t xp,
                                    bool rankedUp,
-                                   const ReplayWeaponProgression *row = nullptr)
+                                   const ReplayWeaponProgression *row = nullptr,
+                                   const RankInventory *inventory = nullptr,
+                                   bool refreshAwards = true)
         {
             // Replay's event 67 -> 0x142125410 reads version UInt64(1), full
             // ContextSerialization user, context, Int32 JSON format, count,
             // then each bdRewardEventJSONV2 (Int32 format + typed string).
             const auto achievementId = row ? uint64_t{2000000} + row->id : uint64_t{1000000};
-            const Json event = {
+            Json event = {
                 {"type", "ACHIEVEMENT"}, {"name", row ? std::string(row->reference) : "player_xp"},
                 {"reason", rankedUp ? "completed" : "inProgress"},
                 {"kind", row ? 5 : 0}, {"id_", achievementId},
                 {"multiProgress", {{"xp", {{"value", xp}}},
                                     {"rank", {{"value", row ? weaponRank(*row, xp) : playerRank(xp)}}}}}};
+            const auto rewards = rankNotification(row, xp, inventory, refreshAwards);
+            if (!rewards.grants.empty())
+                event["triggers"] = Json::array({
+                    {{"type", "GRANT_PRODUCT"},
+                     {"inventory", {{"granted_items", rewards.grants}}}}});
+            const auto body = event.dump();
+            wire::require(body.size() < 16 * 1024);
             wire::Writer push;
             push.u32(67);
             push.u64(1);
@@ -478,11 +552,12 @@ namespace services
             push.u32(1);
             push.data.push_back(7);
             wire::raw(push.data, int32_t{1});
-            push.text(event.dump());
+            push.text(body);
             Delivery delivery{id.userId, std::move(push.data)};
             delivery.progressionContext = context;
             delivery.progressionXp = xp;
             delivery.progressionId = achievementId;
+            delivery.progressionRewardsHash = rewards.hash;
             return delivery;
         }
 
@@ -844,6 +919,11 @@ namespace services
 
         void validateEventWrite(const achievement_store::Write &write)
         {
+            if (write.kind == achievement_store::Destination::inventory)
+            {
+                validateRankInventory(write.document);
+                return;
+            }
             platform::LobbyIdentity id;
             id.titleId = 5800;
             id.userId = write.owner;
@@ -980,19 +1060,19 @@ namespace services
                         return event.at("name") == "mp_addxp" &&
                                integer(event.at("values"), "Param0") > 0;
                     });
+                const auto xp = data.contains("player_xp")
+                                    ? integer(data, "player_xp") : initialPlayerXp(path);
                 if (earnedXp)
                 {
                     // The original consumer assigns absolute XP/rank. Replay the
                     // latest accepted snapshot after a lost result or recovered
                     // commit; never award the delta or repeat a rank-up event.
-                    const auto xp = data.contains("player_xp")
-                                        ? integer(data, "player_xp") : initialPlayerXp(path);
-                    result.deliveries.push_back(progressionUpdate(id, context, xp, false));
                     result.operation = "achievement-events-idempotent-refresh";
                     result.detail = " progression_xp=" + std::to_string(xp);
                 }
                 const auto weapons = storedWeaponXp(data, path);
                 std::set<uint16_t> refreshed;
+                WeaponXp snapshots;
                 for (const auto &event : events)
                     if (event.at("name") == "mp_addxp" && integer(event.at("values"), "Param3"))
                     {
@@ -1001,10 +1081,31 @@ namespace services
                         {
                             const auto found = weapons.find(row.id);
                             wire::require(found != weapons.end());
-                            result.deliveries.push_back(progressionUpdate(id, context, found->second,
-                                                                         false, &row));
+                            snapshots.emplace(row.id, found->second);
                         }
                     }
+                std::optional<RankInventory> awards;
+                const auto selected = rankItems(snapshots, xp);
+                if (!selected.empty())
+                    awards = prepareRankInventory(root, id, selected, true);
+                if (awards && awards->changed)
+                {
+                    // Repair entitlements from an older XP-only backend without
+                    // applying its accepted delta or changing the retry identity.
+                    std::vector<achievement_store::Write> local;
+                    auto &writes = staged ? *staged : local;
+                    writes.push_back({id.userId, id.platformAccountId, context, {}, data});
+                    writes.push_back({id.userId, id.platformAccountId, "5800", {},
+                        std::move(awards->document), achievement_store::Destination::inventory});
+                    if (!staged)
+                        achievement_store::commit(root, id.titleId, writes, validateEventWrite);
+                }
+                if (earnedXp)
+                    result.deliveries.push_back(progressionUpdate(id, context, xp, false,
+                        nullptr, awards ? &*awards : nullptr));
+                for (const auto &[weaponId, total] : snapshots)
+                    result.deliveries.push_back(progressionUpdate(id, context, total, false,
+                        &weapon(weaponId), awards ? &*awards : nullptr));
                 if (!refreshed.empty())
                     result.operation = "achievement-events-idempotent-refresh";
                 return result;
@@ -1033,6 +1134,17 @@ namespace services
                     total += weaponDelta;
                 }
             }
+            WeaponXp changedWeapons;
+            for (const auto &[weaponId, total] : weapons)
+            {
+                const auto previous = previousWeapons.find(weaponId);
+                if (previous == previousWeapons.end() || total != previous->second)
+                    changedWeapons.emplace(weaponId, total);
+            }
+            std::optional<RankInventory> awards;
+            const auto selected = rankItems(changedWeapons, xp);
+            if (!selected.empty())
+                awards = prepareRankInventory(root, id, selected, true);
             data["player_xp"] = xp;
             if (xp != previousXp)
                 data["player_xp_pending"] = xp;
@@ -1064,17 +1176,21 @@ namespace services
                 data["requests"].erase(data["requests"].begin());
             }
             writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
+            if (awards && awards->changed)
+                writes.push_back({id.userId, id.platformAccountId, "5800", {},
+                    std::move(awards->document), achievement_store::Destination::inventory});
             if (!staged)
                 achievement_store::commit(root, id.titleId, writes, validateEventWrite);
             Reply result{0, {}, "achievement-events-recorded", true, {}};
             if (xp != previousXp)
             {
                 result.deliveries.push_back(
-                    progressionUpdate(id, context, xp, playerRank(xp) > playerRank(previousXp)));
+                    progressionUpdate(id, context, xp, playerRank(xp) > playerRank(previousXp),
+                                      nullptr, awards ? &*awards : nullptr, false));
                 result.detail = " progression_xp=" + std::to_string(xp) +
                                 " progression_rank=" + std::to_string(playerRank(xp));
             }
-            for (const auto &[weaponId, total] : weapons)
+            for (const auto &[weaponId, total] : changedWeapons)
             {
                 const auto previous = previousWeapons.find(weaponId);
                 const auto oldXp = previous == previousWeapons.end() ? uint64_t{0} : previous->second;
@@ -1082,7 +1198,8 @@ namespace services
                     continue;
                 const auto &row = weapon(weaponId);
                 result.deliveries.push_back(progressionUpdate(id, context, total,
-                    weaponRank(row, total) > weaponRank(row, oldXp), &row));
+                    weaponRank(row, total) > weaponRank(row, oldXp), &row,
+                    awards ? &*awards : nullptr, false));
             }
             return result;
         }
@@ -1344,6 +1461,12 @@ namespace services
         }
     } // namespace
 
+    void recoverAchievementWrites(const std::filesystem::path &root, uint32_t title)
+    {
+        if (title == 5800)
+            achievement_store::recover(root, title, validateEventWrite);
+    }
+
     bool achievementDeliveryValid(const std::filesystem::path &root, uint32_t title,
                                   const Delivery &delivery)
     {
@@ -1372,15 +1495,29 @@ namespace services
             wire::require(delivery.progressionId == uint64_t{2000000} + row.id);
             const auto weapons = storedWeaponXp(journal, path);
             const auto found = weapons.find(row.id);
-            return found != weapons.end() && delivery.progressionXp == found->second;
+            if (found == weapons.end() || delivery.progressionXp != found->second)
+                return false;
+            platform::LobbyIdentity identity;
+            identity.titleId = title;
+            identity.userId = delivery.user;
+            const auto selected = rankItems({{row.id, found->second}});
+            std::optional<RankInventory> inventory;
+            if (!selected.empty())
+                inventory = prepareRankInventory(root, identity, selected, false);
+            return delivery.progressionRewardsHash == rankNotification(&row, found->second,
+                inventory ? &*inventory : nullptr, true).hash;
         }
-        if (!journal.contains("player_xp"))
-            return delivery.progressionXp == initialPlayerXp(path);
-        wire::require(journal.at("schema") == 1 && journal.at("events").is_array() &&
-                      journal.at("requests").is_array() &&
-                      journal.at("events").size() <= 1024 &&
-                      journal.at("requests").size() <= 4096 && integer(journal, "next") > 0);
-        return delivery.progressionXp == integer(journal, "player_xp");
+        const auto xp = journal.contains("player_xp") ? integer(journal, "player_xp")
+                                                     : initialPlayerXp(path);
+        if (delivery.progressionXp != xp)
+            return false;
+        if (delivery.progressionRewardsHash.empty())
+            return true;
+        platform::LobbyIdentity identity;
+        identity.titleId = title;
+        identity.userId = delivery.user;
+        const auto inventory = prepareRankInventory(root, identity, playerRankItems(xp), false);
+        return delivery.progressionRewardsHash == rankNotification(nullptr, xp, &inventory, true).hash;
     }
 
     std::vector<Delivery> currentProgressionDeliveries(const std::filesystem::path &root,
@@ -1405,10 +1542,19 @@ namespace services
         id.titleId = title;
         id.userId = user;
         std::vector<Delivery> result;
+        const auto weapons = storedWeaponXp(journal, path);
+        const auto xp = journal.contains("player_xp") ? integer(journal, "player_xp")
+                                                     : initialPlayerXp(path);
+        const auto selected = rankItems(weapons, xp);
+        std::optional<RankInventory> inventory;
+        if (!selected.empty())
+            inventory = prepareRankInventory(root, id, selected, false);
         if (journal.contains("player_xp"))
-            result.push_back(progressionUpdate(id, context, integer(journal, "player_xp"), false));
-        for (const auto &[weaponId, xp] : storedWeaponXp(journal, path))
-            result.push_back(progressionUpdate(id, context, xp, false, &weapon(weaponId)));
+            result.push_back(progressionUpdate(id, context, xp, false, nullptr,
+                                               inventory ? &*inventory : nullptr));
+        for (const auto &[weaponId, weaponXp] : weapons)
+            result.push_back(progressionUpdate(id, context, weaponXp, false, &weapon(weaponId),
+                                               inventory ? &*inventory : nullptr));
         for (auto &delivery : result)
             delivery.progressionRefresh = true;
         return result;
@@ -1475,13 +1621,27 @@ namespace services
 
     void restoreAchievementProgression(const std::filesystem::path &root,
                                        uint32_t title, uint64_t user, uint64_t xp,
-                                       bool restore, unsigned startingRank)
+                                       bool restore, unsigned startingRank,
+                                       uint32_t platformAccount)
     {
         wire::require(title == 5800 && user && user != UINT64_MAX &&
                       startingRank <= replayPlayerRankMinimumXp.size());
         achievement_store::recover(root, title, validateEventWrite);
+        platform::LobbyIdentity identity;
+        identity.titleId = title;
+        identity.userId = user;
+        identity.platformAccountId = platformAccount;
         if (!restore && !startingRank)
+        {
+            auto inventory = prepareRankInventory(root, identity, playerRankItems(0), true);
+            if (inventory.changed)
+            {
+                const achievement_store::Write write{user, platformAccount, "5800", {},
+                    std::move(inventory.document), achievement_store::Destination::inventory};
+                achievement_store::commit(root, title, {&write, 1}, validateEventWrite);
+            }
             return;
+        }
         const auto path = root / "achievements" / std::to_string(title) /
                           std::to_string(title) / std::to_string(user) / "events.json";
         auto journal = document(path, Json{{"schema", 1}, {"next", uint64_t{1}},
@@ -1509,7 +1669,16 @@ namespace services
                 xp = pending; // Preserve an accepted award missing from the local snapshot.
         }
         journal["player_xp"] = xp;
-        publish(path, journal);
+        const auto selected = rankItems(storedWeaponXp(journal, path), xp);
+        auto inventory = prepareRankInventory(root, identity, selected, true);
+        std::vector<achievement_store::Write> writes;
+        // Profile selection and native item ownership are one recovery window;
+        // a custom displayed rank must not leave create-a-class still locked.
+        writes.push_back({user, platformAccount, "5800", {}, std::move(journal)});
+        if (inventory.changed)
+            writes.push_back({user, platformAccount, "5800", {}, std::move(inventory.document),
+                              achievement_store::Destination::inventory});
+        achievement_store::commit(root, title, writes, validateEventWrite);
     }
 
     Reply achievementEventsRest(const std::filesystem::path &root,

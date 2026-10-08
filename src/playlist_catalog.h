@@ -10,6 +10,7 @@ namespace services
         nlohmann::json rules;
         nlohmann::json metadata;
         unsigned teamCount = 0;
+        unsigned squadSize = 0;
         bool splitPartiesForTeamBalance = false;
     };
 

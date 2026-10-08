@@ -198,9 +198,8 @@ extern "C" void DW_LocalProgression_Frame()
     s_poll = now;
     Load();
     constexpr const char *unlocks[] = {
-        "unlock_all_loot", "unlockAllItems", "allEmblemsUnlocked",
-        "force_unlock_all_attachments", "force_unlock_all_attachment_lines",
-        "force_unlock_all_killstreaks"};
+        "NLOTNSOSKK", "OLKMKMTKRO", "LLQQNOO",
+        "MNLPOPMMSK", "LSPQSSPSOL", "NQRLNKMTSL"};
     for (unsigned i = 0; i < sizeof(unlocks) / sizeof(*unlocks); ++i)
         if (!(s_unlockMask & (1U << i)))
         {

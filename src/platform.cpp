@@ -707,6 +707,7 @@ namespace platform
             existing = clientProfiles.emplace(id, account).first;
         }
         const auto user = existing->second.userId;
+        const auto platformAccount = existing->second.gameAccountId;
         if (extended && (local.options & 1) && local.localUserId != user)
             throw std::runtime_error("Local progression belongs to a different identity");
         auto response = issueSession(std::string(reinterpret_cast<const char *>(request.nonce), 32),
@@ -716,7 +717,7 @@ namespace platform
         lock.unlock();
         if (extended)
             services::restoreLocalProgression(5800, user, local.playerXp,
-                                               (local.options & 1) != 0, local.startingRank);
+                                               (local.options & 1) != 0, local.startingRank, platformAccount);
         return response;
     }
 

@@ -350,12 +350,15 @@ namespace services
                                                        : 14U));
         if ((task == 3 || task == 4) && (cat == "chat" || cat == "clanChat"))
         {
-            // Replay's text-chat consumer copies a NUL-terminated C string into
-            // OnlineChatMessage::m_message[500]. Other channel categories carry
-            // binary tournament/game payloads and retain the SDK's 1024-byte cap.
-            wire::require(!message.empty() && message.size() <= 500 && message.back() == 0 &&
-                          std::find(message.begin(), message.end() - 1, uint8_t{0}) ==
-                              message.end() - 1);
+            // Original SendMessageToChat (140F3D9D0) passes strlen, excluding
+            // the terminator. The receiving game's 500-byte C-string buffer
+            // needs one. Normalize here before publishing the native push.
+            wire::require(!message.empty() && message.size() <= 500);
+            if (message.back() == 0)
+                message.pop_back();
+            wire::require(!message.empty() && message.size() < 500 &&
+                          std::find(message.begin(), message.end(), uint8_t{0}) == message.end());
+            message.push_back(0);
         }
         if (task == 5)
             wire::require(user <= 256);
