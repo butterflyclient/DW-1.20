@@ -141,7 +141,7 @@ Content streaming
   Registered routes: 50/2, 50/3, 50/5, 50/6, 50/9, 50/10, 50/15, 50/16, 50/18, 50/19, 50/20, 58/5, 58/6, 58/18, 58/20, 58/21
   REST resources: none in recovered writer set
   Known missing routes: 50/22, 58/22
-  Open contracts: Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved. Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native multipart upload/commit remains unverified.
+  Open contracts: Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved. Whole pooled-file preparation and HTTP staging persist across backend restarts in a validated per-title store. Immutable blobs are flushed before HTTP acknowledgement; catalog-before-staging-cleanup publication recovers the same file ID on retries. Pooled and multipart transfers share a bounded staging quota with expiry reclamation. Isolated Windows/Linux native-wire and HTTP fixtures cover interrupted writes, corrupt snapshots/blobs, ownership, expiry and user/multipart/copy regressions. Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native upload/commit consumption remains unverified.
 
 Telemetry
   Services: 67

@@ -143,7 +143,7 @@ def exercise(client, directory, title, user, base, helpers, checks):
         base + "/content-streaming/upload/"
     )
     post_params = u64(file_id) + u16(0) + text(server_name)
-    client.task(58, 6, post_params + u32(8), error=106)
+    client.task(58, 6, post_params + u32(8), error=108)
     body = os.urandom(300 * 1024)  # Exceeds ordinary auth/REST body limit.
 
     def put(url, value, expected=200):

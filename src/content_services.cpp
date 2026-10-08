@@ -11,6 +11,7 @@
 #include <mutex>
 #include <set>
 #include <string_view>
+#include <memory>
 
 namespace services
 {
@@ -31,18 +32,6 @@ namespace services
         }
 
         std::mutex contentMutex;
-
-        struct Upload
-        {
-            uint32_t title = 0, expires = 0;
-            uint64_t user = 0, file = 0;
-            std::string name, ownerName, serverName;
-            uint16_t category = 0;
-            Json tags = Json::array();
-            std::optional<wire::Bytes> bytes;
-        };
-
-        std::map<std::string, Upload> uploads;
 
         uint32_t now()
         {
@@ -95,13 +84,33 @@ namespace services
             std::filesystem::create_directories(path.parent_path());
             auto pending = path;
             pending += ".pending";
+            const auto file = CreateFileW(pending.c_str(),
+                                          GENERIC_WRITE,
+                                          0,
+                                          nullptr,
+                                          CREATE_ALWAYS,
+                                          FILE_ATTRIBUTE_NORMAL,
+                                          nullptr);
+            if (file == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Streaming store write failed");
+            std::unique_ptr<void, decltype(&CloseHandle)> handle(file, &CloseHandle);
+            size_t offset = 0;
+            while (offset < bytes.size())
             {
-                std::ofstream out(pending, std::ios::binary | std::ios::trunc);
-                if (!out.write(reinterpret_cast<const char *>(bytes.data()),
-                               static_cast<std::streamsize>(bytes.size())) ||
-                    !out.flush())
+                DWORD written = 0;
+                if (!WriteFile(file,
+                               bytes.data() + offset,
+                               static_cast<DWORD>(bytes.size() - offset),
+                               &written,
+                               nullptr) ||
+                    !written)
                     throw std::runtime_error("Streaming store write failed");
+                offset += written;
             }
+            if (!FlushFileBuffers(file))
+                throw std::runtime_error("Streaming store flush failed");
+            // Windows replacement requires closing the non-delete-sharing writer.
+            CloseHandle(handle.release());
             if (!MoveFileExW(pending.c_str(),
                              path.c_str(),
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
@@ -496,10 +505,90 @@ namespace services
                    std::span(reinterpret_cast<const uint8_t *>(encoded.data()), encoded.size()));
         }
 
+        std::filesystem::path pooledUploadPath(uint32_t title)
+        {
+            return dataRoot / "content-streaming" / std::to_string(title) / "pooled-uploads.json";
+        }
+
+        Json loadPooledUploads(uint32_t title)
+        {
+            const auto path = pooledUploadPath(title);
+            if (!std::filesystem::exists(path))
+                return Json{{"schema", 1}, {"title", title}, {"sessions", Json::array()}};
+            try
+            {
+                wire::require(std::filesystem::file_size(path) <= maxStore);
+                std::ifstream input(path);
+                wire::require(static_cast<bool>(input));
+                bool unique = true;
+                std::vector<std::set<std::string>> keys;
+                auto data = Json::parse(
+                    input,
+                    [&](int, Json::parse_event_t event, Json &value)
+                    {
+                        if (event == Json::parse_event_t::object_start)
+                            keys.emplace_back();
+                        else if (event == Json::parse_event_t::key)
+                            unique = keys.back().insert(value.get<std::string>()).second && unique;
+                        else if (event == Json::parse_event_t::object_end)
+                            keys.pop_back();
+                        return true;
+                    });
+                wire::require(unique && data.is_object() && data.size() == 3 &&
+                              data.at("schema") == 1 &&
+                              number(data.at("title"), UINT32_MAX) == title);
+                auto &sessions = data.at("sessions");
+                wire::require(sessions.is_array() && sessions.size() <= 128);
+                std::set<std::string> tokens;
+                std::set<uint64_t> files;
+                for (const auto &row : sessions)
+                {
+                    wire::require(row.is_object() && row.size() == 11);
+                    const auto token = text(row.at("token"), 33);
+                    wire::require(hashText(token, 32) && tokens.insert(token).second &&
+                                  number(row.at("file"), UINT64_MAX - 1) &&
+                                  files.insert(number(row.at("file"))).second &&
+                                  number(row.at("owner"), UINT64_MAX - 1) &&
+                                  !text(row.at("name"), 128).empty());
+                    (void)text(row.at("owner_name"), 64);
+                    (void)number(row.at("category"), UINT16_MAX);
+                    validateTags(row.at("tags"));
+                    wire::require(number(row.at("expires"), UINT32_MAX) >
+                                  number(row.at("created"), UINT32_MAX));
+                    const auto hash = text(row.at("content"), 65);
+                    const auto size = number(row.at("size"), maximumStreamingBody);
+                    wire::require(hash.empty() ? size == 0 : hashText(hash));
+                }
+                sessions.erase(
+                    std::remove_if(sessions.begin(),
+                                   sessions.end(),
+                                   [](const auto &row)
+                                   {
+                                       return row.at("expires").template get<uint32_t>() <= now();
+                                   }),
+                    sessions.end());
+                return data;
+            }
+            catch (const std::exception &)
+            {
+                throw std::runtime_error("Pooled upload store schema invalid");
+            }
+        }
+
+        void savePooledUploads(uint32_t title, const Json &data)
+        {
+            const auto encoded = data.dump();
+            if (encoded.size() > maxStore)
+                throw std::runtime_error("Pooled upload store capacity exceeded");
+            atomic(pooledUploadPath(title),
+                   std::span(reinterpret_cast<const uint8_t *>(encoded.data()), encoded.size()));
+        }
+
         uint64_t allocateFile(uint32_t title, const Json &files, const Json &sessions)
         {
             const auto copies = loadCopies(title);
             const auto userUploads = loadUserUploads(title);
+            const auto pooledUploads = loadPooledUploads(title);
             const auto catalog = load(title);
             const auto receipts = catalog.value("copy_receipts", Json::object());
             const auto uploadReceipts = catalog.value("upload_receipts", Json::object());
@@ -544,11 +633,11 @@ namespace services
                                  {
                                      return row.at("id") == file;
                                  }) ||
-                     std::any_of(uploads.begin(),
-                                 uploads.end(),
-                                 [title, file](const auto &row)
+                     std::any_of(pooledUploads["sessions"].begin(),
+                                 pooledUploads["sessions"].end(),
+                                 [file](const auto &row)
                                  {
-                                     return row.second.title == title && row.second.file == file;
+                                     return row.at("file") == file;
                                  }));
             return file;
         }
@@ -873,9 +962,9 @@ namespace services
             for (const auto &session : sessions)
                 for (const auto &entry : session.at("parts"))
                     held += entry.at("size").get<uint32_t>();
-            for (const auto &entry : uploads)
-                if (entry.second.bytes)
-                    held += entry.second.bytes->size();
+            const auto pooledUploads = loadPooledUploads(title);
+            for (const auto &entry : pooledUploads.at("sessions"))
+                held += entry.at("size").template get<uint32_t>();
             if (held + bytes.size() > 64 * 1024 * 1024)
                 return 503;
             const auto hash = hex(crypto::sha256(bytes));
@@ -1326,48 +1415,54 @@ namespace services
             return {0, {std::move(result)}, "streaming-user-upload-committed"};
         }
 
-        void prune()
-        {
-            const auto stamp = now();
-            std::erase_if(uploads,
-                          [&](const auto &entry)
-                          {
-                              return entry.second.expires <= stamp;
-                          });
-        }
-
         Reply preUpload(const platform::LobbyIdentity &id, wire::Reader &p)
         {
-            Upload upload;
-            upload.title = id.titleId;
-            upload.user = id.userId;
-            upload.ownerName = id.name;
-            upload.name = p.text(129);
-            wire::require(!upload.name.empty() && upload.name.size() < 128);
-            upload.category = p.u16();
-            upload.tags = tags(p);
+            const auto name = p.text(129);
+            wire::require(!name.empty() && name.size() < 128);
+            const auto category = p.u16();
+            const auto suppliedTags = tags(p);
             wire::require(p.text(1).empty());
             p.end();
-            prune();
-            if (uploads.size() >= 128)
+            auto pending = loadPooledUploads(id.titleId);
+            auto &sessions = pending["sessions"];
+            if (sessions.size() >= 128)
                 return {102, {}, "streaming-upload-capacity-exceeded"};
-            const auto data = load(id.titleId);
-            const auto &files = data.at("files");
-            if (files.size() >= maxFiles)
+            const auto catalog = load(id.titleId);
+            if (catalog.at("files").size() >= maxFiles)
                 return {102, {}, "streaming-file-capacity-exceeded"};
-            auto pending = loadMultipart(id.titleId);
-            expireMultipart(pending);
-            upload.file = allocateFile(id.titleId, files, pending.at("sessions"));
-            const auto token = hex(crypto::random(16));
-            upload.serverName = std::to_string(upload.file);
-            upload.expires = now() + 600;
-            // Complete native bdURL reader 142163B40: URL/location/server filename/ID.
+            const auto multipart = loadMultipart(id.titleId);
+            const auto file =
+                allocateFile(id.titleId, catalog.at("files"), multipart.at("sessions"));
+            std::string token;
+            do
+                token = hex(crypto::random(16));
+            while (std::any_of(sessions.begin(),
+                               sessions.end(),
+                               [&token](const auto &row)
+                               {
+                                   return row.at("token") == token;
+                               }));
+            const auto created = now();
+            sessions.push_back(Json{{"file", file},
+                                    {"owner", id.userId},
+                                    {"owner_name", id.name},
+                                    {"name", name},
+                                    {"category", category},
+                                    {"tags", suppliedTags},
+                                    {"token", token},
+                                    {"created", created},
+                                    {"expires", created + 600},
+                                    {"content", ""},
+                                    {"size", 0u}});
+            savePooledUploads(id.titleId, pending);
+            // Native bdURL format is unchanged. Its opaque URL now includes the
+            // realm so a fresh process can resolve the durable session directly.
             wire::Writer out;
-            out.text(origin() + "/content-streaming/upload/" + token);
+            out.text(origin() + "/content-streaming/upload/pooled/" + std::to_string(id.titleId) +
+                     "/" + token);
             out.u16(0);
-            out.text(upload.serverName);
-            out.u64(upload.file);
-            uploads.emplace(token, std::move(upload));
+            out.text(std::to_string(file));
+            out.u64(file);
             return {0, {std::move(out.data)}, "streaming-upload-prepared"};
         }
 
@@ -1378,65 +1473,134 @@ namespace services
             const auto serverName = p.text(129);
             const auto size = p.u32();
             p.end();
-            wire::require(file && file != UINT64_MAX && !location && size <= maximumStreamingBody);
-            prune();
-            const auto found =
-                std::find_if(uploads.begin(),
-                             uploads.end(),
-                             [&](const auto &row)
-                             {
-                                 return row.second.title == id.titleId && row.second.file == file;
-                             });
-            if (found == uploads.end())
+            wire::require(file && file != UINT64_MAX && !location && size <= maximumStreamingBody &&
+                          serverName == std::to_string(file));
+            auto pending = loadPooledUploads(id.titleId);
+            auto &sessions = pending["sessions"];
+            const auto found = std::find_if(sessions.begin(),
+                                            sessions.end(),
+                                            [file](const auto &row)
+                                            {
+                                                return row.at("file") == file;
+                                            });
+            auto catalog = load(id.titleId);
+            const auto committed = std::find_if(catalog["files"].begin(),
+                                                catalog["files"].end(),
+                                                [file](const auto &row)
+                                                {
+                                                    return row.at("id") == file &&
+                                                           row.at("kind") == "pooled" &&
+                                                           !row.contains("parts");
+                                                });
+            if (committed != catalog["files"].end())
             {
-                // A retry after commit/process restart is checked against the durable
-                // object rather than allocating another ID or publishing duplicate rows.
-                const auto data = load(id.titleId);
-                for (const auto &row : data.at("files"))
-                    if (row.at("id") == file && row.at("kind") == "pooled" &&
-                        !row.contains("parts"))
-                    {
-                        if (row.at("owner") != id.userId)
-                            return {101, {}, "streaming-upload-owner-denied"};
-                        wire::require(serverName == std::to_string(file) && row.at("size") == size);
-                        wire::Writer out;
-                        out.u64(file);
-                        return {0, {std::move(out.data)}, "streaming-upload-commit-retried"};
-                    }
-                return {108, {}, "streaming-upload-not-found"};
+                if (committed->at("owner") != id.userId)
+                    return {101, {}, "streaming-upload-owner-denied"};
+                wire::require(committed->at("size") == size);
+                (void)readBlob(
+                    id.titleId, committed->at("content").template get<std::string>(), size);
+                if (found != sessions.end())
+                {
+                    for (const auto *key : {"owner", "name", "category", "tags", "content", "size"})
+                        if (found->at(key) != committed->at(key))
+                            throw std::runtime_error("Pooled upload recovery snapshot mismatch");
+                    sessions.erase(found);
+                    savePooledUploads(id.titleId, pending);
+                }
+                wire::Writer out;
+                out.u64(file);
+                return {0, {std::move(out.data)}, "streaming-upload-commit-retried"};
             }
-            const auto &upload = found->second;
-            if (upload.user != id.userId)
+            if (found == sessions.end())
+                return {108, {}, "streaming-upload-not-found"};
+            if (found->at("owner") != id.userId)
                 return {101, {}, "streaming-upload-owner-denied"};
-            wire::require(serverName == upload.serverName && upload.bytes &&
-                          upload.bytes->size() == size);
-            auto data = load(id.titleId);
-            if (data.at("files").size() >= maxFiles)
+            if (found->at("content").get<std::string>().empty())
+                return {108, {}, "streaming-upload-http-incomplete"};
+            wire::require(found->at("size") == size);
+            const auto hash = found->at("content").get<std::string>();
+            (void)readBlob(id.titleId, hash, size);
+            if (catalog.at("files").size() >= maxFiles)
                 return {102, {}, "streaming-file-capacity-exceeded"};
-            const auto hash = hex(crypto::sha256(*upload.bytes));
-            atomic(blobPath(id.titleId, hash), *upload.bytes);
-            data["files"].push_back(Json{{"id", file},
-                                         {"kind", "pooled"},
-                                         {"owner", id.userId},
-                                         {"owner_name", id.name},
-                                         {"name", upload.name},
-                                         {"category", upload.category},
-                                         {"slot", 0u},
-                                         {"created", now()},
-                                         {"modified", now()},
-                                         {"size", size},
-                                         {"content", hash},
-                                         {"summary", ""},
-                                         {"summary_size", 0u},
-                                         {"metadata", ""},
-                                         {"tags", upload.tags},
-                                         {"copies", 0u},
-                                         {"origin", 0u}});
-            save(id.titleId, data);
-            uploads.erase(found);
+            catalog["files"].push_back(Json{{"id", file},
+                                            {"kind", "pooled"},
+                                            {"owner", id.userId},
+                                            {"owner_name", found->at("owner_name")},
+                                            {"name", found->at("name")},
+                                            {"category", found->at("category")},
+                                            {"slot", 0u},
+                                            {"created", now()},
+                                            {"modified", now()},
+                                            {"size", size},
+                                            {"content", hash},
+                                            {"summary", ""},
+                                            {"summary_size", 0u},
+                                            {"metadata", ""},
+                                            {"tags", found->at("tags")},
+                                            {"copies", 0u},
+                                            {"origin", 0u}});
+            // Publish the complete catalog before removing staging. A restart or
+            // failed cleanup retries the same row rather than creating another ID.
+            save(id.titleId, catalog);
+            sessions.erase(found);
+            savePooledUploads(id.titleId, pending);
             wire::Writer out;
             out.u64(file);
             return {0, {std::move(out.data)}, "streaming-upload-committed"};
+        }
+
+        unsigned putPooledUpload(const std::string &request, std::span<const uint8_t> bytes)
+        {
+            constexpr std::string_view prefix = "/content-streaming/upload/pooled/";
+            const auto suffix = request.substr(prefix.size());
+            const auto slash = suffix.find('/');
+            if (slash == std::string::npos || !hashText(suffix.substr(slash + 1), 32))
+                return 404;
+            const auto realm = suffix.substr(0, slash);
+            uint32_t title = 0;
+            const auto parsed = std::from_chars(realm.data(), realm.data() + realm.size(), title);
+            if (realm.empty() || (realm.size() > 1 && realm[0] == '0') ||
+                parsed.ec != std::errc{} || parsed.ptr != realm.data() + realm.size())
+                return 404;
+            if (bytes.size() > maximumStreamingBody)
+                return 400;
+            auto pending = loadPooledUploads(title);
+            auto &sessions = pending["sessions"];
+            const auto token = suffix.substr(slash + 1);
+            const auto found = std::find_if(sessions.begin(),
+                                            sessions.end(),
+                                            [&token](const auto &row)
+                                            {
+                                                return row.at("token") == token;
+                                            });
+            if (found == sessions.end())
+                return 404;
+            const auto hash = found->at("content").get<std::string>();
+            if (!hash.empty())
+                return crypto::equal(readBlob(title, hash, found->at("size").get<uint32_t>()),
+                                     bytes)
+                           ? 200
+                           : 409;
+            uint64_t held = 0;
+            for (const auto &row : sessions)
+                held += row.at("size").get<uint32_t>();
+            auto multipart = loadMultipart(title);
+            expireMultipart(multipart);
+            for (const auto &session : multipart.at("sessions"))
+                for (const auto &part : session.at("parts"))
+                    held += part.at("size").template get<uint32_t>();
+            if (held + bytes.size() > 64 * 1024 * 1024)
+                return 503;
+            const auto checksum = hex(crypto::sha256(bytes));
+            if (std::filesystem::exists(blobPath(title, checksum)))
+                (void)readBlob(title, checksum, bytes.size());
+            else
+                atomic(blobPath(title, checksum), bytes);
+            (*found)["content"] = checksum;
+            (*found)["size"] = static_cast<uint32_t>(bytes.size());
+            (*found)["expires"] = now() + 600;
+            savePooledUploads(title, pending);
+            return 200;
         }
     } // namespace
 
@@ -1445,7 +1609,6 @@ namespace services
         std::lock_guard lock(contentMutex);
         dataRoot = std::filesystem::absolute(directory);
         contentPort = port;
-        uploads.clear();
     }
 
     std::optional<Reply> contentServices(const std::filesystem::path &,
@@ -1638,28 +1801,12 @@ namespace services
     unsigned streamingUpload(const std::string &request, std::span<const uint8_t> bytes)
     {
         std::lock_guard lock(contentMutex);
-        constexpr std::string_view prefix = "/content-streaming/upload/";
         if (request.starts_with("/content-streaming/upload/user/"))
             return putUserUpload(request, bytes);
         if (request.starts_with("/content-streaming/upload/multipart/"))
             return putMultipart(request, bytes);
-        if (!request.starts_with(prefix) || !hashText(request.substr(prefix.size()), 32))
-            return 404;
-        prune();
-        const auto found = uploads.find(request.substr(prefix.size()));
-        if (found == uploads.end())
-            return 404;
-        if (bytes.size() > maximumStreamingBody)
-            return 400;
-        if (found->second.bytes)
-            return crypto::equal(*found->second.bytes, bytes) ? 200 : 409;
-        size_t held = 0;
-        for (const auto &row : uploads)
-            if (row.second.bytes)
-                held += row.second.bytes->size();
-        if (held + bytes.size() > 64 * 1024 * 1024)
-            return 503;
-        found->second.bytes = wire::Bytes(bytes.begin(), bytes.end());
-        return 200;
+        if (request.starts_with("/content-streaming/upload/pooled/"))
+            return putPooledUpload(request, bytes);
+        return 404;
     }
 } // namespace services
