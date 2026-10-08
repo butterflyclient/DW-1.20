@@ -1,0 +1,34 @@
+REPLAY PLATFORM SESSION PERSISTENCE - 2026-10-08
+
+The issuer previously retained sessions only in memory. A backend restart made
+an otherwise unexpired native platform credential pair and machine renewal
+unavailable. The change is in src/platform.cpp; no game recompile is required.
+
+The complete Session record is saved in platform-sessions.bin under the existing
+server data directory: the signed 256-byte platform payload, native 128-byte
+ticket, 24-byte key, title/IV seed and all legacy/UNO grants. A versioned 16-byte
+header and the complete JSON body are authenticated with the existing issuer's
+RSA-PSS/SHA-256 key. The file is bounded to 2 MiB/1024 rows and uses the existing
+flushed atomic writer with owner-only permissions. Failed unacknowledged issuer
+mutations roll back in memory. Startup rejects an invalid signature/layout,
+skips expired or removed-profile grants and verifies stable account ownership.
+
+Login, native authentication, renewal, legacy access, UNO grant creation and
+credential revocation all publish through the same signed image. A new native
+authentication still rotates the ticket/key and revokes its earlier native
+connection. Renewal preserves the current ticket/key and existing account
+tokens. Single-use machine challenges remain transient, so restart never makes
+an old challenge reusable.
+
+Focused Windows/Linux checks exercise real process restarts, cached encrypted
+task completion, legacy/UNO grants, signed renewal, failed publication,
+reauthentication revocation, corrupt/truncated/malformed images and expiry.
+The separate native test used the shipping game, reauthenticated its cached
+platform credential pair after a Linux restart and consumed signed renewal in
+the same game process. Replay retained its native disconnect/quit error 65538.
+A clean relaunch restored Multiplayer, all 27 fences, relay establishment and
+the original local XP/rank. Transparent frontend or in-match restart recovery
+is not claimed.
+
+Tools export only hashes and bounded owner metadata, never stored credentials
+or native keys. The full backend goal and remaining service contracts are open.

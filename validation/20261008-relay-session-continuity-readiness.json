@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "passed": true,
-  "generated_utc": "2026-10-08T08:23:55.581777+00:00",
+  "generated_utc": "2026-10-08T09:08:39.008192+00:00",
   "backend_sha256": "78a2fb203957e382df60a432772035c529adb08b898d177c7559c4d1ad3c02bf",
   "backend_pid": 90406,
   "game_sha256": "638dab82f069be51f6450f9ed2744f0b049d34642c0b67ae30cde01b53ea16e5",
@@ -11,9 +11,9 @@
   "native_relay_callback_and_server_event_correlated": true,
   "native_udp_keepalives_verified": true,
   "native_new_packet_rejections": 0,
-  "stable_seconds": 152.975226,
+  "stable_seconds": 3155.975329,
   "original_admission_expires_utc": "2026-10-08T09:07:04+00:00",
-  "native_original_admission_expiry_crossing_verified": false,
+  "native_original_admission_expiry_crossing_verified": true,
   "native_in_match_renewal_verified": false,
   "native_two_network_renewal_verified": false,
   "native_route_and_keys_preserved": true,
@@ -28,8 +28,8 @@
       "sha256": "78bc92d9f52a641f2050ea107cbb3d25686485f7d9dd8c075c0e3347b7435948"
     },
     {
-      "path": "data/relay-renewal-hour-20261008/native-stable.json",
-      "sha256": "58c7c9a67ff52b225beea63b7ba409411601c7b227e960c88fd3849ebfd0f686"
+      "path": "data/relay-renewal-hour-20261008/native-past-expiry.json",
+      "sha256": "ae42296cfabbb68ef8bb811ce678767f822e6951a4aed00a2ce2abbce158a3df"
     },
     {
       "path": "data/relay-renewal-hour-20261008/native-issued-admission.json",

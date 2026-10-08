@@ -72,10 +72,10 @@ namespace platform
                 throw std::runtime_error(std::string("Platform crypto failure: ") + operation);
         }
 
-        std::vector<unsigned char> read(const std::filesystem::path &path)
+        std::vector<unsigned char> read(const std::filesystem::path &path, size_t maximum = 16384)
         {
             std::ifstream file(path, std::ios::binary | std::ios::ate);
-            if (!file || file.tellg() <= 0 || file.tellg() > 16384)
+            if (!file || file.tellg() <= 0 || file.tellg() > static_cast<std::streamoff>(maximum))
                 throw std::runtime_error("Invalid platform identity/key file");
             std::vector<unsigned char> bytes(static_cast<size_t>(file.tellg()));
             file.seekg(0);
@@ -85,12 +85,20 @@ namespace platform
             return bytes;
         }
 
-        void write(const std::filesystem::path &path, const void *data, size_t size)
+        void write(const std::filesystem::path &path,
+                   const void *data,
+                   size_t size,
+                   bool privateFile = false)
         {
             auto pending = path;
             pending += ".creating";
             {
                 std::ofstream file(pending, std::ios::binary | std::ios::trunc);
+                if (privateFile && file)
+                    std::filesystem::permissions(pending,
+                                                 std::filesystem::perms::owner_read |
+                                                     std::filesystem::perms::owner_write,
+                                                 std::filesystem::perm_options::replace);
                 if (!file.write(static_cast<const char *>(data),
                                 static_cast<std::streamsize>(size)) ||
                     !file.flush())
@@ -101,6 +109,29 @@ namespace platform
                              MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
                 throw std::runtime_error("Cannot publish platform identity/key");
         }
+
+        void saveSessions();
+
+        // Issuer mutation is acknowledged only after the complete signed image
+        // is flushed and atomically published. An unacknowledged mutation rolls
+        // back in memory; startup accepts only a complete authenticated image.
+        struct SessionChanges
+        {
+            std::vector<Session> previous = issuedSessions;
+            bool committed = false;
+
+            ~SessionChanges()
+            {
+                if (!committed)
+                    issuedSessions = std::move(previous);
+            }
+
+            void commit()
+            {
+                saveSessions();
+                committed = true;
+            }
+        };
 
         void profileKey(const std::string &value)
         {
@@ -258,6 +289,8 @@ namespace platform
                 write(selected.path, &changed, sizeof(changed));
             *selected.value = changed;
             if (revokeCredentials)
+            {
+                SessionChanges mutation;
                 for (auto &session : issuedSessions)
                     if (session.payload.userId == profile.user)
                     {
@@ -265,6 +298,8 @@ namespace platform
                         session.unoAccessToken.clear();
                         session.unoRefreshToken.clear();
                     }
+                mutation.commit();
+            }
         }
 
         void recoverAccounts(uint64_t onlyOwner = 0)
@@ -453,6 +488,163 @@ namespace platform
             return false;
         }
 
+        constexpr size_t sessionStoreLimit = 2 * 1024 * 1024;
+
+        struct SessionStoreHeader
+        {
+            char magic[8] = {'R', 'P', 'S', 'E', 'S', '0', '0', '1'};
+            uint32_t version = 1;
+            uint32_t length = 0;
+        };
+
+        static_assert(sizeof(SessionStoreHeader) == 16);
+
+        void decodeSessionBytes(const nlohmann::json &value, std::span<uint8_t> target)
+        {
+            if (!value.is_string())
+                throw std::runtime_error("Invalid persisted platform session byte field");
+            const auto bytes = wire::base64(value.get_ref<const std::string &>(), target.size());
+            if (bytes.size() != target.size())
+                throw std::runtime_error("Invalid persisted platform session byte length");
+            std::copy(bytes.begin(), bytes.end(), target.begin());
+        }
+
+        bool persistedToken(const std::string &value, bool optional = false)
+        {
+            return (optional && value.empty()) ||
+                   (value.size() == 64 &&
+                    value.find_first_not_of("0123456789abcdef") == std::string::npos);
+        }
+
+        void saveSessions()
+        {
+            using Json = nlohmann::json;
+            if (issuedSessions.size() > 1024)
+                throw std::runtime_error("Platform session capacity reached");
+            Json rows = Json::array();
+            for (const auto &session : issuedSessions)
+                rows.push_back({{"payload",
+                                 wire::base64Encode(
+                                     std::span(reinterpret_cast<const uint8_t *>(&session.payload),
+                                               sizeof(session.payload)))},
+                                {"ticket", wire::base64Encode(session.serverTicket)},
+                                {"key", wire::base64Encode(session.sessionKey)},
+                                {"title", session.titleId},
+                                {"seed", session.ivSeed},
+                                {"umbrella", session.umbrellaToken},
+                                {"uno_id", session.unoIDToken},
+                                {"uno_access", session.unoAccessToken},
+                                {"uno_refresh", session.unoRefreshToken}});
+            const auto body = rows.dump();
+            if (body.size() > sessionStoreLimit - sizeof(SessionStoreHeader) - 256)
+                throw std::runtime_error("Platform session store capacity reached");
+            SessionStoreHeader header;
+            header.length = static_cast<uint32_t>(body.size());
+            std::vector<uint8_t> bytes(sizeof(header) + body.size());
+            std::memcpy(bytes.data(), &header, sizeof(header));
+            std::memcpy(bytes.data() + sizeof(header), body.data(), body.size());
+            uint8_t signature[256]{};
+            sign(bytes.data(), bytes.size(), signature, 32);
+            bytes.insert(bytes.end(), std::begin(signature), std::end(signature));
+            write(identityDirectory / "platform-sessions.bin", bytes.data(), bytes.size(), true);
+        }
+
+        void loadSessions()
+        {
+            const auto path = identityDirectory / "platform-sessions.bin";
+            issuedSessions.clear();
+            if (!std::filesystem::exists(path))
+                return; // Existing installations acquire their first image at login.
+            auto bytes = read(path, sessionStoreLimit);
+            if (bytes.size() < sizeof(SessionStoreHeader) + 256)
+                throw std::runtime_error("Truncated platform session store");
+            SessionStoreHeader header;
+            std::memcpy(&header, bytes.data(), sizeof(header));
+            const SessionStoreHeader expected;
+            if (std::memcmp(header.magic, expected.magic, sizeof(header.magic)) ||
+                header.version != 1 || header.length != bytes.size() - sizeof(header) - 256)
+                throw std::runtime_error("Invalid platform session store header");
+            const auto authenticated = std::span(bytes).first(bytes.size() - 256);
+            auto digest = crypto::sha256(authenticated);
+            BCRYPT_PSS_PADDING_INFO padding{BCRYPT_SHA256_ALGORITHM, 32};
+            check(BCryptVerifySignature(key,
+                                        &padding,
+                                        digest.data(),
+                                        static_cast<ULONG>(digest.size()),
+                                        bytes.data() + authenticated.size(),
+                                        256,
+                                        BCRYPT_PAD_PSS),
+                  "persisted session signature");
+            const auto rows = nlohmann::json::parse(bytes.begin() + sizeof(header),
+                                                    bytes.begin() + sizeof(header) + header.length);
+            if (!rows.is_array() || rows.size() > 1024)
+                throw std::runtime_error("Invalid platform session store count");
+            const auto time = now();
+            std::set<std::string> tokens;
+            std::vector<Session> restored;
+            for (const auto &row : rows)
+            {
+                if (!row.is_object() || row.size() != 9 || !row.at("title").is_number_unsigned() ||
+                    !row.at("seed").is_number_unsigned() ||
+                    row.at("title").get<uint64_t>() > UINT32_MAX ||
+                    row.at("seed").get<uint64_t>() > UINT32_MAX)
+                    throw std::runtime_error("Invalid persisted platform session fields");
+                Session session{};
+                decodeSessionBytes(row.at("payload"),
+                                   std::span(reinterpret_cast<uint8_t *>(&session.payload),
+                                             sizeof(session.payload)));
+                decodeSessionBytes(row.at("ticket"), session.serverTicket);
+                decodeSessionBytes(row.at("key"), session.sessionKey);
+                session.titleId = row.at("title").get<uint32_t>();
+                session.ivSeed = row.at("seed").get<uint32_t>();
+                session.umbrellaToken = row.at("umbrella").get<std::string>();
+                session.unoIDToken = row.at("uno_id").get<std::string>();
+                session.unoAccessToken = row.at("uno_access").get<std::string>();
+                session.unoRefreshToken = row.at("uno_refresh").get<std::string>();
+                const auto &payload = session.payload;
+                if (payload.magic != DW_LOCAL_PLATFORM_MAGIC ||
+                    payload.version != DW_LOCAL_PLATFORM_VERSION || !payload.userId ||
+                    payload.userId == UINT64_MAX || !payload.gameAccountId || !payload.issued ||
+                    payload.issued > time + 30 || payload.expires <= payload.issued ||
+                    payload.expires - payload.issued > 3600 || payload.name[35] ||
+                    payload.sessionToken[64] || payload.accountToken[64] || payload.licenses != 1 ||
+                    payload.region != 1 || payload.age != 21 || payload.accountPolicy ||
+                    payload.capabilities != 1 || nonzero(payload.reserved) ||
+                    !nonzero(payload.nonce) || !persistedToken(payload.sessionToken) ||
+                    !persistedToken(payload.accountToken) ||
+                    !tokens.insert(payload.sessionToken).second ||
+                    !persistedToken(session.umbrellaToken, true) ||
+                    !persistedToken(session.unoIDToken, true) ||
+                    !persistedToken(session.unoAccessToken, true) ||
+                    !persistedToken(session.unoRefreshToken, true) ||
+                    (session.unoIDToken.empty() != session.unoAccessToken.empty()) ||
+                    (session.unoIDToken.empty() != session.unoRefreshToken.empty()) ||
+                    (session.titleId
+                         ? (!nonzero(session.serverTicket) || !nonzero(session.sessionKey))
+                         : (session.ivSeed || nonzero(session.serverTicket) ||
+                            nonzero(session.sessionKey) || !session.umbrellaToken.empty() ||
+                            !session.unoIDToken.empty())))
+                    throw std::runtime_error("Invalid persisted platform session state");
+                validateName(payload.name);
+                if (payload.expires <= time)
+                    continue;
+                // A removed profile revokes its old grants. Recreating a profile
+                // must never adopt another account's persisted credentials.
+                Identity *owner = identity.userId == payload.userId ? &identity : nullptr;
+                for (auto &[name, profile] : profiles)
+                    if (profile.userId == payload.userId)
+                        owner = &profile;
+                for (auto &[name, profile] : clientProfiles)
+                    if (profile.userId == payload.userId)
+                        owner = &profile;
+                if (owner && owner->gameAccountId != payload.gameAccountId)
+                    throw std::runtime_error("Persisted platform session account mismatch");
+                if (owner)
+                    restored.push_back(std::move(session));
+            }
+            issuedSessions = std::move(restored);
+        }
+
         // Caller holds the issuer mutex. Login and renewal consume the same
         // single-use server challenge and sign their complete request prefix.
         template <typename Request>
@@ -492,6 +684,7 @@ namespace platform
                                  bool machineOwned = false)
         {
             recoverAccounts(selected->userId);
+            SessionChanges mutation;
             const auto time = now();
             std::erase_if(issuedSessions,
                           [time](const auto &session)
@@ -528,7 +721,10 @@ namespace platform
             token(p.sessionToken);
             token(p.accountToken);
             sign(&p, sizeof(p), reply.signature, 32);
-            issuedSessions.push_back({p});
+            Session created{};
+            created.payload = p;
+            issuedSessions.push_back(std::move(created));
+            mutation.commit();
             ++loginCount;
             return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
         }
@@ -622,6 +818,7 @@ namespace platform
             clientProfiles.emplace(fingerprint, account);
         }
         accountStore.initialize(directory);
+        loadSessions();
         recoverAccounts();
     }
 
@@ -673,7 +870,8 @@ namespace platform
         else
             std::memcpy(&request, bytes.data(), sizeof(request));
         if (request.magic != DW_LOCAL_CLIENT_MAGIC ||
-            request.version != (extended ? DW_LOCAL_CLIENT_LOGIN_VERSION : DW_LOCAL_CLIENT_VERSION) ||
+            request.version !=
+                (extended ? DW_LOCAL_CLIENT_LOGIN_VERSION : DW_LOCAL_CLIENT_VERSION) ||
             request.name[35] || !nonzero(request.nonce))
             throw std::runtime_error("Invalid machine login layout");
         const std::string name(request.name);
@@ -720,13 +918,20 @@ namespace platform
         if (extended && (local.options & 1) && local.localUserId != user)
             throw std::runtime_error("Local progression belongs to a different identity");
         auto response = issueSession(std::string(reinterpret_cast<const char *>(request.nonce), 32),
-                                     &existing->second, path, name, true);
+                                     &existing->second,
+                                     path,
+                                     name,
+                                     true);
         // Service dispatch takes storeMutex before consulting platform sessions.
         // Release the issuer lock before restoring its service mirror.
         lock.unlock();
         if (extended)
-            services::restoreLocalProgression(5800, user, local.playerXp,
-                                               (local.options & 1) != 0, local.startingRank, platformAccount);
+            services::restoreLocalProgression(5800,
+                                              user,
+                                              local.playerXp,
+                                              (local.options & 1) != 0,
+                                              local.startingRank,
+                                              platformAccount);
         return response;
     }
 
@@ -750,8 +955,9 @@ namespace platform
             const auto &current = session.payload;
             if (current.expires <= time || current.userId != owner->second.userId ||
                 current.gameAccountId != owner->second.gameAccountId ||
-                !crypto::equal(std::span(reinterpret_cast<const uint8_t *>(current.sessionToken), 64),
-                               std::span(reinterpret_cast<const uint8_t *>(request.sessionToken), 64)))
+                !crypto::equal(
+                    std::span(reinterpret_cast<const uint8_t *>(current.sessionToken), 64),
+                    std::span(reinterpret_cast<const uint8_t *>(request.sessionToken), 64)))
                 continue;
             DWLocalPlatformReply reply{};
             reply.payload = current;
@@ -761,7 +967,9 @@ namespace platform
             sign(&reply.payload, sizeof(reply.payload), reply.signature, 32);
             // Publish only after signing succeeds. The established native lobby,
             // DTLS key, relay digest and account tokens retain their exact values.
+            SessionChanges mutation;
             session.payload = reply.payload;
+            mutation.commit();
             return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
         }
         throw std::runtime_error("Machine renewal session unavailable or expired");
@@ -934,6 +1142,10 @@ namespace platform
             Json{{"schema", 1}, {"owner", owner.userId}, {"fields", Json::object()}});
         const auto grants = [&session]()
         {
+            if (!session->unoIDToken.empty() && !session->unoAccessToken.empty() &&
+                !session->unoRefreshToken.empty())
+                return;
+            SessionChanges mutation;
             for (auto *target :
                  {&session->unoIDToken, &session->unoAccessToken, &session->unoRefreshToken})
                 if (target->empty())
@@ -943,6 +1155,7 @@ namespace platform
                     *target = value;
                     SecureZeroMemory(value, sizeof(value));
                 }
+            mutation.commit();
         };
 
         if (operation == "authenticateUser")
@@ -1243,6 +1456,7 @@ namespace platform
         }
         if (!session)
             throw std::runtime_error("Platform credential pair unknown or expired");
+        SessionChanges mutation;
         check(BCryptGenRandom(nullptr,
                               session->sessionKey.data(),
                               static_cast<unsigned long>(session->sessionKey.size()),
@@ -1295,6 +1509,7 @@ namespace platform
         // actual verifier unchanged; the local public key alone is selected in C++.
         sign(reply.body.data(), reply.body.size(), signature, 0);
         reply.signature = base64(signature, sizeof(signature));
+        mutation.commit();
         ++authCount;
         return reply;
     }
@@ -1402,10 +1617,12 @@ namespace platform
                 continue;
             if (session.umbrellaToken.empty())
             {
+                SessionChanges mutation;
                 char text[65]{};
                 token(text);
                 session.umbrellaToken = text;
                 SecureZeroMemory(text, sizeof(text));
+                mutation.commit();
             }
             ++legacyCount;
             // bdUmbrellaAccessInfo::deserializeFromJSON reads these three fields.

@@ -1079,10 +1079,12 @@ def main():
             # This pass proves client-auth completion (26), not that a newly
             # fetched server-info response (24) replaced the retained cache.
             relay_proofs[26] = (same_server_path.relative_to(ROOT).as_posix(), proof)
-    continuity_path = (
-        ROOT / "validation/20261008-relay-session-continuity-readiness.json"
-    )
-    if continuity_path.is_file():
+    for continuity_path in (
+        ROOT / "validation/20261008-relay-session-continuity-readiness.json",
+        ROOT / "validation/20261008-session-store-relay-native-readiness.json",
+    ):
+        if not continuity_path.is_file():
+            continue
         proof = json.loads(continuity_path.read_bytes())
         if (
             proof.get("passed")
