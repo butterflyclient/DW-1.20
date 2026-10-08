@@ -38,9 +38,11 @@ def packet(kind, route, counter, payload, key):
 
 
 class Relay:
-    def __init__(self, client, user, remote=None):
+    def __init__(self, client, user, remote=None, *, token=None):
         self.user = user
-        document = json.loads(client.task(145, 24, b"\x10replay\0\x10pc\0")[1:-1])
+        document = json.loads(
+            client.task(145, 24, b"\x10replay\0\x10pc\0", structured=False)[1:-1]
+        )
         assert document["datacenter"] == "local" and isinstance(
             document["server_info"], str
         )
@@ -55,7 +57,12 @@ class Relay:
             struct.unpack_from("<H", self.address_bytes, 4)[0],
         )
         assert self.address[0] == "127.0.0.1" and self.address[1] and self.relay_id
-        self.token = relay_fixtures._native_blob(client.task(145, 26))
+        self.token = (
+            relay_fixtures._native_blob(client.task(145, 26, b"", structured=False))
+            if token is None
+            else token
+        )
+        assert len(self.token) == 77 and self.token[0] == 1
         self.secret = self.token[57:73]
         credential = self.server[:53] if remote is None else remote.join_init()
         self.remote_secret = (

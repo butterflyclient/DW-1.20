@@ -1284,10 +1284,10 @@ try:
         members = read(party + 2584, 488 * 199 + 11)
         statuses, teams = {}, {}
         for index in range(200):
-            status = members[index * 488 + 10]
-            if status:
-                statuses[str(status)] = statuses.get(str(status), 0) + 1
-            if status >= 5:
+            member_status = members[index * 488 + 10]
+            if member_status:
+                statuses[str(member_status)] = statuses.get(str(member_status), 0) + 1
+            if member_status >= 5:
                 team = str(struct.unpack_from("<i", members, index * 488)[0])
                 teams[team] = teams.get(team, 0) + 1
         flags = struct.unpack("<I", read(party + 311200, 4))[0]
@@ -1320,7 +1320,7 @@ try:
             })
 
     result = {
-        "schema": 7,
+        "schema": 8,
         "pid": pid,
         "executable": str(path),
         "sha256": deployment["sha256"],

@@ -85,5 +85,8 @@
   "past_deadline_observed_utc": "2026-10-08T05:53:39.523182+00:00",
   "preserved_party_id": 5313616138492870069,
   "post_renewal_party_members": 2,
-  "full_backend_completed": false
+  "full_backend_completed": false,
+  "native_udp_continuity_past_deadline_verified": false,
+  "past_deadline_relay_auth_state": 3,
+  "relay_scope_note": "The existing past-deadline snapshot proves platform/lobby/party continuity, but its native relay auth is failed (3) and UDP association is closed (0). See the separate relay continuity correction and pending native hour-boundary validation."
 }

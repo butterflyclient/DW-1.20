@@ -342,7 +342,15 @@ namespace relay_provider
 
             bool session(const Association &item) const
             {
-                return item.client.expires > now() &&
+                // The signed token admits a new handshake; it is not an
+                // established connection's lease. Replay does not refresh it
+                // while connected/in a match (NetRelay::Frame/Request).
+                // An established route is still bound to the exact live native
+                // session digest. Signed renewal preserves that key; expiry or
+                // reauthentication invalidates it. Pending handshakes retain
+                // the original client/server token deadline, and INIT always
+                // runs the strict credential verifiers before route lookup.
+                return (item.established || item.client.expires > now()) &&
                        platform::relaySessionMatches(
                            item.client.title, item.client.user, item.client.session);
             }

@@ -1,0 +1,44 @@
+REPLAY RELAY SESSION CONTINUITY - 2026-10-08
+
+Issue
+The UDP provider used the original admission token's deadline to retire an
+established association. Signed platform renewal retained the same native
+session key, but could not keep that UDP route alive. A short-lived, correctly
+signed fixture token reproduces the lost route on the deployed Windows cohort.
+
+Original target evidence
+Replay NetRelay::Frame at 0x1412BFBB0 does not refresh an auth token in connected
+state 6. Three executions of its unchanged PE instructions cover cached expiry
+zero, one and UINT32_MAX, with auth state 2. None calls a helper or changes the
+credential/state. Bounds come from the original PE unwind table, not a database
+label. Request at 0x1412C0090 checks expiry when requesting a relay connection;
+the frame reaches that request through the idle frontend retry path.
+
+Policy and fix
+An admission token authorizes a new INIT/VERIFY handshake. Both client and server
+credentials retain their signed expiry checks; a pending handshake expires at
+their original minimum deadline. INIT validation runs before route/digest reuse.
+
+After VERIFY establishes a route, every maintenance pass and authenticated packet
+checks the original title/user/native-session-key digest against the issuer's
+currently valid platform session. Signed machine renewal preserves that session
+key. Reauthentication replaces it, and platform expiry rejects it. The existing
+peer endpoint, packet MAC, sequence window, closed-state and idle limits remain
+required. The provider never rewrites signed credentials or revives an expired
+token, unverified handshake, closed route or expired platform session.
+
+Validation
+tools/test-relay-session-continuity.py uses disposable profiles on private local
+ports and a four-second, correctly encrypted/MACed admission credential. It checks
+real UDP admission/VERIFY, pinned signed machine renewal, unchanged route keys and
+counters, bidirectional forwarding after admission expiry, rejected expired INIT,
+retired pending handshakes, invalid-renewal isolation and native reauthentication
+revocation. It does not change production clocks or accounts. The old binary fails
+specifically on the first established-route ping after admission expiry.
+
+tools/research-relay-connected-expiry.py records original connected-frame execution
+at validation/20261008-relay-connected-expiry-target.json. Protocol proof and actual
+native startup/transport/hour-boundary evidence are recorded separately. A passing
+fence cache or lobby task alone is insufficient to prove UDP continuity.
+
+The change is confined to the backend provider; it does not require a game recompile.
