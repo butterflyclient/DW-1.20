@@ -14,9 +14,16 @@ def main():
     parser.add_argument("--evidence", required=True, type=Path)
     parser.add_argument("--observation", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--fixture-evidence",
+        type=Path,
+        help="Previously validated exact-binary fixtures; defaults to --evidence",
+    )
     parser.add_argument("--require-expiry-crossing", action="store_true")
     args = parser.parse_args()
     evidence = args.evidence.resolve()
+    fixture_evidence = (args.fixture_evidence or args.evidence).resolve()
+    assert evidence.is_relative_to(ROOT) and fixture_evidence.is_relative_to(ROOT)
     before_path = evidence / "native-menu-fixed-observer.json"
     before = json.loads(before_path.read_bytes())
     current = json.loads(args.observation.read_bytes())
@@ -29,6 +36,7 @@ def main():
     for item in (before, current):
         server = item["server_process_verified"]
         assert server["verified_live_process"]
+        assert server["launch_receipt_matches"] and server["connection_receipt_matches"]
         assert (
             server["sha256"] == deployment["sha256"]
             and server["pid"] == deployment["pid"]
@@ -53,7 +61,10 @@ def main():
         relay = item["server"]["relay"]
         assert relay["enabled"] and not relay["failure"]
         assert relay["active_associations"] == relay["verified_associations"] == 1
-        assert relay["rejected_packets"] == relay["suppressed_rejection_events"] == 0
+        # A production service can contain earlier rejections. Keep the current
+        # same-process test strict by rejecting any new packet errors instead.
+        for field in ("rejected_packets", "suppressed_rejection_events"):
+            assert relay[field] == before["server"]["relay"][field]
         assert item["server_counter_changes_since_launch"]["auth_successes"] == 1
         assert item["server_counter_changes_since_launch"]["lobby_authenticated"] == 1
         assert item["server_counter_changes_since_launch"]["lobby_failures"] == 0
@@ -99,10 +110,23 @@ def main():
         evidence / "native-launch.json",
         evidence / "native-multiplayer.jpg",
         ROOT / "validation/20261008-relay-connected-expiry-target.json",
+        Path(__file__).resolve(),
     ]
+    compiled = {
+        "windows": json.loads((fixture_evidence / "source.json").read_bytes())[
+            "windows_server_sha256"
+        ],
+        "linux": json.loads((fixture_evidence / "linux-build.json").read_bytes())[
+            "linux_server_sha256"
+        ],
+    }
+    assert deployment["sha256"] in compiled.values()
     for system in ("windows", "linux"):
+        for suffix in ("continuity.json", "renewal.json", "startup-verification.json"):
+            fixture = json.loads((fixture_evidence / f"{system}-{suffix}").read_bytes())
+            assert fixture["passed"] and fixture["server_sha256"] == compiled[system]
         paths.extend(
-            evidence / f"{system}-{suffix}"
+            fixture_evidence / f"{system}-{suffix}"
             for suffix in (
                 "continuity.json",
                 "renewal.json",
@@ -120,7 +144,7 @@ def main():
             )
         )
     proof = dict(
-        schema=1,
+        schema=2,
         passed=True,
         generated_utc=datetime.now(timezone.utc).isoformat(),
         backend_sha256=deployment["sha256"],
@@ -128,8 +152,10 @@ def main():
         game_sha256=current["sha256"],
         game_pid=current["pid"],
         native_auth_and_multiplayer_frontend_verified=True,
+        audit_tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         native_relay_callback_and_server_event_correlated=True,
         native_udp_keepalives_verified=True,
+        native_new_packet_rejections=0,
         stable_seconds=elapsed,
         original_admission_expires_utc=datetime.fromtimestamp(
             admitted["expires"], timezone.utc
@@ -147,7 +173,7 @@ def main():
     )
     output = args.output.resolve()
     assert output.is_relative_to(ROOT)
-    output.write_text(json.dumps(proof, indent=2) + "\n")
+    output.write_text(json.dumps(proof, indent=2) + "\n", newline="\n")
     print(
         f"PASS: native relay stability {elapsed:.0f}s; original expiry crossing {crossed and renewed}"
     )

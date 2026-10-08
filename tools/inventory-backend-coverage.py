@@ -6,6 +6,7 @@ references, not runtime/native completion. Unknown indirect calls remain open.
 """
 
 import ast
+import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -83,7 +84,7 @@ GAPS = {
     "8": "Full native positive CRUD roundtrip still needs observation.",
     "10": "Full native positive editing/deletion/backup roundtrip still needs observation.",
     "12": "Native utility methods outside the recovered request set remain unclassified.",
-    "23": "Full native positive signed increment/read roundtrip still needs observation.",
+    "23": "Native signed positive/negative uploads and durable aggregate restoration have a scoped per-method receipt. Native counter download and a complete increment/read roundtrip remain unverified; current-binary upload credit requires that exact receipt below.",
     "27": "Configured geography is local metadata, not real IP geolocation.",
     "29": "Original sendMail 0x14212D970 forwards to sendMailWithDuration 0x14212D9D0, whose raw conditional-move/stack-save path selects task 7 for an explicit sender and task 9 otherwise; that forwarding method is not evidence for task 2. Categorized/status SDK variants not recovered in Replay remain unclassified. Native event 18 recipient notifications, bounded per-connection unread catch-up, durable idle expiration returns and queued-row revalidation are implemented and covered by encrypted two-client fixtures. The stock game callback, header/body decoder, deletion and idle return were verified with one inert diagnostic; application-specific mail handlers remain unverified.",
     "38": "Reports are durable acknowledgements, not a retail attestation/security verdict.",
@@ -802,7 +803,9 @@ def current_protocol_fixture(server_hash):
     def referenced(row):
         path = (ROOT / row["path"]).resolve()
         if not path.is_relative_to(ROOT) or digest(path) != row["sha256"]:
-            raise ValueError("Backend readiness evidence changed or escaped the project")
+            raise ValueError(
+                "Backend readiness evidence changed or escaped the project"
+            )
         return path, json.loads(path.read_bytes())
 
     _, readiness = referenced(json.loads(latest.read_bytes()))
@@ -810,7 +813,10 @@ def current_protocol_fixture(server_hash):
         full = readiness.get("full_protocol_evidence")
         if full:
             path, candidate = referenced(full)
-            if candidate.get("passed") and candidate.get("server_sha256") == server_hash:
+            if (
+                candidate.get("passed")
+                and candidate.get("server_sha256") == server_hash
+            ):
                 return candidate, path.relative_to(ROOT).as_posix()
     return fixture, fallback.relative_to(ROOT).as_posix()
 
@@ -822,11 +828,17 @@ def objectstore_completion_evidence():
     proof = json.loads(path.read_bytes())
     tool = ROOT / "tools/research-objectstore-completion-target.py"
     assert proof["tool_sha256"] == digest(tool)
-    assert proof["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    assert (
+        proof["target_image_sha256"]
+        == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    )
     assert all(row["passed"] for row in proof["completion_calls"])
-    assert {(row["mode"], row["call"]["task"]) for row in proof["completion_calls"]} == {(2, 12), (4, 24)}
+    assert {
+        (row["mode"], row["call"]["task"]) for row in proof["completion_calls"]
+    } == {(2, 12), (4, 24)}
     return dict(
-        receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
+        receipt=path.relative_to(ROOT).as_posix(),
+        sha256=digest(path),
         scope="Original conditional post-HTTP task-manager bindings; fixture initializes modes",
         task_semantics=proof["interpretation"],
         cached_serializer_binding_verified=False,
@@ -835,24 +847,114 @@ def objectstore_completion_evidence():
     )
 
 
+def counter_upload_evidence(server_hash, game_hash):
+    path = ROOT / "validation/20261008-native-counter-upload-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed")
+        and proof.get("server_sha256") == server_hash
+        and proof.get("game_sha256") == game_hash
+        and proof.get("native_counter_upload_completion_verified")
+        and proof.get("native_compensating_signed_upload_verified")
+        and proof.get("temporary_increment_reversed")
+        and proof.get("write_interval_restored_minutes") == 15
+    ):
+        return None
+    for item in proof["evidence"]:
+        evidence = (ROOT / item["path"]).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != item["sha256"]:
+            raise ValueError("Current native counter evidence changed")
+    return path.relative_to(ROOT).as_posix(), proof
+
+
+def live_streaming_layout_evidence():
+    path = ROOT / "validation/20261008-live-streaming-target-layout.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    assert proof["passed"] and proof["target_consumer_layout_corroborated"]
+    assert (
+        proof["original_image_sha256"]
+        == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    )
+    assert proof["tool_sha256"] == digest(
+        ROOT / "tools/research-live-streaming-layout.py"
+    )
+    oracle = (ROOT / proof["oracle"]["path"]).resolve()
+    assert oracle.is_relative_to(ROOT) and digest(oracle) == proof["oracle"]["sha256"]
+    assert [row["part_index"] for row in proof["unchanged_original_vm_cases"]] == [
+        0,
+        1,
+        9,
+    ]
+    assert all(
+        row["passed"] and row["external_calls"] == 0
+        for row in proof["unchanged_original_vm_cases"]
+    )
+    return dict(
+        receipt=path.relative_to(ROOT).as_posix(),
+        sha256=digest(path),
+        target_consumer_layout_corroborated=True,
+        extended_metadata_deserializer_verified=False,
+        response_wire_order_verified=False,
+        native_task_completion_verified=False,
+        interpretation=proof["interpretation"],
+    )
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--server", type=Path, default=ROOT / "build/Release/iw8-dw-server.exe"
+    )
+    parser.add_argument("--deployment", type=Path, default=DATA / "deployment.json")
+    parser.add_argument("--source-root", type=Path, default=ROOT)
+    parser.add_argument("--source-receipt", type=Path)
+    parser.add_argument("--protocol", type=Path)
+    parser.add_argument(
+        "--output", type=Path, default=DATA / "backend-coverage-inventory.json"
+    )
+    parser.add_argument(
+        "--text-output", type=Path, default=DATA / "backend-coverage-inventory.txt"
+    )
+    args = parser.parse_args()
+    source_root = args.source_root.resolve()
+    source_receipt = None
+    if args.source_receipt:
+        source_receipt = json.loads(args.source_receipt.read_bytes())
+        for name, expected in source_receipt["inputs"].items():
+            if name.startswith("src/"):
+                path = (source_root / name).resolve()
+                if not path.is_relative_to(source_root) or digest(path) != expected:
+                    raise ValueError("Compiled source receipt changed: " + name)
+    for output in (args.output, args.text_output):
+        if not output.resolve().is_relative_to(ROOT):
+            raise ValueError("Keep inventory output inside the backend project")
     graph = json.loads((DATA / "native-service-callgraph.json").read_bytes())
     byte_evidence, byte_calls = native_byte_task_evidence()
-    deployment = json.loads((DATA / "deployment.json").read_bytes())
-    executable = ROOT / "build/Release/iw8-dw-server.exe"
+    deployment = json.loads(args.deployment.read_bytes())
+    executable = args.server
     current_hash = digest(executable)
-    fixture, fixture_path = current_protocol_fixture(current_hash)
+    if args.protocol:
+        fixture = json.loads(args.protocol.read_bytes())
+        fixture_path = args.protocol.resolve().relative_to(ROOT).as_posix()
+        if not fixture.get("passed") or fixture.get("server_sha256") != current_hash:
+            raise ValueError("Selected protocol proof does not match the backend image")
+    else:
+        fixture, fixture_path = current_protocol_fixture(current_hash)
     valid_fixture = bool(fixture["passed"] and fixture["server_sha256"] == current_hash)
     routes = {}
     domains = {}
     sources = {}
     for service, domain, filename, tasks in ROUTES:
-        path = ROOT / "src" / filename
-        sources[str(path.relative_to(ROOT))] = digest(path)
+        path = source_root / "src" / filename
+        sources["src/" + filename] = digest(path)
         domains[service] = domain
         for task in tasks:
             assert (service, task) not in routes, (service, task)
-            routes[service, task] = str(path.relative_to(ROOT))
+            routes[service, task] = "src/" + filename
     # Source locations aid further review. These do not establish execution or
     # every optional/malformed path, even when the enclosing suite has passed.
     references = {}
@@ -977,6 +1079,28 @@ def main():
             # This pass proves client-auth completion (26), not that a newly
             # fetched server-info response (24) replaced the retained cache.
             relay_proofs[26] = (same_server_path.relative_to(ROOT).as_posix(), proof)
+    continuity_path = (
+        ROOT / "validation/20261008-relay-session-continuity-readiness.json"
+    )
+    if continuity_path.is_file():
+        proof = json.loads(continuity_path.read_bytes())
+        if (
+            proof.get("passed")
+            and proof.get("backend_sha256") == current_hash
+            and proof.get("game_sha256") == deployment["sha256"]
+            and proof.get("native_relay_callback_and_server_event_correlated")
+            and proof.get("native_udp_keepalives_verified")
+        ):
+            for item in proof["evidence"]:
+                path = (ROOT / item["path"]).resolve()
+                if not path.is_relative_to(ROOT) or digest(path) != item["sha256"]:
+                    raise ValueError("Current native relay evidence changed")
+            normalized = dict(proof, server_sha256=proof["backend_sha256"])
+            for task in (24, 26):
+                relay_proofs[task] = (
+                    continuity_path.relative_to(ROOT).as_posix(),
+                    normalized,
+                )
     for filename in (
         "relay_provider.cpp",
         "crypto.cpp",
@@ -997,7 +1121,7 @@ def main():
         "social_services.cpp",
         "social_services.h",
     ):
-        sources["src/" + filename] = digest(ROOT / "src" / filename)
+        sources["src/" + filename] = digest(source_root / "src" / filename)
     marketing_path = DATA / "native-marketing-verification.json"
     marketing_proof = (
         json.loads(marketing_path.read_bytes()) if marketing_path.exists() else None
@@ -1023,6 +1147,7 @@ def main():
     rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
     friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
     ab_evidence = abtesting_native_evidence(current_hash, deployment["sha256"])
+    counter_evidence = counter_upload_evidence(current_hash, deployment["sha256"])
     rest_requests = (
         rest_coverage(rest_inventory, friend_evidence, current_hash)
         if rest_inventory
@@ -1059,8 +1184,19 @@ def main():
             relay_proof = channel_proof
         if (service, task) == (194, 1) and ab_evidence:
             proof_filename, relay_proof = ab_evidence
+        if (service, task) == (23, 1) and counter_evidence:
+            proof_filename, relay_proof = counter_evidence
         completion = bool(relay_proof and relay_proof.get("passed"))
         scope = None
+        if (service, task) == (23, 1) and counter_evidence:
+            scope = counter_evidence[1]["scope"]
+        if (
+            service == 145
+            and task in (24, 26)
+            and relay_proof
+            and relay_proof.get("native_udp_keepalives_verified")
+        ):
+            scope = "Native SDK discovery/auth/association callbacks matched exact issuer token and backend UDP event; authenticated keepalives advanced with an unchanged route. In-match/two-network renewal remains unverified."
         if (service, task) == (194, 1) and ab_evidence:
             scope = "Native populated enrollment decoded exact test/cohort/modifier and applied its registered dvar before and after backend restart/dw_restart; cleanup restored the empty enrollment and value 16. Future native polling and other modifier types remain unverified"
         if (service, task) == (198, 6) and channel_proof:
@@ -1144,6 +1280,7 @@ def main():
         callgraph_sha256=digest(DATA / "native-service-callgraph.json"),
         native_byte_task_inventory=byte_evidence,
         objectstore_completion_target_evidence=objectstore_completion_evidence(),
+        live_streaming_target_layout_evidence=live_streaming_layout_evidence(),
         selected_protocol_fixture=fixture_path,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),
@@ -1153,7 +1290,20 @@ def main():
         server_sha256=current_hash,
         game_sha256=deployment["sha256"],
         source_sha256=sources,
-        source_inventory_scope="Current checkout source hashes; these are not a compiled-backend source receipt",
+        source_inventory_scope=(
+            "Selected frozen source hashes checked against its compilation receipt"
+            if source_receipt
+            else "Selected source hashes without a compiled-backend source receipt"
+        ),
+        selected_source_root=str(source_root),
+        compiled_source_receipt=(
+            dict(
+                path=args.source_receipt.resolve().relative_to(ROOT).as_posix(),
+                sha256=digest(args.source_receipt),
+            )
+            if source_receipt
+            else None
+        ),
         private_native_pair_evidence=private_pair_evidence(current_hash),
         private_native_tournament_retirement_evidence=private_tournament_retirement_evidence(
             current_hash
@@ -1164,7 +1314,8 @@ def main():
         validation=dict(
             independent_suite_matches_binary=valid_fixture,
             grouped_checks=len(fixture["checks"]),
-            receipt="data/lobby-verification.json",
+            receipt=fixture_path,
+            scope=fixture.get("scope", "full fixture suite"),
             native_method_completion_is_separate=True,
         ),
         counts=dict(
@@ -1296,9 +1447,7 @@ def main():
             "REST/push consumer coverage outside binary task constructors",
         ],
     )
-    (DATA / "backend-coverage-inventory.json").write_text(
-        json.dumps(inventory, indent=2) + "\n"
-    )
+    args.output.write_text(json.dumps(inventory, indent=2) + "\n", newline="\n")
     text = [
         "REPLAY DW BACKEND COVERAGE INVENTORY",
         "",
@@ -1391,7 +1540,7 @@ def main():
             if request.get("native_pre_transport_blocked"):
                 text.append("    Blocker: " + request["native_pre_transport_blocker"])
                 text.append("    Backend scope: " + request["coverage_scope"])
-    (DATA / "backend-coverage-inventory.txt").write_text("\n".join(text) + "\n")
+    args.text_output.write_text("\n".join(text) + "\n", newline="\n")
     print(json.dumps(inventory["counts"]))
 
 

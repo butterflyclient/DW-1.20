@@ -1,16 +1,18 @@
 {
-  "schema": 1,
+  "schema": 2,
   "passed": true,
-  "generated_utc": "2026-10-08T07:21:33.899739+00:00",
+  "generated_utc": "2026-10-08T08:23:55.581777+00:00",
   "backend_sha256": "78a2fb203957e382df60a432772035c529adb08b898d177c7559c4d1ad3c02bf",
-  "backend_pid": 87281,
+  "backend_pid": 90406,
   "game_sha256": "638dab82f069be51f6450f9ed2744f0b049d34642c0b67ae30cde01b53ea16e5",
-  "game_pid": 18264,
+  "game_pid": 25528,
   "native_auth_and_multiplayer_frontend_verified": true,
+  "audit_tool_sha256": "af0ea7385ea977b00eccc25bb96d5cab2170299eed1f1ced21379759e623b4a5",
   "native_relay_callback_and_server_event_correlated": true,
   "native_udp_keepalives_verified": true,
-  "stable_seconds": 321.694849,
-  "original_admission_expires_utc": "2026-10-08T08:08:55+00:00",
+  "native_new_packet_rejections": 0,
+  "stable_seconds": 152.975226,
+  "original_admission_expires_utc": "2026-10-08T09:07:04+00:00",
   "native_original_admission_expiry_crossing_verified": false,
   "native_in_match_renewal_verified": false,
   "native_two_network_renewal_verified": false,
@@ -22,36 +24,40 @@
   "full_backend_complete": false,
   "evidence": [
     {
-      "path": "data/relay-continuity-20261008/native-menu-fixed-observer.json",
-      "sha256": "16ac0a8f667522e9285b0f075b78f742461957739079e70dc76b62670abc42ad"
+      "path": "data/relay-renewal-hour-20261008/native-menu-fixed-observer.json",
+      "sha256": "78bc92d9f52a641f2050ea107cbb3d25686485f7d9dd8c075c0e3347b7435948"
     },
     {
-      "path": "data/relay-continuity-20261008/native-stable.json",
-      "sha256": "30e72e7da5c9233200e1c3a8b7eb7564fcdb1e4045e40d3ab44c5744898ab594"
+      "path": "data/relay-renewal-hour-20261008/native-stable.json",
+      "sha256": "58c7c9a67ff52b225beea63b7ba409411601c7b227e960c88fd3849ebfd0f686"
     },
     {
-      "path": "data/relay-continuity-20261008/native-issued-admission.json",
-      "sha256": "7f55654b040137d9a3207e1f3c540f31d023cc1beff06d11b88985b34fba78bb"
+      "path": "data/relay-renewal-hour-20261008/native-issued-admission.json",
+      "sha256": "ec46617d9a9afd93f7fcea42db3f988f51ee2ad090062d2e1226f546196046d0"
     },
     {
-      "path": "data/relay-continuity-20261008/native-transport-events.json",
-      "sha256": "721783b9c502c15f4c11a243ce8fbd37640b5ca3c358435e0f40ddb7349bd800"
+      "path": "data/relay-renewal-hour-20261008/native-transport-events.json",
+      "sha256": "917df985ac08325c7a8377e228363f17d3471c3d5f2515d222d224510ff60ba3"
     },
     {
-      "path": "data/relay-continuity-20261008/deployment.json",
-      "sha256": "121a51c10d45ad8fb4a4fba0a325f24c703f802901ec665c1175e4d435aa4402"
+      "path": "data/relay-renewal-hour-20261008/deployment.json",
+      "sha256": "1ac591b713606c1324f309c111261211fed7d95f0e589e8135aad79711e5e6da"
     },
     {
-      "path": "data/relay-continuity-20261008/native-launch.json",
-      "sha256": "531701f1cba9dac339cd291bbaed21b09fcd400d0f4622a2a6256ff20f3519f2"
+      "path": "data/relay-renewal-hour-20261008/native-launch.json",
+      "sha256": "db7042028202aeb84f308050a3846418ae85767e898f52a763faf4838b516b49"
     },
     {
-      "path": "data/relay-continuity-20261008/native-multiplayer.jpg",
-      "sha256": "df6ff7a585489a1f171c60779c2e84930cb168b37fe7c3a4e5d85ed48832e944"
+      "path": "data/relay-renewal-hour-20261008/native-multiplayer.jpg",
+      "sha256": "9252eca486244ef4875a45788bb3e01c54911af86845db9371fb0dbfc1d32e3d"
     },
     {
       "path": "validation/20261008-relay-connected-expiry-target.json",
       "sha256": "89d14218674cc6a94676e32bfba4ab754714cc4ac6e884b37dbf5ff50785c4f0"
+    },
+    {
+      "path": "tools/record-native-relay-continuity.py",
+      "sha256": "af0ea7385ea977b00eccc25bb96d5cab2170299eed1f1ced21379759e623b4a5"
     },
     {
       "path": "data/relay-continuity-20261008/windows-continuity.json",

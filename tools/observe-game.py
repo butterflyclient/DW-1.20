@@ -595,7 +595,10 @@ try:
         slots = read(symbols["gl_14E6BFB38"], 32 * 32)
         # Follow the exact native DB_AssetEntryTable hash/chain reader
         # 0x140F5E010 for this single string table; no pool scan or mutation.
-        asset_table = struct.unpack("<Q", read(symbols["gl_14C815C60"], 8))[0]
+        # Original DB_FindXAssetHeader 1411AA890 uses LEA, not a pointer
+        # load, for this inline DB_AssetEntryTable. The analysis label's
+        # qword spelling must not turn its first asset header into the owner.
+        asset_table = base + symbols["gl_14C815C60"]
         asset_name = b"mp/globalcounters.csv"
         asset_type = 54
         hashed = asset_type
@@ -645,6 +648,8 @@ try:
                         csv_rows.append(values)
                     break
             index = struct.unpack_from("<I", entry, 8)[0]
+        if count and not csv_rows:
+            raise RuntimeError("Initialized native counter CSV was not resolved")
         counter_state = {
             "initialized": bool(read(symbols["gl_14E6BFB23"], 1)[0]),
             "write_pending": bool(read(symbols["gl_14E6BFB29"], 1)[0]),
@@ -1320,7 +1325,7 @@ try:
             })
 
     result = {
-        "schema": 8,
+        "schema": 9,
         "pid": pid,
         "executable": str(path),
         "sha256": deployment["sha256"],
