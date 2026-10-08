@@ -771,6 +771,20 @@ namespace services
                                   hashText(receipt.at("request").get<std::string>()));
                     wire::require(receipt.at("recorded").is_number_unsigned() &&
                                   receipt.at("recorded").get<uint64_t>() <= UINT32_MAX);
+                    if (receipt.contains("refresh_items"))
+                    {
+                        const auto &refresh = receipt.at("refresh_items");
+                        wire::require(format == 106 && refresh.is_array() && !refresh.empty() &&
+                                      refresh.size() <= 32 * 255);
+                        uint32_t previous = 0;
+                        for (const auto &item : refresh)
+                        {
+                            wire::require(item.is_number_unsigned() &&
+                                          item.get<uint64_t>() > previous &&
+                                          item.get<uint64_t>() <= INT32_MAX);
+                            previous = item.get<uint32_t>();
+                        }
+                    }
                     wire::require(receipt.at("orders").is_array() &&
                                   !receipt.at("orders").empty() &&
                                   receipt.at("orders").size() <= 255);
@@ -816,6 +830,60 @@ namespace services
         Reply commitPurchase(const std::filesystem::path &directory,
                              const platform::LobbyIdentity &id,
                              const PurchaseRequest &input);
+
+        std::vector<wire::Bytes> inventoryUpdates(const platform::LobbyIdentity &id,
+                                                  const std::set<uint32_t> &selected,
+                                                  const Json &inventory)
+        {
+            if (selected.empty())
+                return {};
+            // Same-Replay event 67 must first pass AchievementEvent (140F33650).
+            // A kind-18 completion (140F34CA0) reaches the GRANT_PRODUCT reader
+            // (141B3B6D0) without processing player/weapon progression. Use its
+            // absolute quantities, not increments. Sale/smart SKU IDs do not
+            // occur in bundle_ids.csv, so their purchase callback cannot expand
+            // the base bundle locally. Notify its actual durable item records.
+            std::map<uint32_t, uint32_t> quantities;
+            for (const auto &item : inventory.at("items"))
+                if (selected.contains(item.at("1").get<uint32_t>()))
+                {
+                    const auto quantity = item.at("2").get<uint32_t>();
+                    wire::require(quantity > 0 && quantity <= INT32_MAX);
+                    quantities.emplace(item.at("1").get<uint32_t>(), quantity);
+                }
+            wire::require(quantities.size() == selected.size());
+            std::vector<wire::Bytes> messages;
+            auto grant = quantities.begin();
+            while (grant != quantities.end())
+            {
+                auto rows = Json::array();
+                for (unsigned count = 0; count < 128 && grant != quantities.end(); ++count, ++grant)
+                    rows.push_back({{"id", grant->first}, {"quantity", grant->second}});
+                const auto body = Json{{"type", "ACHIEVEMENT"},
+                                       {"name", "marketplace_inventory"},
+                                       {"reason", "completed"},
+                                       {"kind", 18},
+                                       {"triggers",
+                                        Json::array({{{"type", "GRANT_PRODUCT"},
+                                                      {"inventory", {{"granted_items", rows}}}}})}}
+                                      .dump();
+                wire::require(body.size() < 16 * 1024);
+                wire::Writer push;
+                push.u32(67);
+                push.u8(1);
+                push.u64(id.userId);
+                push.text("uno");
+                push.text(std::to_string(id.titleId));
+                push.data.push_back(7);
+                wire::raw(push.data, int32_t{1});
+                push.u32(1);
+                push.data.push_back(7);
+                wire::raw(push.data, int32_t{1});
+                push.text(body);
+                messages.push_back(std::move(push.data));
+            }
+            return messages;
+        }
 
         Reply purchase(const std::filesystem::path &directory,
                        const platform::LobbyIdentity &id,
@@ -971,9 +1039,17 @@ namespace services
                     const auto &receipt = receipts.at(key);
                     wire::require(receipt.value("format", 106u) == (input.assetsV3 ? 125u : 106u) &&
                                   receipt.at("request") == request);
-                    return {0,
-                            {wire::base64(receipt.at("response").get<std::string>(), 128 * 1024)},
-                            "marketplace-purchase-retried"};
+                    Reply reply{
+                        0,
+                        {wire::base64(receipt.at("response").get<std::string>(), 128 * 1024)},
+                        "marketplace-purchase-retried"};
+                    if (receipt.contains("refresh_items"))
+                    {
+                        const auto items = receipt.at("refresh_items").get<std::vector<uint32_t>>();
+                        reply.pushes =
+                            inventoryUpdates(id, {items.begin(), items.end()}, inventory);
+                    }
+                    return reply;
                 }
             }
             const auto catalog = publishedCatalog(directory, id);
@@ -1004,6 +1080,17 @@ namespace services
                                   rule.at("allow_ignore_entitlements").is_boolean());
                     if (rule.contains("allow_gifting"))
                         wire::require(rule.at("allow_gifting").is_boolean());
+                    if (rule.contains("required_owned_items"))
+                    {
+                        const auto &required = rule.at("required_owned_items");
+                        wire::require(required.is_array() && !required.empty() &&
+                                      required.size() <= 32);
+                        std::set<uint32_t> prerequisites;
+                        for (const auto &value : required)
+                            wire::require(value.is_number_unsigned() && value.get<uint64_t>() > 0 &&
+                                          value.get<uint64_t>() < UINT32_MAX &&
+                                          prerequisites.insert(value.get<uint32_t>()).second);
+                    }
                     wire::require(catalogNumber(rule, "maximum_quantity", UINT32_MAX) > 0);
                     const auto &sources = rule.at("sources");
                     wire::require(sources.is_array() && !sources.empty() && sources.size() <= 256);
@@ -1041,6 +1128,7 @@ namespace services
             std::map<uint8_t, uint64_t> costs;
             std::map<uint32_t, uint64_t> quantities;
             std::map<std::pair<uint64_t, uint32_t>, uint64_t> grants;
+            std::set<uint32_t> refreshItems;
             std::map<uint64_t, Json> recipients;
             std::map<uint64_t, Json> beforeChecksums;
             size_t snapshotBytes = inventory.dump().size();
@@ -1056,6 +1144,29 @@ namespace services
                     return {108, {}, "marketplace-purchase-not-published"};
                 const auto &definition = definitions.at(skuId);
                 const auto &offer = skus.at(skuId);
+                const auto original = offer.at("original").get<uint32_t>();
+                if (!input.assetsV3 && order.at("recipient") == id.userId && original >= 400000 &&
+                    original < 410000 && offer.at("product") == original &&
+                    (skuId == original + 20000 || skuId == original + 60000))
+                    for (const auto &item : definition.at("items"))
+                    {
+                        const auto itemId = item.at("1").get<uint32_t>();
+                        wire::require(itemId > 0 && itemId <= INT32_MAX);
+                        refreshItems.insert(itemId);
+                    }
+                // Replay selects its smart SKU only when the local buyer owns
+                // smartID. Enforce the same entitlement against durable inventory
+                // before prices, debits or grants; the request cannot supply it.
+                if (definition.contains("required_owned_items"))
+                    for (const auto &required : definition.at("required_owned_items"))
+                        if (std::none_of(inventory.at("items").begin(),
+                                         inventory.at("items").end(),
+                                         [&](const auto &item)
+                                         {
+                                             return item.at("1") == required &&
+                                                    item.at("2").template get<uint64_t>() > 0;
+                                         }))
+                            return {101, {}, "marketplace-smart-prerequisite-not-owned"};
                 const auto recipient = order.at("recipient").get<uint64_t>();
                 if (recipient != id.userId)
                 {
@@ -1291,6 +1402,9 @@ namespace services
             }
             if (response.data.size() > 128 * 1024)
                 return {102, {}, "marketplace-purchase-response-capacity-exceeded"};
+            // Construct every notification before committing, so an invalid
+            // native quantity cannot turn an acknowledged purchase into an error.
+            auto notifications = inventoryUpdates(id, refreshItems, inventory);
             Json receipt{{"schema", 1},
                          {"title", id.titleId},
                          {"owner", id.userId},
@@ -1303,6 +1417,9 @@ namespace services
                          {"request", request},
                          {"recorded", stamp},
                          {"response", wire::base64Encode(response.data)}};
+            if (!refreshItems.empty())
+                receipt["refresh_items"] =
+                    std::vector<uint32_t>(refreshItems.begin(), refreshItems.end());
             receipt["checksum"] = purchaseChecksum(receipt);
             if (input.assetsV3)
             {
@@ -1341,7 +1458,9 @@ namespace services
                 saveInventory(purchaseJournal(directory, id.titleId), journal, 64 * 1024 * 1024);
                 recoverPurchase(directory, id);
             }
-            return {0, {std::move(response.data)}, "marketplace-purchase-committed"};
+            Reply reply{0, {std::move(response.data)}, "marketplace-purchase-committed"};
+            reply.pushes = std::move(notifications);
+            return reply;
         }
 
         wire::Bytes grantedItem(const Json &item)
@@ -1703,7 +1822,7 @@ namespace services
             wire::require(item && item <= INT32_MAX && ids.insert(item).second);
             auto found = positions.find(item);
             auto quantity = found == positions.end() ? uint32_t{0}
-                : items[found->second].at("2").get<uint32_t>();
+                                                     : items[found->second].at("2").get<uint32_t>();
             // GRANT_PRODUCT's native reader uses getInt32 and stores a full,
             // absolute positive cache quantity. Never truncate an owned stack.
             wire::require(quantity <= INT32_MAX);

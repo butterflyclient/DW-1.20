@@ -64,7 +64,7 @@ def exercise(host, peer, stranger, data, query, tokens, policy, ordinary,
 
     def reward(client, expected):
         kind, packet = receive(client)
-        prefix = u32(67) + u64(1) + u64(client.user) + text("uno") + text("5800")
+        prefix = u32(67) + b"\x03\x01" + u64(client.user) + text("uno") + text("5800")
         prefix += b"\x07\x01\0\0\0" + u32(1) + b"\x07\x01\0\0\0"
         assert kind == 2 and packet.startswith(prefix + b"\x10") and packet[-1] == 0
         event = json.loads(packet[len(prefix) + 1:-1])

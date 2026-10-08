@@ -91,7 +91,7 @@ GAPS = {
     "50": "Task 22 live download; preparation IDs 5/15/20 are source-oracle contracts without target constructor proofs. Whole-user optional X-Checksum algorithm unresolved. Full positive native upload/copy lifecycle still unobserved.",
     "58": "Whole pooled-file preparation and HTTP staging persist across backend restarts in a validated per-title store. Immutable blobs are flushed before HTTP acknowledgement; catalog-before-staging-cleanup publication recovers the same file ID on retries. Pooled and multipart transfers share a bounded staging quota with expiry reclamation. Isolated Windows/Linux native-wire and HTTP fixtures cover interrupted writes, corrupt snapshots/blobs, ownership, expiry and user/multipart/copy regressions. Task 22 multipart/live download exact extended result binding remains unresolved: its consumer reads fields beyond the ordinary file-metadata DTO. Positive native upload/commit consumption remains unverified.",
     "67": "Positive native telemetry batch completion beyond startup filter initialization.",
-    "80": "Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Task106 recipient SKU orders support published gifting to existing local accounts with full owner/buyer coupon DTOs, flushed multi-account intents, conflicting-image preflight and disk/process recovery. Native gift/purchase callbacks, discount rules, other variants and loot generation remain open.",
+    "80": "Task 58 validates trusted local issuer publications with the exact Int64/Int64/blob DTO; retail token issuance/semantics and positive native validation callback remain unverified. Task125 CouponOrderV2 request unavailable. Task106 recipient SKU orders support published gifting to existing local accounts with full owner/buyer coupon DTOs, flushed multi-account intents, conflicting-image preflight and disk/process recovery. CSV sale and smart prices preserve base ownership; smart prerequisites are checked against durable buyer inventory. Sale/smart self-purchases and durable retries deliver absolute item quantities through the exact event-67 UByte8 version and kind-18 completion envelope. A real zero-price sale has private-game native callback/cache evidence; paid/smart UI and gift callbacks remain unverified. Other discount and loot-generation rules remain open.",
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
     "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
@@ -893,6 +893,30 @@ def private_counter_read_evidence(server_hash, shipping_hash):
     return path.relative_to(ROOT).as_posix(), proof
 
 
+def private_store_variants_evidence(server_hash):
+    path = ROOT / "validation/20261008-native-store-variants-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed")
+        and proof.get("server_sha256") == server_hash
+        and proof.get("private_test_game")
+        and proof.get("shipping_image_completion_inherited") is False
+        and proof.get("native_sale_purchase_completion_verified")
+        and proof.get("native_immediate_inventory_update_verified")
+        and proof.get("native_inventory_override_applied") is False
+        and proof.get("recorder_sha256")
+        == digest(ROOT / "tools/record-native-store-variants-proof.py")
+    ):
+        return None
+    for name, expected in proof["evidence"].items():
+        evidence = (ROOT / name).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != expected:
+            raise ValueError("Private native sale purchase evidence changed")
+    return path.relative_to(ROOT).as_posix(), proof
+
+
 def live_streaming_layout_evidence():
     path = ROOT / "validation/20261008-live-streaming-target-layout.json"
     if not path.is_file():
@@ -1177,6 +1201,7 @@ def main():
     private_counter_read = private_counter_read_evidence(
         current_hash, deployment["sha256"]
     )
+    private_store = private_store_variants_evidence(current_hash)
     rest_requests = (
         rest_coverage(rest_inventory, friend_evidence, current_hash)
         if rest_inventory
@@ -1267,6 +1292,11 @@ def main():
             and relay_proof["server_sha256"] == current_hash
             and relay_proof["game_sha256"] == deployment["sha256"]
         )
+        private_proof = (
+            private_counter_read if (service, task) == (23, 2)
+            else private_store if (service, task) == (80, 106)
+            else None
+        )
         tasks.append(
             dict(
                 service=service,
@@ -1294,23 +1324,15 @@ def main():
                 native_positive_completion_verified_current_binary=native,
                 native_completion_evidence=proof_filename if native else None,
                 native_completion_scope=scope if native else None,
-                private_native_positive_completion_verified=bool(
-                    (service, task) == (23, 2) and private_counter_read
-                ),
+                private_native_positive_completion_verified=bool(private_proof),
                 private_native_completion_evidence=(
-                    private_counter_read[0]
-                    if (service, task) == (23, 2) and private_counter_read
-                    else None
+                    private_proof[0] if private_proof else None
                 ),
                 private_native_completion_scope=(
-                    private_counter_read[1]["scope"]
-                    if (service, task) == (23, 2) and private_counter_read
-                    else None
+                    private_proof[1]["scope"] if private_proof else None
                 ),
                 private_native_completion_game_sha256=(
-                    private_counter_read[1]["game_sha256"]
-                    if (service, task) == (23, 2) and private_counter_read
-                    else None
+                    private_proof[1]["game_sha256"] if private_proof else None
                 ),
                 native_fence_completion_is_not_per_method_proof=True,
             )

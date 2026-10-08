@@ -6,7 +6,7 @@ import struct
 from native_wire_client import u32, u64
 
 
-def decode_reward(packet, user=None):
+def decode_event67(packet, user=None):
     position = 0
     def number(tag, fmt):
         nonlocal position
@@ -22,7 +22,7 @@ def decode_reward(packet, user=None):
         value = packet[position + 1:end].decode()
         position = end + 1
         return value
-    assert number(8, "<I") == 67 and number(10, "<Q") == 1
+    assert number(8, "<I") == 67 and number(3, "<B") == 1
     owner = number(10, "<Q")
     assert owner and (user is None or owner == user)
     assert text() == "uno"
@@ -31,6 +31,11 @@ def decode_reward(packet, user=None):
     assert number(7, "<i") == 1 and number(8, "<I") == 1 and number(7, "<i") == 1
     event = json.loads(text())
     assert position == len(packet)
+    return owner, context, event
+
+
+def decode_reward(packet, user=None):
+    owner, context, event = decode_event67(packet, user)
     assert event["type"] == "ACHIEVEMENT"
     if event["kind"] == 0:
         assert event["id_"] == 1000000 and event["name"] == "player_xp"

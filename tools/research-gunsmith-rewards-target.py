@@ -1,6 +1,7 @@
 """Execute the original Replay reward reader and inventory cache writer."""
 
 from datetime import datetime, timezone
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -9,7 +10,7 @@ import struct
 
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-from capstone.x86 import X86_OP_IMM
+from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP, X86_REG_R15
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
 from unicorn.x86_const import (
     UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8,
@@ -24,12 +25,15 @@ assert image_hash == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b3
 pe = pefile.PE(data=raw, fast_load=True)
 base = pe.OPTIONAL_HEADER.ImageBase
 reader, writer, quantity, getter = 0x141B3B6D0, 0x141B3E0A0, 0x141B3C230, 0x141B3C030
+completion = 0x140F34CA0
+envelope = 0x140F33650
+version_reader, reward_message = 0x1420EFB80, 0x142125410
 cs = Cs(CS_ARCH_X86, CS_MODE_64)
 cs.detail = True
 functions = {}
 with sqlite3.connect(IMAGE.with_suffix(".exe.sqlite").as_uri() + "?mode=ro", uri=True) as db:
     db.execute("pragma query_only=on")
-    for address in (reader, writer, quantity, getter, 0x1421CCF60, 0x1420E4290, 0x1420E42B0):
+    for address in (reader, writer, quantity, getter, completion, envelope, version_reader, reward_message, 0x1421CCF60, 0x1420E4290, 0x1420E42B0):
         size = db.execute("select size from functions where address=?", (str(address),)).fetchone()[0]
         code = pe.get_data(address - base, size)
         functions[address] = dict(size=size, code=code)
@@ -41,9 +45,29 @@ assert pe.get_data(0x25BE720, 32).split(b"\0", 1)[0] == b"GRANT_CURRENCY"
 assert pe.get_data(0x23FAA08, 32).split(b"\0", 1)[0] == b"ACTIVATE_ACHIEVEMENT"
 calls = {i.operands[0].imm for a, f in functions.items() for i in cs.disasm(f["code"], a)
          if i.mnemonic == "call" and i.operands[0].type == X86_OP_IMM}
+envelope_instructions = list(cs.disasm(functions[envelope]["code"], envelope))
+envelope_literals = set()
+assert any(i.mnemonic == "lea" and i.operands[0].reg == X86_REG_R15
+           and i.operands[1].type == X86_OP_MEM and i.operands[1].mem.base == X86_REG_RIP
+           and i.address + i.size + i.operands[1].mem.disp == base for i in envelope_instructions)
+for instruction in envelope_instructions:
+    for operand in instruction.operands:
+        if operand.type == X86_OP_MEM:
+            address = (instruction.address + instruction.size + operand.mem.disp
+                       if operand.mem.base == X86_REG_RIP else operand.mem.disp)
+            if operand.mem.base == X86_REG_R15 or operand.mem.index == X86_REG_R15:
+                address = base + operand.mem.disp
+            if not base <= address < base + pe.OPTIONAL_HEADER.SizeOfImage:
+                continue
+            value = pe.get_data(address - base, 128).split(b"\0", 1)[0]
+            if value and all(32 <= byte < 127 for byte in value):
+                envelope_literals.add(value.decode())
+assert {"type", "name", "reason", "ACHIEVEMENT", "completed", "inProgress"} <= envelope_literals
+assert completion in {i.operands[0].imm for i in envelope_instructions
+                      if i.mnemonic == "call" and i.operands[0].type == X86_OP_IMM}
 
 
-def execute(events=None, initial=(), direct_updates=None, prefilled=0):
+def execute(events=None, initial=(), direct_updates=None, prefilled=0, through_completion=False, version_packet=None):
     vm = Uc(UC_ARCH_X86, UC_MODE_64)
     mapped = set()
     stack, scratch, halt = 0x10000000, 0x11000000, 0x12000000
@@ -80,6 +104,11 @@ def execute(events=None, initial=(), direct_updates=None, prefilled=0):
     slots, count_address = state + 64, state + 120064
     for address in range(state & ~4095, count_address + 4096, 4096):
         page(address)
+    # Isolate the optional upload-current-stats branch. No live engine dvars,
+    # player progression state, AAR manager or Lua VM exist in this execution.
+    if through_completion:
+        page(0x14EE565D8)
+        vm.mem_write(0x14EE565D8, struct.pack("<Q", scratch + 0x8000))
     initial_rows = list(initial) if not prefilled else [(3000000+i, 1) for i in range(prefilled)]
     for i, (item, amount) in enumerate(initial_rows):
         vm.mem_write(slots + i*8, struct.pack("<II", item, amount))
@@ -148,10 +177,44 @@ def execute(events=None, initial=(), direct_updates=None, prefilled=0):
             pass # Diagnostic printing and the external last-drops history.
         elif address == 0x1419BCC30:
             pass # No real Lua VM in this isolated execution.
+        elif through_completion and address == 0x1413FD570:
+            assert rcx == 0
+            value = 0 # Modeled controller mapping for the known local user.
+        elif through_completion and address == 0x140F27A30:
+            value = scratch + 0x4000 # External AAR manager, not progression.
+        elif through_completion and address == 0x140F27DD0:
+            assert rdx == 0 and r8 == 18 and contexts[r9]["kind"] == 18
+            # AAR summary is external to this cache test; assert its exact kind.
+        elif version_packet is not None and address == 0x1420EF570:
+            assert rdx == 3 # Original readUByte8 requests tag 3, not UInt64's 10.
+            current = struct.unpack("<Q", machine.mem_read(rcx + 32, 8))[0]
+            value = int(bytes(machine.mem_read(current, 1))[0] == rdx)
+            if value:
+                machine.mem_write(rcx + 32, struct.pack("<Q", current + 1))
+        elif version_packet is not None and address == 0x1420F23C0:
+            rsp = machine.reg_read(UC_X86_REG_RSP)
+            output = struct.unpack("<Q", machine.mem_read(rsp + 40, 8))[0]
+            length = struct.unpack("<I", machine.mem_read(rsp + 48, 4))[0]
+            assert length == 1 and rdx >= 1 and r8 == 0
+            machine.mem_write(output, bytes(machine.mem_read(rcx, 1)))
+            machine.mem_write(r9, struct.pack("<I", 1))
+            value = 1
         else:
             raise AssertionError(f"Unexpected boundary {address:x}")
         returned(machine, value)
     vm.hook_add(UC_HOOK_CODE, boundary)
+    if version_packet is not None:
+        wire_data = scratch + 0x1000
+        vm.mem_write(wire_data, version_packet)
+        vm.mem_write(document + 16, struct.pack("<I", wire_data))
+        vm.mem_write(document + 24, struct.pack("<I", len(version_packet)))
+        vm.mem_write(document + 32, struct.pack("<Q", wire_data))
+        output = scratch + 0x2000
+        vm.mem_write(output, b"\xff" * 8)
+        accepted = invoke(version_reader, document, output) & 255
+        return dict(accepted=accepted, output=bytes(vm.mem_read(output, 8)).hex(),
+                    consumed=struct.unpack("<Q", vm.mem_read(document + 32, 8))[0] - wire_data,
+                    modeled_boundaries=sorted(boundaries))
     snapshots = []
     operations = direct_updates if direct_updates is not None else events
     for operation in operations:
@@ -160,7 +223,7 @@ def execute(events=None, initial=(), direct_updates=None, prefilled=0):
             invoke(writer, state, 0, item, amount, absolute)
         else:
             contexts[document] = operation
-            invoke(reader, state, 0, document, 5)
+            invoke(completion, 0, 0, document) if through_completion else invoke(reader, state, 0, document, 5)
         count = struct.unpack("<I", vm.mem_read(count_address, 4))[0]
         cache = bytes(vm.mem_read(slots, count*8))
         snapshots.append(dict(count=count, rows=[struct.unpack_from("<II", cache, i*8)
@@ -177,6 +240,13 @@ def grant(items, product=None):
 
 
 cases = []
+for packet, accepted, consumed in ((b"\x03\x01", 1, 2),
+                                   (b"\x0a\x01" + bytes(7), 0, 0)):
+    result = execute(version_packet=packet)
+    assert result["accepted"] == accepted and result["consumed"] == consumed
+    assert result["output"] == ("01" + "ff" * 7 if accepted else "ff" * 8)
+    cases.append(dict(case="original version reader accepts tag-3 byte and rejects tag-10 UInt64",
+                      packet_hex=packet.hex(), **result))
 wrong = grant([(1001124, 1)])
 wrong["triggers"][0]["type"] = "grantProduct"
 result = execute(events=[wrong])
@@ -204,16 +274,34 @@ cases.append(dict(case="negative quantity cannot replace a zero entry", **result
 result = execute(direct_updates=[(1001124, 1, 1)], prefilled=15000)
 assert result["snapshots"][0]["count"] == 15000
 cases.append(dict(case="full native cache cannot append another item", **result))
+event = dict(type="ACHIEVEMENT", name="marketplace_inventory", reason="completed",
+             kind=18, **grant([(400063, 1), (1001124, 3)]))
+result = execute(events=[grant([(400063, 1)])], through_completion=True)
+assert result["snapshots"][0]["count"] == 0 and not result["writer_flags"]
+cases.append(dict(case="original completion rejects a grant body with no kind", **result))
+result = execute(events=[event, event], through_completion=True)
+assert [s["rows"] for s in result["snapshots"]] == [[(400063, 1), (1001124, 3)]] * 2
+assert result["writer_flags"] == [1] * 4
+cases.append(dict(case="kind-18 original completion dispatcher reaches absolute loot grants without XP or weapon handlers", **result))
 receipt = dict(schema=1, passed=True, generated_utc=datetime.now(timezone.utc).isoformat(),
                target_image_sha256=image_hash, tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                functions={hex(a): dict(size=f["size"], bytes_sha256=hashlib.sha256(f["code"]).hexdigest())
                           for a, f in functions.items()}, cases=cases,
                native_controller=0, native_cache_capacity=15000,
+               envelope_gate=dict(address=hex(envelope), required_literals=sorted(envelope_literals),
+                                  completion_target=hex(completion), method="original instruction/literal validation; not VM executed"),
+               original_completion_dispatcher_executed=True,
+               reward_version=dict(reader=hex(version_reader), consumer=hex(reward_message),
+                                   tag=3, width_bytes=1, original_reader_executed=True,
+                                   sqlite_name_is_not_wire_type_proof=True),
                parser_descriptor_count_offset=28, reward_quantity_semantics="absolute snapshot, flag 1",
                verified_trigger_types=["GRANT_PRODUCT", "GRANT_CURRENCY", "ACTIVATE_ACHIEVEMENT"],
-               modeled_boundaries=["JSON field reads", "controller mapping", "diagnostics", "last-drops history", "Lua begin-event unavailable"],
+               modeled_boundaries=["JSON field reads", "controller mapping", "diagnostics", "last-drops history", "Lua begin-event unavailable", "AAR manager summary"],
                original_reward_reader_executed=True, original_inventory_writer_executed=True,
                original_inventory_quantity_getter_executed=True,
                native_game_verified=False, backend_grants_implemented=False, game_runs_performed=False)
-(ROOT / "validation/20261007-gunsmith-rewards-target.json").write_text(json.dumps(receipt, indent=2) + "\n")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--output", type=Path, default=ROOT / "validation/20261007-gunsmith-rewards-target.json")
+args = parser.parse_args()
+args.output.write_text(json.dumps(receipt, indent=2) + "\n", newline="\n")
 print(f"PASS: {len(cases)} original reward/cache execution cases, no game runs")

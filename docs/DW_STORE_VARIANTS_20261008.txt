@@ -1,0 +1,77 @@
+Replay DW Store variants and reward transport — 2026-10-08
+
+Deployed backend
+  Primary: 162.243.115.160, systemd replay-dw, native Linux C++ server.
+  Release: /opt/replay-dw/releases/20261008-e5150218c9c4/iw8-dw-server
+  SHA256: e5150218c9c44ee37f125a2acb975405060f610d4cb5a6951185ee5e41d9242f
+  Windows build SHA256: 4113609cf6e7503813f5710f502ab9eb9c3bd5d4b612194e5b1f66ef38bd4b5a
+  Compilation snapshot: data/store-variants-20261008-v4/source.json and source.tar.
+  Only runtime C++ changes from the verified session-persistence build:
+    src/marketplace_services.cpp, src/achievement_services.cpp.
+  Unrelated working-tree changes were excluded from both private compilations.
+
+Issue and evidence
+  Native sale selection adds 20000 to the base bundle ID. Smart selection adds
+  60000 when the buyer owns the CSV smart qualifier. Sales take precedence.
+  The original purchase callback cannot expand these variant IDs through the
+  base bundle table. Server ownership persisted but the native cache stayed old.
+
+  A triggers-only JSON message also fails Replay's achievement dispatcher.
+  Original 140F33650 requires type/name/reason before dispatch; 140F34CA0's
+  kind-18 completion reaches 141B3B6D0's absolute inventory reader without
+  player XP or weapon progression handling.
+
+  The SDK's reward version was a second blocker. Original 142125410 calls
+  1420EFB80, which checks typed tag 3 and copies ONE byte. Its SQLite alias
+  incorrectly says readUInt64. The old backend sent tag 10/eight bytes and the
+  client rejected the message before the JSON callback. Both Store and existing
+  player/weapon progression senders now send UByte8(1).
+
+Implementation
+  Catalog generation takes explicit sale base IDs, validates stock sale prices,
+  preserves base bundle and visible/hidden child grants, and publishes both MP
+  and Warzone sale variables. Smart offers require the stock smartID in durable
+  buyer inventory before any debit or grant. No synthetic variant ownership is
+  created. Missing sale prices and invalid smart qualifiers are rejected.
+
+  Committed sale/smart self-purchases send the exact event-67 account/context/
+  JSON envelope with kind-18 completion and absolute durable item quantities.
+  Sorted refresh item IDs are protected by the existing receipt checksum.
+  Retrying a saved transaction returns the saved completion and refreshes current
+  quantities without another debit or grant, even after offer withdrawal.
+  The existing atomic purchase/journal recovery paths remain authoritative.
+
+Validation
+  Windows and Linux: compile passed; 13 encrypted Store checks passed on each;
+  102 startup/social/profile-storage check groups passed on each.
+  Original Replay executable: 12 isolated reader/cache cases passed, including
+  one-byte version acceptance, eight-byte rejection, kind-18 dispatch, capacity
+  and repeated absolute quantities. JSON/type-read dependencies and external
+  controller/AAR/Lua boundaries are modeled; this is not a whole-game VM.
+
+  Real Store test, ONE private game at a time, root game folder:
+    Purchase SKU 420093, base bundle 400093, zero CP.
+    Native task 80/106 completed; UI showed PURCHASED.
+    Native inventory changed 248 -> 250 without a restart.
+    New records: 190013=1 and 400093=1, exactly matching durable server grants.
+    Native XP/rank unchanged; unlock_all override disabled for this test.
+    Proof: validation/20261008-native-store-variants-readiness.json.
+
+  Normal shipping EXE remains unchanged:
+    E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+    SHA256 638dab82f069be51f6450f9ed2744f0b049d34642c0b67ae30cde01b53ea16e5
+  The normal client was restored on the new backend: all 27 fences passed,
+  XP 869220 / zero-based rank 52. Main INI bytes unchanged. Private test INI
+  restored and its pending screenshot command removed.
+
+Limits and next work
+  Smart offers are protocol-tested using explicit fixture rows with real stock
+  item IDs. This Replay bundle table has no populated smart qualifier/price
+  rows; a live native smart UI purchase is therefore not claimed.
+  Live paid sale, gifting and new match-earned XP/AAR animations remain separate
+  validation gates. Private-game Store completion is not inherited as a test of
+  every shipping-image callback or a completed multiplayer playtest.
+  First-party and Battle Pass offers remain separate domains.
+  Full backend remains open: 140 known task routes, 134 registered handlers;
+  missing routes 50/22, 58/22, 193/9, 193/10, 193/12, 193/24. Indirect/unresolved
+  routes and other domain limits remain in the subsystem coverage report.

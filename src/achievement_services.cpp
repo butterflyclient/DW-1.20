@@ -524,8 +524,10 @@ namespace services
                                    const RankInventory *inventory = nullptr,
                                    bool refreshAwards = true)
         {
-            // Replay's event 67 -> 0x142125410 reads version UInt64(1), full
-            // ContextSerialization user, context, Int32 JSON format, count,
+            // Replay's event 67 -> 0x142125410 reads version UByte8(1), full
+            // user identity. 1420EFB80 checks tag 3 and copies one byte despite
+            // the SQLite alias naming it readUInt64. Keep the actual wire ABI.
+            // ContextSerialization context, Int32 JSON format, count,
             // then each bdRewardEventJSONV2 (Int32 format + typed string).
             const auto achievementId = row ? uint64_t{2000000} + row->id : uint64_t{1000000};
             Json event = {
@@ -543,7 +545,7 @@ namespace services
             wire::require(body.size() < 16 * 1024);
             wire::Writer push;
             push.u32(67);
-            push.u64(1);
+            push.u8(1);
             push.u64(id.userId);
             push.text("uno");
             push.text(context);
