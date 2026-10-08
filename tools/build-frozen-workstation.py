@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -163,7 +164,7 @@ frame_id, frame_unit = next(
     for key, value in user_document["functions"].items()
     if value.get("name") == "DW_LocalBackend_Frame"
 )
-frame_source = ROOT / "integration/replay/DW_LocalBackend_Frame.cpp"
+frame_source = (args.integration_root or ROOT / "integration/replay") / "DW_LocalBackend_Frame.cpp"
 frame_destination = snapshot / frame_unit["path"]
 frame_record = next(
     item for item in records if Path(item["snapshot"]) == frame_destination
@@ -202,6 +203,16 @@ for source in sorted(private_sources.iterdir()):
             "Private DW source collides with shared source: " + source.name
         )
     copy_file(source, destination)
+# A normal build generates its own static updater from the selected, frozen
+# client trust/ABI sources. Explicit reviewed integration snapshots may retain
+# their already-built helper header, whose bytes remain compiler dependencies.
+if (snapshot / "src/DW_ExecutableUpdate.cpp").exists() and not (snapshot / "src/DW_UpdateHelper.h").exists():
+    generated_helper = snapshot / "generated-updater/DW_UpdateHelper.h"
+    generated_helper.parent.mkdir(parents=True)
+    subprocess.run([sys.executable, "-B", str(ROOT / "tools/embed-update-helper.py"),
+                    "--source-root", str(snapshot / "src"), "--output", str(generated_helper)], check=True)
+    copy_file(generated_helper, snapshot / "src/DW_UpdateHelper.h")
+
 fixtures = (
     "evidence/mw131-canonical-selected-scripts/1806.gscbin",
     "evidence/replay120-global-mp-scriptfiles/1806.gscbin",

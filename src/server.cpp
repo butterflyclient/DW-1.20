@@ -16,6 +16,7 @@
 #include <thread>
 #include <vector>
 #include "platform.h"
+#include "executable_updates.h"
 #include "../integration/replay/dw_client_identity.h"
 #include "platform_resources.h"
 #include "lobby.h"
@@ -317,7 +318,62 @@ namespace
             reply(socket, 400, "{\"error\":\"unexpected_request_bytes\"}");
             return;
         }
-        if (method == "GET" && (path == "/health" || path == "/status"))
+        if (path == "/updates/v1/check")
+        {
+            if (method != "POST" || length != sizeof(DWUpdateRequest) || rangeHeader)
+                reply(socket, 400, "{\"error\":\"invalid_update_request\"}");
+            else
+            {
+                try
+                {
+                    reply(socket, 200, platform::executableUpdate(request.substr(bodyAt, length)),
+                          "application/octet-stream");
+                }
+                catch (const std::exception &)
+                {
+                    reply(socket, 503, "{\"error\":\"update_catalog_unavailable\"}");
+                }
+            }
+        }
+        else if (path.starts_with("/updates/v1/patch/"))
+        {
+            const auto digest = path.substr(std::strlen("/updates/v1/patch/"));
+            if (method != "GET" || length || rangeHeader || !executable_updates::digestName(digest))
+            {
+                reply(socket, 400, "{\"error\":\"invalid_patch_request\"}");
+                return;
+            }
+            // Immutable, content-addressed blobs. Stream bounded chunks instead
+            // of allocating a full EXE-sized response per connected player.
+            const auto filePath = platform::executablePatchPath(digest);
+            std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+            if (!file || file.tellg() <= 0 ||
+                static_cast<uint64_t>(file.tellg()) > DW_UPDATE_MAX_IMAGE)
+            {
+                reply(socket, 404, "{\"error\":\"patch_unavailable\"}");
+                return;
+            }
+            const auto size = static_cast<uint64_t>(file.tellg());
+            file.seekg(0);
+            if (!sendAll(socket, "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+                         "Connection: close\r\nCache-Control: public, max-age=31536000, immutable\r\n"
+                         "Content-Length: " + std::to_string(size) + "\r\n\r\n"))
+                return;
+            std::string chunk(64 * 1024, '\0');
+            uint64_t remaining = size;
+            while (remaining && !stopping.load())
+            {
+                const auto count = static_cast<size_t>(std::min<uint64_t>(chunk.size(), remaining));
+                file.read(chunk.data(), static_cast<std::streamsize>(count));
+                if (file.gcount() != static_cast<std::streamsize>(count))
+                    return;
+                chunk.resize(count);
+                if (!sendAll(socket, chunk))
+                    return;
+                remaining -= count;
+            }
+        }
+        else if (method == "GET" && (path == "/health" || path == "/status"))
         {
             ++probes;
             reply(socket, 200, status());

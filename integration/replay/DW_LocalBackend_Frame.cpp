@@ -6,6 +6,7 @@
 
 extern "C"
 {
+    void DW_ExecutableUpdate_Frame();
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *, char *, unsigned long);
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
     __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
@@ -274,6 +275,7 @@ extern "C" void DW_LocalBackend_Frame()
     if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread())
         return;
     DW_LocalProgression_Frame();
+    DW_ExecutableUpdate_Frame();
     if (!s_registered)
     {
         // DW runs before Com_DebugStates_Frame. Initialize its default once;

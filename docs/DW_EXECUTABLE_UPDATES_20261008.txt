@@ -1,0 +1,117 @@
+Replay DW executable updates
+============================
+
+Playtest deployment
+-------------------
+Game: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Build job: 942699db867140ef
+Game SHA256: 7ceaf1967a926c94986937106a706d6257582a224184822c0231c44f985aa678
+Backend: 162.243.115.160, release /opt/replay-dw/releases/20261008-b419953bff1b
+Backend SHA256: b419953bff1bedf56d05a43feb86c989dd60258e79a7ae0c505e7292a2984881
+Published update catalog release: 4
+
+The owner began the playtest in this build. Read-only inspection found all 27
+startup fences passing and the existing local XP/rank unchanged. No further
+live server restart, EXE replacement, or catalog advancement is authorized by
+this handoff during that playtest. Development and compilation can continue
+locally. The next private compiler job is b682882ba8264eae; it is NOT deployed.
+
+Implemented update flow
+-----------------------
+The EXE contains a statically linked Windows updater helper. It is extracted
+beside the game automatically; players do not install Python, a proxy DLL or a
+separate updater package. The game folder must be writable by the player.
+
+At startup a worker hashes the actual executable and asks the configured INI
+DW host for an update. The main/render thread does not download or hash files.
+The client checks the existing pinned platform RSA-PSS/SHA256 signature, a fresh
+request nonce, time window, exact base/target hashes and bounded file sizes.
+
+The patch is applied to a new staged file, not the running EXE. Its entire hash
+must match the freshly compiled target. The native patch-status getter reports
+COMPLETE_RESTART (2) only after staging succeeds and the native patch work has
+completed. The original global PATCH dependency fence is left intact.
+
+The shipped ui/utils/fencepatch.lua creates PopupPatchingRestart. Its OK action
+sets lui_system_restart_required directly; the native platform restart entry
+is therefore connected in addition to Fences.PatchRestart. The helper confirms
+that it is waiting on this exact game process. Replay's native deferred quit
+path saves settings and exits. The helper then verifies the files again, uses
+ReplaceFileW with a recovery backup, verifies the installed image, and launches
+it from the same game directory. INI files and local player identity/profile
+files are not included in any patch.
+
+If the EXE is unknown/modified, a signature fails, the download is incomplete,
+or reconstruction fails, no unverified executable is installed. The installed
+EXE remains usable. Details go to replay-dw-client.log and
+game_dx12_ship_replay_dw.exe.update\result.log. The latter directory also holds
+the staged image and the exact old EXE backup after a successful replacement.
+
+Multiple releases behind
+------------------------
+There is no dependency on installing successive patches. Every publication
+creates a direct old-hash -> latest-hash delta for EVERY retained release.
+Each delta is applied locally and compared byte for byte with the fresh target
+before publication. Release numbers increase; hashes identify the actual code.
+
+Retain data/executable-releases, including releases.json, every archived EXE
+and its compiler report. A missing/changed archived release stops publication.
+The uploader refuses a catalog which removes a previously published base's
+upgrade path. Blobs are immutable and uploaded first. Only after remote hash
+checks does an atomic catalog rename advertise the new release. Interrupted
+uploads leave the previous catalog usable. Future publication needs no backend
+restart. Keep protocol v1 and its signing trust supported for older clients.
+
+EXEs from before this feature do not contain an updater. Those players need
+one manual copy of an updater-enabled EXE. Retained deltas cannot add an update
+check to an executable which has not downloaded anything yet. Internal test
+builds preceding job 942699db867140ef must not be handed to players.
+
+Normal build and publication
+----------------------------
+1. Run build-game.ps1 using the private compiler workflow. The default snapshot
+   now builds/embeds the helper automatically from frozen client crypto and ABI
+   sources. Explicit reviewed integration snapshots can retain a verified
+   helper header. Existing linker/relocation/provenance gates still apply.
+2. Finish the deployment/client checks and an appropriate native game test.
+3. Run:
+   python -B tools/publish-executable-update.py --image <fresh-compiler-exe>
+       --build-report <matching-build-report.json> --release <next-number>
+   The report directory must contain matching verification-report.json and
+   relocation-audit.json. The original compiled EXE is never edited in place.
+4. Run python -B tools/upload-executable-updates.py when publication is allowed.
+   Default output: data/executable-update-publication.
+   Remote root: /var/lib/replay-dw/updates.
+
+HTTP uses the existing DW port 8085:
+POST /updates/v1/check       fixed version-1 request -> signed 448-byte reply
+GET  /updates/v1/patch/<sha> immutable delta bytes, streamed in bounded chunks
+
+Validation and remaining gate
+-----------------------------
+Windows and Linux backend compilation passed. The Linux startup regression
+suite passed 102 encrypted startup/social/profile-storage groups.
+
+The actual Windows helper passed direct release 1/2/3 -> 4 reconstruction,
+current/unknown build handling, corrupt/missing patch rejection, replayed and
+forged manifest rejection, exact-parent wait, replacement, old-file backup,
+relaunch and no-update-loop checks using four separately compiled fixture EXEs.
+The full-size Replay delta was also downloaded from the droplet and reproduced
+its roughly 101 MB target exactly from a roughly 2 MB patch.
+
+The compiled game passed 100 linked patch-status cases, native prerequisite
+preservation and actual platform restart routing, plus existing client/ownership
+checks and compiler relocation/provenance validation. The running playtest build
+has passed all 27 native startup fences.
+
+STILL PENDING: the corrected native game's actual PopupPatchingRestart OK ->
+clean exit -> replacement -> automatic relaunch sequence. The owner started
+playing before this last test. Do not describe fixture or ABI tests as proof of
+that UI sequence. After playtesting, publish the next verified private build,
+restart the older corrected build, capture the stock restart screen, accept it,
+and verify the new process hash, root working directory, 27 fences and unchanged
+INI/identity/XP. Preserve one-instance-at-a-time testing.
+
+The broader backend is not complete. Earlier mission progress/reward edits in
+achievement_store.*, replay_quest_data.h and prepare-replay-quests.py remain
+separate unfinished local work and were not included in this server deployment.

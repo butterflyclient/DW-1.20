@@ -5,6 +5,7 @@
 #include "platform_resources.h"
 #include "services.h"
 #include "crypto.h"
+#include "executable_updates.h"
 #include "../integration/replay/dw_platform_protocol.h"
 #include "../integration/replay/dw_client_identity.h"
 #include <array>
@@ -1350,6 +1351,28 @@ namespace platform
     {
         std::lock_guard lock(mutex);
         return static_cast<unsigned>(issuedSessions.size());
+    }
+
+    std::filesystem::path executablePatchPath(const std::string &digest)
+    {
+        if (!executable_updates::digestName(digest))
+            throw std::runtime_error("Invalid executable patch identity");
+        // The path is selected by the same configured data root as the signed
+        // catalog. No dependency on optional dashboard/operator state.
+        return identityDirectory / "updates" / "patches" / (digest + ".delta");
+    }
+
+    std::string executableUpdate(const std::string &bytes)
+    {
+        if (bytes.size() != sizeof(DWUpdateRequest))
+            throw std::runtime_error("Invalid executable update request size");
+        DWUpdateRequest request{};
+        std::memcpy(&request, bytes.data(), sizeof(request));
+        std::lock_guard lock(mutex);
+        DWUpdateReply reply{};
+        reply.plan = executable_updates::plan(identityDirectory, request, now());
+        sign(&reply.plan, sizeof(reply.plan), reply.signature, 32);
+        return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
     }
 
     std::string resource(const std::string &bytes)
