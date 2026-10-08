@@ -283,6 +283,29 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             "Four independent ready tournament matches allocate distinct closed native lobbies with actual party search IDs, exact create/join envelopes, Replay tournament/team/round metadata and native-selected available map rules"
         )
 
+        # A catalog/pool revision mismatch is an inconsistent publication,
+        # not a withdrawal. Native readers fail while maintenance preserves
+        # the already allocated competition and all party assignments.
+        formation_path = mm_root / "tournaments" / f"{tournament}.json"
+        formation_before = formation_path.read_bytes()
+        terminal_path = mm_root / "tournament-terminations" / f"{tournament}.json"
+        mismatched = dict(publication, native_map_pool_revision=74)
+        publish(catalog_path, {"schema": 1, "title": title, "tournaments": [mismatched]})
+        try:
+            clients[0][1].task(145, 20, error=102)
+            time.sleep(1.2)  # Include offline-store maintenance, not just the task.
+            assert not terminal_path.exists()
+            assert formation_path.read_bytes() == formation_before
+            for _, connection in clients:
+                assert not connection.pushes, "Unexpected queued tournament notification"
+                no_update(connection)
+        finally:
+            publish(catalog_path, {"schema": 1, "title": title, "tournaments": [publication]})
+        assert json.loads(clients[0][1].task(145, 20)[1:-1])["rounds"] == bracket["rounds"]
+        checks.append(
+            "Unavailable catalog/map-pool revisions reject native reads without withdrawing allocated rounds or publishing disband notifications; consistent publication restores the existing bracket"
+        )
+
         # A connection lost after publication recovers both bracket and its join.
         identity, old = clients[1]
         authentication = old.fixture_auth_identity
@@ -368,11 +391,14 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             == record
         )
         # Controlled fixture restoration only; production revisions cannot roll back.
-        revision_path.write_bytes(accepted)
-        publish(map_path, map_policy)
+        # Restore the publication files first. Until the controlled receipt
+        # restoration below, the high-water check rejects the older policy.
+        # Writing the receipt first lets maintenance re-accept revision 74.
         publish(
             catalog_path, {"schema": 1, "title": title, "tournaments": [publication]}
         )
+        publish(map_path, map_policy)
+        revision_path.write_bytes(accepted)
         assert (
             json.loads(clients[0][1].task(145, 20)[1:-1])["rounds"] == bracket["rounds"]
         )

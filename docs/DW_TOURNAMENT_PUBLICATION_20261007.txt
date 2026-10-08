@@ -1,0 +1,9 @@
+REPLAY DW TOURNAMENT PUBLICATION CONSISTENCY
+
+Issue: an unavailable catalog/map-pool revision filtered out a still-live tournament. Native task 145/20 returned 14526 and the backend wrote a publication-unavailable terminal record for its PLAYING bracket.
+Research: frozen current-release C++ and an isolated eight-client encrypted-wire reproduction. The terminal record and failure log are retained under data/tournament-publication-20261007.
+Fix: fail an inconsistent publication read as a persistent-data error instead of hiding the row. This preserves allocated rounds, player enrollment and lobbies while configuration is inconsistent. Real withdrawal/expiry still performs its existing recoverable cleanup.
+Fixture correction: controlled rollback restores catalog/pool files before restoring the revision high-water receipt, preventing maintenance from re-accepting the newer revision midway through restoration. Production rollback protection remains intact.
+Validation: Windows and Linux compile; fifteen focused groups on each platform, including four independent first-round lobbies, all seven matches, same-session reconnect, real expiry, decline/leave and blocked-write recovery. No game runs and no engine recompile.
+Deployment: HELD. Three real players were connected to the primary server during the deployment preflight. The existing server, game EXE and client package were left unchanged. The frozen tested release is ready for a controlled deployment after their session ends.
+Scope: one compiled backend input changed; other deployed C++ and unrelated dirty work are preserved. This is not full-backend completion or positive in-game tournament verification.

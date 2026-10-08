@@ -452,8 +452,10 @@ namespace services
                               row["native_map_pool_revision"].get<uint64_t>() <= UINT16_MAX);
                     const auto policy =
                         tournamentMapPolicy(path.parent_path().parent_path().parent_path(), title);
-                    if (!policy || policy->at("revision") != row["native_map_pool_revision"])
-                        continue;
+                    // An incomplete catalog/pool publication is not evidence
+                    // of withdrawal. Fail the read so maintenance cannot turn
+                    // this live row into a durable terminal competition.
+                    persisted(policy && policy->at("revision") == row["native_map_pool_revision"]);
                     row["native_map_pool"] = *policy;
                 }
                 if (row.contains("formation"))

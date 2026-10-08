@@ -3,6 +3,8 @@
 Calling login/auth supersedes that identity's earlier session. Default-account
 callers MUST stop the game first; a separate provisioned profile is independent.
 No credentials or transport keys are written to disk or printed.
+An in-memory fixture_auth_identity can resume that already-issued native session
+without another platform login; the backend still validates its ticket and lease.
 """
 
 import base64
@@ -104,7 +106,7 @@ def expand(key, info, size):
 class NativeClient:
     def __init__(
         self, root: Path, title=5800, profile="", host="127.0.0.1", access_key="",
-        player_name="", port_offset=0, platform_reply=None
+        player_name="", port_offset=0, platform_reply=None, auth_identity=None
     ):
         self.socket = None
         self.title = title
@@ -132,65 +134,79 @@ class NativeClient:
             or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for c in profile)
         ):
             raise ValueError("Invalid local profile key")
-        if platform_reply is None:
+        if auth_identity is None:
+            if platform_reply is None:
+                with post(
+                    "/platform/login" + ("/" + profile if profile else ""), os.urandom(32)
+                ) as reply:
+                    platform = reply.read()
+            else:
+                platform = platform_reply
+            if len(platform) != 512:
+                raise ValueError("Platform reply size")
+            self.user = struct.unpack_from("<Q", platform, 56)[0]
+            self.platform_account_id = struct.unpack_from("<I", platform, 64)[0]
+            credentials = {
+                "session_token": platform[112:176].decode(),
+                "account_token": platform[177:241].decode(),
+            }
+            seed = struct.unpack("<I", os.urandom(4))[0]
             with post(
-                "/platform/login" + ("/" + profile if profile else ""), os.urandom(32)
+                "/auth/",
+                {
+                    "auth_task": "84",
+                    "iv_seed": str(seed),
+                    "title_id": str(title),
+                    "extra_data": json.dumps(credentials),
+                },
             ) as reply:
-                platform = reply.read()
+                raw = reply.read()
+                signature = base64.b64decode(reply.headers["X-Signature"], validate=True)
+            public = (root / "data/platform-public.blob").read_bytes()
+            magic, bits, exponent_size, modulus_size, _, _ = struct.unpack_from(
+                "<6I", public
+            )
+            if magic != 0x31415352 or bits != 2048:
+                raise ValueError("Platform public-key format")
+            exponent = int.from_bytes(public[24 : 24 + exponent_size], "big")
+            modulus = int.from_bytes(
+                public[24 + exponent_size : 24 + exponent_size + modulus_size], "big"
+            )
+            rsa.RSAPublicNumbers(exponent, modulus).public_key().verify(
+                signature,
+                raw,
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=0),
+                hashes.SHA256(),
+            )
+            auth = json.loads(raw)
+            ticket = base64.b64decode(auth["server_ticket"], validate=True)
+            key = base64.b64decode(auth["client_ticket"], validate=True)[97:121]
+            self.session_fingerprint = base64.b64encode(
+                hashlib.sha256(key).digest()
+            ).decode()
+            with post(
+                "/v1.0/tokens/lsg/?client=replaylocal",
+                {
+                    "ticket": auth["server_ticket"],
+                    "initialVectorSeed": base64.b64encode(str(seed).encode()).decode(),
+                    "titleID": title,
+                },
+            ) as reply:
+                if json.load(reply)["umbrellaID"] != self.user:
+                    raise ValueError("Legacy identity binding")
         else:
-            platform = platform_reply
-        if len(platform) != 512:
-            raise ValueError("Platform reply size")
-        self.user = struct.unpack_from("<Q", platform, 56)[0]
-        self.platform_account_id = struct.unpack_from("<I", platform, 64)[0]
-        credentials = {
-            "session_token": platform[112:176].decode(),
-            "account_token": platform[177:241].decode(),
-        }
-        seed = struct.unpack("<I", os.urandom(4))[0]
-        with post(
-            "/auth/",
-            {
-                "auth_task": "84",
-                "iv_seed": str(seed),
-                "title_id": str(title),
-                "extra_data": json.dumps(credentials),
-            },
-        ) as reply:
-            raw = reply.read()
-            signature = base64.b64decode(reply.headers["X-Signature"], validate=True)
-        public = (root / "data/platform-public.blob").read_bytes()
-        magic, bits, exponent_size, modulus_size, _, _ = struct.unpack_from(
-            "<6I", public
-        )
-        if magic != 0x31415352 or bits != 2048:
-            raise ValueError("Platform public-key format")
-        exponent = int.from_bytes(public[24 : 24 + exponent_size], "big")
-        modulus = int.from_bytes(
-            public[24 + exponent_size : 24 + exponent_size + modulus_size], "big"
-        )
-        rsa.RSAPublicNumbers(exponent, modulus).public_key().verify(
-            signature,
-            raw,
-            padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=0),
-            hashes.SHA256(),
-        )
-        auth = json.loads(raw)
-        ticket = base64.b64decode(auth["server_ticket"], validate=True)
-        key = base64.b64decode(auth["client_ticket"], validate=True)[97:121]
-        self.session_fingerprint = base64.b64encode(
-            hashlib.sha256(key).digest()
-        ).decode()
-        with post(
-            "/v1.0/tokens/lsg/?client=replaylocal",
-            {
-                "ticket": auth["server_ticket"],
-                "initialVectorSeed": base64.b64encode(str(seed).encode()).decode(),
-                "titleID": title,
-            },
-        ) as reply:
-            if json.load(reply)["umbrellaID"] != self.user:
-                raise ValueError("Legacy identity binding")
+            self.user = auth_identity["user"]
+            self.platform_account_id = auth_identity["platform_account_id"]
+            ticket, key, seed = auth_identity["ticket"], auth_identity["key"], auth_identity["seed"]
+            if not (isinstance(ticket, bytes) and len(ticket) == 128 and
+                    isinstance(key, bytes) and len(key) == 24 and
+                    type(seed) is int and 0 <= seed <= 0xffffffff and
+                    type(self.user) is int and 0 < self.user <= 0xffffffffffffffff and
+                    type(self.platform_account_id) is int and 0 <= self.platform_account_id <= 0xffffffff):
+                raise ValueError("Native reconnect auth identity format")
+            self.session_fingerprint = base64.b64encode(hashlib.sha256(key).digest()).decode()
+        self.fixture_auth_identity = dict(user=self.user, platform_account_id=self.platform_account_id,
+                                          ticket=ticket, key=key, seed=seed)
         self.socket = socket.create_connection((host, 3075 + port_offset), timeout=5)
         self.incoming = self.outgoing = 1
         try:

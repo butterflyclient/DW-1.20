@@ -107,6 +107,28 @@ GAPS = {
     "255": "Friends/user lists/presence/event ingestion and exact-target regulation publication/preference CRUD are implemented. Regulation choices bind the signed owner, preserve retries and survive atomic-write failure/process restart; no preference is invented from an absent publication. Regulation response vtables were verified independently of misleading database aliases, but live native regulation task callbacks remain unverified. Online queries require a registered, valid issuer lease; revoked idle/partial reads and keepalives retire promptly, with last-valid-session scoped offline notifications and independent session preservation covered by native-wire fixtures. Four exact-target account upgrade/auth/link/Umbrella routes persist optional credentials on the existing signed owner; per-session UNO grants, credential-change revocation and recoverable account/profile publication are covered by encrypted fixtures. Native account-menu/crossplay-login callbacks and two-network lifecycle remain unverified; other account/objectstore REST mutations need explicit request/result/domain contracts.",
 }
 
+# Current rank/chat/BR source contracts. Deployment and native completion
+# remain independently checked by the hash-bound evidence readers below.
+GAPS["125"] += (
+    " Native player and 51 canonical weapon XP snapshots now include uppercase "
+    "ACHIEVEMENT routing. Shipped initial items, player-rank features and unconditional "
+    "weapon-rank items receive absolute owned inventory through the same recoverable "
+    "XP/retry transaction. Inventory delivery hashes track entitlement changes even "
+    "without XP changes. Conditional camo/quest predicates and positive game UI "
+    "completion remain separate requirements."
+)
+GAPS["198"] += (
+    " The original outgoing text length excludes its NUL terminator. The backend "
+    "normalizes text for the native 500-byte receiver and rejects empty, embedded-NUL "
+    "and oversized messages. Current two-player in-game delivery remains unverified."
+)
+GAPS["145"] += (
+    " BR publication takes squad size from native playlist teamSize, keeps each party "
+    "together and disables MP partition splitting. Verdansk client selectors and a "
+    "targeted missing-combined-collision-package fallback have linked-code evidence; "
+    "BR load/traversal and full transient package readiness remain unverified."
+)
+
 GAPS["145"] += (
     " Globally unavailable managed publications now retire forming/playing searches and "
     "allocated lobbies, remove account assignments and clear readiness in one recoverable "
