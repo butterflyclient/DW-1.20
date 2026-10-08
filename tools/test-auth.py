@@ -15,9 +15,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 
 root = Path(__file__).resolve().parents[1]
+base = os.environ.get("IW8_DW_TEST_BASE", "http://127.0.0.1:8085")
+server = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build/Release/iw8-dw-server.exe")))
+proof_directory = Path(os.environ.get("IW8_DW_TEST_PROOF_DIRECTORY", str(root / "data")))
 nonce = os.urandom(32)
 with urllib.request.urlopen(
-    urllib.request.Request("http://127.0.0.1:8085/platform/login", nonce), timeout=5
+    urllib.request.Request(base + "/platform/login", nonce), timeout=5
 ) as response:
     platform = response.read()
 extra = {
@@ -37,7 +40,7 @@ request = {
 def post(value):
     return urllib.request.urlopen(
         urllib.request.Request(
-            "http://127.0.0.1:8085/auth/",
+            base + "/auth/",
             json.dumps(value).encode(),
             {"Content-Type": "application/json"},
         ),
@@ -109,13 +112,13 @@ receipt = {
         "unsupported platform rejected",
     ],
     "server_sha256": hashlib.sha256(
-        (root / "build" / "Release" / "iw8-dw-server.exe").read_bytes()
+        server.read_bytes()
     ).hexdigest(),
     "public_der_sha256": hashlib.sha256(
         (root / "data" / "platform-public.der").read_bytes()
     ).hexdigest(),
 }
-(root / "data" / "auth-verification.json").write_text(
+(proof_directory / "auth-verification.json").write_text(
     json.dumps(receipt, indent=2) + "\n"
 )
 print(

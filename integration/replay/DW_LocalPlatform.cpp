@@ -110,7 +110,13 @@ namespace
     bool s_restartDisconnectIssued = false;
     bool s_restartRelayStopIssued = false;
     void *s_loginThread = nullptr; // joined non-blockingly before credentials are reset
-    cmd_function_s s_testKeyCommand{}, s_testMenuCommand{}, s_testFriendCommand{};
+    void *s_renewThread = nullptr;
+    unsigned s_renewState = 0; // 0 idle, 1 working, 2 verified, 3 failed
+    uint64_t s_renewAttempt = 0;
+    char s_renewToken[64]{};
+    DWLocalPlatformReply s_renewReply{};
+    cmd_function_s s_testKeyCommand{}, s_testMenuCommand{}, s_testFriendCommand{}, s_testRenewCommand{};
+    void RenewFrame(bool force = false);
     unsigned s_testMode = 0;
     uint64_t s_testPoll = 0;
     uint32_t s_testRequest = 0;
@@ -251,6 +257,12 @@ namespace
         const bool queued = func_140F54AE0(func_141B371E0(), 0, Cmd_Argv(1), 0) != 0;
         Log(queued ? "DW_LOCAL_TEST_FRIEND native name search queued"
                    : "DW_LOCAL_TEST_FRIEND native name search rejected");
+    }
+
+    void TestRenew_f()
+    {
+        if (s_testMode == 2 && Cmd_Argc() == 1 && Sys_IsMainThread())
+            RenewFrame(true);
     }
 
     void TestFrame()
@@ -407,6 +419,88 @@ extern "C" bool DW_LocalPlatform_Post(
 
 namespace
 {
+    unsigned long __stdcall RenewThread(void *)
+    {
+        uint8_t nonce[32]{};
+        DWLocalPlatformReply reply{};
+        const bool ok = DW_LocalPlatform_MakeNonce(nonce) &&
+                        DW_LocalIdentity_Renew(nonce, s_renewToken, &reply, DW_LocalPlatform_Post) &&
+                        DW_LocalPlatform_VerifyReply(&reply, nonce, DW_LocalPlatform_Time());
+        if (ok)
+            s_renewReply = reply;
+        // A renewal failure leaves the current signed session valid until its
+        // own deadline. No sign-in callback, task or connection is reset here.
+        __atomic_store_n(&s_renewState, ok ? 2U : 3U, __ATOMIC_RELEASE);
+        return 0;
+    }
+
+    bool RenewalMatches()
+    {
+        const auto &candidate = s_renewReply.payload;
+        if (candidate.expires <= s_reply.payload.expires ||
+            candidate.expires <= DW_LocalPlatform_Time())
+            return false;
+        const auto *before = reinterpret_cast<const uint8_t *>(&s_reply.payload);
+        const auto *after = reinterpret_cast<const uint8_t *>(&candidate);
+        for (unsigned index = 0; index < sizeof(candidate); ++index)
+        {
+            // Only the challenge nonce and signed lifetime may change. The
+            // complete remaining layout, including padding, stays identical.
+            if (index >= offsetof(DWLocalPlatformPayload, nonce) &&
+                index < offsetof(DWLocalPlatformPayload, userId))
+                continue;
+            if (before[index] != after[index])
+                return false;
+        }
+        return true;
+    }
+
+    void RenewFrame(bool force)
+    {
+        if (!Sys_IsMainThread() || s_restartPhase != RestartPhase::Idle)
+            return;
+        const auto renewal = __atomic_load_n(&s_renewState, __ATOMIC_ACQUIRE);
+        if (s_renewThread && renewal != 1)
+        {
+            const auto wait = WaitForSingleObject(s_renewThread, 0);
+            if (wait != 0)
+                return;
+            CloseHandle(s_renewThread);
+            s_renewThread = nullptr;
+            if (renewal == 2 && State() == 2 && RenewalMatches())
+            {
+                // All account/token bytes are identical; publish the verified
+                // nonce, signature and extended lifetime on the engine thread.
+                s_reply = s_renewReply;
+                Log("DW_LOCAL_PLATFORM_RENEWED signed session extended; native lobby and party retained");
+            }
+            else
+                Log("DW_LOCAL_PLATFORM_RENEW_FAILED current signed session retained until expiry");
+            __atomic_store_n(&s_renewState, 0U, __ATOMIC_RELEASE);
+            return;
+        }
+        if (s_renewThread || State() != 2)
+            return;
+        const auto time = DW_LocalPlatform_Time();
+        const auto ticks = GetTickCount64();
+        if (time >= s_reply.payload.expires ||
+            (!force && (s_reply.payload.expires - time > 300 ||
+                        (s_renewAttempt && ticks - s_renewAttempt < 30000))))
+            return;
+        s_renewAttempt = ticks;
+        for (unsigned i = 0; i < sizeof(s_renewToken); ++i)
+            s_renewToken[i] = s_reply.payload.sessionToken[i];
+        __atomic_store_n(&s_renewState, 1U, __ATOMIC_RELEASE);
+        s_renewThread = CreateThread(nullptr, 0, RenewThread, nullptr, 0, nullptr);
+        if (!s_renewThread)
+        {
+            __atomic_store_n(&s_renewState, 0U, __ATOMIC_RELEASE);
+            Log("DW_LOCAL_PLATFORM_RENEW_FAILED worker creation failed; current session retained");
+        }
+        else
+            Log("DW_LOCAL_PLATFORM_RENEW_BEGIN proving machine ownership of the current session");
+    }
+
     unsigned long __stdcall LoginThread(void *)
     {
         uint8_t nonce[32]{};
@@ -616,6 +710,22 @@ extern "C" bool DW_LocalPlatform_RestartFrame()
                 func_1412976C0(0, 0, "disconnect");
             }
             return true;
+        }
+        if (s_renewThread)
+        {
+            const auto wait = WaitForSingleObject(s_renewThread, 0);
+            if (wait == 258)
+                return true;
+            if (wait != 0)
+            {
+                Log("DW_RESTART_FAILED unable to join renewal worker; credentials retained");
+                s_restartPhase = RestartPhase::Idle;
+                return false;
+            }
+            CloseHandle(s_renewThread);
+            s_renewThread = nullptr;
+            s_renewAttempt = 0;
+            __atomic_store_n(&s_renewState, 0U, __ATOMIC_RELEASE);
         }
         if (s_loginThread)
         {
@@ -1101,11 +1211,13 @@ extern "C" DWPlatformAuth *func_141665AC0()
             Cmd_AddCommandInternal("dw_localTestKey", TestKey_f, &s_testKeyCommand);
             Cmd_AddCommandInternal("dw_localTestMenuMP", TestMenuMP_f, &s_testMenuCommand);
             Cmd_AddCommandInternal("dw_localTestAddFriend", TestAddFriend_f, &s_testFriendCommand);
+            Cmd_AddCommandInternal("dw_localTestRenew", TestRenew_f, &s_testRenewCommand);
         }
         s_registered = true;
     }
     if (DW_LocalPlatform_RestartFrame())
         return auth;
+    RenewFrame();
     func_141662F00(func_141662FC0());
     func_14165FFA0(auth);
     func_14165E230(func_1416702C0());

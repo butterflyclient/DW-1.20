@@ -29,6 +29,13 @@ parser.add_argument("--client-integration-receipt", type=Path,
                     help="Hash-bound linked client checks for this build, retaining earlier build evidence")
 parser.add_argument("--unlock-policy-receipt", type=Path,
                     help="Hash-bound compiled Loot.IsOwned policy and Lua registration checks")
+parser.add_argument("--identity-receipt", type=Path,
+                    default=ROOT / "data/local-player-verification.json",
+                    help="Actual Windows identity checks for the compiled source revision")
+parser.add_argument("--protocol-directory", type=Path, default=ROOT / "data",
+                    help="Frozen platform/auth proof directory for the selected backend")
+parser.add_argument("--server", type=Path, default=ROOT / "build/Release/iw8-dw-server.exe")
+parser.add_argument("--identity-dll", type=Path, default=ROOT / "build/Release/iw8-dw-platform-client.dll")
 args = parser.parse_args()
 for receipt_path in (args.job_receipt, args.snapshot_receipt):
     if not receipt_path.resolve().is_relative_to((ROOT / "data").resolve()):
@@ -153,7 +160,7 @@ if (
     raise RuntimeError(
         "DW startup constructor and filename selection were not verified"
     )
-platform_proof = json.loads((ROOT / "data" / "platform-verification.json").read_text())
+platform_proof = json.loads((args.protocol_directory / "platform-verification.json").read_text())
 if (
     not platform_proof.get("passed")
     or platform_proof["public_key_sha256"]
@@ -292,7 +299,7 @@ try:
         )
 finally:
     image.close()
-auth_proof = json.loads((ROOT / "data" / "auth-verification.json").read_text())
+auth_proof = json.loads((args.protocol_directory / "auth-verification.json").read_text())
 if (
     not auth_proof.get("passed")
     or auth_proof["server_sha256"] != platform_proof["server_sha256"]
@@ -303,7 +310,7 @@ if (
 if (
     auth_proof["server_sha256"]
     != hashlib.sha256(
-        (ROOT / "build" / "Release" / "iw8-dw-server.exe").read_bytes()
+        args.server.read_bytes()
     ).hexdigest()
 ):
     raise RuntimeError("Server changed after signed-session/auth protocol verification")
@@ -366,9 +373,7 @@ if (
     raise RuntimeError(
         "Compiled native account getter verification source is stale or unavailable"
     )
-local_identity_proof = json.loads(
-    (ROOT / "data/local-player-verification.json").read_text()
-)
+local_identity_proof = json.loads(args.identity_receipt.read_text())
 identity_source = ROOT / "integration/replay/DW_LocalIdentity.cpp"
 if not all(
     local_identity_proof.get(field)
@@ -391,7 +396,7 @@ if not all(
     != hashlib.sha256(identity_source.read_bytes()).hexdigest()
     or local_identity_proof["client_dll_sha256"]
     != hashlib.sha256(
-        (ROOT / "build/Release/iw8-dw-platform-client.dll").read_bytes()
+        args.identity_dll.read_bytes()
     ).hexdigest()
 ):
     raise RuntimeError("Automatic local identity verification is absent or stale")
@@ -440,13 +445,13 @@ receipt = {
         "player_provisioning_required": False,
         "local_path": "%LOCALAPPDATA%/ReplayDW/player-identity.bin",
         "protection": "Windows user DPAPI; P-256 challenge proof of possession",
-        "protocol_verification": str(ROOT / "data/local-player-verification.json"),
+        "protocol_verification": str(args.identity_receipt.resolve()),
         "native_runtime_verified": False,
     },
     "platform_sources": private_objects,
-    "platform_protocol_verification": str(ROOT / "data" / "platform-verification.json"),
-    "auth_protocol_verification": str(ROOT / "data" / "auth-verification.json"),
-    "lobby_protocol_verification": str(ROOT / "data" / "lobby-verification.json"),
+    "platform_protocol_verification": str((args.protocol_directory / "platform-verification.json").resolve()),
+    "auth_protocol_verification": str((args.protocol_directory / "auth-verification.json").resolve()),
+    "lobby_protocol_verification": str((args.startup_receipt or ROOT / "data/lobby-verification.json").resolve()),
     "server_sha256": auth_proof["server_sha256"],
     "native_tasks": True,
     "profiles": True,

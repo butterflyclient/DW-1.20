@@ -47,11 +47,29 @@ static_assert(sizeof(DWLocalClientLoginRequestV2) == 272);
 static_assert(offsetof(DWLocalClientLoginRequestV2, signature) == 208);
 constexpr uint32_t DW_LOCAL_CLIENT_LOGIN_VERSION = 2;
 
+// Renewal proves the same machine key and the specific active platform session.
+// It carries no rename, rank, inventory or progression mutation.
+struct DWLocalClientRenewRequest
+{
+    uint32_t magic;
+    uint32_t version;
+    uint8_t nonce[32];
+    uint8_t challenge[32];
+    uint8_t publicKey[72];
+    char sessionToken[64];
+    uint8_t signature[64];
+};
+static_assert(sizeof(DWLocalClientRenewRequest) == 272);
+static_assert(offsetof(DWLocalClientRenewRequest, signature) == 208);
+constexpr uint32_t DW_LOCAL_CLIENT_RENEW_VERSION = 3;
+
 using DWLocalIdentityPost = bool (*)(const wchar_t *, void *, unsigned, void *, unsigned);
 extern "C"
 {
     bool DW_LocalIdentity_Login(const char *, const uint8_t *, DWLocalPlatformReply *,
                                 DWLocalIdentityPost);
     bool DW_LocalIdentity_PublicKey(uint8_t *);
+    bool DW_LocalIdentity_Renew(const uint8_t *, const char *, DWLocalPlatformReply *,
+                               DWLocalIdentityPost);
     const char *DW_LocalIdentity_Error();
 }

@@ -451,13 +451,15 @@ namespace
             }
         }
         else if (method == "POST" &&
-                 (path == "/platform/client/challenge" || path == "/platform/client/login"))
+                 (path == "/platform/client/challenge" || path == "/platform/client/login" ||
+                  path == "/platform/client/renew"))
         {
             const bool challenge = path == "/platform/client/challenge";
-            if (!hasLength ||
-                (challenge ? length != sizeof(DWLocalClientChallengeRequest)
-                           : (length != sizeof(DWLocalClientLoginRequest) &&
-                              length != sizeof(DWLocalClientLoginRequestV2))))
+            const bool renew = path == "/platform/client/renew";
+            if (!hasLength || (challenge ? length != sizeof(DWLocalClientChallengeRequest)
+                                         : renew ? length != sizeof(DWLocalClientRenewRequest)
+                                                 : (length != sizeof(DWLocalClientLoginRequest) &&
+                                                    length != sizeof(DWLocalClientLoginRequestV2))))
             {
                 reply(socket, 400, "{\"error\":\"invalid_client_identity_request\"}");
                 return;
@@ -466,9 +468,12 @@ namespace
             {
                 const auto body = request.substr(bodyAt, length);
                 const auto response =
-                    challenge ? platform::clientChallenge(body) : platform::clientLogin(body);
+                    challenge ? platform::clientChallenge(body)
+                              : renew ? platform::clientRenew(body) : platform::clientLogin(body);
                 reply(socket, 200, response, "application/octet-stream");
-                if (!challenge)
+                if (renew)
+                    log("PLATFORM machine-owned session renewed; native lobby lease retained");
+                else if (!challenge)
                     log("PLATFORM machine-owned identity verified; native DW authentication "
                         "required");
             }

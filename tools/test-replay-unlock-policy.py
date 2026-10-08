@@ -14,8 +14,15 @@ import struct
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
-from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX,
-                              UC_X86_REG_RSP, UC_X86_REG_RIP, UC_X86_REG_XMM0, UC_X86_REG_XMM1)
+from unicorn.x86_const import (
+    UC_X86_REG_RAX,
+    UC_X86_REG_RCX,
+    UC_X86_REG_RDX,
+    UC_X86_REG_RSP,
+    UC_X86_REG_RIP,
+    UC_X86_REG_XMM0,
+    UC_X86_REG_XMM1,
+)
 
 
 def main():
@@ -25,7 +32,11 @@ def main():
     args = parser.parse_args()
     report = json.loads((args.build / "build-report.json").read_bytes())
     verification = json.loads((args.build / "verification-report.json").read_bytes())
-    images = [path for path in args.build.glob("*.exe") if hashlib.sha256(path.read_bytes()).hexdigest() == report["sha256"]]
+    images = [
+        path
+        for path in args.build.glob("*.exe")
+        if hashlib.sha256(path.read_bytes()).hexdigest() == report["sha256"]
+    ]
     assert len(images) == 1 and verification["sha256"] == report["sha256"]
     assert verification["unresolved_symbols"] == 0
     pe = pefile.PE(str(images[0]), fast_load=True)
@@ -36,13 +47,34 @@ def main():
     assert all(base + symbols[name] == entry for name in aliases)
     registration = symbols["gl_1425BDE40"]
     registered_entry = struct.unpack("<Q", pe.get_data(registration + 24, 8))[0]
-    assert registered_entry == entry, "Loot registration does not target the compiled ownership binding"
+    assert (
+        registered_entry == entry
+    ), "Loot registration does not target the compiled ownership binding"
     inventory = base + symbols["gl_1459E05C0"]
-    boundaries = {base + symbols[name]: name for name in (
-        "func_1420838B0", "func_1420839E0", "func_142084A10", "func_142084100",
-        "func_142089FB0", "func_140D66C20", "DW_LocalBackend_IsEnabled", "DW_LocalConfig_UnlockAll")}
+    boundaries = {
+        base + symbols[name]: name
+        for name in (
+            "func_1420838B0",
+            "func_1420839E0",
+            "func_142084A10",
+            "func_142084100",
+            "func_142089FB0",
+            "func_140D66C20",
+            "DW_LocalBackend_IsEnabled",
+            "DW_LocalConfig_UnlockAll",
+        )
+    }
 
-    def case(enabled, item, expected, quantity=7, controller=0, mapped=0, argc=2, numeric=True):
+    def case(
+        enabled,
+        item,
+        expected,
+        quantity=7,
+        controller=0,
+        mapped=0,
+        argc=2,
+        numeric=True,
+    ):
         vm = Uc(UC_ARCH_X86, UC_MODE_64)
         stack, lua, halt = 0x10000000, 0x11000000, 0x12000000
         for address, size in ((stack, 65536), (lua, 4096), (halt, 4096)):
@@ -97,7 +129,9 @@ def main():
                 returned(machine, int(numeric))
             elif name == "func_142084A10":
                 value = controller if machine.reg_read(UC_X86_REG_RDX) == 1 else item
-                machine.reg_write(UC_X86_REG_XMM0, int.from_bytes(struct.pack("<d", value), "little"))
+                machine.reg_write(
+                    UC_X86_REG_XMM0, int.from_bytes(struct.pack("<d", value), "little")
+                )
                 returned(machine)
             elif name == "func_142084100":
                 value = machine.reg_read(UC_X86_REG_XMM1).to_bytes(16, "little")[:8]
@@ -107,8 +141,11 @@ def main():
                 errors.append("native Lua argument error")
                 machine.emu_stop()
             elif name == "func_140D66C20":
-                assert machine.reg_read(UC_X86_REG_RCX) & 0xffffffff == controller & 0xffffffff
-                returned(machine, mapped & 0xffffffff)
+                assert (
+                    machine.reg_read(UC_X86_REG_RCX) & 0xFFFFFFFF
+                    == controller & 0xFFFFFFFF
+                )
+                returned(machine, mapped & 0xFFFFFFFF)
             elif name == "DW_LocalBackend_IsEnabled":
                 returned(machine, 1)
             elif name == "DW_LocalConfig_UnlockAll":
@@ -124,18 +161,42 @@ def main():
             assert vm.reg_read(UC_X86_REG_RAX) == 1 and pushed == [float(expected)]
         assert struct.unpack("<II", vm.mem_read(inventory + 64, 8)) == (111, quantity)
         assert struct.unpack("<i", vm.mem_read(inventory + 120064, 4))[0] == 1
-        return dict(enabled=enabled, item=item, expected=expected, controller=controller,
-                    mapped=mapped, argc=argc, numeric=numeric, passed=True, inventory_unchanged=True)
+        return dict(
+            enabled=enabled,
+            item=item,
+            expected=expected,
+            controller=controller,
+            mapped=mapped,
+            argc=argc,
+            numeric=numeric,
+            passed=True,
+            inventory_unchanged=True,
+        )
 
-    cases = [case(False, 111, 7), case(False, 222, 0), case(True, 111, 7), case(True, 222, 1),
-             case(True, 0, 0), case(True, 0xffffffff, 0), case(True, 222, 0, mapped=-1),
-             case(True, 222, 0, controller=-1), case(True, 222, None, argc=1),
-             case(True, 222, None, numeric=False)]
-    result = dict(schema=1, passed=True, generated_utc=datetime.now(timezone.utc).isoformat(),
-                  game_sha256=report["sha256"], tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                  lua_registration_target_verified=True, original_symbol_aliases_verified=list(aliases),
-                  cases=cases, native_runtime_verified=False,
-                  scope="Linked C++ ownership binding; modeled Lua/controller/config boundaries; actual inventory memory stays unchanged")
+    cases = [
+        case(False, 111, 7),
+        case(False, 222, 0),
+        case(True, 111, 7),
+        case(True, 222, 1),
+        case(True, 0, 0),
+        case(True, 0xFFFFFFFF, 0),
+        case(True, 222, 0, mapped=-1),
+        case(True, 222, 0, controller=-1),
+        case(True, 222, None, argc=1),
+        case(True, 222, None, numeric=False),
+    ]
+    result = dict(
+        schema=1,
+        passed=True,
+        generated_utc=datetime.now(timezone.utc).isoformat(),
+        game_sha256=report["sha256"],
+        tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        lua_registration_target_verified=True,
+        original_symbol_aliases_verified=list(aliases),
+        cases=cases,
+        native_runtime_verified=False,
+        scope="Linked C++ ownership binding; modeled Lua/controller/config boundaries; actual inventory memory stays unchanged",
+    )
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(f"PASS: {len(cases)} linked ownership policy/ABI cases")
 

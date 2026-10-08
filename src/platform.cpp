@@ -453,6 +453,36 @@ namespace platform
             return false;
         }
 
+        // Caller holds the issuer mutex. Login and renewal consume the same
+        // single-use server challenge and sign their complete request prefix.
+        template <typename Request>
+        std::string verifyMachineProof(const Request &request, const std::string &bytes)
+        {
+            ClientKey publicKey;
+            publicKey.import(request.publicKey);
+            const auto id = fingerprint(request.publicKey);
+            const auto found = challenges.find(id);
+            if (found == challenges.end())
+                throw std::runtime_error("Machine challenge missing");
+            const auto challenge = found->second;
+            challenges.erase(found);
+            if (challenge.expires <= now() || !crypto::equal(challenge.nonce, request.nonce) ||
+                !crypto::equal(challenge.value, request.challenge))
+                throw std::runtime_error("Machine challenge invalid or expired");
+            auto digest = crypto::sha256(
+                std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(bytes.data()),
+                                         bytes.size() - sizeof(request.signature)));
+            check(BCryptVerifySignature(publicKey.handle,
+                                        nullptr,
+                                        digest.data(),
+                                        static_cast<ULONG>(digest.size()),
+                                        const_cast<uint8_t *>(request.signature),
+                                        sizeof(request.signature),
+                                        0),
+                  "machine request signature");
+            return id;
+        }
+
         // Caller owns the platform mutex; both fixture and machine logins use
         // the same native signed session ABI and rename persistence.
         std::string issueSession(const std::string &nonce,
@@ -652,29 +682,8 @@ namespace platform
                 throw std::runtime_error("Invalid machine name padding");
         if (!name.empty())
             validateName(name);
-        ClientKey publicKey;
-        publicKey.import(request.publicKey);
-        const auto id = fingerprint(request.publicKey);
         std::unique_lock lock(mutex);
-        const auto foundChallenge = challenges.find(id);
-        if (foundChallenge == challenges.end())
-            throw std::runtime_error("Machine challenge missing");
-        const auto challenge = foundChallenge->second;
-        challenges.erase(foundChallenge); // Every login attempt consumes the server nonce.
-        if (challenge.expires <= now() || !crypto::equal(challenge.nonce, request.nonce) ||
-            !crypto::equal(challenge.value, request.challenge))
-            throw std::runtime_error("Machine challenge invalid or expired");
-        auto digest = crypto::sha256(
-            std::span<const uint8_t>(reinterpret_cast<const uint8_t *>(bytes.data()),
-                                     bytes.size() - sizeof(request.signature)));
-        check(BCryptVerifySignature(publicKey.handle,
-                                    nullptr,
-                                    digest.data(),
-                                    static_cast<ULONG>(digest.size()),
-                                    request.signature,
-                                    sizeof(request.signature),
-                                    0),
-              "machine login signature");
+        const auto id = verifyMachineProof(request, bytes);
         const auto path = identityDirectory / "platform-client-profiles" / (id + ".bin");
         auto existing = clientProfiles.find(id);
         if (existing == clientProfiles.end())
@@ -719,6 +728,43 @@ namespace platform
             services::restoreLocalProgression(5800, user, local.playerXp,
                                                (local.options & 1) != 0, local.startingRank, platformAccount);
         return response;
+    }
+
+    std::string clientRenew(const std::string &bytes)
+    {
+        if (bytes.size() != sizeof(DWLocalClientRenewRequest))
+            throw std::runtime_error("Invalid machine renewal request size");
+        DWLocalClientRenewRequest request{};
+        std::memcpy(&request, bytes.data(), sizeof(request));
+        if (request.magic != DW_LOCAL_CLIENT_MAGIC ||
+            request.version != DW_LOCAL_CLIENT_RENEW_VERSION || !nonzero(request.nonce))
+            throw std::runtime_error("Invalid machine renewal layout");
+        std::lock_guard lock(mutex);
+        const auto id = verifyMachineProof(request, bytes);
+        const auto owner = clientProfiles.find(id);
+        if (owner == clientProfiles.end())
+            throw std::runtime_error("Machine renewal owner missing");
+        const auto time = now();
+        for (auto &session : issuedSessions)
+        {
+            const auto &current = session.payload;
+            if (current.expires <= time || current.userId != owner->second.userId ||
+                current.gameAccountId != owner->second.gameAccountId ||
+                !crypto::equal(std::span(reinterpret_cast<const uint8_t *>(current.sessionToken), 64),
+                               std::span(reinterpret_cast<const uint8_t *>(request.sessionToken), 64)))
+                continue;
+            DWLocalPlatformReply reply{};
+            reply.payload = current;
+            std::memcpy(reply.payload.nonce, request.nonce, sizeof(request.nonce));
+            reply.payload.issued = time;
+            reply.payload.expires = time + 3600;
+            sign(&reply.payload, sizeof(reply.payload), reply.signature, 32);
+            // Publish only after signing succeeds. The established native lobby,
+            // DTLS key, relay digest and account tokens retain their exact values.
+            session.payload = reply.payload;
+            return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
+        }
+        throw std::runtime_error("Machine renewal session unavailable or expired");
     }
 
     void provisionProfile(const std::filesystem::path &directory,
@@ -1281,7 +1327,7 @@ namespace platform
 
     bool valid(const LobbyIdentity &sessionIdentity)
     {
-        if (sessionIdentity.expires <= now())
+        if (!sessionIdentity.expires || !sessionIdentity.userId || !sessionIdentity.titleId)
             return false;
         std::lock_guard lock(mutex);
         for (const auto &session : issuedSessions)

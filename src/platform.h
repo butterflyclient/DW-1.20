@@ -20,6 +20,7 @@ namespace platform
                       const std::string &playerName = "");
     std::string clientChallenge(const std::string &request);
     std::string clientLogin(const std::string &request);
+    std::string clientRenew(const std::string &request);
     void provisionProfile(const std::filesystem::path &directory,
                           const std::string &profile,
                           const std::string &name);

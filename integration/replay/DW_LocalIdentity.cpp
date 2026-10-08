@@ -368,7 +368,8 @@ namespace
             return true;
         }
 
-        bool Sign(DWLocalClientLoginRequestV2 &request)
+        template <typename Request>
+        bool Sign(Request &request)
         {
             void *hashAlgorithm = nullptr, *hash = nullptr;
             uint8_t digest[32]{};
@@ -378,7 +379,7 @@ namespace
                 api.BCryptCreateHash(hashAlgorithm, &hash, nullptr, 0, nullptr, 0, 0) >= 0 &&
                 api.BCryptHashData(hash,
                                    reinterpret_cast<uint8_t *>(&request),
-                                   offsetof(DWLocalClientLoginRequestV2, signature),
+                                   offsetof(Request, signature),
                                    0) >= 0 &&
                 api.BCryptFinishHash(hash, digest, sizeof(digest), 0) >= 0 &&
                 api.BCryptSignHash(key,
@@ -463,6 +464,43 @@ extern "C" bool DW_LocalIdentity_Login(const char *name,
         return false;
     s_error = "server-identity-login";
     if (!post(L"/platform/client/login", &request, sizeof(request), reply, sizeof(*reply)))
+        return false;
+    s_error = "none";
+    return true;
+}
+
+extern "C" bool DW_LocalIdentity_Renew(const uint8_t *nonce,
+                                       const char *sessionToken,
+                                       DWLocalPlatformReply *reply,
+                                       DWLocalIdentityPost post)
+{
+    API api{};
+    s_error = "windows-identity-api";
+    if (!nonce || !sessionToken || !reply || !post || !api.Load())
+        return false;
+    Key key{api};
+    if (!key.Load())
+        return false;
+    DWLocalClientChallengeRequest challenge{};
+    DWLocalClientRenewRequest request{};
+    request.magic = DW_LOCAL_CLIENT_MAGIC;
+    request.version = DW_LOCAL_CLIENT_RENEW_VERSION;
+    if (!key.Public(request.publicKey))
+        return false;
+    for (unsigned i = 0; i < 72; ++i)
+        challenge.publicKey[i] = request.publicKey[i];
+    for (unsigned i = 0; i < 32; ++i)
+        challenge.nonce[i] = request.nonce[i] = nonce[i];
+    for (unsigned i = 0; i < 64; ++i)
+        request.sessionToken[i] = sessionToken[i];
+    s_error = "server-identity-renew-challenge";
+    if (!post(L"/platform/client/challenge", &challenge, sizeof(challenge), request.challenge, 32))
+        return false;
+    s_error = "local-identity-renew-signature";
+    if (!key.Sign(request))
+        return false;
+    s_error = "server-identity-renew";
+    if (!post(L"/platform/client/renew", &request, sizeof(request), reply, sizeof(*reply)))
         return false;
     s_error = "none";
     return true;

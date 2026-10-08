@@ -26,11 +26,19 @@ parser.add_argument("--probe", type=Path)
 parser.add_argument("--name", default="")
 parser.add_argument("--public-only", action="store_true")
 parser.add_argument("--resume", type=Path)
+parser.add_argument("--client-dll", type=Path,
+                    default=Path(os.environ.get("IW8_DW_IDENTITY_TEST_DLL", str(DLL))))
+parser.add_argument("--backend-url", default=os.environ.get("IW8_DW_IDENTITY_TEST_BASE", "http://127.0.0.1:8085"))
+parser.add_argument("--server", type=Path, default=ROOT / "build/Release/iw8-dw-server.exe")
+parser.add_argument("--output", type=Path, default=ROOT / "data/local-player-verification.json")
 parser.add_argument(
     "--legacy-name",
     help="A private legacy fixture name to verify upgrade compatibility",
 )
 args = parser.parse_args()
+DLL = args.client_dll.resolve(strict=True)
+os.environ["IW8_DW_IDENTITY_TEST_DLL"] = str(DLL)
+os.environ["IW8_DW_IDENTITY_TEST_BASE"] = args.backend_url
 
 
 def digest(path):
@@ -72,7 +80,7 @@ def probe(directory, name, public_only=False):
         try:
             with urllib.request.urlopen(
                 urllib.request.Request(
-                    "http://127.0.0.1:8085" + path,
+                    args.backend_url + path,
                     data,
                     {"Content-Type": "application/octet-stream"},
                 ),
@@ -107,7 +115,7 @@ def probe(directory, name, public_only=False):
         try:
             urllib.request.urlopen(
                 urllib.request.Request(
-                    "http://127.0.0.1:8085/platform/client/login", body
+                    args.backend_url + "/platform/client/login", body
                 ),
                 timeout=10,
             )
@@ -121,7 +129,7 @@ def probe(directory, name, public_only=False):
     challenge_request = captured["/platform/client/challenge"]
     with urllib.request.urlopen(
         urllib.request.Request(
-            "http://127.0.0.1:8085/platform/client/challenge", challenge_request
+            args.backend_url + "/platform/client/challenge", challenge_request
         ),
         timeout=10,
     ) as response:
@@ -285,13 +293,13 @@ else:
         assert restored == evidence["other"]
         evidence["legacy_names_do_not_block_machine_players"] = True
         evidence["duplicate_machine_names_rejected"] = True
-    evidence["server_sha256"] = digest(ROOT / "build/Release/iw8-dw-server.exe")
+    evidence["server_sha256"] = digest(args.server)
     evidence["client_dll_sha256"] = digest(DLL)
     evidence["identity_source_sha256"] = digest(
         ROOT / "integration/replay/DW_LocalIdentity.cpp"
     )
     receipt_path.write_text(json.dumps(evidence, indent=2) + "\n")
-    (ROOT / "data/local-player-verification.json").write_text(
+    args.output.write_text(
         json.dumps(evidence, indent=2) + "\n"
     )
     print(

@@ -4,13 +4,18 @@ import ctypes
 import hashlib
 import json
 import os
+import os
 from pathlib import Path
 import struct
 import time
 import urllib.request
 
 root = Path(__file__).resolve().parents[1]
-library = ctypes.CDLL(str(root / "build" / "Release" / "iw8-dw-platform-client.dll"))
+base = os.environ.get("IW8_DW_TEST_BASE", "http://127.0.0.1:8085")
+server = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build/Release/iw8-dw-server.exe")))
+client_dll = Path(os.environ.get("IW8_DW_TEST_CLIENT_DLL", str(root / "build/Release/iw8-dw-platform-client.dll")))
+proof_directory = Path(os.environ.get("IW8_DW_TEST_PROOF_DIRECTORY", str(root / "data")))
+library = ctypes.CDLL(str(client_dll))
 verify = library.DW_LocalPlatform_VerifyReply
 verify.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64)
 verify.restype = ctypes.c_bool
@@ -19,7 +24,7 @@ validate.argtypes = verify.argtypes
 validate.restype = ctypes.c_bool
 nonce = os.urandom(32)
 request = urllib.request.Request(
-    "http://127.0.0.1:8085/platform/login",
+    base + "/platform/login",
     nonce,
     {"Content-Type": "application/octet-stream"},
 )
@@ -59,7 +64,7 @@ struct.pack_into("<Q", damaged, 48, now - 1)
 assert not validate(bytes(damaged), nonce, now), "Expired payload was accepted"
 nonce2 = os.urandom(32)
 with urllib.request.urlopen(
-    urllib.request.Request("http://127.0.0.1:8085/platform/login", nonce2), timeout=5
+    urllib.request.Request(base + "/platform/login", nonce2), timeout=5
 ) as response:
     second = response.read()
 assert verify(second, nonce2, now)
@@ -82,7 +87,7 @@ evidence = {
         "signed account age/region/capability policy",
     ],
     "server_sha256": hashlib.sha256(
-        (root / "build" / "Release" / "iw8-dw-server.exe").read_bytes()
+        server.read_bytes()
     ).hexdigest(),
     "crypto_source_sha256": hashlib.sha256(
         (root / "integration" / "replay" / "DW_LocalPlatformCrypto.cpp").read_bytes()
@@ -91,7 +96,7 @@ evidence = {
         (root / "data" / "platform-public.blob").read_bytes()
     ).hexdigest(),
 }
-(root / "data" / "platform-verification.json").write_text(
+(proof_directory / "platform-verification.json").write_text(
     json.dumps(evidence, indent=2) + "\n"
 )
 print(
