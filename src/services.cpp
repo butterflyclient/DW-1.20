@@ -605,11 +605,14 @@ namespace services
         }
     }
 
-    Reply dispatch(const platform::LobbyIdentity &id,
+    Reply dispatch(const platform::LobbyIdentity &authenticatedIdentity,
                    uint8_t service,
                    uint8_t task,
                    wire::Reader &p)
     {
+        auto id = authenticatedIdentity;
+        if (!platform::refreshLease(id))
+            return Reply{101, {}, "service-session-expired-or-superseded"};
         std::lock_guard lock(storeMutex);
         try
         {

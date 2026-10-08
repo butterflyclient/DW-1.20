@@ -23,7 +23,7 @@ import urllib.request
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa, utils
 
-from native_wire_client import NativeClient
+from native_wire_client import NativeClient, integer, structure, text
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -201,9 +201,34 @@ def main():
                 > struct.unpack_from("<Q", initial, 48)[0]
             )
             assert renewed[:8] == initial[:8] and renewed[56:256] == initial[56:256]
-            assert client.task(12, 6, b"", structured=False) and client.connection == before_connection
+            assert (
+                client.task(12, 6, b"", structured=False)
+                and client.connection == before_connection
+            )
             checks.append(
                 "signed renewal preserves complete identity/token layout and an established encrypted native lobby connection"
+            )
+            channel = 817260108
+            client.task(
+                198,
+                6,
+                structure(
+                    text(1, "chat") + integer(2, channel) + integer(3, identity["user"])
+                ),
+            )
+            channels = json.loads((data / "channels/5800.json").read_bytes())
+            member = channels["channels"][f"chat:{channel}"]["members"][
+                str(identity["user"])
+            ]
+            assert member["expires"] == struct.unpack_from("<Q", renewed, 48)[0]
+            token = client.task(145, 26, b"", structured=False)
+            assert token
+            relay = json.loads(
+                (data / "relay/5800/clients" / f"{identity['user']}.json").read_bytes()
+            )
+            assert relay["expires"] == member["expires"]
+            checks.append(
+                "new native channel membership and relay credentials use the renewed issuer lease on the original connection"
             )
             post("/platform/client/renew", request, 400)
             checks.append("consumed challenge replay rejected")
@@ -269,11 +294,15 @@ def main():
             verify.restype = ctypes.c_bool
             nonce = os.urandom(32)
             first = ctypes.create_string_buffer(512)
-            assert logon(b"Renewal Native Signer", nonce, first, callback), identity_error().decode()
+            assert logon(
+                b"Renewal Native Signer", nonce, first, callback
+            ), identity_error().decode()
             assert verify(first, nonce, int(time.time()))
             nonce = os.urandom(32)
             result = ctypes.create_string_buffer(512)
-            assert renew(nonce, first.raw[112:176], result, callback), identity_error().decode()
+            assert renew(
+                nonce, first.raw[112:176], result, callback
+            ), identity_error().decode()
             assert verify(result, nonce, int(time.time()))
             assert first.raw[56:256] == result.raw[56:256]
             checks.append(

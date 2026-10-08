@@ -42,3 +42,41 @@ machine identities and friendships are not changed by those fixtures.
 These checks cover protocol/domain behavior. Native startup/reconnect on the
 fresh backend is recorded separately. Native credential-expiry UI callbacks,
 two-network friends/party/gameplay and host migration remain distinct gates.
+
+SIGNED MACHINE SESSION RENEWAL
+
+The compiled Replay client requests renewal five minutes before its one-hour
+platform deadline. A background worker signs a version-3 request with the same
+machine key and a new single-use server challenge. The request includes the
+existing session token. The server requires the matching machine profile and
+an active, unexpired issued session. It does not create a new player or revive
+an expired session. Its pinned RSA reply retains every identity, account token
+and native transport field; only the nonce and signed lifetime change.
+
+The engine thread accepts a verified reply only when the complete stable
+payload still matches the current session. Failure preserves the original
+deadline and uses a bounded retry interval. Renewal does not call native
+sign-in callbacks, repeat lobby authentication, reset tasks or clear a party.
+
+A socket retains the LobbyIdentity copied during its original handshake.
+Its timestamp must not override the authoritative issuer after renewal.
+platform::refreshLease checks the player, title, seed and original session key,
+then updates only that snapshot's expiry. Service dispatch and onlineIdentity
+use this refreshed copy so newly issued channel, relay, matchmaking and
+tournament credentials receive the current deadline. Account access uses the
+same authoritative session lookup. A replaced key remains rejected.
+
+Already issued relay credentials and domain records retain their own original
+protocol lifetimes. This change does not silently rewrite a signed relay token
+or extend an existing search, tournament, lobby or UDP association. Their
+normal renewal/update paths need separate native long-session validation.
+
+tools/test-session-lease.cpp executes the real issuer and ticket checks with
+past/future copied timestamps, mismatched claims and a replaced authentication
+key. The progression-restore adapter fails if reached and is not tested here.
+tools/test-platform-renewal.py independently exercises the signed machine
+exchange, challenge replay and owner/signature rejection, then sends channel
+and relay requests on the same encrypted connection and checks their issued
+deadlines. The optional Windows DLL executes the real DPAPI machine signer
+and pinned reply verifier. These are contracts; native evidence is recorded
+separately in validation/20261008-native-session-renewal.json.

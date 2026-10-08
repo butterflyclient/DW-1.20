@@ -590,8 +590,8 @@ namespace lobby
                 for (const auto &[fingerprint, session] : entry->second)
                     identities.push_back(session.identity);
         }
-        for (const auto &identity : identities)
-            if (platform::valid(identity))
+        for (auto &identity : identities)
+            if (platform::refreshLease(identity))
                 return identity;
         return std::nullopt;
     }

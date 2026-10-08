@@ -4,6 +4,7 @@ import copy
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,17 +19,28 @@ parser.add_argument(
     default=ROOT / "data/compiler-snapshot-receipt.json",
 )
 parser.add_argument("--state-root", type=Path, default=STATE)
-parser.add_argument("--profiles-root", type=Path, default=STATE)
+parser.add_argument(
+    "--profiles-root",
+    type=Path,
+    help="Private profiles directory; defaults to the selected state root",
+)
 parser.add_argument("--server-receipt", type=Path)
-parser.add_argument("--remote-backend", action="store_true",
-                    help="Use the hash-verified primary droplet for these private clients")
-parser.add_argument("--instances", nargs="+", choices=("alpha", "bravo"),
-                    default=("alpha", "bravo"))
-parser.add_argument("--preserve-ini", action="store_true",
-                    help="Keep an owned test instance's name and endpoint settings")
+parser.add_argument(
+    "--remote-backend",
+    action="store_true",
+    help="Use the hash-verified primary droplet for these private clients",
+)
+parser.add_argument(
+    "--instances", nargs="+", choices=("alpha", "bravo"), default=("alpha", "bravo")
+)
+parser.add_argument(
+    "--preserve-ini",
+    action="store_true",
+    help="Keep an owned test instance's name and endpoint settings",
+)
 args = parser.parse_args()
 STATE = args.state_root.resolve()
-profiles_root = args.profiles_root.resolve()
+profiles_root = (args.profiles_root or args.state_root).resolve()
 for directory in (STATE, profiles_root):
     assert directory.is_relative_to(
         ROOT / "data"
@@ -76,6 +88,7 @@ if args.remote_backend:
     if args.server_receipt:
         raise ValueError("Choose a local server receipt or the primary remote backend")
     from remote_backend import verify
+
     remote = verify()
     server_sha256 = remote["sha256"]
 if args.server_receipt:
@@ -109,16 +122,30 @@ for instance in dict.fromkeys(args.instances):
     enabled_file = f"replay-dw-test-{instance}.enabled"
     ini = executable.with_suffix(".ini")
     assert not ini.exists() or receipt.exists(), "Refusing to replace an unowned INI"
+    game_port = 3074 + index * 5
+    if args.preserve_ini and ini.exists():
+        existing_ini = ini.read_text()
+        assert (
+            len(existing_ini) <= 8192
+        ), "Private INI exceeds its bounded configuration"
+        ports = re.findall(r"(?mi)^\s*game_port\s*=\s*([0-9]+)[ \t]*$", existing_ini)
+        assert len(ports) == 1, "Private INI must contain one game_port"
+        game_port = int(ports[0])
+        assert 1024 <= game_port <= 65535, "Private game_port is out of range"
     if not (args.preserve_ini and ini.exists()):
         ini.write_text(
             f"host={remote['host'] if remote else '127.0.0.1'}\n"
             f"player_name=DW Pair {instance.title()} 1006\n"
-            f"game_port={3074 + index * 5}\n"
+            f"game_port={game_port}\n"
             "public_address=127.0.0.1\nlocal_address=127.0.0.1\n"
             "unlock_all=0\nrank=0\n"
             f"test_command_file={command_file}\ntest_enabled_file={enabled_file}\n"
         )
-    executable.write_bytes(image)
+    if (
+        not executable.exists()
+        or hashlib.sha256(executable.read_bytes()).hexdigest() != digest
+    ):
+        executable.write_bytes(image)
     record = copy.deepcopy(normal)
     record.update(
         executable=str(executable),
@@ -133,7 +160,7 @@ for instance in dict.fromkeys(args.instances):
         test_enabled_file=enabled_file,
         localappdata=str(profile / "appdata"),
         home=str(profile / "home"),
-        game_port=3074 + index * 5,
+        game_port=game_port,
         primary_executable_unchanged_sha256=normal["sha256"],
         evidence_scope="Private native pair test; no two-game connection asserted by deployment",
     )

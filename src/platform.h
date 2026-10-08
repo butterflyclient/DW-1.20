@@ -52,6 +52,10 @@ namespace platform
                    uint32_t seed,
                    LobbyIdentity &result);
     bool valid(const LobbyIdentity &identity);
+    // Update only a still-authorized connection's lease from its issuing session.
+    // A renewal retains the ticket, key and identity; copied expiry timestamps
+    // must not cap newly issued domain credentials at the original login time.
+    bool refreshLease(LobbyIdentity &identity);
     // Relay INIT omits the lobby ticket; bind its signed digest to a live session.
     bool relaySessionMatches(uint32_t title, uint64_t user, std::span<const uint8_t> digest);
     bool sessionTokenMatches(const LobbyIdentity &identity, const std::string &token);

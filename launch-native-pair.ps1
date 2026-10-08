@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][ValidateSet('alpha','bravo')][string]$Instance,
     [ValidateSet('Start','Stop')][string]$Action = 'Start',
-    [string]$StateRoot = (Join-Path $PSScriptRoot 'data\native-pair-20261006')
+    [string]$StateRoot = (Join-Path $PSScriptRoot 'data\native-pair-20261006'),
+    [switch]$AllowVerifiedMain
 )
 $ErrorActionPreference = 'Stop'
 $StateRoot = [IO.Path]::GetFullPath($StateRoot)
@@ -32,6 +33,9 @@ if ($Action -eq 'Stop') {
     Write-Host ('Stopped owned native ' + $Instance + ' client.')
     return
 }
+if (@($running).Count -ge 2) {
+    throw 'Two Replay clients are already running; do not start a third test instance.'
+}
 foreach ($process in $running) {
     $verified = $false
     foreach ($peer in @('alpha','bravo')) {
@@ -45,6 +49,26 @@ foreach ($process in $running) {
                 if ($peer -eq $Instance) { throw 'This native client is already running.' }
                 $verified = $true
             }
+        }
+    }
+    if (-not $verified -and $AllowVerifiedMain) {
+        $mainLaunch = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data\current-runtime-launch.json') -Raw | ConvertFrom-Json
+        $mainDeployment = Get-Content -LiteralPath $mainLaunch.deployment_receipt.path -Raw | ConvertFrom-Json
+        $createdUtc = $process.CreationDate.ToUniversalTime()
+        $createdMatches = if ($mainLaunch.process_created_utc) {
+            $createdUtc.Ticks -eq ([datetime]$mainLaunch.process_created_utc).ToUniversalTime().Ticks
+        } else {
+            # Older normal-launch receipts recorded launch time rather than the
+            # exact CIM timestamp. Limit that compatibility path to one second.
+            [Math]::Abs(($createdUtc - ([datetime]$mainLaunch.launched_utc).ToUniversalTime()).TotalSeconds) -le 1
+        }
+        if ($process.ProcessId -eq $mainLaunch.pid -and $createdMatches -and
+            $process.ExecutablePath -eq $mainLaunch.executable -and
+            $mainDeployment.executable -eq $mainLaunch.executable -and
+            $mainDeployment.sha256 -eq $mainLaunch.sha256 -and
+            (Get-FileHash -LiteralPath $mainLaunch.deployment_receipt.path).Hash.ToLowerInvariant() -eq $mainLaunch.deployment_receipt.sha256 -and
+            (Get-FileHash -LiteralPath $process.ExecutablePath).Hash.ToLowerInvariant() -eq $mainLaunch.sha256) {
+            $verified = $true
         }
     }
     if (-not $verified) { throw 'An unrelated Replay game is running; leave it intact.' }
@@ -69,6 +93,9 @@ if ($record.remote_backend) {
 $status = Invoke-RestMethod -Uri ('http://' + $backendHost + ':8085/health') -TimeoutSec 10
 if ($status.server -ne 'iw8-dw' -or $server.sha256 -ne $record.server_sha256) {
     throw 'Start the hash-matching backend first.'
+}
+if (@(Get-NetUDPEndpoint -LocalPort $record.game_port -ErrorAction SilentlyContinue).Count) {
+    throw ('Private game UDP port ' + $record.game_port + ' is already in use; choose a distinct game_port in its INI and prepare its receipts again.')
 }
 $folder = Split-Path -Parent $record.executable
 if ($record.test_command_file -ne ('replay-dw-test-' + $Instance + '.command') -or

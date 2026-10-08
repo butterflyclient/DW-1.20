@@ -298,7 +298,7 @@ namespace platform
         Session *liveSession(const LobbyIdentity &owner)
         {
             const auto time = now();
-            if (owner.expires <= time)
+            if (!owner.expires || !owner.userId || !owner.titleId)
                 return nullptr;
             for (auto &session : issuedSessions)
                 if (session.payload.expires > time && session.titleId == owner.titleId &&
@@ -1327,17 +1327,18 @@ namespace platform
 
     bool valid(const LobbyIdentity &sessionIdentity)
     {
-        if (!sessionIdentity.expires || !sessionIdentity.userId || !sessionIdentity.titleId)
-            return false;
         std::lock_guard lock(mutex);
-        for (const auto &session : issuedSessions)
-            if (session.payload.expires > now() &&
-                session.payload.userId == sessionIdentity.userId &&
-                session.titleId == sessionIdentity.titleId &&
-                session.ivSeed == sessionIdentity.ivSeed &&
-                crypto::equal(session.sessionKey, sessionIdentity.key))
-                return true;
-        return false;
+        return liveSession(sessionIdentity) != nullptr;
+    }
+
+    bool refreshLease(LobbyIdentity &sessionIdentity)
+    {
+        std::lock_guard lock(mutex);
+        const auto *session = liveSession(sessionIdentity);
+        if (!session)
+            return false;
+        sessionIdentity.expires = session->payload.expires;
+        return true;
     }
 
     bool relaySessionMatches(uint32_t title, uint64_t user, std::span<const uint8_t> digest)
