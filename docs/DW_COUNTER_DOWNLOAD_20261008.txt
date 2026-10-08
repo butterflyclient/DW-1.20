@@ -1,0 +1,55 @@
+REPLAY NATIVE SHARED-COUNTER DOWNLOAD
+
+Issue
+The server's 23/2 fixtures passed, but the shipping game had never requested a
+counter download. Its seven CSV-defined cached totals were still -1.
+
+Target research
+The untouched Replay getter at 0x1414F2320 returns the indexed cached total and
+sets the native read-request byte. The original frame at 0x1414F26F0 dispatches
+the SDK download, decodes the result and retires its native task. No existing
+console command calls that getter. Indexes refer to CSV rows, not counter IDs.
+
+Implementation
+tools/prepare-native-counter-read-test.py freezes the verified shipping private
+integration and adds an opt-in dw_localTestCounter command in private C++.
+It requires the main thread, an initialized table and a bounded row index.
+It calls the original getter; it never writes cache values, task state or fences.
+The compiler resolves placement and all references. The current shared engine
+profile compiled 81 C++ modules, so this private image is not represented as the
+shipping image with only one byte or function changed.
+
+The private filename must end in _dw.exe to activate the local DW provider.
+The initial diagnostic filename did not; it was corrected without recompiling.
+
+Actual native result
+Private image: 902b0ce8371320a7882e70c8903abcbf3d43abaee04b14d5f07ff97c703f20c1
+Linux backend: 24aeb6cba0abdc854c06e815a55db0eb49ae3dccbeca2569b9a1eb56d285e163
+2026-10-08T10:12:17Z: service 23, task 2, error 0, results 7.
+Native cached values: IDs 1..7 = 0, 0, 0, 13, 0, 21, 7.
+The values match the server's persisted store, including absent IDs returning 0.
+The native read request cleared and no active counter task remained.
+Pending/upload arrays, XP and the server counter store were unchanged.
+Both read and write intervals remained 15 minutes.
+
+validation/20261008-native-counter-read-readiness.json binds the compiler job,
+source snapshot, build/relocation checks, original getter, native observations,
+exact server process and store snapshots. The inventory retains this private
+image scope; shipping-image completion is not inherited.
+
+Restoration
+The owned temporary root-folder EXE, INI and pending test command were removed.
+Compiled artifacts and evidence remain under data/native-counter-read-20261008.
+The unchanged normal game was relaunched from E:\IW8\Builds\1.20-replay.
+Its authentication state is 2, native DW state 33 is connected, all 27 fences
+pass, and XP 869220/rank 52 (zero-based) is intact.
+
+Remaining implementation
+This closes the native counter download gate, not the complete backend goal.
+Known missing handlers remain 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24.
+Extended streaming consumers corroborate object offsets, but they do not prove
+the deserializer's wire order. The embedded object constructed at 0x142163830
+is a summary metadata handler, not proof of the external live metadata reader.
+The target scan found no direct call to the ordinary 0x14213DBE0 reader from an
+extended reader. This negative search is not evidence that no such reader exists.
+Do not install a guessed positive response for these missing contracts.

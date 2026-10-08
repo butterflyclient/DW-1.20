@@ -869,6 +869,30 @@ def counter_upload_evidence(server_hash, game_hash):
     return path.relative_to(ROOT).as_posix(), proof
 
 
+def private_counter_read_evidence(server_hash, shipping_hash):
+    path = ROOT / "validation/20261008-native-counter-read-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (
+        proof.get("passed")
+        and proof.get("server_sha256") == server_hash
+        and proof.get("shipping_game_sha256") == shipping_hash
+        and proof.get("native_counter_read_completion_verified")
+        and proof.get("native_counter_cache_matches_durable_totals")
+        and proof.get("native_counter_task_retired")
+        and proof.get("private_diagnostic_command")
+        and proof.get("counter_store_unchanged")
+        and proof.get("shipping_executable_native_completion_inherited") is False
+    ):
+        return None
+    for item in proof["evidence"]:
+        evidence = (ROOT / item["path"]).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != item["sha256"]:
+            raise ValueError("Private native counter read evidence changed")
+    return path.relative_to(ROOT).as_posix(), proof
+
+
 def live_streaming_layout_evidence():
     path = ROOT / "validation/20261008-live-streaming-target-layout.json"
     if not path.is_file():
@@ -1150,6 +1174,9 @@ def main():
     friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
     ab_evidence = abtesting_native_evidence(current_hash, deployment["sha256"])
     counter_evidence = counter_upload_evidence(current_hash, deployment["sha256"])
+    private_counter_read = private_counter_read_evidence(
+        current_hash, deployment["sha256"]
+    )
     rest_requests = (
         rest_coverage(rest_inventory, friend_evidence, current_hash)
         if rest_inventory
@@ -1267,6 +1294,24 @@ def main():
                 native_positive_completion_verified_current_binary=native,
                 native_completion_evidence=proof_filename if native else None,
                 native_completion_scope=scope if native else None,
+                private_native_positive_completion_verified=bool(
+                    (service, task) == (23, 2) and private_counter_read
+                ),
+                private_native_completion_evidence=(
+                    private_counter_read[0]
+                    if (service, task) == (23, 2) and private_counter_read
+                    else None
+                ),
+                private_native_completion_scope=(
+                    private_counter_read[1]["scope"]
+                    if (service, task) == (23, 2) and private_counter_read
+                    else None
+                ),
+                private_native_completion_game_sha256=(
+                    private_counter_read[1]["game_sha256"]
+                    if (service, task) == (23, 2) and private_counter_read
+                    else None
+                ),
                 native_fence_completion_is_not_per_method_proof=True,
             )
         )
@@ -1283,6 +1328,7 @@ def main():
         native_byte_task_inventory=byte_evidence,
         objectstore_completion_target_evidence=objectstore_completion_evidence(),
         live_streaming_target_layout_evidence=live_streaming_layout_evidence(),
+        private_native_counter_read_evidence=private_counter_read,
         selected_protocol_fixture=fixture_path,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),

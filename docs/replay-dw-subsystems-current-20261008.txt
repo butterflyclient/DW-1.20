@@ -116,6 +116,11 @@ Shared counters
   Known missing routes: none in recovered constructor set
   Current native verified routes: none on these exact binaries
   Open contracts: Native signed positive/negative uploads and durable aggregate restoration have a scoped per-method receipt. Native counter download and a complete increment/read roundtrip remain unverified; current-binary upload credit requires that exact receipt below.
+  Private game native route: 23/2
+  Private game SHA256: 902b0ce8371320a7882e70c8903abcbf3d43abaee04b14d5f07ff97c703f20c1
+  Private native receipt: validation/20261008-native-counter-read-readiness.json
+  Private native scope: Private freshly compiled root-folder game called the original counter getter. The original frame sent task 23/2, the SDK populated all CSV-defined cached values and the task retired. No uploads or direct cache/task writes; shipping-image completion is not inherited.
+  Shipping image completion is not inherited.
 
 Geography
   Services: 27

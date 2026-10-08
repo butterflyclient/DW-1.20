@@ -355,6 +355,19 @@ for name, services, persistence, contract in DOMAINS:
                 if item["service"] in services
                 and item["native_positive_completion_verified_current_binary"]
             ],
+            "native_verified_routes_private_game": [
+                {
+                    "service": item["service"],
+                    "task": item["task"],
+                    "receipt": item["private_native_completion_evidence"],
+                    "scope": item["private_native_completion_scope"],
+                    "game_sha256": item["private_native_completion_game_sha256"],
+                    "shipping_image_completion_inherited": False,
+                }
+                for item in coverage["tasks"]
+                if item["service"] in services
+                and item.get("private_native_positive_completion_verified")
+            ],
             "full_native_completion_verified": False,
         }
     )
@@ -411,6 +424,9 @@ report = {
     ),
     "live_streaming_target_layout_evidence": coverage.get(
         "live_streaming_target_layout_evidence"
+    ),
+    "private_native_counter_read_evidence": coverage.get(
+        "private_native_counter_read_evidence"
     ),
     "playlist_contract": {
         "playlists": len(catalog["playlists"]),
@@ -485,6 +501,16 @@ for row in rows:
     for item in row["native_verified_routes_current_binary"]:
         text.extend(
             ["  Native receipt: " + item["receipt"], "  Native scope: " + item["scope"]]
+        )
+    for item in row["native_verified_routes_private_game"]:
+        text.extend(
+            [
+                f"  Private game native route: {item['service']}/{item['task']}",
+                "  Private game SHA256: " + item["game_sha256"],
+                "  Private native receipt: " + item["receipt"],
+                "  Private native scope: " + item["scope"],
+                "  Shipping image completion is not inherited.",
+            ]
         )
     text.append("")
 text.append("NON-TASK DOMAINS")
