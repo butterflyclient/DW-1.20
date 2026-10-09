@@ -9,7 +9,8 @@ namespace achievement_store
     enum class Destination : uint8_t
     {
         event,
-        inventory
+        inventory,
+        states
     };
 
     struct Write

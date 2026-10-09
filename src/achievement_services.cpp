@@ -8,6 +8,7 @@
 #include "gunsmith_rank_unlock_data.h"
 #include "replay_quest_data.h"
 #include "marketplace_services.h"
+#include "battlepass_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <algorithm>
@@ -634,6 +635,13 @@ namespace services
                     data.push_back(questDefinition(row));
             if (!definitions)
             {
+                // The first Battle Pass backend left completed activations at
+                // ACTIVE. Present their inactive status without queuing
+                // them again into the native challenge-activation cache.
+                for (auto &row : data)
+                    if (row.contains("battlepass_pending") &&
+                        !row.at("battlepass_pending").get<bool>())
+                        row["status"] = uint64_t{2};
                 const auto journal = document(path.parent_path() / "events.json", Json::object());
                 validatePendingXp(journal);
                 if (journal.contains("player_xp"))
@@ -993,6 +1001,21 @@ namespace services
                 validateRankInventory(write.document);
                 return;
             }
+            if (write.kind == achievement_store::Destination::states)
+            {
+                wire::require(write.receiptKey.empty() && write.document.is_array() &&
+                              write.document.size() <= 15000);
+                std::set<uint64_t> identities;
+                for (const auto &row : write.document)
+                {
+                    // Use the same complete native state serializer as query
+                    // replies. Recover no part of a batch with a later malformed
+                    // progress record or duplicated achievement identity.
+                    (void)state(row);
+                    wire::require(identities.insert(integer(row, "id")).second);
+                }
+                return;
+            }
             platform::LobbyIdentity id;
             id.titleId = 5800;
             id.userId = write.owner;
@@ -1189,6 +1212,8 @@ namespace services
                         id, context, total, false, &weapon(weaponId), awards ? &*awards : nullptr));
                 if (!refreshed.empty())
                     result.operation = "achievement-events-idempotent-refresh";
+                std::vector<achievement_store::Write> refreshWrites;
+                battlepassEvents(root, id, context, events, refreshWrites, result.deliveries, true);
                 return result;
             }
             const auto previousXp =
@@ -1264,9 +1289,12 @@ namespace services
                                   {},
                                   std::move(awards->document),
                                   achievement_store::Destination::inventory});
+            std::vector<Delivery> battlepassDeliveries;
+            battlepassEvents(root, id, context, events, writes, battlepassDeliveries);
             if (!staged)
                 achievement_store::commit(root, id.titleId, writes, validateEventWrite);
             Reply result{0, {}, "achievement-events-recorded", true, {}};
+            result.deliveries = std::move(battlepassDeliveries);
             if (xp != previousXp)
             {
                 result.deliveries.push_back(
@@ -1495,6 +1523,10 @@ namespace services
             }
             wire::require(seen == (activate ? 30u : 14u) && (selected || !name.empty()) &&
                           (context == std::to_string(id.titleId) || context == "iw8"));
+            if (activate)
+                if (auto reply = battlepassActivation(root, id, context, name, selected, timestamp,
+                                                       validateEventWrite))
+                    return *reply;
             const auto folder = root / "achievements" / std::to_string(id.titleId) / context;
             const auto path = folder / std::to_string(id.userId) / "states.json";
             auto data = document(path, Json::array());
@@ -1581,7 +1613,18 @@ namespace services
             }
             else if (!activate && status == 1)
                 (*found)["status"] = uint64_t{2};
-            publish(path, data);
+            if (id.titleId == 5800)
+            {
+                const achievement_store::Write write{id.userId,
+                                                       id.platformAccountId,
+                                                       context,
+                                                       {},
+                                                       data,
+                                                       achievement_store::Destination::states};
+                achievement_store::commit(root, id.titleId, {&write, 1}, validateEventWrite);
+            }
+            else
+                publish(path, data);
             return {
                 0, {}, activate ? "achievement-activated" : "achievement-deactivated", true, {}};
         }

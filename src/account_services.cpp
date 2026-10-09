@@ -1,5 +1,6 @@
 #include "host_os.h"
 #include "account_services.h"
+#include "battlepass_services.h"
 #include "leaderboard_row.h"
 #include "protobuf.h"
 #include "../third_party/nlohmann/json.hpp"
@@ -90,7 +91,8 @@ namespace services
             wire::require(!context.empty());
             const auto path = directory / "achievement-user-state" / std::to_string(id.titleId) /
                               context / (std::to_string(id.userId) + ".json");
-            const auto state = document(path, 4096);
+            auto state = document(path, 4096);
+            projectBattlepassUserState(directory, id, context, state);
             const auto json = state.dump();
             wire::require(json.size() <= 4096);
             // A new local account has no claimed battlepasses, tutorial rewards or XP

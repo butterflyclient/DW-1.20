@@ -66,7 +66,7 @@ namespace achievement_store
                 return true;
             };
             auto value = Json::parse(bytes, callback);
-            wire::require(unique && value.is_object());
+            wire::require(unique && (value.is_object() || value.is_array()));
             return value;
         }
 
@@ -97,12 +97,18 @@ namespace achievement_store
                           row.at("owner").is_number_unsigned() &&
                           row.at("platform_account").is_number_unsigned());
             const auto platform = row.at("platform_account").get<uint64_t>();
-            wire::require(platform <= UINT32_MAX && row.at("after").is_object());
-            const bool inventory = row.contains("kind");
-            wire::require(!inventory || row.at("kind") == "inventory");
+            wire::require(platform <= UINT32_MAX);
+            auto kind = Destination::event;
+            if (row.contains("kind"))
+            {
+                wire::require(row.at("kind") == "inventory" || row.at("kind") == "states");
+                kind = row.at("kind") == "inventory" ? Destination::inventory : Destination::states;
+            }
+            wire::require(kind == Destination::states ? row.at("after").is_array()
+                                                     : row.at("after").is_object());
             return {row.at("owner").get<uint64_t>(), static_cast<uint32_t>(platform),
                     row.at("context").get<std::string>(), row.at("receipt_key").get<std::string>(),
-                    row.at("after"), inventory ? Destination::inventory : Destination::event};
+                    row.at("after"), kind};
         }
     } // namespace
 
@@ -118,6 +124,12 @@ namespace achievement_store
             wire::require(write.context == "5800" && write.receiptKey.empty());
             return root / "marketplace" / std::to_string(title) /
                    std::to_string(write.owner) / "inventory.json";
+        }
+        if (write.kind == Destination::states)
+        {
+            wire::require(write.receiptKey.empty());
+            return root / "achievements" / std::to_string(title) / write.context /
+                   std::to_string(write.owner) / "states.json";
         }
         wire::require(write.kind == Destination::event);
         const auto folder = root / "achievements" / std::to_string(title) /
@@ -187,6 +199,8 @@ namespace achievement_store
                                {"before_digest", current.is_null() ? Json() : Json(digest(current))}});
             if (write.kind == Destination::inventory)
                 entries.back()["kind"] = "inventory";
+            else if (write.kind == Destination::states)
+                entries.back()["kind"] = "states";
         }
         // The complete intent reaches stable storage before any account journal
         // or archived retry receipt is changed. Keep it on every failure.
