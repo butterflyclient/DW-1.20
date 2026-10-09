@@ -16,6 +16,7 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--startup-only", action="store_true",
                     help="Stop after encrypted startup, social, publisher and user-profile storage contracts")
+parser.add_argument("--host-controls-only", action="store_true")
 args = parser.parse_args()
 exe = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build" / "Release" / "iw8-dw-server.exe")))
 # Imported fixture modules share this subprocess module. The Windows window
@@ -3440,6 +3441,15 @@ try:
         checks,
     )
     peer_client.task(58, 6, content_fixture["post"], error=101)
+    import host_bot_control_fixtures
+    host_bot_control_fixtures.exercise(client, peer_client, directory, title, user,
+                                     match_query, (u32, u64, text, boolean), checks)
+    if args.host_controls_only:
+        proof = dict(passed=True, native_game_verified=False, checks=checks,
+                     server_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())
+        (root / "data/lobby-host-controls-verification.json").write_text(json.dumps(proof, indent=2)+"\n")
+        print(f"PASS: {len(checks)} native startup and host-control groups")
+        raise SystemExit(0)
     import lobby_join_fixtures
 
     lobby_join_fixtures.exercise(

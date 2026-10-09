@@ -330,6 +330,24 @@ extern "C" void DW_BotPolicy_Register()
         Dvar_RegisterInt("replay_dw_squadSize", 0, 0, 200, 0, "DW native battle royale squad size");
 }
 
+extern "C" void DW_BotPolicy_BuildRoster(const void *party, unsigned capacity, unsigned count)
+{
+    if (!party || !count || count > 199 || capacity > 200 || count > capacity || !func_140CA2250())
+        return;
+    // Native selection fills a prefix and does not clear old valid records.
+    // Place exactly the requested bots in unused real party indices, including
+    // holes left by departing humans, using the complete native 88-byte record.
+    static BotRecord selected[200]{};
+    for (unsigned i = 0; i < count; ++i)
+        selected[i] = *static_cast<const BotRecord *>(func_140CA2230(i));
+    for (unsigned i = 0; i < 200; ++i)
+        *static_cast<BotRecord *>(func_140CA2210(i)) = {};
+    unsigned used = 0;
+    for (unsigned i = 0; i < capacity && used < count; ++i)
+        if (!func_14118E020(party, i))
+            *static_cast<BotRecord *>(func_140CA2210(i)) = selected[used++];
+}
+
 extern "C" bool func_14118E2C0(const void *party, unsigned index)
 {
     if (!party || index >= 200)
@@ -373,9 +391,7 @@ extern "C" void DW_BotPolicy_Prepare(const void *party)
         {
             auto *bot = static_cast<BotRecord *>(func_140CA2210(i));
             for (unsigned character = 0; character < sizeof(bot->clan); ++character)
-                bot->clan[character] = character < sizeof(BotClanTag)
-                                           ? BotClanTag[character]
-                                           : 0;
+                bot->clan[character] = character < sizeof(BotClanTag) ? BotClanTag[character] : 0;
             if (s_squadSize && s_squadSize->current.integer > 0)
                 bot->team = uint8_t(Team(assignments, i));
             else if (gl_14C796328->current.integer == 2)

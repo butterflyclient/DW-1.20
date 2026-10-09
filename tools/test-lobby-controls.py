@@ -8,7 +8,16 @@ import struct
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
-from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RSP, UC_X86_REG_RIP, UC_X86_REG_XMM1
+from unicorn.x86_const import (
+    UC_X86_REG_RAX,
+    UC_X86_REG_RCX,
+    UC_X86_REG_RDX,
+    UC_X86_REG_R8,
+    UC_X86_REG_R9,
+    UC_X86_REG_RSP,
+    UC_X86_REG_RIP,
+    UC_X86_REG_XMM1,
+)
 
 
 def main():
@@ -72,35 +81,156 @@ def main():
         vm.reg_write(UC_X86_REG_RSP, rsp + 8)
 
     dvars = {}
-    for i, name in enumerate(("gl_14D386820", "gl_14D386948", "gl_14D386840", "gl_14C796328", "DVARBOOL_onlinegame")):
+    for i, name in enumerate(
+        ("gl_14D386820", "gl_14D386948", "gl_14D386840", "gl_14C796328", "DVARBOOL_onlinegame")
+    ):
         pointer = arena + 0x1000 + i * 0x100
         dvars[name] = pointer
         write(base + symbols[name], pointer, "<Q")
         write(pointer + 29, 5, "<B")
     write(dvars["DVARBOOL_onlinegame"] + 40, 1)
     write(dvars["gl_14C796328"] + 40, 2)
-    settings = dict(enabled=True, main=True, frontend=True, lobby=True, host=True, systemlink=False, controller=0, playlist_bots=False, mode=2, slots=152, humans=2, allies=1, axis=1, requested=7, initialized=False, bots=0)
+    settings = dict(
+        enabled=True,
+        main=True,
+        frontend=True,
+        lobby=True,
+        host=True,
+        systemlink=False,
+        controller=0,
+        playlist_bots=False,
+        mode=2,
+        slots=152,
+        humans=2,
+        allies=1,
+        axis=1,
+        requested=7,
+        initialized=False,
+        bots=0,
+    )
     command = dict(callback=None, argc=2)
     calls, registered, checks = [], {}, []
     lua = dict(top=2, locked=False, limits={}, now=10000)
-    names = ("DW_LocalBackend_IsEnabled", "Sys_IsMainThread", "Com_FrontEndScene_IsActive", "Com_GameMode_GetActiveGameMode", "Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration", "Dvar_RegisterInt", "DW_BotPolicy_Register", "DW_BotPolicy_Prepare", "Dvar_SetVariant", "Dvar_FindVarByName", "Com_Printf", "replay_rva_01187fa0", "replay_rva_01187ee0", "replay_rva_01189120", "replay_rva_0118dd00", "replay_rva_0119cfa0", "replay_rva_0119a5a0", "replay_rva_00ca2370", "replay_rva_00ca1d20", "replay_rva_01119b40", "replay_rva_0118ab60", "replay_rva_0118ad10", "replay_rva_00ca2110", "replay_rva_01528420", "replay_rva_00ca1c50", "replay_rva_010cd460", "replay_rva_010cc6f0", "replay_rva_019bdad0", "replay_rva_019bedb0", "replay_rva_020838b0", "replay_rva_020836e0", "replay_rva_02084ac0", "replay_rva_02084100", "replay_rva_02084510", "replay_rva_02084790", "replay_rva_0148fce0")
-    names += ("func_142083A30", "func_1420839E0", "func_142084950", "func_1419B78C0", "func_142089FB0", "func_1413E33E0", "func_1413E2BA0", "func_1413E2B40", "func_142084120", "func_1419CDD30")
-    names += ("Cmd_AddCommandInternal", "Cmd_Argc", "Cmd_Argv", "replay_rva_00ca2250", "replay_rva_00ca2270", "replay_rva_0118e020")
-    store = dict(active=False, top=4, table="loot/bundle_ids.csv", column=10, price="500", exists=True, result=None)
+    names = (
+        "DW_LocalBackend_IsEnabled",
+        "Sys_IsMainThread",
+        "Com_FrontEndScene_IsActive",
+        "Com_GameMode_GetActiveGameMode",
+        "Dvar_BeginPermanentRegistration",
+        "Dvar_EndPermanentRegistration",
+        "Dvar_RegisterInt",
+        "DW_BotPolicy_Register",
+        "DW_BotPolicy_Prepare",
+        "Dvar_SetVariant",
+        "Dvar_FindVarByName",
+        "Com_Printf",
+        "replay_rva_01187fa0",
+        "replay_rva_01187ee0",
+        "replay_rva_01189120",
+        "replay_rva_0118dd00",
+        "replay_rva_0119cfa0",
+        "replay_rva_0119a5a0",
+        "replay_rva_00ca2370",
+        "replay_rva_00ca1d20",
+        "replay_rva_01119b40",
+        "replay_rva_0118ab60",
+        "replay_rva_0118ad10",
+        "replay_rva_00ca2110",
+        "replay_rva_01528420",
+        "replay_rva_00ca1c50",
+        "replay_rva_010cd460",
+        "replay_rva_010cc6f0",
+        "replay_rva_019bdad0",
+        "replay_rva_019bedb0",
+        "replay_rva_020838b0",
+        "replay_rva_020836e0",
+        "replay_rva_02084ac0",
+        "replay_rva_02084100",
+        "replay_rva_02084510",
+        "replay_rva_02084790",
+        "replay_rva_0148fce0",
+    )
+    names += (
+        "func_142083A30",
+        "func_1420839E0",
+        "func_142084950",
+        "func_1419B78C0",
+        "func_142089FB0",
+        "func_1413E33E0",
+        "func_1413E2BA0",
+        "func_1413E2B40",
+        "func_142084120",
+        "func_1419CDD30",
+    )
+    names += (
+        "Cmd_AddCommandInternal",
+        "Cmd_Argc",
+        "Cmd_Argv",
+        "replay_rva_00ca2250",
+        "replay_rva_00ca2270",
+        "replay_rva_0118e020",
+    )
+    names += ("replay_rva_00ca2070", "DW_BotPolicy_BuildRoster", "Com_sprintf")
+    names += ("replay_rva_00f6eb20", "replay_rva_021367b0")
+    store = dict(
+        active=False,
+        top=4,
+        table="loot/bundle_ids.csv",
+        column=10,
+        price="500",
+        exists=True,
+        result=None,
+    )
 
     def resolve(name):
-        canonical = f"func_{0x140000000 + int(name.removeprefix('replay_rva_'), 16):X}" if name.startswith("replay_rva_") else name
+        canonical = (
+            f"func_{0x140000000 + int(name.removeprefix('replay_rva_'), 16):X}"
+            if name.startswith("replay_rva_")
+            else name
+        )
         return base + symbols[name if name in symbols else canonical]
 
-    boundaries = {resolve(name): name for name in (*names, "replay_rva_0118c7d0", "replay_rva_011916c0")}
+    boundaries = {
+        resolve(name): name for name in (*names, "replay_rva_0118c7d0", "replay_rva_011916c0")
+    }
+    boundaries[arena + 0xFD00] = "sdk_ready"
 
     def boundary(machine, address, size, context):
         name = boundaries.get(address)
         if not name:
             return
-        values = [machine.reg_read(reg) for reg in (UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9)]
-        boolean = {"DW_LocalBackend_IsEnabled": "enabled", "Sys_IsMainThread": "main", "Com_FrontEndScene_IsActive": "frontend", "replay_rva_01187fa0": "lobby", "replay_rva_01189120": "host", "replay_rva_0118dd00": "lobby", "replay_rva_01528420": "systemlink", "replay_rva_010cc6f0": "playlist_bots"}
-        if name in boolean:
+        values = [
+            machine.reg_read(reg)
+            for reg in (UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9)
+        ]
+        boolean = {
+            "DW_LocalBackend_IsEnabled": "enabled",
+            "Sys_IsMainThread": "main",
+            "Com_FrontEndScene_IsActive": "frontend",
+            "replay_rva_01187fa0": "lobby",
+            "replay_rva_01189120": "host",
+            "replay_rva_0118dd00": "lobby",
+            "replay_rva_01528420": "systemlink",
+            "replay_rva_010cc6f0": "playlist_bots",
+        }
+        if name == "sdk_ready":
+            assert values[0] == arena + 0xC200
+            returned(1)
+        elif name == "replay_rva_00f6eb20":
+            assert values[0] == arena + 0xC400 + 904
+            returned(arena + 0xC700)
+        elif name == "replay_rva_021367b0":
+            assert values[:4] == [arena + 0xC700, arena + 0xC900,
+                                  read(lobby_identity, "<Q"),
+                                  base + symbols["gl_14C27E4B0"] + 131864]
+            rsp = machine.reg_read(UC_X86_REG_RSP)
+            assert read(rsp + 40, "<Q") == 123
+            document = string(read(rsp + 48, "<Q"))
+            assert read(rsp + 56, "<Q") == len(document) + 1
+            command["submitted"] = json.loads(document)
+            write(values[1], arena + 0xC800, "<Q")
+            returned(values[1])
+        elif name in boolean:
             returned(int(settings[boolean[name]]))
         elif name == "Cmd_AddCommandInternal":
             assert string(values[0]) == "fill_lobby" and command["callback"] is None
@@ -117,6 +247,18 @@ def main():
             returned(int(values[0] < settings["humans"] + settings["bots"]))
         elif name == "replay_rva_0118e020":
             returned(int(values[1] < settings["humans"]))
+        elif name == "replay_rva_00ca2070":
+            settings.update(initialized=False, bots=0)
+            returned()
+        elif name == "DW_BotPolicy_BuildRoster":
+            assert values[:3] == [arena + 0x8000, settings["slots"], settings["requested"]]
+            returned()
+        elif name == "Com_sprintf":
+            assert string(values[2]) == ',"dw_bot_count":%u}'
+            body = (',"dw_bot_count":' + str(values[3]) + "}").encode()
+            assert len(body) + 1 <= values[1]
+            vm.mem_write(values[0], body + b"\0")
+            returned(len(body))
         elif name == "Com_GameMode_GetActiveGameMode":
             returned(settings["mode"])
         elif name == "replay_rva_01187ee0":
@@ -134,7 +276,11 @@ def main():
             returned()
         elif name == "Dvar_RegisterInt":
             key = string(values[0])
-            assert key in ("replay_dw_forceStart", "replay_dw_fillBots", "replay_dw_botCount") and values[1:4] == [0, 0, 199 if key == "replay_dw_botCount" else 1]
+            assert key in (
+                "replay_dw_forceStart",
+                "replay_dw_fillBots",
+                "replay_dw_botCount",
+            ) and values[1:4] == [0, 0, 199 if key == "replay_dw_botCount" else 1]
             assert key not in registered
             pointer = arena + 0x2000 + len(registered) * 0x100
             write(pointer + 29, 5, "<B")
@@ -163,7 +309,11 @@ def main():
             assert lua["locked"]
             returned(lua["top"])
         elif name == "replay_rva_020836e0":
-            assert lua["locked"] and values[1] & 0xFFFFFFFF == (-10002 & 0xFFFFFFFF) and string(values[2]) in ("Lobby", "BATTLEPASS")
+            assert (
+                lua["locked"]
+                and values[1] & 0xFFFFFFFF == (-10002 & 0xFFFFFFFF)
+                and string(values[2]) in ("Lobby", "BATTLEPASS")
+            )
             lua["table"] = string(values[2])
             lua["top"] += 1
             returned()
@@ -172,7 +322,9 @@ def main():
             returned(5)
         elif name == "replay_rva_02084100":
             raw = (machine.reg_read(UC_X86_REG_XMM1) & ((1 << 64) - 1)).to_bytes(8, "little")
-            assert lua["locked"] and struct.unpack("<d", raw)[0] == (200.0 if lua["table"] == "Lobby" else 0.0)
+            assert lua["locked"] and struct.unpack("<d", raw)[0] == (
+                200.0 if lua["table"] == "Lobby" else 0.0
+            )
             lua["top"] += 1
             returned()
         elif name == "replay_rva_02084510":
@@ -187,7 +339,10 @@ def main():
             lua["top"] = 2
             returned()
         elif name == "replay_rva_00ca2370":
-            assert values[:2] == [settings["humans"] + settings["requested"], 0 if read(dvars["gl_14C796328"] + 40) == 0 else 2]
+            assert values[:2] == [
+                settings["humans"] + settings["requested"],
+                0 if read(dvars["gl_14C796328"] + 40) == 0 else 2,
+            ]
             returned()
         elif name == "replay_rva_0118ab60":
             assert values[1] == 1
@@ -215,7 +370,9 @@ def main():
             returned(1)
         elif name == "func_142084950":
             pointer = arena + (0x6000 if values[1] == 1 else 0x6100)
-            machine.mem_write(pointer, (store["table"] if values[1] == 1 else "400061").encode() + b"\0")
+            machine.mem_write(
+                pointer, (store["table"] if values[1] == 1 else "400061").encode() + b"\0"
+            )
             assert values[2] == 0
             returned(pointer)
         elif name == "func_1419B78C0":
@@ -234,7 +391,8 @@ def main():
             machine.mem_write(arena + 0x6200, store["price"].encode() + b"\0")
             returned(arena + 0x6200)
         elif name == "func_142084120":
-            store["result"] = string(values[1]); store["top"] += 1
+            store["result"] = string(values[1])
+            store["top"] += 1
             returned()
         elif name == "func_142089FB0":
             returned(0xFFFFFFFF)
@@ -247,10 +405,16 @@ def main():
     vm.hook_add(UC_HOOK_MEM_UNMAPPED, missing)
     vm.hook_add(UC_HOOK_CODE, boundary)
 
-    def run(name):
+    def run(name, *arguments):
         rsp = stack + 0x8000 - 8
         write(rsp, halt, "<Q")
         vm.reg_write(UC_X86_REG_RSP, rsp)
+        for register, value in zip(
+            (UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9), arguments
+        ):
+            vm.reg_write(register, value)
+        for index, value in enumerate(arguments[4:]):
+            write(rsp + 40 + index * 8, value, "<Q")
         vm.emu_start(name if isinstance(name, int) else base + symbols[name], halt, count=100000)
         assert vm.reg_read(UC_X86_REG_RIP) == halt
         return vm.reg_read(UC_X86_REG_RAX) & 255
@@ -259,6 +423,7 @@ def main():
     write(arena + 0x3000 + 40, 150)
     lobby_identity = base + symbols["gl_14C27E4B0"] + 79656
     write(lobby_identity, 1, "<Q")
+    write(base + symbols["gl_14C27E4B0"] + 80128, 1, "<B")
     run("DW_LobbyControls_Frame")
     assert read(arena + 0x3000 + 40) == 2
     write(dvars["gl_14D386840"] + 40, 152)
@@ -277,7 +442,9 @@ def main():
     assert read(dvars["gl_14D386840"] + 40) == 152 and settings["slots"] == 152
     run("DW_LobbyControls_Frame")
     assert len(calls) == 4
-    checks.append("BR prepares seven requested bots, retains its 152-slot capacity, restores squad count and requests native start once")
+    checks.append(
+        "BR prepares seven requested bots, retains its 152-slot capacity, restores squad count and requests native start once"
+    )
     assert run("func_140CA1C80") == 1
     for key, value in (("systemlink", True), ("controller", -1), ("mode", 3)):
         old = settings[key]
@@ -294,7 +461,9 @@ def main():
     assert run("func_140CA1C80") == 0
     settings["playlist_bots"] = True
     assert run("func_140CA1C80") == 1
-    checks.append("Bot eligibility preserves native online, platform, mode, controller and playlist checks")
+    checks.append(
+        "Bot eligibility preserves native online, platform, mode, controller and playlist checks"
+    )
     run("DW_LobbyControls_Frame")
     write(registered["replay_dw_forceStart"] + 40, 1)
     run("DW_LobbyControls_Frame")
@@ -316,23 +485,58 @@ def main():
         assert read(registered["replay_dw_botCount"] + 40) == 0
         settings[key] = True
     run(command["callback"])
-    assert read(registered["replay_dw_botCount"] + 40) == 4
+    assert read(registered["replay_dw_botCount"] + 40) == 0
+
+    def submitted(expected):
+        body = b'{"test":1}\0'
+        vm.mem_write(arena + 0x6300, body)
+        write(arena + 0x6200, arena + 0x6300, "<Q")
+        write(arena + 0x6220, len(body))
+        run(
+            "DW_LobbyControls_HostDocument",
+            read(lobby_identity, "<Q"),
+            base + symbols["gl_14C27E4B0"] + 131864,
+            arena + 0x6200,
+            arena + 0x6220,
+        )
+        assert json.loads(string(read(arena + 0x6200, "<Q"))) == {
+            "test": 1,
+            "dw_bot_count": expected,
+        }
+        write(arena + 0xC200, arena + 0xC600, "<Q")
+        write(arena + 0xC600, arena + 0xFD00, "<Q")
+        write(arena + 0xC208, arena + 0xC400, "<Q")
+        run("func_140F77B40", arena + 0xC200, arena + 0xC900,
+            read(lobby_identity, "<Q"), base + symbols["gl_14C27E4B0"] + 131864,
+            arena + 0x6300, len(body), 123)
+        assert command["submitted"] == {"test": 1, "dw_bot_count": expected}
+        assert read(arena + 0xC900, "<Q") == arena + 0xC800
+        # The native backend update publishes this only after accepting the task.
+        write(registered["replay_dw_botCount"] + 40, expected)
+
+    submitted(4)
     settings["requested"] = 4
     run("DW_LobbyControls_Frame")
     assert settings["bots"] == 4
     vm.mem_write(arena + 0x5000, b"199\0")
     run(command["callback"])
-    assert read(registered["replay_dw_botCount"] + 40) == 150
+    assert read(registered["replay_dw_botCount"] + 40) == 4
+    submitted(150)
     settings["requested"] = 150
     run("DW_LobbyControls_Frame")
     assert settings["bots"] == 150 and settings["slots"] == 152
     assert read(dvars["gl_14C796328"] + 40) == 200
     assert read(dvars["gl_14D386840"] + 40) == 152
-    checks.append("Linked fill_lobby command rejects invalid counts and non-host contexts, adds to the native pool and clamps at the original playlist capacity")
+    checks.append(
+        "Linked fill_lobby command rejects invalid counts and non-host contexts, adds to the native pool and clamps at the original playlist capacity"
+    )
     write(lobby_identity, 3, "<Q")
+    write(registered["replay_dw_botCount"] + 40, 0)  # new backend round's document
     run("DW_LobbyControls_Frame")
     assert read(registered["replay_dw_botCount"] + 40) == 0
-    checks.append("A command-owned bot request is cleared when native matchmaking changes lobby identity")
+    checks.append(
+        "A command-owned bot request is cleared when native matchmaking changes lobby identity"
+    )
     write(base + symbols["gl_151868880"], arena + 0x9000, "<Q")
     lua["now"] += 1000
     write(dvars["gl_14D386820"] + 40, 1)
@@ -341,7 +545,9 @@ def main():
     assert settings["slots"] == 200
     assert lua["limits"] == dict(BotLimit=200, BotLimitForSplitScreen=200, SINGLE_TIER_COST=0)
     assert not lua["locked"] and lua["top"] == 2
-    checks.append("Custom setup uses the full native slot capacity; Lua table updates preserve the VM stack and native LUI locking")
+    checks.append(
+        "Custom setup uses the full native slot capacity; Lua table updates preserve the VM stack and native LUI locking"
+    )
     write(arena + 0x3000 + 29, 9, "<B")
     write(arena + 0x3000 + 24, 256)
     vm.mem_write(arena + 0x4000, b"12\0")
@@ -351,7 +557,9 @@ def main():
     pointer = read(arena + 0x3000 + 40, "<Q")
     page(pointer)
     assert string(pointer) == "2" and read(arena + 0x3000 + 24) == 256
-    checks.append("BR's actual script-created STRING type receives value 2 without changing its registration or flags")
+    checks.append(
+        "BR's actual script-created STRING type receives value 2 without changing its registration or flags"
+    )
     store["active"] = True
     for table, column, value, enabled, exists, expected in (
         ("loot/bundle_ids.csv", 10, "500", True, True, "0"),
@@ -373,12 +581,35 @@ def main():
     store["top"] = 3
     assert run("func_1419BA320") == 255
     for column, expected in ((8, "0"), (9, "0"), (6, "1000")):
-        store.update(top=3, table="loot/battlepass_ids.csv", column=column, price="1000", exists=True, result=None)
+        store.update(
+            top=3,
+            table="loot/battlepass_ids.csv",
+            column=column,
+            price="1000",
+            exists=True,
+            result=None,
+        )
         settings["enabled"] = True
         assert run("func_1419BA610") == 1 and store["result"] == expected and store["top"] == 4
-    checks.append("Both native keyed and row CSV readers expose free Battle Pass prices while preserving IDs and Lua stack/arity")
-    checks.append("Native bundle price binding zeros regular, sale and smart costs only for DW; other columns/tables, missing rows, non-DW calls and Lua arity retain their original behavior")
-    args.output.write_text(json.dumps(dict(schema=1, passed=True, game_sha256=report["sha256"], checks=checks, native_game_verified=False), indent=2) + "\n")
+    checks.append(
+        "Both native keyed and row CSV readers expose free Battle Pass prices while preserving IDs and Lua stack/arity"
+    )
+    checks.append(
+        "Native bundle price binding zeros regular, sale and smart costs only for DW; other columns/tables, missing rows, non-DW calls and Lua arity retain their original behavior"
+    )
+    args.output.write_text(
+        json.dumps(
+            dict(
+                schema=1,
+                passed=True,
+                game_sha256=report["sha256"],
+                checks=checks,
+                native_game_verified=False,
+            ),
+            indent=2,
+        )
+        + "\n"
+    )
     print(f"PASS: {len(checks)} linked native control groups")
 
 

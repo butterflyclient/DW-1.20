@@ -8,6 +8,8 @@ extern "C"
     bool DW_LocalBackend_IsEnabled();
     void DW_BotPolicy_Register();
     void DW_BotPolicy_Prepare(const void *);
+    void DW_BotPolicy_BuildRoster(const void *, unsigned, unsigned);
+    void replay_rva_00ca2070();                 // BG_GameStateInfo_ClearBotData
     bool replay_rva_01187fa0();                 // Lobby_IsInLobby
     void *replay_rva_01187ee0();                // Lobby_GetPartyData
     bool replay_rva_01189120(const void *);     // Party_AreWeHost
@@ -72,6 +74,9 @@ namespace
     cmd_function_s s_fillCommand{};
     uint64_t s_lobby = 0;
     int s_commandBotCount = 0;
+    unsigned s_requestStarted = 0;
+    bool s_requestPending = false;
+    char s_requestDocument[16384]{};
 
     void SyncLobby()
     {
@@ -80,13 +85,9 @@ namespace
         const auto lobby = *reinterpret_cast<const uint64_t *>(replay_rva_0c27e4b0 + 79656);
         if (lobby == s_lobby)
             return;
-        if (s_commandBotCount && s_botCount->current.integer == s_commandBotCount)
-        {
-            DvarValue cleared{};
-            Dvar_SetVariant(s_botCount, &cleared, 0);
-        }
         s_lobby = lobby;
         s_commandBotCount = 0;
+        s_requestPending = false;
         s_filled = false;
         s_started = false;
     }
@@ -148,8 +149,8 @@ namespace
                 if (!replay_rva_0118e020(party, i) && replay_rva_00ca2270(i))
                     ++bots;
         // A second command before the next frame also includes the queued bots.
-        if (!s_filled && s_botCount->current.integer > int(bots))
-            bots = unsigned(s_botCount->current.integer);
+        if (s_requestPending && s_commandBotCount > int(bots))
+            bots = unsigned(s_commandBotCount);
         if (bots >= capacity - humans)
         {
             Com_Printf(25, "fill_lobby: the lobby is already full.\n");
@@ -157,17 +158,19 @@ namespace
         }
         const auto available = capacity - humans - bots;
         const auto added = requested < available ? requested : available;
-        DvarValue value{};
-        value.integer = int(bots + added);
-        Dvar_SetVariant(s_botCount, &value, 0);
-        s_commandBotCount = value.integer;
-        s_filled = false;
+        s_commandBotCount = int(bots + added);
+        s_requestPending = true;
+        s_requestStarted = replay_rva_0148fce0();
+        // Queue the SDK's existing authenticated 145/15 host document update.
+        // The backend retains the count; no operator credential is used.
+        *reinterpret_cast<bool *>(replay_rva_0c27e4b0 + 79636) = true;
+        *reinterpret_cast<unsigned *>(replay_rva_0c27e4b0 + 79640) = 0;
         Com_Printf(
             25,
             "fill_lobby: adding %u bots (%u requested); %u bots total, playlist capacity %u.\n",
             added,
             requested,
-            unsigned(value.integer),
+            unsigned(s_commandBotCount),
             capacity);
     }
 
@@ -283,6 +286,21 @@ extern "C" void DW_LobbyControls_Frame()
     if (!party || !replay_rva_0118dd00(party) || !replay_rva_01189120(party))
         return;
     SyncLobby();
+    if (s_requestPending)
+    {
+        if (s_botCount->current.integer == s_commandBotCount)
+        {
+            s_requestPending = false;
+            s_filled = false;
+            Com_Printf(
+                25, "fill_lobby: backend accepted %u native bots.\n", unsigned(s_commandBotCount));
+        }
+        else if (unsigned(replay_rva_0148fce0() - s_requestStarted) > 15000)
+        {
+            s_requestPending = false;
+            Com_Printf(25, "fill_lobby: backend request timed out; no local-only fill applied.\n");
+        }
+    }
     if (gl_14D386820->current.enabled)
     {
         if (gl_14D386840->current.integer != 200 || replay_rva_0118c7d0(party) != 200)
@@ -325,6 +343,7 @@ extern "C" void DW_LobbyControls_Frame()
         }
         // Initialize only the native bot quotas and pool. Party slots and their
         // network encoding retain the playlist's actual capacity (e.g. 152 BR).
+        replay_rva_00ca2070();
         replay_rva_00ca2370(int(total), saved.integer == 2 ? 2 : 0);
         if (saved.integer == 2)
         {
@@ -337,6 +356,7 @@ extern "C" void DW_LobbyControls_Frame()
             replay_rva_01119b40(1, uint8_t(axis));
         }
         replay_rva_00ca1d20();
+        DW_BotPolicy_BuildRoster(party, capacity, requested);
         if (saved.integer > 2)
             Dvar_SetVariant(teams, &saved, 0);
         DW_BotPolicy_Prepare(party);
@@ -355,4 +375,37 @@ extern "C" void DW_LobbyControls_Frame()
         s_started = true;
         Com_Printf(25, "DW_LOBBY_START native host start requested.\n");
     }
+}
+
+// The migration and lobby controls share Replay's original host-document SDK
+// wrapper. Extend its bounded JSON before the SDK copies the caller's buffer.
+extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
+                                              void *result,
+                                              const char **document,
+                                              unsigned *length)
+{
+    if (!s_requestPending || lobby != s_lobby || result != replay_rva_0c27e4b0 + 131864 ||
+        !*reinterpret_cast<const bool *>(replay_rva_0c27e4b0 + 80128))
+        return;
+    if (!document || !*document || !length || *length < 3 ||
+        *length > sizeof(s_requestDocument) - 64 || (*document)[*length - 1] != 0 ||
+        (*document)[*length - 2] != '}')
+    {
+        s_requestPending = false;
+        Com_Printf(25, "fill_lobby: host document has no room for the request.\n");
+        return;
+    }
+    for (unsigned i = 0; i < *length - 2; ++i)
+        s_requestDocument[i] = (*document)[i];
+    const int added = Com_sprintf(s_requestDocument + *length - 2,
+                                  sizeof(s_requestDocument) - (*length - 2),
+                                  ",\"dw_bot_count\":%u}",
+                                  unsigned(s_commandBotCount));
+    if (added <= 0 || unsigned(added) >= sizeof(s_requestDocument) - (*length - 2))
+    {
+        s_requestPending = false;
+        return;
+    }
+    *length = *length - 2 + unsigned(added) + 1;
+    *document = s_requestDocument;
 }

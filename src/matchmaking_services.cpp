@@ -197,7 +197,8 @@ namespace services
         Json nativeBackendDocument(const Json &lobby)
         {
             auto backendDocument = lobby.at("backend_doc");
-            const unsigned squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+            const unsigned squadSize =
+                lobby.value("match_selection", Json::object()).value("squad_size", 0u);
             auto &botRules = backendDocument["ruleset_payload"]["dvar_overrides"];
             botRules["replay_dw_squadSize"] = squadSize;
             std::string reserved(50, '0');
@@ -208,12 +209,15 @@ namespace services
                 // groups which native bots may occupy later.
                 auto &teams = backendDocument["team_balance"]["teams"];
                 teams = backendDocument["team_balance"]["squads"];
-                const auto groups = (lobby.at("maximum_members").get<unsigned>() + squadSize - 1) / squadSize;
+                const auto groups =
+                    (lobby.at("maximum_members").get<unsigned>() + squadSize - 1) / squadSize;
                 wire::require(groups > 0 && groups <= 200);
                 for (unsigned i = 0; i < groups; ++i)
                     if (!teams.contains(std::to_string(i)))
                         teams[std::to_string(i)] = Json::array();
-                botRules[lobby.at("match_selection").value("native_team_count_dvar", std::string("party_teamCount"))] = groups;
+                botRules[lobby.at("match_selection")
+                             .value("native_team_count_dvar", std::string("party_teamCount"))] =
+                    groups;
                 const auto fill = lobby.value("squad_fill", Json::object());
                 for (const auto &entry : backendDocument["team_balance"]["squads"].items())
                     if (!fill.value(entry.key(), false))
@@ -221,7 +225,9 @@ namespace services
                         const unsigned group = unsigned(std::stoul(entry.key()));
                         wire::require(group < 200);
                         auto &digit = reserved[49 - group / 4];
-                        const unsigned bits = unsigned(digit <= '9' ? digit - '0' : digit - 'a' + 10) | (1u << (group % 4));
+                        const unsigned bits =
+                            unsigned(digit <= '9' ? digit - '0' : digit - 'a' + 10) |
+                            (1u << (group % 4));
                         digit = "0123456789abcdef"[bits];
                     }
             }
@@ -672,6 +678,8 @@ namespace services
                 pool["squad_size"] = selection.squadSize;
                 // Fill is a party preference, not a separate matchmaking pool.
                 pool["team_balance"].erase("lock_squad");
+                // BR groups come from squads. A stale MP/previous-round team
+                // count must not split otherwise compatible searching parties.
                 pool["team_balance"].erase("num_teams");
             }
             return pool;
@@ -847,7 +855,10 @@ namespace services
                     continue;
                 auto candidate = loadLobby(path, id);
                 const auto compatible = selectPlaylist(
-                    directory, id.titleId, query, {},
+                    directory,
+                    id.titleId,
+                    query,
+                    {},
                     candidate.at("match_selection").at("playlist_id").get<unsigned>());
                 if (!compatible)
                     continue;
@@ -875,7 +886,8 @@ namespace services
                 // Replay's accepted initial host snapshots use an empty state
                 // while waiting for players. They are open pre-game lobbies;
                 // the owner/session/capacity checks above still apply.
-                if (!state.empty() && state != "intermission" && !(inProgress && state == "in_game"))
+                if (!state.empty() && state != "intermission" &&
+                    !(inProgress && state == "in_game"))
                     continue;
                 candidates.push_back(std::move(candidate));
             }
@@ -1222,6 +1234,7 @@ namespace services
                     return Reply{0, {std::move(result.data)}, "matchmaker-lobby-documents-read"};
                 }
                 const bool migration = lobby.at("owner") != id.userId;
+                bool retainingHost = false;
                 std::string address;
                 if (migration)
                 {
@@ -1230,8 +1243,19 @@ namespace services
                     // 0x14104DBD0 retains their DTLS keys and sets its own UID
                     // and native address before UpdateHostDoc 0x14104BFA0.
                     // The party elects its host; this service validates its claim.
-                    if (hostSessionActive(lobby, id.titleId))
+                    // A live host may explicitly authorize one member/session
+                    // through its own authenticated 145/15 document update.
+                    // Keeping that host connected must not enable arbitrary claims.
+                    const auto handoff = lobby.value("host_handoff", Json::object());
+                    const bool authorized =
+                        handoff.value("target", uint64_t{}) == id.userId &&
+                        handoff.value("session", std::string{}) == sessionFingerprint(id) &&
+                        handoff.value("owner_session", std::string{}) ==
+                            lobby.value("owner_session", std::string{}) &&
+                        handoff.value("expires", uint64_t{}) > now();
+                    if (hostSessionActive(lobby, id.titleId) && !authorized)
                         return Reply{101, {}, "matchmaker-host-update-owner-denied"};
+                    retainingHost = authorized && hostSessionActive(lobby, id.titleId);
                     const auto assignments = currentLobbies(root, id);
                     const auto key = std::to_string(id.userId);
                     if (!assignments["lobbies"].contains(key) ||
@@ -1308,9 +1332,44 @@ namespace services
                     wire::require(lobby["backend_doc"]["players"].contains(it.key()));
                 }
                 wire::require(revision != UINT64_MAX);
+                if (retainingHost)
+                {
+                    const auto oldHost = std::to_string(lobby.at("owner").get<uint64_t>());
+                    wire::require(host["player_state"].contains(oldHost) &&
+                                  host["player_state"][oldHost].get<uint64_t>() < 4);
+                }
+                if (host.contains("dw_migration_target"))
+                {
+                    wire::require(!migration && host["dw_migration_target"].is_number_unsigned());
+                    const auto target = host["dw_migration_target"].get<uint64_t>();
+                    wire::require(target != id.userId && member(lobby, target));
+                    const auto targetKey = std::to_string(target);
+                    const auto targetPath = root / "players" / (targetKey + ".json");
+                    if (!std::filesystem::exists(targetPath))
+                        return Reply{108, {}, "matchmaker-handoff-target-missing"};
+                    auto targetIdentity = id;
+                    targetIdentity.userId = target;
+                    const auto player = read(targetPath, targetIdentity);
+                    const auto session = player.value("token_session", std::string{});
+                    if (session.empty() || player.value("token_expires", uint64_t{}) <= now() ||
+                        !lobby::sessionOnline(id.titleId, target, session))
+                        return Reply{108, {}, "matchmaker-handoff-target-offline"};
+                    // Retain both players in the same save/lobby. The successor
+                    // still passes all normal token, assignment and address gates.
+                    wire::require(host["player_state"].contains(targetKey) &&
+                                  host["player_state"][targetKey] == 2 &&
+                                  host["player_state"].contains(std::to_string(id.userId)) &&
+                                  host["player_state"][std::to_string(id.userId)] == 2);
+                    lobby["host_handoff"] = {{"target", target},
+                                             {"session", session},
+                                             {"owner_session", sessionFingerprint(id)},
+                                             {"expires", now() + 60}};
+                    host.erase("dw_migration_target");
+                }
                 const auto documentTime = nextDocumentTime(lobby);
                 if (migration)
                 {
+                    lobby.erase("host_handoff");
                     lobby["owner"] = id.userId;
                     lobby["owner_session"] = sessionFingerprint(id);
                     auto &order = lobby["backend_doc"]["listen_server"]["lobby_host_order"];
@@ -1319,6 +1378,44 @@ namespace services
                     order.insert(order.begin(), id.userId);
                 }
                 auto writes = reconcileMembers(root, id, lobby, host);
+                if (host.contains("dw_bot_count"))
+                {
+                    // This extension travels in Replay's authenticated 145/15
+                    // host update. Apply the same authoritative native rules as
+                    // the operator panel without exposing its credentials.
+                    wire::require(!migration && host["dw_bot_count"].is_number_unsigned());
+                    const auto count = host["dw_bot_count"].get<uint64_t>();
+                    const auto phase = host.value("game_state", Json::object())
+                                           .value("state", std::string{});
+                    wire::require(operatorCanStart(lobby) &&
+                                  (phase.empty() || phase == "intermission") &&
+                                  count > 0 && count <= 199);
+                    const auto slots = occupiedSlots(
+                        lobby.at("members"), lobby["backend_doc"]["player_id_to_slots"]);
+                    const auto capacity = lobby.at("maximum_members").get<uint64_t>();
+                    wire::require(slots <= capacity && count <= capacity - slots);
+                    const auto bindingPath = directory / "playlists" /
+                                             std::to_string(id.titleId) / "native-dvar-names.json";
+                    wire::require(std::filesystem::file_size(bindingPath) <= 1024 * 1024);
+                    std::ifstream stream(bindingPath);
+                    Json bindings;
+                    stream >> bindings;
+                    wire::require(bindings.is_object());
+                    auto &overrides = lobby["backend_doc"]["ruleset_payload"]["dvar_overrides"];
+                    for (const auto *name : {"replay_dw_fillBots", "replay_dw_botCount"})
+                    {
+                        const auto key = bindings.contains(name)
+                                             ? bindings.at(name).get<std::string>() : name;
+                        wire::require(!key.empty() && key.size() <= 128);
+                        if (!lobby["operator_start_overrides"].contains(key))
+                            lobby["operator_start_overrides"][key] = overrides.value(key, Json());
+                        overrides[key] = name == std::string_view("replay_dw_botCount") ? count : 0;
+                    }
+                    wire::require(overrides.size() <= 128);
+                    lobby["operator_bots_requested"] = true;
+                    lobby["operator_bot_count"] = count;
+                    host.erase("dw_bot_count");
+                }
                 const auto oldPhase = lobby["host_doc"]["game_state"].value("state", std::string{});
                 const auto newPhase = host.value("game_state", Json::object()).value("state", std::string{});
                 if ((lobby.value("operator_start_requested", false) ||
@@ -1368,8 +1465,10 @@ namespace services
                 for (const auto user : joiningMembers)
                 {
                     const std::set<uint64_t> recipient{user};
-                    const auto mmId = lobby.at("backend_doc").at("player_id_to_mm_id")
-                                          .at(std::to_string(user)).get<uint64_t>();
+                    const auto mmId = lobby.at("backend_doc")
+                                          .at("player_id_to_mm_id")
+                                          .at(std::to_string(user))
+                                          .get<uint64_t>();
                     notify(reply, lobby, 2001, mmId, &recipient);
                 }
                 std::set<uint64_t> observers;

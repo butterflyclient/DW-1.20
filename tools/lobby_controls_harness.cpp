@@ -1,6 +1,7 @@
 // Isolated policy checks. Engine boundaries are modeled; no game is launched.
 #include "../integration/replay/DW_LobbyControls.cpp"
 #include <initializer_list>
+#include <stdarg.h>
 
 namespace
 {
@@ -20,13 +21,14 @@ namespace
         ++*reinterpret_cast<uint64_t *>(replay_rva_0c27e4b0 + 79656);
         initialized = false;
         existingBots = 0;
+        registered[2].current.integer = 0; // new authoritative lobby document
         DW_LobbyControls_Frame();
     }
 } // namespace
 
 extern "C"
 {
-    uint8_t replay_rva_0c27e4b0[79664]{};
+    uint8_t replay_rva_0c27e4b0[132000]{};
     dvar_t *gl_14D386820 = &privateMatch, *gl_14D386948 = &selector;
     dvar_t *gl_14D386840 = &maxPlayers, *gl_14C796328 = &teams;
     dvar_t *DVARBOOL_onlinegame = &online;
@@ -50,6 +52,44 @@ extern "C"
     int Com_GameMode_GetActiveGameMode()
     {
         return 2;
+    }
+
+    void replay_rva_00ca2070()
+    {
+        initialized = false;
+        existingBots = 0;
+    }
+
+    void DW_BotPolicy_BuildRoster(const void *, unsigned, unsigned count)
+    {
+        existingBots = count;
+    }
+
+    int Com_sprintf(char *out, size_t size, const char *, ...)
+    {
+        const char *prefix = ",\"dw_bot_count\":";
+        size_t used = 0;
+        while (prefix[used])
+        {
+            if (used + 1 >= size)
+                return -1;
+            out[used] = prefix[used];
+            ++used;
+        }
+        unsigned value = unsigned(s_commandBotCount), divisor = 100;
+        while (divisor > 1 && value < divisor)
+            divisor /= 10;
+        do
+        {
+            if (used + 2 >= size)
+                return -1;
+            out[used++] = char('0' + value / divisor);
+            value %= divisor;
+            divisor /= 10;
+        } while (divisor);
+        out[used++] = '}';
+        out[used] = 0;
+        return int(used);
     }
 
     void DW_BotPolicy_Register() {}
@@ -241,6 +281,7 @@ extern "C" __declspec(dllexport) int Test_Run()
     teams.current.integer = 2;
     maxPlayers.current.integer = 12;
     *reinterpret_cast<uint64_t *>(replay_rva_0c27e4b0 + 79656) = 1;
+    *reinterpret_cast<bool *>(replay_rva_0c27e4b0 + 80128) = true;
     DW_LobbyControls_Frame();
     CHECK(command && registrationCount == 3);
     for (const char *bad : {"", "0", "-1", "+2", "1.5", "199x", "200", "99999999999999"})
@@ -269,10 +310,11 @@ extern "C" __declspec(dllexport) int Test_Run()
         CHECK(!registered[2].current.integer);
     }
     command();
-    CHECK(registered[2].current.integer == 4);
+    CHECK(!registered[2].current.integer && s_commandBotCount == 4);
     argument = "2";
     command();
-    CHECK(registered[2].current.integer == 6); // back-to-back queued additions
+    CHECK(!registered[2].current.integer && s_commandBotCount == 6); // queued additions
+    registered[2].current.integer = s_commandBotCount;               // accepted backend document
     DW_LobbyControls_Frame();
     CHECK(existingBots == 6 && setupTotal == 7 && teamLimits[0] == 4 && teamLimits[1] == 3);
     CHECK(changed == 1 && prepared == 1 && !maximumWrites && capacity == 12);
@@ -280,6 +322,7 @@ extern "C" __declspec(dllexport) int Test_Run()
     CHECK(setupCalls == 1);
     argument = "199";
     command();
+    registered[2].current.integer = s_commandBotCount; // accepted backend document
     DW_LobbyControls_Frame();
     CHECK(existingBots == 11 && setupTotal == 12 && capacity == 12);
     command();
@@ -294,6 +337,7 @@ extern "C" __declspec(dllexport) int Test_Run()
     teams.current.integer = 51;
     argument = "20";
     command();
+    registered[2].current.integer = s_commandBotCount; // accepted backend document
     DW_LobbyControls_Frame();
     CHECK(existingBots == 20 && setupTotal == 22 && teams.current.integer == 51);
     CHECK(capacity == 152 && !maximumWrites && prepared == 3);
@@ -310,6 +354,7 @@ extern "C" __declspec(dllexport) int Test_Run()
     humanAllies = 3;
     argument = "1";
     command();
+    registered[2].current.integer = s_commandBotCount; // accepted backend document
     const auto previous = setupCalls;
     DW_LobbyControls_Frame();
     CHECK(setupCalls == previous && teams.current.integer == 2);

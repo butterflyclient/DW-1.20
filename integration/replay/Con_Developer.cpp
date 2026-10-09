@@ -6,6 +6,7 @@
 
 extern "C" {
 bool DW_LocalBackend_IsEnabled();
+void DW_HostMigration_Frame();
 void replay_rva_015ae0b0(int); // Con_DrawConsole, exact Replay implementation
 bool replay_rva_015b0ef0(int); // Con_IsActive
 uintptr_t replay_rva_012aa180(void*); // CL_Keys_ClearField
@@ -216,6 +217,7 @@ extern "C" void func_1415B1930() {
 extern "C" const void* replay_rva_0eeb0c58; // cls.consoleFont, native Con_CheckResize
 extern "C" void Con_DeveloperFrame() {
     if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread()) return;
+    DW_HostMigration_Frame();
     Con_UpdateDeveloperInput(0);
     if (replay_rva_0eeb0c58 && replay_rva_015b0ef0(0))
         replay_rva_015ae0b0(0);
