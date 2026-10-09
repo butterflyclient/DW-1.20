@@ -11,6 +11,7 @@ import urllib.request
 import argparse
 from native_loot_inventory import snapshot as loot_inventory_snapshot
 from native_quests import snapshot as quest_snapshot, table as quest_table
+from native_battlepass import snapshot as battlepass_snapshot
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -75,6 +76,9 @@ parser.add_argument(
     "--quests",
     action="store_true",
     help="Read native mission states and activation slots",
+)
+parser.add_argument(
+    "--battlepass", action="store_true", help="Read native season XP/tier caches without writes"
 )
 parser.add_argument(
     "--quest-table",
@@ -1655,6 +1659,7 @@ try:
             loot_inventory_snapshot(read, symbols) if args.inventory else None
         ),
         "native_quests": quest_snapshot(read, symbols) if args.quests else None,
+        "native_battlepass": battlepass_snapshot(read, symbols) if args.battlepass else None,
         "native_quest_table": (
             quest_table(read, symbols, base) if args.quest_table else None
         ),

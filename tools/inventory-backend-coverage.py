@@ -111,6 +111,18 @@ GAPS = {
 # Current rank/chat/BR source contracts. Deployment and native completion
 # remain independently checked by the hash-bound evidence readers below.
 GAPS["125"] += (
+    " Native mp_addxp.Param4 now earns exact current-season Battle Pass XP through "
+    "the recoverable event transaction, independently of player and weapon XP. "
+    "Free/premium tier rewards, once-only COD Points, fractional XP on late premium "
+    "activation, tier-100 saturation and non-completing retry refreshes share one "
+    "tier advancement implementation. Original Replay FlushXPCache execution "
+    "proves the independent 64-bit field and first-weapon-only emission. Sixteen "
+    "focused encrypted fixture groups pass on the deployed Linux image. A fresh "
+    "shipping-game login restores its tier/XP cache; the short Shipment runs "
+    "emitted only zero-XP match events, so a positive native match-earned Battle "
+    "Pass callback remains unverified."
+)
+GAPS["125"] += (
     " Native player and 51 canonical weapon XP snapshots now include uppercase "
     "ACHIEVEMENT routing. Shipped initial items, player-rank features and unconditional "
     "weapon-rank items receive absolute owned inventory through the same recoverable "

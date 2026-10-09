@@ -86,19 +86,27 @@ def main():
     activate = lambda selected: structure(
         text(1, "5800") + text(2, "") + integer(3, 1000) + integer(4, selected)
     )
-    send = lambda name, request: structure(
-        text(1, "5800")
-        + binary(
-            2,
-            text(1, name)
-            + integer(2, 1000)
-            + integer(4, 0)
-            + binary(3, text(1, "version") + integer(2, 1)),
-        )
-        + text(3, request)
-    )
+
+    def send(name, request, values=None):
+        values = {"version": 1, **(values or {})}
+        event = text(1, name) + integer(2, 1000) + integer(4, 0)
+        for key, value in values.items():
+            event += binary(3, text(1, key) + integer(2, value))
+        return structure(text(1, "5800") + binary(2, event) + text(3, request))
+
+    def received(client):
+        events = []
+        while client.pushes:
+            events.append(decode_event67(client.pushes.pop(0), client.user)[2])
+        while not any(row["kind"] == 20 for row in events):
+            kind, packet = client.receive()
+            assert kind == 2
+            events.append(decode_event67(packet, client.user)[2])
+        return [row for row in events if row["kind"] == 20]
+
     config = json.loads((args.publication / "rules.json").read_bytes())
     thresholds = config["seasons"]["3"]
+
     def reject(client, request, expected):
         try:
             client.task(125, 5, request)
@@ -110,11 +118,110 @@ def main():
     process = start()
     try:
         with NativeClient(fixture, profile="unowned", port_offset=offset) as client:
-            user_state = json.loads(fields(client.task(125, 9, structure(text(1, "5800"))))[1][0])
+            user_state = json.loads(
+                fields(client.task(125, 9, structure(text(1, "5800"))))[1][0]
+            )
             assert "battlepass3_owned" not in user_state
             reject(client, activate(3002001), 101)
             reject(client, activate(3000006), 101)
             checks.append("Unowned premium packages and tokens cannot be activated")
+            state_path = (
+                data / "achievements/5800/5800" / str(client.user) / "states.json"
+            )
+            inventory_path = (
+                data / "marketplace/5800" / str(client.user) / "inventory.json"
+            )
+            battlepass_state = lambda: next(
+                row
+                for row in json.loads(state_path.read_bytes())
+                if row["id"] == 3002000
+            )
+            amount = thresholds[3]["xp"] + 1
+            client.task(
+                125, 1, send("mp_addxp", "earned-free", {"Param0": 0, "Param4": amount})
+            )
+            updates = received(client)
+            assert updates[-1]["reason"] == "completed"
+            state = battlepass_state()
+            assert state["multiProgress"][0]["current"] == amount
+            assert state["multiProgress"][1]["current"] == 3 and not state.get(
+                "premium", False
+            )
+            for tier in thresholds[:4]:
+                key = ("free:" if tier["free"] else "premium:") + str(tier["rank"])
+                assert (key in state["claimed"]) == tier["free"]
+            checks.append(
+                "Native Param4 alone earns exact Battle Pass XP and free-track rewards without purchasing premium"
+            )
+            client.task(
+                125, 1, send("mp_addxp", "earned-fraction", {"Param0": 0, "Param4": 1})
+            )
+            assert received(client)[-1]["reason"] == "inProgress"
+            snapshot = (state_path.read_bytes(), inventory_path.read_bytes())
+            client.task(
+                125, 1, send("mp_addxp", "earned-fraction", {"Param0": 0, "Param4": 1})
+            )
+            refresh = received(client)[-1]
+            assert refresh["reason"] == "inProgress" and not refresh.get("triggers")
+            assert snapshot == (state_path.read_bytes(), inventory_path.read_bytes())
+            checks.append(
+                "Within-tier updates and exact retries refresh absolute XP without another tier-completion effect or reward"
+            )
+            client.task(80, 106, buy(432000, "earned-premium"), structured=False)
+            client.task(125, 5, activate(3002001))
+            client.task(
+                125, 1, send("activate_battlepass_s3", "earned-premium-activation")
+            )
+            received(client)
+            state = battlepass_state()
+            assert (
+                state["premium"] and state["multiProgress"][0]["current"] == amount + 1
+            )
+            assert all(
+                ("free:" if tier["free"] else "premium:") + str(tier["rank"])
+                in state["claimed"]
+                for tier in thresholds[:4]
+            )
+            checks.append(
+                "Later premium activation preserves earned fractional XP and backfills only previously unclaimed premium rewards"
+            )
+            target = thresholds[6]["xp"] + 7
+            delta = target - state["multiProgress"][0]["current"]
+            blocked = inventory_path.with_name(inventory_path.name + ".pending")
+            blocked.mkdir()
+            try:
+                try:
+                    client.task(
+                        125,
+                        1,
+                        send(
+                            "mp_addxp",
+                            "earned-recovery",
+                            {"Param0": 0, "Param4": delta},
+                        ),
+                    )
+                except RuntimeError as failure:
+                    assert str(failure).endswith("returned 102"), failure
+                else:
+                    raise AssertionError(
+                        "Blocked earned-tier inventory write succeeded"
+                    )
+                assert (data / "achievements/5800/event-transaction.json").exists()
+            finally:
+                blocked.rmdir()
+            client.task(
+                125,
+                1,
+                send("mp_addxp", "earned-recovery", {"Param0": 0, "Param4": delta}),
+            )
+            assert received(client)[-1]["reason"] == "inProgress"
+            assert battlepass_state()["multiProgress"][0]["current"] == target
+            assert not (data / "achievements/5800/event-transaction.json").exists()
+            checks.append(
+                "A real earned-reward write interruption recovers its XP, grants and request receipt once"
+            )
+            earned_user = client.user
+            earned_snapshot = (state_path.read_bytes(), inventory_path.read_bytes())
         with NativeClient(fixture, profile="battlepass", port_offset=offset) as client:
             inventory = data / "marketplace/5800" / str(client.user) / "inventory.json"
             states = data / "achievements/5800/5800" / str(client.user) / "states.json"
@@ -128,14 +235,7 @@ def main():
 
             def event(name, request):
                 client.task(125, 1, send(name, request))
-                events = []
-                while client.pushes:
-                    events.append(decode_event67(client.pushes.pop(0), client.user)[2])
-                while not any(row["kind"] == 20 for row in events):
-                    kind, packet = client.receive()
-                    assert kind == 2
-                    events.append(decode_event67(packet, client.user)[2])
-                return events
+                return received(client)
 
             client.task(80, 106, buy(432001, "premium-plus-tokens"), structured=False)
             assert quantity(432000) == 1 and quantity(430006) == 1
@@ -192,29 +292,104 @@ def main():
                 except RuntimeError as failure:
                     assert str(failure).endswith("returned 102"), failure
                 else:
-                    raise AssertionError("Blocked inventory publication unexpectedly succeeded")
+                    raise AssertionError(
+                        "Blocked inventory publication unexpectedly succeeded"
+                    )
                 assert (data / "achievements/5800/event-transaction.json").exists()
             finally:
                 blocked.rmdir()
             event("skip_tier", "recovered-token-event")
-            assert quantity(430003) == 0 and get_state(3002000)["multiProgress"][1]["current"] == 24
+            assert (
+                quantity(430003) == 0
+                and get_state(3002000)["multiProgress"][1]["current"] == 24
+            )
             assert not (data / "achievements/5800/event-transaction.json").exists()
-            checks.append("Interrupted publication recovers its receipt, token debit, rewards and tier state once")
+            checks.append(
+                "Interrupted publication recovers its receipt, token debit, rewards and tier state once"
+            )
             user = client.user
         process.terminate()
         process.wait(timeout=10)
         process = start()
+        with NativeClient(fixture, profile="unowned", port_offset=offset) as client:
+            assert client.user == earned_user
+            client.task(
+                125,
+                1,
+                send("mp_addxp", "earned-recovery", {"Param0": 0, "Param4": delta}),
+            )
+            assert received(client)[-1]["reason"] == "inProgress"
+            assert earned_snapshot == (
+                state_path.read_bytes(),
+                inventory_path.read_bytes(),
+            )
+            checks.append(
+                "Earned Battle Pass progress and retry identity persist across an actual backend process restart"
+            )
+            before = battlepass_state()
+            client.task(
+                125, 1, send("mp_addxp", "player-only", {"Param0": 9000, "Param4": 0})
+            )
+            assert battlepass_state() == before
+            checks.append("Player XP without Param4 does not create Battle Pass credit")
+            client.task(
+                125,
+                1,
+                send("mp_addxp", "earned-cap", {"Param0": 0, "Param4": 2**64 - 1}),
+            )
+            received(client)
+            state = battlepass_state()
+            assert state["multiProgress"][0]["current"] == thresholds[100]["xp"]
+            assert state["multiProgress"][1]["current"] == 100
+            snapshot = (state_path.read_bytes(), inventory_path.read_bytes())
+            client.task(
+                125,
+                1,
+                send("mp_addxp", "earned-cap", {"Param0": 0, "Param4": 2**64 - 1}),
+            )
+            assert received(client)[-1]["reason"] == "inProgress"
+            assert snapshot == (state_path.read_bytes(), inventory_path.read_bytes())
+            checks.append(
+                "Unsigned 64-bit XP saturates at the native tier-100 threshold without overflow or duplicate rewards"
+            )
         with NativeClient(fixture, profile="battlepass", port_offset=offset) as client:
             assert (
                 client.user == user
                 and get_state(3002000)["multiProgress"][1]["current"] == 24
             )
-            user_state = json.loads(fields(client.task(125, 9, structure(text(1, "5800"))))[1][0])
-            assert user_state["battlepass3_owned"] == 1 and type(user_state["battlepass3_owned"]) is int
-            active = fields(client.task(125, 3, structure(text(1, "5800") + integer(2, 20) + integer(3, 100) + text(4, "") + integer(5, 1) + integer(5, 3) + integer(5, 5) + integer(8, 0))))
+            user_state = json.loads(
+                fields(client.task(125, 9, structure(text(1, "5800"))))[1][0]
+            )
+            assert (
+                user_state["battlepass3_owned"] == 1
+                and type(user_state["battlepass3_owned"]) is int
+            )
+            active = fields(
+                client.task(
+                    125,
+                    3,
+                    structure(
+                        text(1, "5800")
+                        + integer(2, 20)
+                        + integer(3, 100)
+                        + text(4, "")
+                        + integer(5, 1)
+                        + integer(5, 3)
+                        + integer(5, 5)
+                        + integer(8, 0)
+                    ),
+                )
+            )
             returned = [fields(row)[11][0] for row in active.get(1, [])]
-            assert 3002000 in returned and not {3002001, 3000002, 3000003, 3000006}.intersection(returned)
-            checks.append("The native login JSON restores integer ownership flags and excludes completed activations from the active query")
+            assert 3002000 in returned and not {
+                3002001,
+                3000002,
+                3000003,
+                3000006,
+            }.intersection(returned)
+            checks.append(
+                "The native login JSON restores integer ownership flags and excludes completed activations from the active query"
+            )
             client.task(125, 5, activate(3002001))
             event("activate_battlepass_s3", "premium-restart-repair")
             assert quantity(432000) == 0 and get_state(3002000)["premium"]

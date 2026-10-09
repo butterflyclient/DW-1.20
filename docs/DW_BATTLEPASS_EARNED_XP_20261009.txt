@@ -1,0 +1,61 @@
+Replay DW earned Battle Pass XP - 2026-10-09
+
+The deployed Linux backend is 1f4ad24b1cea894fd19a95e8577ea121abfd5c9785d9aa16fef3751824881a71.
+The root game EXE remains 80277fed1fe1488310ff271fc1af21272e2bc4ea453e5179312bc0d80f57494d.
+No game recompile or proxy DLL is required for this backend change.
+
+Issue: mp_addxp.Param4 was retained in the event journal but did not advance
+the Battle Pass. It is a separate 64-bit award from player XP (Param0) and
+weapon XP (Param3). Historical accepted events are not replayed as new awards.
+
+Research: the pinned original Replay FlushXPCache at 0x140F345C0 was executed
+with independent XP values, multiple weapon rows and an award above UINT32_MAX.
+The first weapon row carries player/Battle Pass XP; later rows carry zero.
+The target cache uses 968-byte entries and 16-byte secure integers. Larger
+source-oracle layouts were not copied into Replay. The relocated singleton
+getter and same-build consumer establish native XP/rank arrays at +64/+120.
+
+Implementation: accepted positive Param4 earns XP in the published current
+season through the existing durable event transaction. A shared tier advance
+routine grants eligible free/premium items and once-only COD Points, preserves
+fractional XP when premium is activated later, and saturates at tier 100.
+Within-tier changes and exact retry refreshes use inProgress; crossing a tier
+uses completed. A retry neither consumes an activation again nor grants rewards
+again. State, inventory and event receipts recover together after interruption.
+
+Build checks: the changed Windows unit passed /O2 /W4 /WX. Linux linked with
+44 hash-verified retained objects. Sixteen focused encrypted Battle Pass groups
+and 123 startup/host groups passed on that exact Linux image, including real
+write interruption and backend process restart. This is not a full Windows
+backend link or proof that every native service callback has been exercised.
+
+Native checks: one root-folder shipping game instance at a time connected to
+the new backend with all 27 startup fences passing. The native season-3 cache
+restored 5,258,879 XP and tier 42. Two short Shipment rounds returned to the
+frontend and recorded start/end events with no XP award. No positive mp_addxp
+was emitted, so earned Battle Pass callback/tier UI validation remains open.
+The oracle ch_event debug command is not registered in this shipping build.
+No game credentials were used by a synthetic client and no native cache was
+written to manufacture a successful result.
+
+com_optimized registers as integer 0-2 with default 1 in the root source and
+the exact source snapshot compiled into this EXE. A fresh native read was 1.
+Profile 0 disables the optimizations; profile 1 preserves scene appearance;
+profile 2 retains the experimental lower-detail/reflection optimizations.
+The existing fill_lobby command remains in the current EXE. Requests for 3
+and 11 bots were accepted in the Shipment host test without an EXE change.
+
+The temporary Shipment-only policy was restored byte-for-byte to the original
+12-map policy. The primary droplet runs the new backend; the prior 312a8f7f53cb
+release remains available for rollback. Test game instances were stopped and
+the development command file was removed.
+
+Evidence: validation/20261009-battlepass-earned-xp-target.json and
+validation/20261009-battlepass-earned-xp-readiness.json. The latter hashes the
+compiled-source, build, fixture, deployment, native observation and current
+coverage receipts in data/remaining-services-20261009.
+
+The full backend goal remains active. Six known routes still require exact
+target response bindings: 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24.
+Earned mission predicates/rewards and remaining indirect/native callbacks are
+also open; the coverage ledger records these separately from handler presence.

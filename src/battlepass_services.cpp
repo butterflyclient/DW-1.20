@@ -3,6 +3,7 @@
 #include "achievement_services.h"
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <set>
 
 namespace services
@@ -138,14 +139,15 @@ namespace services
                         const std::string &context,
                         const Json &state,
                         const Json &inventory,
-                        const std::set<uint64_t> &granted)
+                        const std::set<uint64_t> &granted,
+                        bool completed = true)
         {
             const auto total = xp(state);
             const auto tier = number(state.at("multiProgress")[1], "current");
             Json event{
                 {"type", "ACHIEVEMENT"},
                 {"name", state.at("name")},
-                {"reason", "completed"},
+                {"reason", completed ? "completed" : "inProgress"},
                 {"kind", uint64_t{20}},
                 {"id_", state.at("id")},
                 {"multiProgress", {{"xp", {{"value", total}}}, {"rank", {{"value", tier}}}}}};
@@ -171,6 +173,71 @@ namespace services
             wire::raw(push.data, int32_t{1});
             push.text(body);
             return Delivery{id.userId, std::move(push.data)};
+        }
+
+        void advance(Json &state,
+                     const Json &tiers,
+                     uint64_t total,
+                     Json &inventory,
+                     std::set<uint64_t> &granted)
+        {
+            const auto newRank = rank(tiers, total);
+            wire::require(total <= number(tiers.at(100), "xp"));
+            state["multiProgress"] =
+                Json::array({{{"name", "xp"}, {"current", total}, {"target", uint64_t{0}}},
+                             {{"name", "rank"}, {"current", newRank}, {"target", uint64_t{100}}}});
+            auto claimed = state.value("claimed", Json::array());
+            wire::require(claimed.is_array() && claimed.size() <= 202);
+            std::set<std::string> earned;
+            for (const auto &claim : claimed)
+            {
+                wire::require(claim.is_string() && earned.insert(claim.get<std::string>()).second);
+            }
+            for (size_t level = 0; level <= newRank; ++level)
+            {
+                const auto &tier = tiers.at(level);
+                wire::require(tier.at("free").is_boolean());
+                const bool free = tier.at("free").get<bool>();
+                if (!free && !state.value("premium", false))
+                    continue;
+                const auto key = std::string(free ? "free:" : "premium:") + std::to_string(level);
+                if (!earned.insert(key).second)
+                    continue;
+                claimed.push_back(key);
+                wire::require(tier.at("items").is_array() && tier.at("items").size() <= 32);
+                for (const auto &value : tier.at("items"))
+                {
+                    wire::require(value.is_number_unsigned() && value.get<uint64_t>() > 0 &&
+                                  value.get<uint64_t>() <= INT32_MAX);
+                    const auto reward = value.get<uint64_t>();
+                    auto &owned = item(inventory, reward);
+                    if (!number(owned, "2", INT32_MAX))
+                        owned["2"] = uint64_t{1};
+                    granted.insert(reward);
+                }
+                const auto points = number(tier, "cod_points", UINT32_MAX);
+                if (points)
+                {
+                    auto &balances = inventory.at("balances");
+                    auto balance = std::find_if(balances.begin(),
+                                                balances.end(),
+                                                [](const Json &row)
+                                                {
+                                                    return number(row, "currency") == 20;
+                                                });
+                    if (balance == balances.end())
+                    {
+                        wire::require(balances.size() < 16);
+                        balances.push_back(
+                            Json{{"currency", uint64_t{20}}, {"amount", uint64_t{0}}});
+                        balance = std::prev(balances.end());
+                    }
+                    const auto amount = number(*balance, "amount", UINT32_MAX);
+                    wire::require(points <= UINT32_MAX - amount);
+                    (*balance)["amount"] = amount + points;
+                }
+            }
+            state["claimed"] = std::move(claimed);
         }
     } // namespace
 
@@ -275,7 +342,11 @@ namespace services
                          [](const Json &event)
                          {
                              const auto &name = event.at("name").get_ref<const std::string &>();
-                             return name == "skip_tier" || name.starts_with("activate_battlepass");
+                             const auto &values = event.at("values");
+                             return name == "skip_tier" ||
+                                    name.starts_with("activate_battlepass") ||
+                                    (name == "mp_addxp" && values.contains("Param4") &&
+                                     number(values, "Param4") > 0);
                          }))
             return;
         const auto config = rules(root);
@@ -298,6 +369,10 @@ namespace services
         {
             std::set<uint64_t> seasons;
             for (const auto &event : events)
+            {
+                if (event.at("name") == "mp_addxp" && event.at("values").contains("Param4") &&
+                    number(event.at("values"), "Param4"))
+                    seasons.insert(number(config, "current_season", 6));
                 for (const auto &definition : config.at("activations"))
                     if (definition.at("name") == event.at("name"))
                     {
@@ -305,16 +380,43 @@ namespace services
                         if (activation && activation->contains("battlepass_season"))
                             seasons.insert(number(*activation, "battlepass_season", 6));
                     }
+            }
             for (auto season : seasons)
                 if (season >= 1)
                     if (const auto *row = find(data, uint64_t{3000000} + (season - 1) * 1000))
-                        deliveries.push_back(update(id, context, *row, inventory, {}));
+                        deliveries.push_back(update(id, context, *row, inventory, {}, false));
             return;
         }
         bool changed = false;
-        std::set<uint64_t> changedSeasons, granted;
+        std::set<uint64_t> changedSeasons, completedSeasons;
+        std::map<uint64_t, std::set<uint64_t>> grants;
         for (const auto &event : events)
         {
+            if (event.at("name") == "mp_addxp")
+            {
+                const auto &values = event.at("values");
+                const auto delta = values.contains("Param4") ? number(values, "Param4") : 0;
+                if (!delta)
+                    continue;
+                // Replay's FlushXPCache emits the cached battlepass XP in Param4
+                // once per player cache entry. It is independent of Param0 and
+                // Param3; later weapon rows explicitly carry zero here.
+                const auto season = number(config, "current_season", 6);
+                auto &state = progress(data, season);
+                const auto &tiers = config.at("seasons").at(std::to_string(season));
+                const auto before = xp(state), oldRank = rank(tiers, before);
+                const auto maximum = number(tiers.at(100), "xp");
+                wire::require(before <= maximum);
+                const auto total = before + std::min(delta, maximum - before);
+                if (total == before)
+                    continue;
+                advance(state, tiers, total, inventory, grants[season]);
+                changed = true;
+                changedSeasons.insert(season);
+                if (rank(tiers, total) > oldRank)
+                    completedSeasons.insert(season);
+                continue;
+            }
             if (event.at("name") != "skip_tier" &&
                 !event.at("name").get<std::string>().starts_with("activate_battlepass"))
                 continue;
@@ -352,65 +454,10 @@ namespace services
                 const auto total = std::min(before + delta, number(tiers.at(100), "xp"));
                 if (!skips)
                     state["premium"] = true;
-                state["multiProgress"] = Json::array(
-                    {{{"name", "xp"}, {"current", total}, {"target", uint64_t{0}}},
-                     {{"name", "rank"}, {"current", newRank}, {"target", uint64_t{100}}}});
-                auto claimed = state.value("claimed", Json::array());
-                wire::require(claimed.is_array() && claimed.size() <= 202);
-                std::set<std::string> earned;
-                for (const auto &claim : claimed)
-                {
-                    wire::require(claim.is_string());
-                    earned.insert(claim.get<std::string>());
-                }
-                for (size_t level = 0; level <= newRank; ++level)
-                {
-                    const auto &tier = tiers.at(level);
-                    wire::require(tier.at("free").is_boolean());
-                    const bool free = tier.at("free").get<bool>();
-                    if (!free && !state.value("premium", false))
-                        continue;
-                    const auto key =
-                        std::string(free ? "free:" : "premium:") + std::to_string(level);
-                    if (!earned.insert(key).second)
-                        continue;
-                    claimed.push_back(key);
-                    wire::require(tier.at("items").is_array() && tier.at("items").size() <= 32);
-                    for (const auto &value : tier.at("items"))
-                    {
-                        wire::require(value.is_number_unsigned() && value.get<uint64_t>() > 0 &&
-                                      value.get<uint64_t>() <= INT32_MAX);
-                        const auto reward = value.get<uint64_t>();
-                        auto &owned = item(inventory, reward);
-                        if (!number(owned, "2", INT32_MAX))
-                            owned["2"] = uint64_t{1};
-                        granted.insert(reward);
-                    }
-                    const auto points = number(tier, "cod_points", UINT32_MAX);
-                    if (points)
-                    {
-                        auto &balances = inventory.at("balances");
-                        auto balance = std::find_if(balances.begin(),
-                                                    balances.end(),
-                                                    [](const Json &row)
-                                                    {
-                                                        return number(row, "currency") == 20;
-                                                    });
-                        if (balance == balances.end())
-                        {
-                            wire::require(balances.size() < 16);
-                            balances.push_back(
-                                Json{{"currency", uint64_t{20}}, {"amount", uint64_t{0}}});
-                            balance = std::prev(balances.end());
-                        }
-                        const auto amount = number(*balance, "amount", UINT32_MAX);
-                        wire::require(points <= UINT32_MAX - amount);
-                        (*balance)["amount"] = amount + points;
-                    }
-                }
-                state["claimed"] = std::move(claimed);
+                advance(state, tiers, total, inventory, grants[season]);
                 changed = true;
                 changedSeasons.insert(season);
+                completedSeasons.insert(season);
             }
         }
         if (!changed)
@@ -427,6 +474,7 @@ namespace services
                                         context,
                                         *find(data, uint64_t{3000000} + (season - 1) * 1000),
                                         inventory,
-                                        granted));
+                                        grants[season],
+                                        completedSeasons.contains(season)));
     }
 } // namespace services
