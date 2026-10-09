@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 from native_wire_client import NativeClient, fields, integer, structure, text
+from progression_transaction_fixtures import exercise_mission_window, mission_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -217,21 +218,36 @@ def main():
             blocker = path.with_name(path.name + ".pending")
             blocker.mkdir()
             before = path.read_bytes()
+            intent = data / "achievements/5800/event-transaction.json"
             try:
                 select(client, 1502, error=102)
-                assert path.read_bytes() == before and 1502 not in states(client)
+                prepared = intent.read_bytes()
+                assert path.read_bytes() == before
+                try:
+                    states(client)
+                except RuntimeError as failure:
+                    assert str(failure) == "Native task 125/3 returned 102"
+                else:
+                    raise AssertionError("Partially committed mission state was exposed")
+                assert intent.read_bytes() == prepared
             finally:
                 blocker.rmdir()
+            row = states(client)[1502]
+            assert row[3] == [0] and row[5] == [1] and row[7] == [123]
+            assert not intent.exists()
+            before = path.read_bytes()
+            select(client, 1502, timestamp=999)
+            assert path.read_bytes() == before
             checks.append(
-                "a failed atomic mission publication exposes no successful activation or partially switched mode"
+                "a real failed mission write blocks partial reads, recovers its durable selection and preserves the first activation timestamp on retry"
             )
             override = {
-                "1": expected[1502]["name"],
+                "1": expected[1503]["name"],
                 "3": 15,
-                "14": 1502,
+                "14": 1503,
                 "initialState": {
-                    "id": 1502,
-                    "name": expected[1502]["name"],
+                    "id": 1503,
+                    "name": expected[1503]["name"],
                     "kind": 15,
                     "status": 2,
                     "progress": 8,
@@ -239,14 +255,14 @@ def main():
                 },
             }
             publication.write_text(json.dumps([override]))
-            select(client, 1502)
-            assert states(client)[1502][3] == [8] and states(client)[1502][4] == [999]
+            select(client, 1503)
+            assert states(client)[1503][3] == [8] and states(client)[1503][4] == [999]
             assert len(query(client, definitions=True)[1]) == 1
             publication.write_text(
-                json.dumps([{"1": expected[1503]["name"], "3": 15, "14": 1503}])
+                json.dumps([{"1": expected[1504]["name"], "3": 15, "14": 1504}])
             )
-            select(client, 1503, error=108)
-            assert 1503 not in states(client)
+            select(client, 1504, error=108)
+            assert 1504 not in states(client)
             publication.unlink()
             checks.append(
                 "explicit domain publications preserve their own initial state and may deliberately withhold activation"
@@ -261,9 +277,17 @@ def main():
         start()
         with NativeClient(fixture, profile="quests", port_offset=offset) as client:
             assert states(client) == saved and path.read_bytes() == before
+            with NativeClient(fixture, profile="quest-peer", port_offset=offset) as peer:
+                snapshots = exercise_mission_window(client, peer, data, checks)
         checks.append(
             "mode selections and completed progress survive server restart without awarding XP, items or fabricated mission completion"
         )
+        stop()
+        start()
+        with NativeClient(fixture, profile="quests", port_offset=offset) as client:
+            with NativeClient(fixture, profile="quest-peer", port_offset=offset) as peer:
+                assert [mission_snapshot(c) for c in (client, peer)] == snapshots
+        checks.append("both signed accounts retain the recovered mixed mission, XP and inventory results after process restart")
     finally:
         stop()
         log.close()

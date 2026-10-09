@@ -53,6 +53,9 @@ def build(rows):
                 category=category,
                 name=row[1],
                 description=row[3],
+                next_name=row[7],
+                xp_reward=int(row[8] or 0),
+                item_reward=int(row[9] or 0),
             )
         )
     for stages in missions.values():
@@ -61,6 +64,11 @@ def build(rows):
         for stage, row in stages.items():
             if row[7] != (stages[stage + 1][1] if stage < max(stages) else ""):
                 raise ValueError("Replay mission stage chain differs from the asset")
+    by_name = {row["name"]: row for row in quests}
+    for row in quests:
+        row["next_id"] = by_name[row["next_name"]]["id"] if row["next_name"] else 0
+        if not 0 <= row["xp_reward"] <= 0xFFFFFFFF or not 0 <= row["item_reward"] <= 0x7FFFFFFF:
+            raise ValueError("Native mission reward exceeds its consumer bounds")
     return sorted(quests, key=lambda row: row["id"])
 
 
@@ -93,7 +101,7 @@ def main():
         "// Retained asset SHA256: " + source_hash,
         "struct ReplayQuest",
         "{",
-        "    uint32_t id, target, category;",
+        "    uint32_t id, target, category, nextId, xpReward, itemReward;",
         "    const char *name, *description;",
         "};",
         "",
@@ -101,11 +109,14 @@ def main():
     ]
     for quest in quests:
         lines.append(
-            "    {%d, %d, %d, %s, %s},"
+            "    {%d, %d, %d, %d, %d, %d, %s, %s},"
             % (
                 quest["id"],
                 quest["target"],
                 quest["category"],
+                quest["next_id"],
+                quest["xp_reward"],
+                quest["item_reward"],
                 json.dumps(quest["name"]),
                 json.dumps(quest["description"]),
             )
