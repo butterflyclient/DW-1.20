@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 import struct
+from types import SimpleNamespace
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 
@@ -20,7 +21,8 @@ def branch(prefix, target, opcode=b"\xe8"):
 
 
 def check(
-    name, code, expected, regions=None, expected_unresolved=False, register_preserving_calls=()
+    name, code, expected, regions=None, expected_unresolved=False,
+    register_preserving_calls=(), read_immutable=None
 ):
     def decode(address):
         return next(decoder.disasm(code[address - start :], address, count=1), None)
@@ -32,6 +34,7 @@ def check(
         {constructor: {("arg:rdx", "arg:r8", constructor)}},
         regions=regions,
         register_preserving_calls=register_preserving_calls,
+        read_immutable=read_immutable,
     )
     actual = {(row[2], row[3]) for row in found}
     assert actual == expected, (name, actual, expected)
@@ -51,7 +54,7 @@ prefix = bytes.fromhex("31 d2 b6 1d 41 b0 04")
 check(
     "high byte is not low byte",
     prefix + branch(prefix, constructor) + b"\xc3",
-    {(29 << 8, 4)},
+    {(0, 4)},
 )
 prefix = bytes.fromhex("bb 1d 00 00 00")
 prefix += branch(prefix, unknown)
@@ -125,9 +128,9 @@ check(
 )
 prefix = bytes.fromhex("c7 44 24 40 09 00 00 00 83 44 24 40 01 44 8b 44 24 40 ba 1d 00 00 00")
 check(
-    "unhandled local write",
+    "constant arithmetic local write",
     prefix + branch(prefix, constructor) + b"\xc3",
-    {(29, None)},
+    {(29, 10)},
 )
 prefix = bytes.fromhex("c7 44 24 40 09 00 00 00 48 8d 4c 24 40")
 prefix += branch(prefix, unknown)
@@ -246,4 +249,58 @@ check(
     {(29, 9)},
     register_preserving_calls={unknown},
 )
-print("PASS: 31 independent x64 task-trace cases")
+for name, instructions, service in (
+    ("constant ADD", "ba 18 00 00 00 83 c2 05", 29),
+    ("constant SUB", "ba 22 00 00 00 83 ea 05", 29),
+    ("constant AND", "ba dd 00 00 00 83 e2 3f", 29),
+    ("constant OR", "ba 1c 00 00 00 83 ca 01", 29),
+    ("constant XOR", "ba 18 00 00 00 83 f2 05", 29),
+    ("constant SHL", "ba 0e 00 00 00 d1 e2 83 ca 01", 29),
+    ("constant SHR", "ba 3a 00 00 00 d1 ea", 29),
+    ("signed SAR", "ba c6 ff ff ff d1 fa", 0xE3),
+    ("byte arithmetic wraps", "b2 ff 80 c2 01", 0),
+    ("unknown arithmetic stays unresolved", "83 c2 05", None),
+):
+    prefix = bytes.fromhex(instructions + " 41 b0 04")
+    check(name, prefix + branch(prefix, constructor) + b"\xc3", {(service, 4)})
+
+constant = 0x500000
+prefix = b"\x8b\x15" + struct.pack("<i", constant - (start + 6)) + b"\x41\xb0\x04"
+code = prefix + branch(prefix, constructor) + b"\xc3"
+check("immutable RIP constant", code, {(29, 4)},
+      read_immutable=lambda address, size: 29 if (address, size) == (constant, 4) else None)
+check("rejected RIP constant stays unresolved", code, {(None, 4)},
+      read_immutable=lambda address, size: None)
+prefix = b"\x65\x8b\x15" + struct.pack("<i", constant - (start + 7)) + b"\x41\xb0\x04"
+check("GS-based RIP address is not an image constant",
+      prefix + branch(prefix, constructor) + b"\xc3", {(None, 4)},
+      read_immutable=lambda address, size: 29)
+prefix = bytes.fromhex("c7 44 24 40 09 00 00 00 65 44 8b 44 24 40 ba 1d 00 00 00")
+check("GS-based stack address is not a saved local",
+      prefix + branch(prefix, constructor) + b"\xc3", {(29, None)})
+
+# Writable bytes, loader-fixed pointers, partial overlaps and bytes beyond the
+# mapped raw/virtual intersection cannot establish an immutable task ID.
+image_base = 0x140000000
+section = SimpleNamespace(Characteristics=0x40000040, VirtualAddress=0x1000,
+                          Misc_VirtualSize=32, SizeOfRawData=64)
+relocation = SimpleNamespace(entries=[SimpleNamespace(rva=0x1010, type=10)])
+image = SimpleNamespace(OPTIONAL_HEADER=SimpleNamespace(ImageBase=image_base),
+                        sections=[section], DIRECTORY_ENTRY_BASERELOC=[relocation],
+                        get_data=lambda rva, size: bytes(range(64))[rva-0x1000:rva-0x1000+size])
+read_constant = audit.immutable_reader(image)
+assert read_constant(image_base + 0x1000, 4) == 0x03020100
+assert read_constant(image_base + 0x1010, 4) is None
+assert read_constant(image_base + 0x100F, 2) is None
+assert read_constant(image_base + 0x101F, 2) is None
+section.Characteristics |= 0x80000000
+assert read_constant(image_base + 0x1000, 4) is None
+
+prefix = bytes.fromhex("31 c0 83 c0 01 48 85 c9 75 f8 ba 1d 00 00 00 41 b0 04")
+check("growing loop counter preserves constants after its exit",
+      prefix + branch(prefix, constructor) + b"\xc3", {(29, 4)}, expected_unresolved=True)
+prefix = bytes.fromhex("48 83 ec 08 c7 44 24 40 09 00 00 00 48 85 c9 75 ef 44 8b 44 24 40 ba 1d 00 00 00")
+check("moving-stack loop cannot preserve a fixed local after generalization",
+      prefix + branch(prefix, constructor) + b"\xc3", {(29, 9), (29, None)},
+      expected_unresolved=True)
+print("PASS: 52 independent x64 task-trace and immutable-image cases")

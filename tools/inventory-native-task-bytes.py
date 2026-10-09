@@ -49,8 +49,37 @@ for index in range(8, 16):
         REGISTERS[f"r{index}{suffix}"] = (f"r{index}", 0)
 
 
+def immutable_reader(pe):
+    """Read original constants only where writes and loader relocations cannot alter them."""
+    base = pe.OPTIONAL_HEADER.ImageBase
+    relocated = [
+        (entry.rva, entry.rva + 8)
+        for block in getattr(pe, "DIRECTORY_ENTRY_BASERELOC", ())
+        for entry in block.entries
+        if entry.type
+    ]
+
+    def read(address, size):
+        rva = address - base
+        if not 1 <= size <= 8 or any(begin < rva + size and rva < end for begin, end in relocated):
+            return None
+        for section in pe.sections:
+            if (section.Characteristics & 0x40000000 and
+                    not section.Characteristics & 0x80000000 and
+                    section.VirtualAddress <= rva and
+                    rva + size <= section.VirtualAddress + min(section.Misc_VirtualSize,
+                                                                section.SizeOfRawData)):
+                value = pe.get_data(rva, size)
+                if len(value) == size:
+                    return int.from_bytes(value, "little")
+        return None
+
+    return read
+
+
 def trace(
-    start, end, decode, recipes, state_limit=10000, regions=None, register_preserving_calls=()
+    start, end, decode, recipes, state_limit=10000, regions=None,
+    register_preserving_calls=(), read_immutable=None
 ):
     """Track register bits and argument origins through a single bounded CFG."""
     intervals = tuple(regions or ((start, end),))
@@ -62,6 +91,30 @@ def trace(
     initial["stack-pointer"] = (0, FULL)
     work = deque([(start, initial)])
     seen, calls, unresolved = set(), set(), set()
+    loops = {}
+
+    def loop_state(edge, incoming):
+        count, previous = loops.get(edge, (0, None))
+        if count < 32:
+            loops[edge] = (count + 1, incoming.copy())
+            return incoming
+        # Finite constant facts cannot enumerate an unbounded counter/pointer
+        # loop. Retain only bits/argument origins common to successive arrivals;
+        # this loses precision and records that loss instead of inventing an ID.
+        joined = {}
+        for key in previous.keys() & incoming.keys():
+            left, left_mask = previous[key]
+            right, right_mask = incoming[key]
+            if left == right:
+                joined[key] = (left, left_mask & right_mask)
+            elif isinstance(left, int) and isinstance(right, int):
+                mask = left_mask & right_mask & (FULL ^ ((left ^ right) & FULL))
+                joined[key] = (left & mask, mask)
+        if "stack-escaped" in previous or "stack-escaped" in incoming:
+            joined["stack-escaped"] = (1, FULL)
+        loops[edge] = (count + 1, joined)
+        unresolved.add((edge[0], "loop-state-generalized"))
+        return joined
     while work:
         address, state = work.popleft()
         stamp = (address, tuple(sorted(state.items())))
@@ -80,7 +133,7 @@ def trace(
         following = address + instruction.size
 
         def stack_address(operand):
-            if operand.type != X86_OP_MEM or operand.mem.index:
+            if operand.type != X86_OP_MEM or operand.mem.index or operand.mem.segment:
                 return None
             register = instruction.reg_name(operand.mem.base)
             key = {"rsp": "stack-pointer", "rbp": "frame-pointer"}.get(register)
@@ -104,6 +157,11 @@ def trace(
             if operand.type == X86_OP_IMM:
                 return operand.imm & FULL, FULL
             if operand.type == X86_OP_MEM:
+                if (read_immutable and operand.mem.base == X86_REG_RIP and
+                        not operand.mem.index and not operand.mem.segment):
+                    value = read_immutable(following + operand.mem.disp, operand.size)
+                    if value is not None:
+                        return value, (1 << (operand.size * 8)) - 1
                 offset = stack_address(operand)
                 if offset is None:
                     return 0, 0
@@ -175,7 +233,10 @@ def trace(
                 resolved = []
                 for value in (service, task):
                     fact = state.get(value[4:], (0, 0)) if isinstance(value, str) else (value, FULL)
-                    resolved.append(fact[0] if fact[1] & 255 == 255 else None)
+                    resolved.append(
+                        (fact[0] & 255 if isinstance(fact[0], int) else fact[0])
+                        if fact[1] & 255 == 255 else None
+                    )
                 calls.add((address, target, *resolved, constructor))
         if op == "call":
             if target not in register_preserving_calls:
@@ -264,6 +325,35 @@ def trace(
             and operands[0].reg == operands[1].reg
         ):
             write(operands[0], (0, FULL))
+        elif op in ("add", "sub", "xor", "and", "or", "shl", "shr", "sar") and len(operands) == 2:
+            left, left_known = read(operands[0])
+            right, right_known = read(operands[1])
+            width = operands[0].size * 8
+            mask = (1 << width) - 1
+            right_mask = (1 << (operands[1].size * 8)) - 1
+            if (isinstance(left, int) and isinstance(right, int) and
+                    left_known & mask == mask and right_known & right_mask == right_mask):
+                count = right & (63 if width == 64 else 31)
+                if op == "add":
+                    value = left + right
+                elif op == "sub":
+                    value = left - right
+                elif op == "xor":
+                    value = left ^ right
+                elif op == "and":
+                    value = left & right
+                elif op == "or":
+                    value = left | right
+                elif op == "shl":
+                    value = left << count
+                elif op == "shr":
+                    value = left >> count
+                else:
+                    signed = left - (1 << width) if left & (1 << (width - 1)) else left
+                    value = signed >> count
+                write(operands[0], (value & mask, FULL))
+            else:
+                write(operands[0], (0, 0))
         elif op == "lea" and len(operands) == 2 and operands[1].type == X86_OP_MEM:
             offset = stack_address(operands[1])
             memory = operands[1].mem
@@ -307,7 +397,10 @@ def trace(
                     state.pop("stack-pointer" if root == "rsp" else "frame-pointer", None)
         if op.startswith("j"):
             if target is not None and contains(target):
-                work.append((target, state.copy()))
+                incoming = state.copy()
+                if target <= address:
+                    incoming = loop_state((address, target), incoming)
+                work.append((target, incoming))
             elif target not in recipes:
                 unresolved.add((address, "external-or-indirect-branch"))
             if op == "jmp":
@@ -345,8 +438,10 @@ def main():
     ranges.sort()
     starts = [row[0] for row in ranges]
     pe.parse_data_directories(
-        directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
+        directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"],
+                     pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_BASERELOC"]]
     )
+    read_constant = immutable_reader(pe)
     entries = {row.struct.BeginAddress: row for row in pe.DIRECTORY_ENTRY_EXCEPTION}
 
     def primary(entry):
@@ -449,6 +544,7 @@ def main():
                 recipes,
                 regions=regions,
                 register_preserving_calls={stack_probe},
+                read_immutable=read_constant,
             )
             for result in found:
                 calls.add((start, *result))
@@ -518,7 +614,7 @@ def main():
             capture_output=True,
             text=True,
         )
-        assert tests.stdout.strip() == "PASS: 31 independent x64 task-trace cases"
+        assert tests.stdout.strip() == "PASS: 52 independent x64 task-trace and immutable-image cases"
         exported_path = ROOT / "data/native-service-callgraph.json"
         exported = json.loads(exported_path.read_bytes())
         text_routes = {(item["service"], item["task"]) for item in exported["proven_calls"]}
@@ -529,7 +625,7 @@ def main():
             target_image_sha256=image_hash,
             audit_tool_sha256=result["audit_tool_sha256"],
             test_tool_sha256=sha256(test_path.read_bytes()).hexdigest(),
-            independent_x64_trace_cases=31,
+            independent_x64_trace_cases=52,
             register_preserving_stack_probe=result["register_preserving_stack_probe"],
             chained_unwind_ownership_resolved=True,
             route_count=len(routes),
@@ -541,6 +637,7 @@ def main():
                 row["boundary"] == "sqlite-fallback" for row in inspected.values()
             ),
             state_limited_paths=sum(reason == "state-limit" for _, _, reason in misses),
+            generalized_loop_paths=sum(reason == "loop-state-generalized" for _, _, reason in misses),
             unresolved_paths=len(misses),
             unowned_candidate_sites=len(unowned),
             text_inventory_routes=len(text_routes),
