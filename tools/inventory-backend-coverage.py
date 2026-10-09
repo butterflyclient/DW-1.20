@@ -253,6 +253,17 @@ GAPS["193"] += (
     "upload-completion reader; see validation/20261006-target-consumer-alias-correction.json."
 )
 
+GAPS["193"] += (
+    " Publisher cache bytes now use flushed atomic publication and checksum-verified "
+    "repair. Durable title/context/publisher/name references keep cache presence separate "
+    "from current public ACL, expiry and exact content identity. Six encrypted-wire/HTTP "
+    "fixture groups include real blocked writes, corrupt snapshots and process restart; "
+    "a fresh root-folder game run passed all 27 startup fences and created eight verified "
+    "publisher cache records on the recorded backend hash. See "
+    "validation/20261009-publisher-cache-readiness.json. Category-list and large-upload "
+    "response bindings remain open; this publication proof does not close those routes."
+)
+
 
 def friend_native_evidence(server_hash, game_hash):
     path = ROOT / "validation/20261006-friend-store-native-lifecycle.json"

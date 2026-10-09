@@ -395,6 +395,56 @@ namespace services
                 throw std::runtime_error("Object publication failed");
         }
 
+        bool publisherCacheMatches(const std::filesystem::path &path,
+                                   size_t expectedSize,
+                                   const std::string &expectedHash)
+        {
+            if (!std::filesystem::exists(path))
+                return false;
+            if (!std::filesystem::is_regular_file(path))
+                throw std::runtime_error("Publisher cache destination is not a file");
+            if (std::filesystem::file_size(path) != expectedSize)
+                return false;
+            std::ifstream input(path, std::ios::binary);
+            wire::Bytes cached(expectedSize);
+            if (!input.read(reinterpret_cast<char *>(cached.data()),
+                            static_cast<std::streamsize>(cached.size())))
+                throw std::runtime_error("Publisher cache verification read failed");
+            return hex(crypto::sha256(cached)) == expectedHash;
+        }
+
+        void publishPublisherCache(const std::filesystem::path &path,
+                                   std::span<const uint8_t> bytes)
+        {
+            std::filesystem::create_directories(path.parent_path());
+            auto pending = path;
+            pending += ".pending";
+            const auto handle = CreateFileW(pending.c_str(),
+                                            GENERIC_WRITE,
+                                            0,
+                                            nullptr,
+                                            CREATE_ALWAYS,
+                                            FILE_ATTRIBUTE_NORMAL,
+                                            nullptr);
+            if (handle == INVALID_HANDLE_VALUE)
+                throw std::runtime_error("Publisher cache persistence failed");
+            {
+                const std::unique_ptr<void, decltype(&CloseHandle)> file(handle, &CloseHandle);
+                DWORD written = 0;
+                if (!WriteFile(handle,
+                               bytes.data(),
+                               static_cast<DWORD>(bytes.size()),
+                               &written,
+                               nullptr) ||
+                    written != bytes.size() || !FlushFileBuffers(handle))
+                    throw std::runtime_error("Publisher cache persistence failed");
+            }
+            if (!MoveFileExW(pending.c_str(),
+                             path.c_str(),
+                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+                throw std::runtime_error("Publisher cache publication failed");
+        }
+
         std::string owner(const platform::LobbyIdentity &id, const Json &object)
         {
             auto result = filename(object, "owner", 30);
@@ -601,6 +651,96 @@ namespace services
             }
         }
 
+        Json publisherCacheReferences(const std::string &hash)
+        {
+            const auto path = contentDirectory / (hash + ".references.json");
+            if (!std::filesystem::exists(path))
+                return Json{{"schema", 1}, {"hash", hash}, {"references", Json::array()}};
+            try
+            {
+                wire::require(std::filesystem::is_regular_file(path) &&
+                              std::filesystem::file_size(path) <= 256 * 1024);
+                std::ifstream input(path, std::ios::binary);
+                if (!input)
+                    throw std::runtime_error("Publisher cache reference read failed");
+                const std::string bytes((std::istreambuf_iterator<char>(input)),
+                                        std::istreambuf_iterator<char>());
+                auto record = parameters(bytes);
+                wire::require(record.is_object() && record.size() == 3 &&
+                              record.at("schema") == 1 && record.at("hash") == hash &&
+                              record.at("references").is_array() &&
+                              record.at("references").size() <= 1024);
+                std::set<std::string> identities;
+                for (const auto &reference : record.at("references"))
+                {
+                    wire::require(reference.is_object() && reference.size() == 4 &&
+                                  reference.at("title").is_number_unsigned() &&
+                                  reference.at("title").get<uint64_t>() <= UINT32_MAX);
+                    const auto context = filename(reference, "context", 16);
+                    const auto owner = filename(reference, "owner", 30);
+                    const auto name = filename(reference, "name", 65);
+                    const auto identity = std::to_string(reference.at("title").get<uint32_t>()) +
+                                          "/" + context + "/" + owner + "/" + name;
+                    wire::require(identities.insert(storageKey(identity)).second);
+                }
+                return record;
+            }
+            catch (const std::exception &)
+            {
+                throw std::runtime_error("Publisher cache reference integrity failure");
+            }
+        }
+
+        void registerPublisherCache(const std::string &hash,
+                                    uint32_t title,
+                                    const std::string &context,
+                                    const std::string &owner,
+                                    const std::string &name)
+        {
+            auto record = publisherCacheReferences(hash);
+            const Json reference{
+                {"title", title}, {"context", context}, {"owner", owner}, {"name", name}};
+            auto &references = record.at("references");
+            if (std::find(references.begin(), references.end(), reference) != references.end())
+                return;
+            if (references.size() == 1024)
+                throw std::runtime_error("Publisher cache reference capacity exceeded");
+            references.push_back(reference);
+            publish(contentDirectory / (hash + ".references.json"), record);
+        }
+
+        bool publisherCachePublished(const std::string &hash,
+                                     size_t size,
+                                     const std::string &checksum)
+        {
+            const auto record = publisherCacheReferences(hash);
+            for (const auto &reference : record.at("references"))
+            {
+                const auto title = reference.at("title").get<uint32_t>();
+                const auto context = reference.at("context").get<std::string>();
+                const auto owner = reference.at("owner").get<std::string>();
+                const auto name = reference.at("name").get<std::string>();
+                const auto path = contentDirectory.parent_path() / "publisher" /
+                                  std::to_string(title) / context / owner /
+                                  (name + ".metadata.json");
+                if (!std::filesystem::exists(path))
+                    continue;
+                wire::require(std::filesystem::file_size(path) <= 16384);
+                std::ifstream input(path);
+                if (!input)
+                    throw std::runtime_error("Publisher metadata read failed");
+                auto metadata = Json::parse(input);
+                validateMetadata(metadata, owner, name, context);
+                publisherChecksum(metadata);
+                const auto expires = metadata.at("expiresOn").get<int64_t>();
+                if (metadata.at("acl") == "public" &&
+                    (expires <= 0 || static_cast<uint64_t>(expires) > now()) &&
+                    metadata.at("contentLength") == size && metadata.at("checksum") == checksum)
+                    return true;
+            }
+            return false;
+        }
+
         std::optional<Json> publisherDocument(const std::filesystem::path &directory,
                                               uint32_t title,
                                               const std::string &context,
@@ -656,23 +796,14 @@ namespace services
             const auto cached = contentDirectory / (hash + ".bin");
             {
                 std::lock_guard lock(contentMutex);
-                if (!std::filesystem::exists(cached))
+                // A successful metadata reply promises the verified immutable
+                // content URL. Repair interrupted/truncated/corrupt cache bytes
+                // from the checksum-verified publication before making that promise.
+                if (!publisherCacheMatches(cached, bytes.size(), hash))
                 {
-                    std::filesystem::create_directories(contentDirectory);
-                    auto pending = cached;
-                    pending += ".pending";
-                    {
-                        std::ofstream out(pending, std::ios::binary | std::ios::trunc);
-                        if (!out.write(reinterpret_cast<const char *>(bytes.data()),
-                                       static_cast<std::streamsize>(bytes.size())) ||
-                            !out.flush())
-                            throw std::runtime_error("Publisher content cache write failed");
-                    }
-                    if (!MoveFileExW(pending.c_str(),
-                                     cached.c_str(),
-                                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-                        throw std::runtime_error("Publisher content cache publication failed");
+                    publishPublisherCache(cached, bytes);
                 }
+                registerPublisherCache(hash, title, context, owner, name);
             }
             metadata["contentURL"] =
                 network::httpOrigin(contentPort) + "/objectstore/content/" + hash;
@@ -988,6 +1119,10 @@ namespace services
                         static_cast<std::streamsize>(out.size())) ||
             hex(crypto::sha256(out)) != hash)
             throw std::runtime_error("Publisher content cache integrity failure");
+        // Cache presence is not publication authority. Retained URLs require a
+        // matching public, unexpired publication of these exact bytes.
+        if (!publisherCachePublished(hash, out.size(), base64(crypto::md5(out))))
+            return std::nullopt;
         return out;
     }
 
