@@ -126,7 +126,8 @@ for directory in ("src", "source-workstation", "generated"):
             selected = saved_dw_source(source) if directory == "src" else source
             # DW owns this optional scheduling replacement. Keep the shared
             # compiler's implementation and other projects unchanged.
-            if args.optimized and source == ORIGINAL / "src/Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp":
+            if (source == ORIGINAL / "src/DB_ResetFileReader.cpp" or
+                (args.optimized and source == ORIGINAL / "src/Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp")):
                 override = ((args.integration_root or ROOT / "integration/replay") / source.name).resolve()
                 if override.is_file():
                     selected = override
@@ -206,9 +207,9 @@ for source in sorted(private_sources.iterdir()):
     ):
         continue
     destination = snapshot / "src" / source.name
-    if source.name == "Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp":
+    if source.name in ("Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp", "DB_ResetFileReader.cpp"):
         # Already copied at its native optional-source association above.
-        if args.optimized and source.read_bytes() != destination.read_bytes():
+        if (source.name == "DB_ResetFileReader.cpp" or args.optimized) and source.read_bytes() != destination.read_bytes():
             raise RuntimeError("DW scheduler source changed during snapshot")
         continue
     if destination.exists():

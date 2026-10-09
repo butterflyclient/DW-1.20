@@ -94,7 +94,7 @@ def atomic_json(path, value):
     os.replace(temporary, path)
 
 
-def publish(image, report, release, archive, output):
+def verify_image(image, report):
     target = image.read_bytes()
     proof = json.loads(report.read_bytes())
     target_hash = digest(target)
@@ -116,6 +116,52 @@ def publish(image, report, release, archive, output):
         raise ValueError(
             "Executable has no successful hash-bound linker and relocation verification"
         )
+    return target, target_hash
+
+
+def retain_release(image, report, release, archive):
+    """Retain a distributed compiler build without advertising it as latest.
+
+    Separately coordinated client builds need an upgrade path too. Verify their
+    actual compiler/linker receipts before adding them to the source archive;
+    the next publication generates and round-trips their deltas normally.
+    """
+    target, target_hash = verify_image(image, report)
+    archive.mkdir(parents=True, exist_ok=True)
+    lock = archive / "publish.lock"
+    descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    try:
+        index = archive / "releases.json"
+        records = json.loads(index.read_bytes()) if index.exists() else []
+        report_hash = digest(report.read_bytes())
+        for row in records:
+            if row["sha256"] == target_hash:
+                if (
+                    row["report_sha256"] != report_hash
+                    or row["size"] != len(target)
+                    or digest((archive / (target_hash + ".exe")).read_bytes()) != target_hash
+                    or digest((archive / (target_hash + ".build-report.json")).read_bytes())
+                    != report_hash
+                ):
+                    raise ValueError("Retained release provenance changed")
+                return dict(retained=True, already_retained=True, **row)
+        if release <= 0 or (records and release <= max(row["release"] for row in records)):
+            raise ValueError("Retained release numbers must increase")
+        shutil.copyfile(image, archive / (target_hash + ".exe"))
+        shutil.copyfile(report, archive / (target_hash + ".build-report.json"))
+        row = dict(
+            release=release, sha256=target_hash, size=len(target), report_sha256=report_hash
+        )
+        records.append(row)
+        atomic_json(index, records)
+        return dict(retained=True, **row)
+    finally:
+        os.close(descriptor)
+        lock.unlink()
+
+
+def publish(image, report, release, archive, output):
+    target, target_hash = verify_image(image, report)
     archive.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
     (output / "patches").mkdir(exist_ok=True)
@@ -192,10 +238,16 @@ if __name__ == "__main__":
     parser.add_argument("--release", type=int, required=True)
     parser.add_argument("--archive", type=Path, default=Path("data/executable-releases"))
     parser.add_argument("--output", type=Path, default=Path("data/executable-update-publication"))
+    parser.add_argument(
+        "--retain-only", action="store_true",
+        help="Verify and archive a distributed compiler build for the next release's deltas",
+    )
     args = parser.parse_args()
     print(
         json.dumps(
-            publish(args.image, args.build_report, args.release, args.archive, args.output),
+            retain_release(args.image, args.build_report, args.release, args.archive)
+            if args.retain_only
+            else publish(args.image, args.build_report, args.release, args.archive, args.output),
             indent=2,
         )
     )

@@ -50,7 +50,7 @@ def number(value, maximum=2**32 - 1, empty=0):
     return result
 
 
-def build(document, stamp, sale_ids=(), zero_prices=False):
+def build(document, stamp, sale_ids=(), zero_prices=False, battlepass=None):
     if document.get("name") != "loot/bundle_ids.csv" or document.get("columns") != 40:
         raise ValueError("Expected Replay's 40-column loot/bundle_ids.csv")
     rows = document.get("rows")
@@ -85,13 +85,14 @@ def build(document, stamp, sale_ids=(), zero_prices=False):
                     raise ValueError("Missing or recursive bundle grant")
                 grants[item] += 1
         ending = number(row[COLS["purchaseEnd"]])
+        is_battlepass = bool(number(row[COLS["isBattlePassBundle"]], 1))
         reason = (
             "first-party"
             if row[COLS["firstPartyProductID"]]
             else (
                 "battle-pass"
-                if number(row[COLS["isBattlePassBundle"]], 1)
-                else "expired" if ending and ending <= stamp else None
+                if is_battlepass and battlepass is None
+                else "expired" if ending and ending <= stamp and not is_battlepass else None
             )
         )
         if reason:
@@ -113,6 +114,7 @@ def build(document, stamp, sale_ids=(), zero_prices=False):
                 "price": price,
                 "currency": currency,
                 "ending": ending,
+                "battlepass": is_battlepass,
             }
         )
     if not eligible:
@@ -138,7 +140,7 @@ def build(document, stamp, sale_ids=(), zero_prices=False):
                 "data": "",
                 "ignore_entitlements": 0,
                 "sale_start": 0,
-                "sale_end": bundle["ending"],
+                "sale_end": 0 if bundle["battlepass"] else bundle["ending"],
                 "rental_duration": 0,
                 "promotional": "",
                 "original": sku,
@@ -202,6 +204,35 @@ def build(document, stamp, sale_ids=(), zero_prices=False):
                     # Native sale selection takes precedence over the smart price.
                     rule["enabled"] = False
             rules.append(rule)
+    if battlepass is not None:
+        if not zero_prices or battlepass.get("name") != "loot/battlepass_ids.csv" or battlepass.get("columns") != 21:
+            raise ValueError("Free Battle Pass publication requires the native 21-column table")
+        bp_rows = battlepass.get("rows")
+        if not isinstance(bp_rows, list) or battlepass.get("row_count") != len(bp_rows) or len(bp_rows) > 256:
+            raise ValueError("Incomplete native Battle Pass table")
+        for row in bp_rows:
+            if not isinstance(row, list) or len(row) != 21 or any(not isinstance(v, str) or "\0" in v for v in row):
+                raise ValueError("Invalid Battle Pass row")
+            item = number(row[0])
+            currency = number(row[7], 255)
+            if not 430000 <= item < 440000 or currency != 20 or any(x["id"] == item for x in skus):
+                raise ValueError("Unsupported/duplicate Battle Pass offer")
+            grants = Counter(number(v) for v in row[11:11 + number(row[10], 5)])
+            if not grants or 0 in grants:
+                raise ValueError("Battle Pass offer has missing grants")
+            for sale in (False, True):
+                sku = item + (20000 if sale else 0)
+                skus.append({"id": sku, "product": item, "type": 1, "data": "", "ignore_entitlements": 0,
+                             "sale_start": 0, "sale_end": 0, "rental_duration": 0, "promotional": "",
+                             "original": item, "collision": 0, "modified": stamp, "coupon_enabled": 0,
+                             "enabled": True, "prices": [{"currency": 20, "amount": 0}]})
+                rules.append({"sku": sku, "enabled": True, "allow_ignore_entitlements": False,
+                              "allow_gifting": False, "sources": [0], "maximum_quantity": 1,
+                              "items": [{"1": grant, "2": count} for grant, count in sorted(grants.items())],
+                              "currencies": []})
+    # Battle Pass offers are purchased from their dedicated native screen.
+    # They do not become ordinary carousel categories.
+    eligible = [item for item in eligible if not item["battlepass"]]
     groups = [
         (
             "featured",
@@ -295,6 +326,7 @@ def main():
     parser.add_argument("--timestamp", type=int, default=int(time.time()))
     parser.add_argument("--zero-prices", action="store_true",
                         help="Publish every supported local bundle/variant for zero COD points")
+    parser.add_argument("--battlepass-table", type=Path, help="Publish the native Battle Pass and tier-skip offers for zero COD points")
     parser.add_argument(
         "--sale-ids",
         type=int,
@@ -306,7 +338,9 @@ def main():
     if not 0 < args.timestamp < 2**32:
         parser.error("Invalid publication timestamp")
     original = args.table.read_bytes()
-    publication = build(json.loads(original), args.timestamp, args.sale_ids, args.zero_prices)
+    bp_bytes = args.battlepass_table.read_bytes() if args.battlepass_table else None
+    publication = build(json.loads(original), args.timestamp, args.sale_ids, args.zero_prices,
+                        json.loads(bp_bytes) if bp_bytes is not None else None)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     files = {}
@@ -345,6 +379,7 @@ def main():
         "excluded": publication["excluded"],
         "files": files,
         "native_purchase_verified": False,
+        "battlepass_source_sha256": hashlib.sha256(bp_bytes).hexdigest() if bp_bytes is not None else None,
     }
     (output / "manifest.json").write_bytes(
         (json.dumps(manifest, indent=2) + "\n").encode()

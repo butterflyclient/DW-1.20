@@ -194,13 +194,50 @@ namespace services
                    !state.at("backend_doc").contains("private_lobby");
         }
 
+        Json nativeBackendDocument(const Json &lobby)
+        {
+            auto backendDocument = lobby.at("backend_doc");
+            const unsigned squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+            auto &botRules = backendDocument["ruleset_payload"]["dvar_overrides"];
+            botRules["replay_dw_squadSize"] = squadSize;
+            std::string reserved(50, '0');
+            if (squadSize)
+            {
+                // BR combat teams follow squads, not the MP query's two-team
+                // default. Keep the full playlist capacity, including empty
+                // groups which native bots may occupy later.
+                auto &teams = backendDocument["team_balance"]["teams"];
+                teams = backendDocument["team_balance"]["squads"];
+                const auto groups = (lobby.at("maximum_members").get<unsigned>() + squadSize - 1) / squadSize;
+                wire::require(groups > 0 && groups <= 200);
+                for (unsigned i = 0; i < groups; ++i)
+                    if (!teams.contains(std::to_string(i)))
+                        teams[std::to_string(i)] = Json::array();
+                botRules[lobby.at("match_selection").value("native_team_count_dvar", std::string("party_teamCount"))] = groups;
+                const auto fill = lobby.value("squad_fill", Json::object());
+                for (const auto &entry : backendDocument["team_balance"]["squads"].items())
+                    if (!fill.value(entry.key(), false))
+                    {
+                        const unsigned group = unsigned(std::stoul(entry.key()));
+                        wire::require(group < 200);
+                        auto &digit = reserved[49 - group / 4];
+                        const unsigned bits = unsigned(digit <= '9' ? digit - '0' : digit - 'a' + 10) | (1u << (group % 4));
+                        digit = "0123456789abcdef"[bits];
+                    }
+            }
+            botRules["replay_dw_reservedSquads"] = reserved;
+            wire::require(botRules.size() <= 128);
+            return backendDocument;
+        }
+
         void notify(Reply &reply,
                     const Json &lobby,
                     uint32_t event,
                     uint64_t mmId = 0,
                     const std::set<uint64_t> *recipients = nullptr)
         {
-            const auto host = lobby.at("host_doc").dump(), backend = lobby.at("backend_doc").dump();
+            const auto backendDocument = nativeBackendDocument(lobby);
+            const auto host = lobby.at("host_doc").dump(), backend = backendDocument.dump();
             wire::require(host.size() < 16384 && backend.size() < 16384);
             // Verified registered async-matchmaker decoder 0x14213F1C0. String size
             // helper 0x1420EEE60 peeks at the next typed string; no length prefix.
@@ -635,6 +672,7 @@ namespace services
                 pool["squad_size"] = selection.squadSize;
                 // Fill is a party preference, not a separate matchmaking pool.
                 pool["team_balance"].erase("lock_squad");
+                pool["team_balance"].erase("num_teams");
             }
             return pool;
         }
@@ -1180,7 +1218,7 @@ namespace services
                     // Bound bdLobbyDocuments result supplies host string then backend.
                     wire::Writer result;
                     result.text(lobby.at("host_doc").dump());
-                    result.text(lobby.at("backend_doc").dump());
+                    result.text(nativeBackendDocument(lobby).dump());
                     return Reply{0, {std::move(result.data)}, "matchmaker-lobby-documents-read"};
                 }
                 const bool migration = lobby.at("owner") != id.userId;
@@ -1837,7 +1875,7 @@ namespace services
         // Native create/join envelopes retain the allocated party's mmID.
         notify(reply, state, state["owner"] == user ? 2005 : 2001, search, &recipient);
         auto delivery = reply.deliveries.at(0);
-        const auto bytes = Json::array({state["host_doc"], state["backend_doc"]}).dump();
+        const auto bytes = Json::array({state["host_doc"], nativeBackendDocument(state)}).dump();
         delivery.tournamentId = tournament;
         delivery.tournamentRoundLobby = true;
         delivery.tournamentStateHash = wire::base64Encode(

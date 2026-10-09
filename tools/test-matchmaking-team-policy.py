@@ -194,12 +194,18 @@ try:
         docs = documents(created[32:])
         assert docs[1]["team_balance"]["squad_size"] == 3
         assert docs[1]["team_balance"]["squads"] == {"0": [host.user, peer.user]}
+        assert len(docs[1]["team_balance"]["teams"]) == 50
+        assert docs[1]["team_balance"]["teams"]["0"] == [host.user, peer.user]
+        assert docs[1]["ruleset_payload"]["dvar_overrides"][names["party_teamCount"]] == 50
+        assert docs[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_squadSize"] == 3
+        assert int(docs[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_reservedSquads"], 16) == 1
         assert docs[1]["ruleset_payload"]["dvar_overrides"][guard] == 0
         assert ordinary(host, 15, u64(lobby) + u64(docs[1]["update_id"])
                         + text(json.dumps(docs[0]))) == b"\x01\x01"
         _, update = receive(host)
         receive(peer)
         joining = {**br, "members": [third.user, fourth.user], "tokens": tokens[2:],
+                   "team_balance": {"num_teams": 50, "lock_squad": True},
                    "ruleset_payload": {**br["ruleset_payload"], "only_join_existing_lobbies": True}}
         joined_mm = documents(ordinary(third, 18, text(json.dumps(joining))))[0]["mm_id"]
         kind, joined = receive(third)
@@ -208,6 +214,8 @@ try:
         joined_docs = documents(joined[23:])
         assert {k: set(v) for k, v in joined_docs[1]["team_balance"]["squads"].items()} == {
             "0": {host.user, peer.user}, "1": {third.user, fourth.user}}
+        assert joined_docs[1]["team_balance"]["teams"]["1"] == [third.user, fourth.user]
+        assert int(joined_docs[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_reservedSquads"], 16) == 3
         for observer in (host, peer):
             _, changed = receive(observer)
             assert documents(changed[23:]) == joined_docs
@@ -215,6 +223,7 @@ try:
         for client in clients:
             assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
         checks.append("Verdansk BR uses its published squad size, preserves each party in one squad, and disables MP partition splitting")
+        checks.append("BR publishes all fifty combat groups, preserves capacity and native bindings, carries No Fill bot reservations, and matches clients with stale MP team counts")
         squad_binding = names["online_matchmaking_update_party_team_squad_assignments"]
         assert docs[1]["ruleset_payload"]["dvar_overrides"][squad_binding] == 1
         for host_locked, joining_locked in ((True, False), (False, True), (False, False)):

@@ -5,6 +5,7 @@ free/paid purchase, ownership enforcement and persistent grant contents.
 """
 
 import argparse
+import importlib.util
 import hashlib
 import json
 import os
@@ -22,6 +23,7 @@ from native_wire_client import (
     NativeClient,
     binary,
     fields,
+    integer as pb_integer,
     structure,
     text as pb_text,
     u32,
@@ -105,6 +107,17 @@ def main():
         stdout=subprocess.DEVNULL,
     )
     checks = []
+    manifest = json.loads((args.publication / "manifest.json").read_bytes())
+    if manifest.get("battlepass_source_sha256"):
+        module_path = ROOT / "tools/build-replay-battlepass.py"
+        spec = importlib.util.spec_from_file_location("battlepass_publication", module_path)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        table_path = ROOT / "data/store-asset-research/live/loot__battlepass_ids.csv.json"
+        assert hashlib.sha256(table_path.read_bytes()).hexdigest() == manifest["battlepass_source_sha256"]
+        definitions = module.build(json.loads(table_path.read_bytes()))
+        destination = data / "achievements/5800/5800/definitions.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(definitions))
     with (fixture / "stdout.log").open("wb") as log:
         process = subprocess.Popen(
             [str(args.server), str(data), "--port-offset", str(offset)],
@@ -403,6 +416,29 @@ def main():
                 checks.append(
                     "fresh authenticated session retries the durable transaction without another debit"
                 )
+                manifest = json.loads((args.publication / "manifest.json").read_bytes())
+                if manifest.get("battlepass_source_sha256"):
+                    for sku in (432000, 432001, 430002, 450002):
+                        offer = next(row for row in catalog["skus"] if row["id"] == sku)
+                        assert offer["prices"] == [{"currency": 20, "amount": 0}] and offer["sale_end"] == 0
+                        before = json.loads(inventory.read_bytes())
+                        client.task(80, 106, buy(sku, "bp-free-" + str(sku)), structured=False)
+                        after = json.loads(inventory.read_bytes())
+                        assert after["balances"] == before["balances"]
+                        expected = next(row for row in rules["rules"] if row["sku"] == sku)["items"]
+                        for grant in expected:
+                            old = next((row["2"] for row in before["items"] if row["1"] == grant["1"]), 0)
+                            new = next(row["2"] for row in after["items"] if row["1"] == grant["1"])
+                            assert new == old + grant["2"]
+                    checks.append("Native premium Battle Pass, premium-plus-skips, regular and sale tier skips grant their exact CSV items without charging COD points")
+                    request = structure(pb_text(1, "5800") + pb_text(2, "") + pb_integer(3, int(time.time())) + pb_integer(4, 3002001))
+                    assert client.task(125, 5, request) == b""
+                    state_path = data / "achievements/5800/5800" / str(client.user) / "states.json"
+                    states = json.loads(state_path.read_bytes())
+                    assert next(row for row in states if row["id"] == 3002001)["status"] == 1
+                    before = state_path.read_bytes()
+                    assert client.task(125, 5, request) == b"" and state_path.read_bytes() == before
+                    checks.append("Season 3 premium activation completes through native 125/5, persists its kind-20 state and repeats without changing that state")
         finally:
             if process.poll() is None:
                 process.terminate()

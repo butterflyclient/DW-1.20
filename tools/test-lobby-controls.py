@@ -82,8 +82,8 @@ def main():
     settings = dict(enabled=True, main=True, frontend=True, lobby=True, host=True, systemlink=False, controller=0, playlist_bots=False, mode=2, slots=152, humans=2, allies=1, axis=1)
     calls, registered, checks = [], {}, []
     lua = dict(top=2, locked=False, limits={}, now=10000)
-    names = ("DW_LocalBackend_IsEnabled", "Sys_IsMainThread", "Com_FrontEndScene_IsActive", "Com_GameMode_GetActiveGameMode", "Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration", "Dvar_RegisterInt", "Dvar_SetVariant", "Dvar_FindVarByName", "Com_Printf", "replay_rva_01187fa0", "replay_rva_01187ee0", "replay_rva_01189120", "replay_rva_0118dd00", "replay_rva_0119cfa0", "replay_rva_0119a5a0", "replay_rva_00ca2370", "replay_rva_00ca1d20", "replay_rva_01119b40", "replay_rva_0118ab60", "replay_rva_0118ad10", "replay_rva_00ca2110", "replay_rva_01528420", "replay_rva_00ca1c50", "replay_rva_010cd460", "replay_rva_010cc6f0", "replay_rva_019bdad0", "replay_rva_019bedb0", "replay_rva_020838b0", "replay_rva_020836e0", "replay_rva_02084ac0", "replay_rva_02084100", "replay_rva_02084510", "replay_rva_02084790", "replay_rva_0148fce0")
-    names += ("func_142083A30", "func_1420839E0", "func_142084950", "func_1419B78C0", "func_142089FB0", "func_1413E33E0", "func_1413E2BA0", "func_142084120", "func_1419CDD30")
+    names = ("DW_LocalBackend_IsEnabled", "Sys_IsMainThread", "Com_FrontEndScene_IsActive", "Com_GameMode_GetActiveGameMode", "Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration", "Dvar_RegisterInt", "DW_BotPolicy_Register", "DW_BotPolicy_Prepare", "Dvar_SetVariant", "Dvar_FindVarByName", "Com_Printf", "replay_rva_01187fa0", "replay_rva_01187ee0", "replay_rva_01189120", "replay_rva_0118dd00", "replay_rva_0119cfa0", "replay_rva_0119a5a0", "replay_rva_00ca2370", "replay_rva_00ca1d20", "replay_rva_01119b40", "replay_rva_0118ab60", "replay_rva_0118ad10", "replay_rva_00ca2110", "replay_rva_01528420", "replay_rva_00ca1c50", "replay_rva_010cd460", "replay_rva_010cc6f0", "replay_rva_019bdad0", "replay_rva_019bedb0", "replay_rva_020838b0", "replay_rva_020836e0", "replay_rva_02084ac0", "replay_rva_02084100", "replay_rva_02084510", "replay_rva_02084790", "replay_rva_0148fce0")
+    names += ("func_142083A30", "func_1420839E0", "func_142084950", "func_1419B78C0", "func_142089FB0", "func_1413E33E0", "func_1413E2BA0", "func_1413E2B40", "func_142084120", "func_1419CDD30")
     store = dict(active=False, top=4, table="loot/bundle_ids.csv", column=10, price="500", exists=True, result=None)
 
     def resolve(name):
@@ -127,8 +127,9 @@ def main():
             machine.mem_write(values[0] + 40, bytes(machine.mem_read(values[1], 16)))
             returned()
         elif name == "Dvar_FindVarByName":
-            assert string(values[0]) == "br_minplayers"
-            returned(arena + 0x3000)
+            key = string(values[0])
+            assert key in ("br_minplayers", "lui_battlepass_tier_sale_price")
+            returned(arena + 0x3000 if key == "br_minplayers" else 0)
         elif name == "replay_rva_0148fce0":
             returned(lua["now"])
         elif name == "replay_rva_019bdad0":
@@ -145,7 +146,8 @@ def main():
             assert lua["locked"]
             returned(lua["top"])
         elif name == "replay_rva_020836e0":
-            assert lua["locked"] and values[1] & 0xFFFFFFFF == (-10002 & 0xFFFFFFFF) and string(values[2]) == "Lobby"
+            assert lua["locked"] and values[1] & 0xFFFFFFFF == (-10002 & 0xFFFFFFFF) and string(values[2]) in ("Lobby", "BATTLEPASS")
+            lua["table"] = string(values[2])
             lua["top"] += 1
             returned()
         elif name == "replay_rva_02084ac0":
@@ -153,14 +155,14 @@ def main():
             returned(5)
         elif name == "replay_rva_02084100":
             raw = (machine.reg_read(UC_X86_REG_XMM1) & ((1 << 64) - 1)).to_bytes(8, "little")
-            assert lua["locked"] and struct.unpack("<d", raw)[0] == 200.0
+            assert lua["locked"] and struct.unpack("<d", raw)[0] == (200.0 if lua["table"] == "Lobby" else 0.0)
             lua["top"] += 1
             returned()
         elif name == "replay_rva_02084510":
             key = string(values[2])
             assert lua["locked"] and values[1] & 0xFFFFFFFF == 0xFFFFFFFE
-            assert key in ("BotLimit", "BotLimitForSplitScreen")
-            lua["limits"][key] = 200
+            assert key in ("BotLimit", "BotLimitForSplitScreen", "SINGLE_TIER_COST")
+            lua["limits"][key] = 0 if key == "SINGLE_TIER_COST" else 200
             lua["top"] -= 1
             returned()
         elif name == "replay_rva_02084790":
@@ -207,6 +209,10 @@ def main():
         elif name == "func_1413E2BA0":
             assert values[0] == arena + 0x7000 and values[1] == 0 and string(values[2]) == "400061"
             assert values[3] == store["column"]
+            machine.mem_write(arena + 0x6200, store["price"].encode() + b"\0")
+            returned(arena + 0x6200)
+        elif name == "func_1413E2B40":
+            assert values[:3] == [arena + 0x7000, 0, store["column"]]
             machine.mem_write(arena + 0x6200, store["price"].encode() + b"\0")
             returned(arena + 0x6200)
         elif name == "func_142084120":
@@ -280,7 +286,7 @@ def main():
     run("DW_LobbyControls_Frame")
     assert read(dvars["gl_14D386840"] + 40) == 200
     assert settings["slots"] == 200
-    assert lua["limits"] == dict(BotLimit=200, BotLimitForSplitScreen=200)
+    assert lua["limits"] == dict(BotLimit=200, BotLimitForSplitScreen=200, SINGLE_TIER_COST=0)
     assert not lua["locked"] and lua["top"] == 2
     checks.append("Custom setup uses the full native slot capacity; Lua table updates preserve the VM stack and native LUI locking")
     write(arena + 0x3000 + 29, 9, "<B")
@@ -299,6 +305,9 @@ def main():
         ("loot/bundle_ids.csv", 11, "200", True, True, "0"),
         ("loot/bundle_ids.csv", 36, "100", True, True, "0"),
         ("loot/bundle_ids.csv", 14, "123", True, True, "123"),
+        ("loot/battlepass_ids.csv", 8, "1000", True, True, "0"),
+        ("loot/battlepass_ids.csv", 9, "750", True, True, "0"),
+        ("loot/battlepass_ids.csv", 6, "3002001", True, True, "3002001"),
         ("loot/bundle_ids.csv", 10, "", True, True, ""),
         ("loot/bundle_ids.csv", 10, "500", False, True, "500"),
         ("other.csv", 10, "500", True, True, "500"),
@@ -310,6 +319,11 @@ def main():
         assert store["result"] == expected and store["top"] == 5
     store["top"] = 3
     assert run("func_1419BA320") == 255
+    for column, expected in ((8, "0"), (9, "0"), (6, "1000")):
+        store.update(top=3, table="loot/battlepass_ids.csv", column=column, price="1000", exists=True, result=None)
+        settings["enabled"] = True
+        assert run("func_1419BA610") == 1 and store["result"] == expected and store["top"] == 4
+    checks.append("Both native keyed and row CSV readers expose free Battle Pass prices while preserving IDs and Lua stack/arity")
     checks.append("Native bundle price binding zeros regular, sale and smart costs only for DW; other columns/tables, missing rows, non-DW calls and Lua arity retain their original behavior")
     args.output.write_text(json.dumps(dict(schema=1, passed=True, game_sha256=report["sha256"], checks=checks, native_game_verified=False), indent=2) + "\n")
     print(f"PASS: {len(checks)} linked native control groups")

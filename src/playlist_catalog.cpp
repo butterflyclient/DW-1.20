@@ -371,7 +371,10 @@ namespace services
             if (selected.splitPartiesForTeamBalance)
                 selected.metadata["split_parties_for_team_balance"] = true;
             if (selected.squadSize)
+            {
                 selected.metadata["squad_size"] = selected.squadSize;
+                selected.metadata["native_team_count_dvar"] = bindings.value("party_teamCount", std::string("party_teamCount"));
+            }
             for (const auto &entry : eligible)
                 selected.metadata["game_types"][entry["gametype"].get<std::string>()] =
                     modes.at(entry["gametype"].get<std::string>());

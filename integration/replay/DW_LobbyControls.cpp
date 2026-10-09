@@ -6,6 +6,8 @@
 extern "C"
 {
     bool DW_LocalBackend_IsEnabled();
+    void DW_BotPolicy_Register();
+    void DW_BotPolicy_Prepare(const void *);
     bool replay_rva_01187fa0();                 // Lobby_IsInLobby
     void *replay_rva_01187ee0();                // Lobby_GetPartyData
     bool replay_rva_01189120(const void *);     // Party_AreWeHost
@@ -92,6 +94,15 @@ namespace
                 Dvar_SetVariant(minimum, &value, 0);
             }
         }
+        if (auto *salePrice = Dvar_FindVarByName("lui_battlepass_tier_sale_price"))
+        {
+            if (static_cast<DvarType>(salePrice->type) == DvarType::Int &&
+                salePrice->current.integer)
+            {
+                DvarValue free{};
+                Dvar_SetVariant(salePrice, &free, 0);
+            }
+        }
         if (!gl_151868880)
             return;
         replay_rva_019bdad0();
@@ -107,6 +118,13 @@ namespace
                     replay_rva_02084100(vm, 200.0);
                     replay_rva_02084510(vm, -2, key);
                 }
+            }
+            replay_rva_02084790(vm, top);
+            replay_rva_020836e0(vm, -10002, "BATTLEPASS");
+            if (replay_rva_02084ac0(vm, -1) == 5)
+            {
+                replay_rva_02084100(vm, 0.0);
+                replay_rva_02084510(vm, -2, "SINGLE_TIER_COST");
             }
             replay_rva_02084790(vm, top);
         }
@@ -146,6 +164,7 @@ extern "C" void DW_LobbyControls_Frame()
             "replay_dw_fillBots", 0, 0, 1, 0, "Legacy DW bot request; use replay_dw_botCount");
         s_botCount = Dvar_RegisterInt(
             "replay_dw_botCount", 0, 0, 199, 0, "DW operator number of native bots to add");
+        DW_BotPolicy_Register();
         Dvar_EndPermanentRegistration();
     }
     if (!s_start->current.integer)
@@ -209,6 +228,7 @@ extern "C" void DW_LobbyControls_Frame()
         replay_rva_00ca1d20();
         if (saved.integer > 2)
             Dvar_SetVariant(teams, &saved, 0);
+        DW_BotPolicy_Prepare(party);
         replay_rva_00ca2110();
         replay_rva_0119a5a0(party);
         s_filled = true;

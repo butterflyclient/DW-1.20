@@ -32,14 +32,17 @@ extern "C" int func_1419BA320(void *vm)
     if (func_1413E33E0(name, &table))
     {
         value = func_1413E2BA0(table, search, key, column);
-        if (value && *value && (column == 10 || column == 11 || column == 36) &&
-            DW_LocalBackend_IsEnabled())
+        if (value && *value && DW_LocalBackend_IsEnabled())
         {
-            constexpr const char *bundleTable = "loot/bundle_ids.csv";
-            unsigned i = 0;
-            while (name[i] && name[i] == bundleTable[i])
-                ++i;
-            if (!name[i] && !bundleTable[i])
+            const auto equals = [name](const char *expected)
+            {
+                unsigned i = 0;
+                while (name[i] && name[i] == expected[i])
+                    ++i;
+                return !name[i] && !expected[i];
+            };
+            if ((equals("loot/bundle_ids.csv") && (column == 10 || column == 11 || column == 36)) ||
+                (equals("loot/battlepass_ids.csv") && (column == 8 || column == 9 || column == 20)))
                 value = "0";
         }
     }
