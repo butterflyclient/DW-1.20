@@ -264,6 +264,14 @@ GAPS["193"] += (
     "response bindings remain open; this publication proof does not close those routes."
 )
 
+GAPS["193"] += (
+    " Exact-name DIA lookup in the game-test oracle found class declarations but no "
+    "emitted class-owned function symbols for the publisher/user category responses. "
+    "The complete-single-upload response provides a positive emitted-method control. "
+    "These are oracle availability results, not proof of Replay's wire layout or "
+    "unused routes; see validation/20261009-storage-oracle-method-availability.json."
+)
+
 
 def friend_native_evidence(server_hash, game_hash):
     path = ROOT / "validation/20261006-friend-store-native-lifecycle.json"
