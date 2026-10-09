@@ -93,6 +93,11 @@ def exercise(
     unchanged_reject(lobby, changed)
     changed = copy.deepcopy(join)
     changed["lobby_slots"]["max"] = 3
+    # Compatibility uses the native match limit, rather than the anchor's
+    # search hint. Change the actual rule as well to request a different pool.
+    changed["ruleset_payload"]["dvar_overrides"][
+        bindings.get("party_maxplayers", "party_maxplayers")
+    ] = 3
     unchanged_reject(lobby, changed)
     changed = copy.deepcopy(join)
     changed["lobby_slots"]["max"] = 0

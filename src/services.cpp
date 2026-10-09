@@ -33,6 +33,7 @@
 #include <mutex>
 #include <optional>
 #include <charconv>
+#include <set>
 
 namespace services
 {
@@ -397,7 +398,8 @@ namespace services
                 // buffers to the iterator. Reject a native tuning publication
                 // that would silently truncate a value before dvar assignment.
                 const size_t valueCapacity = replayNamespace ? 128 : 1024;
-                wire::require(value.size() < valueCapacity && value.find('\0') == std::string::npos);
+                wire::require(value.size() < valueCapacity &&
+                              value.find('\0') == std::string::npos);
             }
             return json;
         }
@@ -539,8 +541,9 @@ namespace services
         return matchmakingStartWaitingMatch(directory, players, matchToken, fillBots, botCount);
     }
 
-    void restoreLocalProgression(uint32_t title, uint64_t user, uint64_t xp,
-                                 bool restore, unsigned startingRank, uint32_t platformAccount)
+    void restoreLocalProgression(
+        uint32_t title, uint64_t user, uint64_t xp, bool restore, unsigned startingRank,
+        uint32_t platformAccount)
     {
         std::lock_guard lock(storeMutex);
         restoreAchievementProgression(directory, title, user, xp, restore, startingRank, platformAccount);
@@ -574,22 +577,41 @@ namespace services
     void maintainTournamentPublications(const std::function<void(const std::string &)> &log)
     {
         std::lock_guard lock(storeMutex);
-        const auto root = directory / "tournaments";
-        if (!std::filesystem::exists(root))
-            return;
-        unsigned count = 0;
-        for (const auto &entry : std::filesystem::directory_iterator(root))
-        {
-            wire::require(++count <= 1024);
-            const auto name = entry.path().filename().string();
-            uint32_t title = 0;
-            const auto parsed = std::from_chars(name.data(), name.data() + name.size(), title);
-            if (!entry.is_directory() || entry.is_symlink() || parsed.ec != std::errc{} ||
-                parsed.ptr != name.data() + name.size() || !title || std::to_string(title) != name)
+        std::set<uint32_t> titles;
+        // Formations survive independently of enrollment/catalog files. Discover
+        // both owners so loss of the tournament realm cannot strand assignments.
+        for (const auto &root : {directory / "tournaments", directory / "matchmaking"})
+            try
             {
-                log("TOURNAMENT maintenance rejected invalid realm path");
-                continue;
+                if (!std::filesystem::exists(root))
+                    continue;
+                wire::require(std::filesystem::is_directory(root) &&
+                              !std::filesystem::is_symlink(root));
+                unsigned count = 0;
+                for (const auto &entry : std::filesystem::directory_iterator(root))
+                {
+                    wire::require(++count <= 1024);
+                    const auto name = entry.path().filename().string();
+                    uint32_t title = 0;
+                    const auto parsed =
+                        std::from_chars(name.data(), name.data() + name.size(), title);
+                    if (!entry.is_directory() || entry.is_symlink() || parsed.ec != std::errc{} ||
+                        parsed.ptr != name.data() + name.size() || !title ||
+                        std::to_string(title) != name)
+                    {
+                        log("TOURNAMENT maintenance rejected invalid realm path");
+                        continue;
+                    }
+                    wire::require(titles.contains(title) || titles.size() < 1024);
+                    titles.insert(title);
+                }
             }
+            catch (const std::exception &)
+            {
+                log("TOURNAMENT maintenance realm discovery storage failure");
+            }
+        for (const auto title : titles)
+        {
             try
             {
                 retireUnavailableManagedTournaments(directory, title, log);

@@ -1,6 +1,7 @@
 """Authenticated dashboard control tested against disposable native-wire clients."""
 
 import json
+import copy
 import secrets
 import struct
 import urllib.error
@@ -79,7 +80,12 @@ def before_match(base, data, clients, activity, lobby_path, strings, checks):
             revision = struct.unpack_from("<Q", packet, 15)[0]
             if revision == state["update_id"]:
                 host, backend = strings(packet[23:])
-                assert host == state["host_doc"] and backend == state["backend_doc"]
+                expected_backend = copy.deepcopy(state["backend_doc"])
+                assert not state["match_selection"].get("squad_size", 0)
+                expected_backend["ruleset_payload"]["dvar_overrides"].update(
+                    replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+                )
+                assert host == state["host_doc"] and backend == expected_backend
                 break
         else:
             raise AssertionError("Native lobby update did not reach every participant")

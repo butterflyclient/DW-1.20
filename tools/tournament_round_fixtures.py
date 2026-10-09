@@ -92,7 +92,15 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         assert assignment["lobbyID"] == lobby_id
         state = json.loads((mm_root / "lobbies" / f"{lobby_id}.json").read_bytes())
         assert event == (2005 if state["owner"] == identity else 2001)
-        assert host == state["host_doc"] and backend == state["backend_doc"]
+        assert host == state["host_doc"]
+        # The native envelope includes transient squad controls. These closed
+        # MP tournament rounds have no BR squad reservations, and those
+        # controls must not mutate the durable assignment document.
+        expected_backend = copy.deepcopy(state["backend_doc"])
+        expected_backend["ruleset_payload"]["dvar_overrides"].update(
+            replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+        )
+        assert backend == expected_backend
         assert backend["tournament"] == {
             "tournament_id": tournament,
             "round_id": round_index,
@@ -247,9 +255,12 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         try:
             ready(1, error=102)
             journal = json.loads((mm_root / "transaction.json").read_bytes())
+            (directory / "tournament-round-blocked-journal.json").write_text(
+                json.dumps(journal, indent=2)
+            )
             assert journal["phase"] == "prepared"
             paths = {entry["path"] for entry in journal["writes"]}
-            assert "tournament-enrollments.json" in paths
+            assert "tournament-enrollments.json" in paths, paths
             assert f"tournaments/{tournament}.json" in paths
             assert "current-lobbies.json" in paths
             assert sum(path.startswith("lobbies/") for path in paths) == 1
@@ -297,7 +308,7 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
             assert not terminal_path.exists()
             assert formation_path.read_bytes() == formation_before
             for _, connection in clients:
-                assert not connection.pushes, "Unexpected queued tournament notification"
+                assert not getattr(connection, "pushes", []), "Unexpected queued tournament notification"
                 no_update(connection)
         finally:
             publish(catalog_path, {"schema": 1, "title": title, "tournaments": [publication]})

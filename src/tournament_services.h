@@ -4,7 +4,8 @@
 
 namespace services
 {
-    // Caller owns the service-store lock; visits persisted enrollment, not sockets.
+    // Caller owns the service-store lock; visits enrollment and persisted formations,
+    // independently of sockets or a surviving tournament catalog/enrollment file.
     void retireUnavailableManagedTournaments(const std::filesystem::path &directory,
                                              uint32_t title,
                                              const std::function<void(const std::string &)> &log);

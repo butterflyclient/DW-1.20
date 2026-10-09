@@ -585,7 +585,7 @@ def native_byte_task_evidence(receipt):
         == digest(ROOT / "tools/inventory-native-task-bytes.py")
         and proof.get("test_tool_sha256")
         == digest(ROOT / "tools/test-native-task-bytes.py")
-        and proof.get("independent_x64_trace_cases") == 31
+        and proof.get("independent_x64_trace_cases") == 52
         and proof.get("chained_unwind_ownership_resolved") is True
         and proof.get("target_image_sha256") == digest(image)
         and raw_path.is_relative_to(DATA)
@@ -764,8 +764,17 @@ def native_byte_task_evidence(receipt):
 
 
 def offline_tournament_maintenance_evidence(server_hash):
-    path = ROOT / "validation/20261006-offline-tournament-startup.json"
-    if not path.is_file():
+    candidates = (
+        ROOT / "validation/20261009-clean-backend-linux-offline-startup.json",
+        ROOT / "validation/20261009-clean-backend-windows-offline-startup.json",
+        ROOT / "validation/20261006-offline-tournament-startup.json",
+    )
+    path = next(
+        (path for path in candidates if path.is_file()
+         and json.loads(path.read_bytes()).get("backend_sha256") == server_hash),
+        None,
+    )
+    if path is None:
         return None
     proof = json.loads(path.read_bytes())
     expected_sources = {
@@ -798,7 +807,19 @@ def offline_tournament_maintenance_evidence(server_hash):
         and proof.get("receiver_membership_seeded") is True
     ):
         return None
-    reference = proof["protocol_evidence"]
+    if "remote_export" in proof:
+        exported = proof["remote_export"]
+        raw_path = (ROOT / exported["path"]).resolve()
+        if (not raw_path.is_relative_to(DATA) or not raw_path.is_file()
+                or digest(raw_path) != exported["sha256"]):
+            return None
+        original = {key: value for key, value in proof.items()
+                    if key not in ("remote_export", "local_protocol_evidence")}
+        if json.loads(raw_path.read_bytes()) != original:
+            return None
+    reference = proof.get("local_protocol_evidence", proof["protocol_evidence"])
+    if reference["sha256"] != proof["protocol_evidence"]["sha256"]:
+        return None
     protocol_path = Path(reference["path"]).resolve()
     if (
         not protocol_path.is_relative_to(DATA)
@@ -823,6 +844,16 @@ def offline_tournament_maintenance_evidence(server_hash):
         offline_retirement_and_reconnect_fixture_verified=True,
         startup_real_clock_expiry_with_zero_authenticated_clients_verified=True,
         malformed_realm_isolation_verified=True,
+        orphan_formation_discovery_verified=bool(
+            proof.get("formation_discovered_without_tournament_realm")
+            and proof.get("orphan_formation_terminal_committed")
+            and proof.get("orphan_registration_and_readiness_not_fabricated")
+        ),
+        malformed_formation_isolation_verified=bool(
+            proof.get("malformed_formation_isolated")
+            and proof.get("noncanonical_formation_preserved")
+            and proof.get("globally_live_orphan_formation_preserved")
+        ),
         backend_fixture_membership_seeded=True,
         native_game_receiver_completion_verified=False,
         cross_network_gameplay_verified=False,
@@ -1147,7 +1178,7 @@ def main():
     parser.add_argument(
         "--task-audit",
         type=Path,
-        default=ROOT / "validation/20261009-native-task-stack-probe-inventory.json",
+        default=ROOT / "validation/20261009-native-task-arithmetic-inventory.json",
     )
     parser.add_argument(
         "--rest-audit", type=Path, default=DATA / "native-rest-callgraph.json"

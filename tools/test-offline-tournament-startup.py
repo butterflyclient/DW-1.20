@@ -5,6 +5,7 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -51,7 +52,7 @@ assert all(digest(ROOT / name) == expected for name, expected in source_hashes.i
 image = validation / "build/Release/iw8-dw-server.exe"
 assert digest(image) == protocol["server_sha256"]
 directory = Path(protocol["fixture_directory"]).resolve()
-assert directory.is_relative_to(validation / "data")
+assert directory.is_relative_to(ROOT / "data")
 assert directory.name.startswith("protocol-fixture-")
 network_path = directory / "network.json"
 # With no network configuration the frozen server binds only loopback and
@@ -94,6 +95,33 @@ formation = dict(
     },
     state=bracket,
 )
+# A second title has only matchmaking-owned formation storage. Its missing
+# catalog/enrollment realm must not prevent discovery, and malformed adjacent
+# formation files must not suppress retirement of the valid formation.
+orphan_title = 5802
+orphan_id = tournament + 1
+orphan_mm = directory / "matchmaking" / str(orphan_title)
+orphan_root = directory / "tournaments" / str(orphan_title)
+assert not orphan_root.exists()
+orphan = copy.deepcopy(formation)
+orphan.update(title=orphan_title, id=orphan_id)
+orphan["definition"].update(id=orphan_id, name=str(orphan_id))
+orphan["state"]["tournamentID"] = orphan_id
+orphan_path = orphan_mm / "tournaments" / f"{orphan_id}.json"
+orphan_terminal = orphan_mm / "tournament-terminations" / f"{orphan_id}.json"
+orphan_enrollment = orphan_root / "enrollments.json"
+invalid_formation = orphan_mm / "tournaments" / f"{orphan_id + 1}.json"
+noncanonical_formation = orphan_mm / "tournaments" / f"0{orphan_id}.json"
+live = copy.deepcopy(formation)
+live_id = tournament + 3
+live.update(id=live_id, expires=expires + 600, parties={})
+live["definition"].update(id=live_id, name=str(live_id), expires=expires + 600)
+live["state"]["tournamentID"] = live_id
+live["state"]["players"] = []
+for team in live["state"]["teams"]:
+    team["playerIDs"] = []
+live_path = mm / "tournaments" / f"{live_id}.json"
+live_terminal = mm / "tournament-terminations" / f"{live_id}.json"
 terminal_path = mm / "tournament-terminations" / f"{tournament}.json"
 formation_path = mm / "tournaments" / f"{tournament}.json"
 malformed_path = directory / "tournaments/5801/enrollments.json"
@@ -103,6 +131,13 @@ paths = [
     formation_path,
     terminal_path,
     malformed_path,
+    orphan_path,
+    orphan_terminal,
+    orphan_enrollment,
+    invalid_formation,
+    noncanonical_formation,
+    live_path,
+    live_terminal,
 ]
 originals = {path: path.read_bytes() if path.exists() else None for path in paths}
 assert originals[formation_path] is None and originals[terminal_path] is None
@@ -136,6 +171,12 @@ def choose_offset():
 process = None
 try:
     publish(formation_path, formation)
+    publish(orphan_path, orphan)
+    publish(invalid_formation, b"{")
+    publish(noncanonical_formation, orphan)
+    publish(live_path, live)
+    live_bytes = live_path.read_bytes()
+    noncanonical_bytes = noncanonical_formation.read_bytes()
     publish(
         realm / "catalog.json",
         dict(
@@ -147,7 +188,13 @@ try:
                     registration_open=True,
                     live_updates=True,
                     start_search_offset_seconds=600.25,
-                )
+                ),
+                dict(
+                    live["definition"],
+                    registration_open=True,
+                    live_updates=True,
+                    start_search_offset_seconds=600.25,
+                ),
             ],
         ),
     )
@@ -174,7 +221,7 @@ try:
         [str(image), str(directory), "--port-offset", str(offset)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
     deadline = time.monotonic() + 12
     status = None
@@ -197,6 +244,8 @@ try:
         if (
             terminal_path.exists()
             and read(mm / "transaction.json")["phase"] == "applied"
+            and orphan_terminal.exists()
+            and read(orphan_mm / "transaction.json")["phase"] == "applied"
         ):
             break
         time.sleep(0.05)
@@ -213,6 +262,15 @@ try:
         for player in read(realm / "enrollments.json")["players"].values()
     )
     assert malformed_path.read_bytes() == b"{"
+    orphan_record = read(orphan_terminal)
+    assert orphan_record["id"] == orphan_id
+    assert orphan_record["action"] == "publication-unavailable"
+    assert orphan_record["actor"] == 0
+    assert orphan_record["state"] == orphan["state"]
+    assert read(orphan_enrollment) == dict(schema=1, title=orphan_title, players={})
+    assert invalid_formation.read_bytes() == b"{"
+    assert noncanonical_formation.read_bytes() == noncanonical_bytes
+    assert live_path.read_bytes() == live_bytes and not live_terminal.exists()
     proof = dict(
         schema=1,
         passed=True,
@@ -230,6 +288,12 @@ try:
         readiness_cleared=True,
         malformed_realm_preserved=True,
         independent_realm_progressed=True,
+        formation_discovered_without_tournament_realm=True,
+        orphan_registration_and_readiness_not_fabricated=True,
+        orphan_formation_terminal_committed=True,
+        malformed_formation_isolated=True,
+        noncanonical_formation_preserved=True,
+        globally_live_orphan_formation_preserved=True,
         game_launched=False,
         receiver_membership_seeded=True,
         protocol_evidence=dict(
@@ -252,5 +316,5 @@ proof["exact_source_restoration_verified"] = True
 output_path.parent.mkdir(parents=True, exist_ok=True)
 output_path.write_text(json.dumps(proof, indent=2) + "\n")
 print(
-    "PASS: startup expiry and malformed-realm isolation with zero auth/lobby/tasks; fixture files restored exactly"
+    "PASS: startup expiry, orphan formation discovery and malformed-neighbor isolation with zero auth/lobby/tasks; fixture files restored exactly"
 )

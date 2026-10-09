@@ -1,0 +1,57 @@
+REPLAY DW BACKEND RELEASE BUILDS
+
+Develop and build inside E:\DW\IW8. Keep the deployed game in
+E:\IW8\Builds\1.20-replay. Backend-only changes do not require a game rebuild.
+
+For a normal local clean rebuild:
+  powershell -NoProfile -File E:\DW\IW8\build-server.ps1 -Clean
+
+For a release, freeze src/, third_party/, CMakeLists.txt and the required test
+publications into an immutable source cohort under the project's data folder.
+Record every input hash and the archive hash. Configure a fresh CMake build
+directory against that cohort and compile every backend translation unit.
+Record the linked image hash and every newly compiled object hash. The current
+backend has 45 translation units. Recheck the frozen input hashes afterward.
+
+Do not use retained-object hashes as proof that an object represents a claimed
+source cohort. The 2026-10-09 retained-object build accepted a presence join
+that exceeded a private party's requested capacity. Full clean Windows and
+Linux builds from the reviewed source rejected that join correctly. That
+retained-object image was withheld from deployment.
+
+Keep test tooling in a separate, hash-recorded validation cohort. Updating a
+fixture does not require rewriting the frozen compilation source. Validate
+the complete encrypted-wire suite against the exact linked image, including
+actual process restart and interrupted durable transactions. Preserve failed
+logs; a compilation success does not replace runtime protocol evidence.
+
+Matchmaking fixture contracts:
+  Private parties retain their explicitly requested capacity.
+  Public matches use the effective native playlist capacity, not a search hint.
+  Tiny laboratory matches must publish an equally small native maximum.
+  Native lobby envelopes include transient squad controls without changing
+  the durable assignment document.
+  Redemption retries must preserve later progression awards. Compare exact
+  redemption records, granted quantities and balances, then prove both retries
+  leave the complete current inventory byte-for-byte unchanged.
+
+Tournament maintenance must discover both tournament realms and matchmaking
+formations. Test startup with zero authenticated clients, missing enrollment
+storage, malformed neighboring formations, and a still-live formation. Verify
+that retirement commits its terminal state and clears owned assignments without
+inventing player registration, readiness or match results. Restore fixture
+files exactly after testing.
+
+Deploy a validated Linux image into a new immutable release directory. Stop
+the service, switch the current symlink atomically, restart, check health and
+hash the running /proc/<pid>/exe. Retain the old release for rollback. Restore
+the old symlink and restart it if health or process-hash verification fails.
+
+Preserve live player data, signing keys, publications and the installation's
+available-map policy. Update the local backend deployment receipt and the
+game/backend pair receipt only after the running process is verified.
+
+Use a brief native startup check when the change affects game-facing behavior.
+Keep build, protocol, deployment, and native callback evidence separate. Owner
+playtest confirmation of progression does not imply that every SDK method has
+been implemented or that all native result callbacks have been verified.

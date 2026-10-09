@@ -127,3 +127,26 @@ def exercise(client, directory, title, user, helpers, checks):
         "bytes": saved,
         "peer_request": request("peer-denied", "LOCAL-CODE"),
     }
+
+
+def check_restart(client, fixture, checks):
+    # Rank/progression fixtures legitimately share this inventory. Check the
+    # complete redemption records and their grants, then require both retries
+    # to preserve the entire current inventory, including those later awards.
+    before = fixture["path"].read_bytes()
+    current = json.loads(before)
+    original = json.loads(fixture["bytes"])
+    for field in ("redemptions", "redeemed_keys"):
+        assert current[field] == original[field]
+    by_item = lambda state: {row["1"]: row for row in state["items"]}
+    by_currency = lambda state: {row["currency"]: row for row in state["balances"]}
+    for item_id, item in by_item(original).items():
+        assert by_item(current)[item_id] == item
+    for currency, balance in by_currency(original).items():
+        assert by_currency(current)[currency] == balance
+    assert client.task(123, 1, fixture["request"], structured=True) == fixture["result"]
+    assert client.task(123, 2, fixture["signed_request"], structured=True) == fixture["signed_result"]
+    assert fixture["path"].read_bytes() == before
+    checks.append(
+        "single-file redemption receipts, grants and balances survive process restart; exact retries preserve later progression awards without duplicate grants"
+    )

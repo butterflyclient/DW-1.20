@@ -1406,16 +1406,53 @@ namespace services
                                              uint32_t title,
                                              const std::function<void(const std::string &)> &log)
     {
-        matchmaking_store::recover(directory / "matchmaking" / std::to_string(title), title);
         const auto root = directory / "tournaments" / std::to_string(title);
+        const auto matchmakingRoot = directory / "matchmaking" / std::to_string(title);
+        // Discovery from one domain must not bypass a malformed/symlinked path
+        // in the other domain when the shared transaction publishes enrollment.
+        for (const auto &owner :
+             {root.parent_path(), root, matchmakingRoot.parent_path(), matchmakingRoot})
+            if (std::filesystem::exists(owner))
+                persisted(std::filesystem::is_directory(owner) &&
+                          !std::filesystem::is_symlink(owner));
+        matchmaking_store::recover(matchmakingRoot, title);
         const auto path = root / "enrollments.json";
-        if (!std::filesystem::exists(path))
-            return;
         auto enrollment = enrollments(path, title);
         const auto rows = catalog(root / "catalog.json", title);
         std::set<uint64_t> competitions;
         for (const auto &player : enrollment["players"])
             competitions.insert(player["id"].get<uint64_t>());
+        const auto formations = matchmakingRoot / "tournaments";
+        if (std::filesystem::exists(formations))
+        {
+            persisted(std::filesystem::is_directory(formations) &&
+                      !std::filesystem::is_symlink(formations));
+            unsigned count = 0;
+            for (const auto &entry : std::filesystem::directory_iterator(formations))
+            {
+                if (++count > 4096)
+                {
+                    log("TOURNAMENT maintenance formation discovery limit; title=" +
+                        std::to_string(title));
+                    break;
+                }
+                if (entry.path().extension() != ".json")
+                    continue;
+                const auto name = entry.path().stem().string();
+                uint64_t tournament = 0;
+                const auto parsed =
+                    std::from_chars(name.data(), name.data() + name.size(), tournament);
+                if (!entry.is_regular_file() || entry.is_symlink() || parsed.ec != std::errc{} ||
+                    parsed.ptr != name.data() + name.size() || !tournament ||
+                    std::to_string(tournament) != name)
+                {
+                    log("TOURNAMENT maintenance rejected invalid formation path; title=" +
+                        std::to_string(title));
+                    continue;
+                }
+                competitions.insert(tournament);
+            }
+        }
         for (const auto tournament : competitions)
             try
             {

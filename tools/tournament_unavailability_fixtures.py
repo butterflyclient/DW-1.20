@@ -1,5 +1,6 @@
 """Retire unavailable managed competitions without fabricating match results."""
 
+import copy
 import json
 import time
 
@@ -58,10 +59,11 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
         return search_id
 
     for iteration, mode in enumerate(
-        ("forming", "playing", "expired", "offline-playing"), 10
+        ("forming", "playing", "expired", "offline-playing", "orphan-playing"), 10
     ):
-        playing = mode in ("playing", "offline-playing")
-        offline = mode == "offline-playing"
+        playing = mode in ("playing", "offline-playing", "orphan-playing")
+        offline = mode in ("offline-playing", "orphan-playing")
+        orphan = mode == "orphan-playing"
         tournament = publication["id"] + iteration
         row = dict(
             publication,
@@ -124,6 +126,10 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             if offline:
                 for _, connection in clients:
                     connection.close()
+                if orphan:
+                    # Retained formations/searches/lobbies must still retire
+                    # after the independently owned enrollment file is lost.
+                    (root / "enrollments.json").unlink()
             publish(catalog, {"schema": 1, "title": title, "tournaments": [other]})
             try:
                 if offline:
@@ -186,18 +192,26 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
                 )
 
         for _, connection in clients[:count]:
-            assert connection.receive() == (
-                2,
-                b"\x08\xdc\x07\0\0"
-                + u64(tournament)
-                + u64(0)
-                + text("Tournament publication is no longer available"),
-            )
+            if orphan:
+                no_update(connection)
+            else:
+                assert connection.receive() == (
+                    2,
+                    b"\x08\xdc\x07\0\0"
+                    + u64(tournament)
+                    + u64(0)
+                    + text("Tournament publication is no longer available"),
+                )
         terminal = json.loads(terminal_path.read_bytes())
         assert (
             terminal["action"] == "publication-unavailable" and terminal["actor"] == 0
         )
-        assert terminal["state"] == bracket
+        expected_bracket = copy.deepcopy(bracket)
+        if orphan:
+            for round_ in expected_bracket["rounds"]:
+                for match in round_["matches"]:
+                    match["readyPlayerIDs"] = []
+        assert terminal["state"] == expected_bracket
         if mode == "expired":
             assert terminal["recorded"] >= row["expires"]
         for search_id in search_ids.values():
@@ -207,12 +221,16 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
         index = json.loads((mm / "tournament-searches.json").read_bytes())
         assert all(str(user) not in index["searches"] for user in search_ids)
         players = json.loads((root / "enrollments.json").read_bytes())["players"]
+        if orphan:
+            assert players == {}, "Retirement fabricated orphan enrollment"
         for user, connection in clients[:count]:
-            assert (
-                players[str(user)]["live_updates"] and not players[str(user)]["ready"]
-            )
-            assert "ready_round" not in players[str(user)]
-            assert "ready_match" not in players[str(user)]
+            if not orphan:
+                assert (
+                    players[str(user)]["live_updates"]
+                    and not players[str(user)]["ready"]
+                )
+                assert "ready_round" not in players[str(user)]
+                assert "ready_match" not in players[str(user)]
             connection.task(145, 20, error=14526)
             no_update(connection)
         if lobby:
@@ -256,7 +274,11 @@ def exercise(directory, title, clients, publication, helpers, publish, checks):
             assert connection.task(145, 22) == []
         if unrelated_search:
             assert clients[3][1].task(145, 22) == []
-        if offline:
+        if orphan:
+            checks.append(
+                "Orphan managed PLAYING formations retire allocated searches/lobbies/indexes after enrollment loss with zero connected participants, recover blocked transactions, preserve actual results and never fabricate registration/readiness/recipient notifications"
+            )
+        elif offline:
             checks.append(
                 "Offline managed publication retirement runs without participant connections or tasks, recovers a blocked terminal transaction, retires allocated searches/lobbies/indexes and delivers exact native event-2012 once on reconnect"
             )

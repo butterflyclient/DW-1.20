@@ -4469,18 +4469,9 @@ try:
     checks.append(
         "streaming commit/bytes/native metadata and published legacy teams survive backend restart"
     )
-    assert (
-        client.task(123, 1, redemption_fixture["request"], structured=True)
-        == redemption_fixture["result"]
-    )
-    assert (
-        client.task(123, 2, redemption_fixture["signed_request"], structured=True)
-        == redemption_fixture["signed_result"]
-    )
-    assert redemption_fixture["path"].read_bytes() == redemption_fixture["bytes"]
-    checks.append(
-        "single-file redemption receipts, grants and balances survive process restart without duplicate awards"
-    )
+    import redemption_fixtures
+
+    redemption_fixtures.check_restart(client, redemption_fixture, checks)
     offline = get_presence([user])["users"][0]["presence"]
     assert offline["online"] is False and offline["data"] == presence["data"]
     set_presence(presence)

@@ -19,6 +19,14 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         "lobby_slots": {"min": 1, "max": 3},
         "team_balance": {"num_teams": 2},
     }
+    # Secondary-slot exhaustion must use the native three-player rule too;
+    # public search slot hints no longer reduce the shipped match capacity.
+    bindings = json.loads(
+        (directory / "playlists" / str(title) / "native-dvar-names.json").read_bytes()
+    )
+    create["ruleset_payload"].setdefault("dvar_overrides", {})[
+        bindings.get("party_maxplayers", "party_maxplayers")
+    ] = 3
     join = {
         **copy.deepcopy(create),
         "members": [peer_user],
