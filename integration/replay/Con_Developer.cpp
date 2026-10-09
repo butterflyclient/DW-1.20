@@ -7,9 +7,16 @@
 extern "C" {
 bool DW_LocalBackend_IsEnabled();
 void replay_rva_015ae0b0(int); // Con_DrawConsole, exact Replay implementation
-void replay_rva_015b18c0(); // Con_ToggleConsole
-void replay_rva_015b1930(); // Con_ToggleConsoleOutput
 bool replay_rva_015b0ef0(int); // Con_IsActive
+uintptr_t replay_rva_012aa180(void*); // CL_Keys_ClearField
+extern unsigned char replay_rva_0eea60d0[]; // native console field
+extern int replay_rva_0eea2b80; // autocomplete choice
+extern unsigned char replay_rva_0eea2b40; // autocomplete active
+extern unsigned replay_rva_0eef1284; // client-zero key catchers
+extern unsigned replay_rva_0eea60dc[2]; // console field dimensions
+extern unsigned replay_rva_0461b674[2]; // native console dimensions
+extern int replay_rva_0eea60e4; // console field fixed-size flag
+extern unsigned char replay_rva_0ee9e18c; // full console output
 extern void* replay_rva_12d36330; // native game HWND
 __declspec(dllimport) short __stdcall GetAsyncKeyState(int);
 __declspec(dllimport) void* __stdcall GetForegroundWindow();
@@ -31,9 +38,38 @@ cmd_function_s s_toggleCommand{};
 bool s_registered = false;
 bool s_visibilitySet = false;
 bool s_f7Held = false;
+bool s_graveHeld = false;
+bool s_graveToggled = false;
 // Translation and immediate Cbuf submission are main-thread-only. Keep this
 // scratch space off the event stack; no allocation or large stack probe needed.
 char s_translation[4096];
+
+// The native event handler and the render-thread fallback share this latch.
+// Holding grave, including Windows key repeat, must toggle only once.
+bool Con_ClaimGravePress() {
+    if (!(GetAsyncKeyState(0xc0) & 0x8000)) {
+        s_graveToggled = false;
+        return true;
+    }
+    if (s_graveToggled) return false;
+    s_graveToggled = true;
+    return true;
+}
+
+uintptr_t Con_ToggleNative() {
+    // Exact Replay Con_ToggleConsole behavior, recovered from its instructions.
+    replay_rva_012aa180(replay_rva_0eea60d0);
+    if (replay_rva_0eea2b80 >= 0 && replay_rva_0eea2b40) {
+        replay_rva_0eea2b80 = -1;
+        replay_rva_0eea2b40 = 0;
+    }
+    replay_rva_0eef1284 ^= 1u;
+    replay_rva_0eea60dc[0] = replay_rva_0461b674[0];
+    replay_rva_0eea60dc[1] = replay_rva_0461b674[1];
+    replay_rva_0eea60e4 = 1;
+    replay_rva_0ee9e18c = 0;
+    return replay_rva_0461b674[0];
+}
 
 bool Equal(const char* text, unsigned length, const char* other) {
     unsigned i = 0;
@@ -119,15 +155,15 @@ bool Translate(const char* input, char (&output)[4096]) {
 }
 
 void Con_ToggleDeveloper_f() {
-    replay_rva_015b18c0();
+    Con_ToggleNative();
 }
 
-void Con_DeveloperFrame(int client) {
+void Con_UpdateDeveloperInput(int client) {
     if (client != 0 || !Sys_IsMainThread()) return;
     if (!s_registered) {
         Cmd_AddCommandInternal("dw_console", Con_ToggleDeveloper_f, &s_toggleCommand);
         s_registered = true;
-        Com_Printf(16, "Developer console: F7; Shift+F7 toggles full output.\n");
+        Com_Printf(16, "Developer console: grave/tilde or F7; Shift+F7 toggles full output.\n");
     }
     if (!s_visibilitySet) {
         if (auto* hidden = Dvar_FindVarByName("NRNSMTPL")) {
@@ -137,33 +173,52 @@ void Con_DeveloperFrame(int client) {
             s_visibilitySet = true;
         }
     }
-    // Poll on the main render thread. Replay's stock key path can return
-    // through LUI before reaching its console-toggle branch. F7 has no stock
-    // console branch, so polling it cannot double-toggle the native console.
-    // Native grave-key handling, character input, editing, history and
-    // autocomplete remain owned by CL_Keys_Event / CL_Keys_ConsoleKey.
+    // LUI can consume grave before the native console branch. Poll both keys
+    // while focused; the native toggle replacements deduplicate grave presses.
+    // Character input, editing, history and autocomplete stay native.
     const bool held = (GetAsyncKeyState(0x76) & 0x8000) != 0;
+    const bool graveHeld = (GetAsyncKeyState(0xc0) & 0x8000) != 0;
+    if (!graveHeld) s_graveToggled = false;
     const bool focused = GetForegroundWindow() == replay_rva_12d36330;
     if (focused && held && !s_f7Held) {
         if (GetAsyncKeyState(0x10) & 0x8000) {
-            if (!replay_rva_015b0ef0(client)) replay_rva_015b18c0();
-            replay_rva_015b1930();
+            if (!replay_rva_015b0ef0(client)) Con_ToggleNative();
+            replay_rva_0ee9e18c = !replay_rva_0ee9e18c;
         } else {
-            replay_rva_015b18c0();
+            Con_ToggleNative();
         }
     }
+    if (focused && graveHeld && !s_graveHeld && Con_ClaimGravePress())
+        Con_ToggleNative();
     s_f7Held = held;
+    s_graveHeld = graveHeld;
 }
 }
 
-// The exact target overlay is mov ecx,edx; jmp nullsub_2144 (a bare ret).
-// Restore the native console draw at the same overlay boundary as the proxy.
-extern "C" uintptr_t func_1415E1340(uintptr_t, int localClientNum) {
-    if (DW_LocalBackend_IsEnabled()) {
-        Con_DeveloperFrame(localClientNum);
-        replay_rva_015ae0b0(localClientNum);
+extern "C" uintptr_t func_1415B18C0() {
+    if (DW_LocalBackend_IsEnabled() && !Con_ClaimGravePress())
+        return replay_rva_0461b674[0];
+    return Con_ToggleNative();
+}
+
+extern "C" void func_1415B1930() {
+    // Stock Shift+grave normally selects full output instead of closing the
+    // console. In DW, both legends on this key mean a regular console toggle.
+    if (DW_LocalBackend_IsEnabled() && (GetAsyncKeyState(0xc0) & 0x8000)) {
+        if (Con_ClaimGravePress()) Con_ToggleNative();
+    } else {
+        replay_rva_0ee9e18c = !replay_rva_0ee9e18c;
     }
-    return 0;
+}
+
+// ScrPlace_EndFrame runs after UI workers in both the no-game-mode main
+// menu and game views. Keep input and draw submission on that common path.
+extern "C" const void* replay_rva_0eeb0c58; // cls.consoleFont, native Con_CheckResize
+extern "C" void Con_DeveloperFrame() {
+    if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread()) return;
+    Con_UpdateDeveloperInput(0);
+    if (replay_rva_0eeb0c58 && replay_rva_015b0ef0(0))
+        replay_rva_015ae0b0(0);
 }
 
 // Source replacement of GScr_AddDebugCommand; no detour or injected DLL.

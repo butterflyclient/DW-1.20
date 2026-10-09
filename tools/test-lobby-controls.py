@@ -79,11 +79,13 @@ def main():
         write(pointer + 29, 5, "<B")
     write(dvars["DVARBOOL_onlinegame"] + 40, 1)
     write(dvars["gl_14C796328"] + 40, 2)
-    settings = dict(enabled=True, main=True, frontend=True, lobby=True, host=True, systemlink=False, controller=0, playlist_bots=False, mode=2, slots=152, humans=2, allies=1, axis=1)
+    settings = dict(enabled=True, main=True, frontend=True, lobby=True, host=True, systemlink=False, controller=0, playlist_bots=False, mode=2, slots=152, humans=2, allies=1, axis=1, requested=7, initialized=False, bots=0)
+    command = dict(callback=None, argc=2)
     calls, registered, checks = [], {}, []
     lua = dict(top=2, locked=False, limits={}, now=10000)
     names = ("DW_LocalBackend_IsEnabled", "Sys_IsMainThread", "Com_FrontEndScene_IsActive", "Com_GameMode_GetActiveGameMode", "Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration", "Dvar_RegisterInt", "DW_BotPolicy_Register", "DW_BotPolicy_Prepare", "Dvar_SetVariant", "Dvar_FindVarByName", "Com_Printf", "replay_rva_01187fa0", "replay_rva_01187ee0", "replay_rva_01189120", "replay_rva_0118dd00", "replay_rva_0119cfa0", "replay_rva_0119a5a0", "replay_rva_00ca2370", "replay_rva_00ca1d20", "replay_rva_01119b40", "replay_rva_0118ab60", "replay_rva_0118ad10", "replay_rva_00ca2110", "replay_rva_01528420", "replay_rva_00ca1c50", "replay_rva_010cd460", "replay_rva_010cc6f0", "replay_rva_019bdad0", "replay_rva_019bedb0", "replay_rva_020838b0", "replay_rva_020836e0", "replay_rva_02084ac0", "replay_rva_02084100", "replay_rva_02084510", "replay_rva_02084790", "replay_rva_0148fce0")
     names += ("func_142083A30", "func_1420839E0", "func_142084950", "func_1419B78C0", "func_142089FB0", "func_1413E33E0", "func_1413E2BA0", "func_1413E2B40", "func_142084120", "func_1419CDD30")
+    names += ("Cmd_AddCommandInternal", "Cmd_Argc", "Cmd_Argv", "replay_rva_00ca2250", "replay_rva_00ca2270", "replay_rva_0118e020")
     store = dict(active=False, top=4, table="loot/bundle_ids.csv", column=10, price="500", exists=True, result=None)
 
     def resolve(name):
@@ -100,6 +102,21 @@ def main():
         boolean = {"DW_LocalBackend_IsEnabled": "enabled", "Sys_IsMainThread": "main", "Com_FrontEndScene_IsActive": "frontend", "replay_rva_01187fa0": "lobby", "replay_rva_01189120": "host", "replay_rva_0118dd00": "lobby", "replay_rva_01528420": "systemlink", "replay_rva_010cc6f0": "playlist_bots"}
         if name in boolean:
             returned(int(settings[boolean[name]]))
+        elif name == "Cmd_AddCommandInternal":
+            assert string(values[0]) == "fill_lobby" and command["callback"] is None
+            command["callback"] = values[1]
+            returned()
+        elif name == "Cmd_Argc":
+            returned(command["argc"])
+        elif name == "Cmd_Argv":
+            assert values[0] == 1
+            returned(arena + 0x5000)
+        elif name == "replay_rva_00ca2250":
+            returned(int(settings["initialized"]))
+        elif name == "replay_rva_00ca2270":
+            returned(int(values[0] < settings["humans"] + settings["bots"]))
+        elif name == "replay_rva_0118e020":
+            returned(int(values[1] < settings["humans"]))
         elif name == "Com_GameMode_GetActiveGameMode":
             returned(settings["mode"])
         elif name == "replay_rva_01187ee0":
@@ -170,7 +187,7 @@ def main():
             lua["top"] = 2
             returned()
         elif name == "replay_rva_00ca2370":
-            assert values[:2] == [settings["humans"] + 7, 0 if read(dvars["gl_14C796328"] + 40) == 0 else 2]
+            assert values[:2] == [settings["humans"] + settings["requested"], 0 if read(dvars["gl_14C796328"] + 40) == 0 else 2]
             returned()
         elif name == "replay_rva_0118ab60":
             assert values[1] == 1
@@ -185,6 +202,7 @@ def main():
             assert read(dvars["gl_14D386840"] + 40) == 152 and settings["slots"] == 152
             assert read(dvars["gl_14C796328"] + 40) in (0, 2)
             calls.append("bots")
+            settings.update(initialized=True, bots=settings["requested"])
             returned()
         elif name == "replay_rva_0119cfa0":
             assert values[0] == arena + 0x8000 and values[1] & 255 == 1
@@ -233,12 +251,14 @@ def main():
         rsp = stack + 0x8000 - 8
         write(rsp, halt, "<Q")
         vm.reg_write(UC_X86_REG_RSP, rsp)
-        vm.emu_start(base + symbols[name], halt, count=100000)
+        vm.emu_start(name if isinstance(name, int) else base + symbols[name], halt, count=100000)
         assert vm.reg_read(UC_X86_REG_RIP) == halt
         return vm.reg_read(UC_X86_REG_RAX) & 255
 
     write(arena + 0x3000 + 29, 5, "<B")
     write(arena + 0x3000 + 40, 150)
+    lobby_identity = base + symbols["gl_14C27E4B0"] + 79656
+    write(lobby_identity, 1, "<Q")
     run("DW_LobbyControls_Frame")
     assert read(arena + 0x3000 + 40) == 2
     write(dvars["gl_14D386840"] + 40, 152)
@@ -280,6 +300,39 @@ def main():
     run("DW_LobbyControls_Frame")
     assert calls[-1] == "start" and len(calls) == 5
     checks.append("A new round's cleared controls permit another start without duplicate bot setup")
+    write(registered["replay_dw_forceStart"] + 40, 0)
+    write(lobby_identity, 2, "<Q")
+    settings.update(initialized=False, bots=0)
+    run("DW_LobbyControls_Frame")
+    assert command["callback"] is not None
+    for text in ("0", "-1", "+2", "1.5", "200", "199x", "999999999999"):
+        vm.mem_write(arena + 0x5000, text.encode() + b"\0")
+        run(command["callback"])
+        assert read(registered["replay_dw_botCount"] + 40) == 0
+    vm.mem_write(arena + 0x5000, b"4\0")
+    for key in ("main", "frontend", "host", "lobby", "enabled"):
+        settings[key] = False
+        run(command["callback"])
+        assert read(registered["replay_dw_botCount"] + 40) == 0
+        settings[key] = True
+    run(command["callback"])
+    assert read(registered["replay_dw_botCount"] + 40) == 4
+    settings["requested"] = 4
+    run("DW_LobbyControls_Frame")
+    assert settings["bots"] == 4
+    vm.mem_write(arena + 0x5000, b"199\0")
+    run(command["callback"])
+    assert read(registered["replay_dw_botCount"] + 40) == 150
+    settings["requested"] = 150
+    run("DW_LobbyControls_Frame")
+    assert settings["bots"] == 150 and settings["slots"] == 152
+    assert read(dvars["gl_14C796328"] + 40) == 200
+    assert read(dvars["gl_14D386840"] + 40) == 152
+    checks.append("Linked fill_lobby command rejects invalid counts and non-host contexts, adds to the native pool and clamps at the original playlist capacity")
+    write(lobby_identity, 3, "<Q")
+    run("DW_LobbyControls_Frame")
+    assert read(registered["replay_dw_botCount"] + 40) == 0
+    checks.append("A command-owned bot request is cleared when native matchmaking changes lobby identity")
     write(base + symbols["gl_151868880"], arena + 0x9000, "<Q")
     lua["now"] += 1000
     write(dvars["gl_14D386820"] + 40, 1)

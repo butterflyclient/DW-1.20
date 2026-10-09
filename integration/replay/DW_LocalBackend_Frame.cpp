@@ -1,6 +1,7 @@
 // Authored source is imported through the Replay workstation revision API.
 // Only the *_dw.exe build selects local endpoints. Other builds retain native values.
 #include "com_debugstates.h"
+#include "replay_dvar.h"
 #include "DW_LocalConfig.h"
 #include "DW_LocalProgression.h"
 
@@ -275,6 +276,16 @@ extern "C" void DW_LocalBackend_Frame()
 {
     if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread())
         return;
+    // Executable-enforced for every DW client, including after namespace or
+    // game-mode resets. Resolve the registered native dvar rather than caching
+    // a pointer across any deregistration/re-registration boundary.
+    if (auto* tutorial = Dvar_FindVarByName("LSPSKLPNQT")) {
+        if (tutorial->type == 0 && !tutorial->current.enabled) {
+            DvarValue value{};
+            value.enabled = true;
+            Dvar_SetVariant(tutorial, &value, 0);
+        }
+    }
     DW_LocalProgression_Frame();
     DW_ExecutableUpdate_Frame();
     DW_LobbyControls_Frame();

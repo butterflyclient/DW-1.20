@@ -127,6 +127,8 @@ for directory in ("src", "source-workstation", "generated"):
             # DW owns this optional scheduling replacement. Keep the shared
             # compiler's implementation and other projects unchanged.
             if (source == ORIGINAL / "src/DB_ResetFileReader.cpp" or
+                source == ORIGINAL / "src/ScrPlace_EndFrame.cpp" or
+                (args.optimized and source == ORIGINAL / "src/Com_Optimized.cpp") or
                 (args.optimized and source == ORIGINAL / "src/Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp")):
                 override = ((args.integration_root or ROOT / "integration/replay") / source.name).resolve()
                 if override.is_file():
@@ -207,9 +209,9 @@ for source in sorted(private_sources.iterdir()):
     ):
         continue
     destination = snapshot / "src" / source.name
-    if source.name in ("Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp", "DB_ResetFileReader.cpp"):
+    if source.name in ("Sys_ProcessWorkerCmdsWithTimeoutAndFilter.cpp", "Com_Optimized.cpp", "DB_ResetFileReader.cpp", "ScrPlace_EndFrame.cpp"):
         # Already copied at its native optional-source association above.
-        if (source.name == "DB_ResetFileReader.cpp" or args.optimized) and source.read_bytes() != destination.read_bytes():
+        if (source.name in ("DB_ResetFileReader.cpp", "ScrPlace_EndFrame.cpp") or args.optimized) and source.read_bytes() != destination.read_bytes():
             raise RuntimeError("DW scheduler source changed during snapshot")
         continue
     if destination.exists():
@@ -217,6 +219,19 @@ for source in sorted(private_sources.iterdir()):
             "Private DW source collides with shared source: " + source.name
         )
     copy_file(source, destination)
+# A private replacement of a saved source unit is a new source revision. Update
+# only this frozen job's metadata; the shared workstation stays untouched.
+units_path = snapshot / "source-workstation/units.json"
+units_document = json.loads(units_path.read_text())
+for unit in units_document["units"]:
+    if unit.get("kind") == "cpp" and Path(unit.get("source", "")).name == "ScrPlace_EndFrame.cpp" and (private_sources / "ScrPlace_EndFrame.cpp").is_file():
+        selected = snapshot / unit["source"]
+        unit["sha256"] = unit["revision"] = hashlib.sha256(selected.read_bytes()).hexdigest()
+        private_overrides.append({"id": unit["function_id"], "content_sha256": unit["sha256"], "source": str(private_sources / "ScrPlace_EndFrame.cpp")})
+units_path.write_text(json.dumps(units_document, indent=2) + "\n")
+units_record = next(item for item in records if Path(item["snapshot"]) == units_path)
+units_record["original_sha256"] = units_record["sha256"]
+units_record["sha256"] = hashlib.sha256(units_path.read_bytes()).hexdigest()
 # A normal build generates its own static updater from the selected, frozen
 # client trust/ABI sources. Explicit reviewed integration snapshots may retain
 # their already-built helper header, whose bytes remain compiler dependencies.
@@ -327,7 +342,7 @@ debug_text = debug_text.replace(
     '            machine.mem_write(args[1], path + b"\\0")\n'
     "            ret(len(path))\n"
     '        elif name == "Dvar_RegisterInt":\n'
-    '            assert string(args[0]) == "com_optimized" and args[1:4] == [0, 0, 2]\n'
+    '            assert string(args[0]) == "com_optimized" and args[1:4] == [1, 0, 2]\n'
     '            write(arena + 0x7080 + 29, 5, "<B")\n'
     '            ret(arena + 0x7080)\n'
     '        elif name == "Sys_IsMainThread":',

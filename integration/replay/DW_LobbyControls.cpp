@@ -26,10 +26,14 @@ extern "C"
     int replay_rva_00ca1c50();          // BG_Bots_GetControllerIndex
     unsigned replay_rva_010cd460(int);  // Playlist_GetPlaylistIdForNum
     bool replay_rva_010cc6f0(unsigned); // Playlist_GetBotMatchMakingEnabled
-    extern dvar_t *gl_14D386820;        // xblive_privatematch
-    extern dvar_t *gl_14D386948;        // playlist selector
-    extern dvar_t *gl_14D386840;        // party_maxplayers
-    extern dvar_t *gl_14C796328;        // party_teamCount
+    bool replay_rva_00ca2250();         // BG_GameStateInfo_IsBotMatchMakingDataInitialized
+    bool replay_rva_00ca2270(unsigned); // BG_GameStateInfo_IsBotMemberPresent
+    bool replay_rva_0118e020(const void *, unsigned); // Party_IsMemberIndexDataAvailable
+    extern uint8_t replay_rva_0c27e4b0[];             // OnlineMatchmakerOmniscient::ms_instance
+    extern dvar_t *gl_14D386820;                      // xblive_privatematch
+    extern dvar_t *gl_14D386948;                      // playlist selector
+    extern dvar_t *gl_14D386840;                      // party_maxplayers
+    extern dvar_t *gl_14C796328;                      // party_teamCount
     extern dvar_t *DVARBOOL_onlinegame;
     extern void *gl_151868880;                           // LUI_luaVM, protected by native LUI lock
     void replay_rva_019bdad0();                          // LUI_EnterCriticalSection
@@ -65,6 +69,107 @@ namespace
     dvar_t *s_start{}, *s_bots{}, *s_botCount{};
     bool s_started = false, s_filled = false;
     unsigned s_luaPoll = 0;
+    cmd_function_s s_fillCommand{};
+    uint64_t s_lobby = 0;
+    int s_commandBotCount = 0;
+
+    void SyncLobby()
+    {
+        // Native lobby identity at the target-build matchmaker field. A command
+        // belongs to one matchmaking round, not a later lobby using this party.
+        const auto lobby = *reinterpret_cast<const uint64_t *>(replay_rva_0c27e4b0 + 79656);
+        if (lobby == s_lobby)
+            return;
+        if (s_commandBotCount && s_botCount->current.integer == s_commandBotCount)
+        {
+            DvarValue cleared{};
+            Dvar_SetVariant(s_botCount, &cleared, 0);
+        }
+        s_lobby = lobby;
+        s_commandBotCount = 0;
+        s_filled = false;
+        s_started = false;
+    }
+
+    void FillLobby_f()
+    {
+        if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread() || !s_botCount)
+            return;
+        unsigned requested = 0;
+        const char *text = Cmd_Argc() == 2 ? Cmd_Argv(1) : nullptr;
+        if (!text || !*text)
+        {
+            Com_Printf(25, "Usage: fill_lobby <number> (1-199 bots to add)\n");
+            return;
+        }
+        for (const char *p = text; *p; ++p)
+        {
+            if (*p < '0' || *p > '9' || requested > 199 / 10)
+            {
+                Com_Printf(25, "fill_lobby: enter a whole number from 1 to 199.\n");
+                return;
+            }
+            requested = requested * 10 + unsigned(*p - '0');
+        }
+        if (!requested || requested > 199)
+        {
+            Com_Printf(25, "fill_lobby: enter a whole number from 1 to 199.\n");
+            return;
+        }
+        if (!Com_FrontEndScene_IsActive() || !replay_rva_01187fa0() || replay_rva_01528420() ||
+            !DVARBOOL_onlinegame || !DVARBOOL_onlinegame->current.enabled || !gl_14D386820 ||
+            gl_14D386820->current.enabled)
+        {
+            Com_Printf(25, "fill_lobby: run this in a public matchmaking lobby in the frontend.\n");
+            return;
+        }
+        auto *party = replay_rva_01187ee0();
+        if (!party || !replay_rva_0118dd00(party) || !replay_rva_01189120(party))
+        {
+            Com_Printf(25, "fill_lobby: only the current matchmaking host can add bots.\n");
+            return;
+        }
+        SyncLobby();
+        if (!s_lobby)
+        {
+            Com_Printf(25, "fill_lobby: wait until the matchmaking lobby is ready.\n");
+            return;
+        }
+        const auto humans = replay_rva_0118ab60(party, 1);
+        const auto capacity = replay_rva_0118c7d0(party);
+        if (!humans || capacity > 200 || humans >= capacity)
+        {
+            Com_Printf(25, "fill_lobby: no playlist slots are available.\n");
+            return;
+        }
+        unsigned bots = 0;
+        if (replay_rva_00ca2250())
+            for (unsigned i = 0; i < capacity; ++i)
+                if (!replay_rva_0118e020(party, i) && replay_rva_00ca2270(i))
+                    ++bots;
+        // A second command before the next frame also includes the queued bots.
+        if (!s_filled && s_botCount->current.integer > int(bots))
+            bots = unsigned(s_botCount->current.integer);
+        if (bots >= capacity - humans)
+        {
+            Com_Printf(25, "fill_lobby: the lobby is already full.\n");
+            return;
+        }
+        const auto available = capacity - humans - bots;
+        const auto added = requested < available ? requested : available;
+        DvarValue value{};
+        value.integer = int(bots + added);
+        Dvar_SetVariant(s_botCount, &value, 0);
+        s_commandBotCount = value.integer;
+        s_filled = false;
+        Com_Printf(
+            25,
+            "fill_lobby: adding %u bots (%u requested); %u bots total, playlist capacity %u.\n",
+            added,
+            requested,
+            unsigned(value.integer),
+            capacity);
+    }
 
     void BotSetupLimits()
     {
@@ -166,6 +271,7 @@ extern "C" void DW_LobbyControls_Frame()
             "replay_dw_botCount", 0, 0, 199, 0, "DW operator number of native bots to add");
         DW_BotPolicy_Register();
         Dvar_EndPermanentRegistration();
+        Cmd_AddCommandInternal("fill_lobby", FillLobby_f, &s_fillCommand);
     }
     if (!s_start->current.integer)
         s_started = false;
@@ -176,6 +282,7 @@ extern "C" void DW_LobbyControls_Frame()
     auto *party = replay_rva_01187ee0();
     if (!party || !replay_rva_0118dd00(party) || !replay_rva_01189120(party))
         return;
+    SyncLobby();
     if (gl_14D386820->current.enabled)
     {
         if (gl_14D386840->current.integer != 200 || replay_rva_0118c7d0(party) != 200)
@@ -203,6 +310,14 @@ extern "C" void DW_LobbyControls_Frame()
         if (!humans || capacity > 200 || humans >= capacity || requested > capacity - humans)
             return;
         const auto total = humans + requested;
+        auto allies = 0u, axis = 0u;
+        if (saved.integer == 2)
+        {
+            allies = replay_rva_0118ad10(party, 2, 1);
+            axis = replay_rva_0118ad10(party, 1, 1);
+            if (allies > humans || axis > humans - allies)
+                return;
+        }
         if (saved.integer > 2)
         {
             DvarValue neutral{};
@@ -213,10 +328,6 @@ extern "C" void DW_LobbyControls_Frame()
         replay_rva_00ca2370(int(total), saved.integer == 2 ? 2 : 0);
         if (saved.integer == 2)
         {
-            auto allies = replay_rva_0118ad10(party, 2, 1);
-            auto axis = replay_rva_0118ad10(party, 1, 1);
-            if (allies + axis > humans)
-                return;
             for (unsigned unassigned = humans - allies - axis + requested; unassigned; --unassigned)
                 if (allies <= axis)
                     ++allies;
