@@ -70,9 +70,7 @@ def exercise(client, directory, title, user, query, helpers, checks):
         "duplicate-json-key",
     ):
         changed = copy.deepcopy(pending)
-        changed["writes"][0]["document"]["host_doc"]["game_state"][
-            "state"
-        ] = "fixture-invalid"
+        changed["writes"][0]["document"]["host_doc"]["game_state"]["state"] = "fixture-invalid"
         if mode == "outside-path":
             changed["writes"][-1]["path"] = "../outside.json"
         elif mode == "duplicate-path":
@@ -108,10 +106,14 @@ def exercise(client, directory, title, user, query, helpers, checks):
 
     block.rmdir()
     result = list(map(json.loads, strings(client.task(145, 13, u64(lobby)))))
-    assert result == [
-        snapshots[lobby_name]["host_doc"],
-        snapshots[lobby_name]["backend_doc"],
-    ]
+    # This fixture forms an ordinary MP lobby. Its wire document adds the
+    # native No Fill defaults; those derived fields do not rewrite the journal.
+    assert not snapshots[lobby_name]["match_selection"].get("squad_size", 0)
+    expected_backend = copy.deepcopy(snapshots[lobby_name]["backend_doc"])
+    expected_backend["ruleset_payload"]["dvar_overrides"].update(
+        replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+    )
+    assert result == [snapshots[lobby_name]["host_doc"], expected_backend]
     for name, snapshot in snapshots.items():
         assert load(root / name) == snapshot
     completed = load(journal_path)

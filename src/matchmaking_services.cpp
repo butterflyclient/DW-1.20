@@ -419,6 +419,17 @@ namespace services
             return maximum;
         }
 
+        uint64_t matchCapacity(const Json &query, const PlaylistSelection &selection)
+        {
+            const auto requested = requestCapacity(query);
+            // Private-party documents retain their explicit party capacity.
+            // Public matches use the same effective rules as the native game.
+            const auto maximum = query.contains("private_lobby") || !selection.maximumMembers
+                                     ? requested : uint64_t{selection.maximumMembers};
+            wire::require(occupiedSlots(query.at("members"), requestedSlots(query)) <= maximum);
+            return maximum;
+        }
+
         Json createLobbyDocument(const platform::LobbyIdentity &id,
                                  const Json &query,
                                  const std::set<uint64_t> &users,
@@ -519,7 +530,7 @@ namespace services
                            {{"acceptable_platforms",
                              query.value("acceptable_platforms", Json::array({"bnet"}))}}},
                           {"match_selection", selection.metadata}};
-            lobby["maximum_members"] = requestCapacity(query);
+            lobby["maximum_members"] = matchCapacity(query, selection);
             if (selection.squadSize)
                 lobby["squad_fill"] = {{"0", !query.value("team_balance", Json::object())
                                                       .value("lock_squad", false)}};
@@ -670,7 +681,7 @@ namespace services
                          {"dedicated_server", query.value("dedicated_server", Json::object())},
                          {"performance", query.value("performance", Json{{"game_type", 1}})},
                          {"team_balance", query.value("team_balance", Json::object())},
-                         {"maximum_members", requestCapacity(query)}};
+                         {"maximum_members", matchCapacity(query, selection)}};
             if (selection.splitPartiesForTeamBalance)
                 pool["split_parties_for_team_balance"] = true;
             if (selection.squadSize)

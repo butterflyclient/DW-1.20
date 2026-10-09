@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--startup-only", action="store_true",
                     help="Stop after encrypted startup, social, publisher and user-profile storage contracts")
 parser.add_argument("--host-controls-only", action="store_true")
+parser.add_argument("--matchmaking-transaction-only", action="store_true")
 args = parser.parse_args()
 exe = Path(os.environ.get("IW8_DW_TEST_SERVER", str(root / "build" / "Release" / "iw8-dw-server.exe")))
 # Imported fixture modules share this subprocess module. The Windows window
@@ -3469,6 +3470,12 @@ try:
     matchmaking_transaction_fixture = matchmaking_transaction_fixtures.exercise(
         client, directory, title, user, match_query, (u32, u64, text, boolean), checks
     )
+    if args.matchmaking_transaction_only:
+        proof = dict(passed=True, native_game_verified=False, checks=checks,
+                     server_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())
+        (root / "data/lobby-transaction-verification.json").write_text(json.dumps(proof, indent=2) + "\n")
+        print(f"PASS: {len(checks)} native startup and matchmaking transaction groups")
+        raise SystemExit(0)
     import public_matchmaking_fixtures
 
     public_matchmaking_fixtures.exercise(

@@ -7,7 +7,7 @@
 int main(int argc, char **argv)
 {
     using Json = nlohmann::json;
-    if (argc != 2)
+    if (argc != 2 && argc != 3)
         return 2;
     try
     {
@@ -15,16 +15,29 @@ int main(int argc, char **argv)
         std::ifstream input(directory / "playlists/5800/catalog.json");
         const auto catalog = Json::parse(input);
         Json result = Json::array();
-        for (const auto &playlist : catalog.at("playlists"))
+        Json queries = Json::array();
+        if (argc == 3)
         {
-            const auto id = playlist.at("playlist").get<unsigned>();
-            Json query = {{"ruleset_payload",
-                           {{"filter", {{"playlist_id", id},
-                                        {"playlist_version", catalog.at("system").at("version")}}}}}};
+            std::ifstream queryInput(argv[2]);
+            queries.push_back(Json::parse(queryInput));
+        }
+        else
+            for (const auto &playlist : catalog.at("playlists"))
+                queries.push_back(
+                    {{"ruleset_payload",
+                      {{"filter",
+                        {{"playlist_id", playlist.at("playlist")},
+                         {"playlist_version", catalog.at("system").at("version")}}}}}});
+        for (const auto &query : queries)
+        {
+            const auto id = query.at("ruleset_payload").at("filter").at("playlist_id");
             const auto selected = services::selectPlaylist(directory, 5800, query);
             if (selected)
-                result.push_back({{"playlist", id}, {"team_count", selected->teamCount},
-                                  {"rules", selected->rules}, {"metadata", selected->metadata}});
+                result.push_back({{"playlist", selected->metadata.at("playlist_id")},
+                                  {"team_count", selected->teamCount},
+                                  {"maximum_members", selected->maximumMembers},
+                                  {"rules", selected->rules},
+                                  {"metadata", selected->metadata}});
             else
                 result.push_back({{"playlist", id}, {"unavailable", true}});
         }

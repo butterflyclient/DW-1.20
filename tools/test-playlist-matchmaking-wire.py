@@ -23,22 +23,39 @@ from native_wire_client import NativeClient, u32, u64
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--game-directory", type=Path, required=True)
+parser.add_argument("--game-directory", type=Path)
+parser.add_argument(
+    "--publication",
+    type=Path,
+    help="Previously verified native catalog/package directory for Linux fixtures",
+)
+parser.add_argument("--server", type=Path, default=ROOT / "build/Release/iw8-dw-server.exe")
+parser.add_argument("--output", type=Path, default=ROOT / "data/playlist-wire-verification.json")
 args = parser.parse_args()
-EXE = ROOT / "build/Release/iw8-dw-server.exe"
+if bool(args.game_directory) == bool(args.publication):
+    parser.error("Choose exactly one of --game-directory and --publication")
+EXE = args.server.resolve(strict=True)
+creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 fixture = ROOT / "data" / f"playlist-wire-fixture-{time.time_ns()}"
 data = fixture / "data"
 data.mkdir(parents=True)
 shutil.copy2(ROOT / "data/replay-traffic-kdf.bin", data / "replay-traffic-kdf.bin")
 prepare = runpy.run_path(str(ROOT / "tools/prepare-playlist-catalog.py"))["prepare"]
 policy = data / "playlists/5800/policy.json"
-policy.parent.mkdir(parents=True)
-policy.write_text(json.dumps({
-    "minimum_players": 2,
-    "minimum_lobby_seconds": 60,
-    "split_parties_for_team_balance": True,
-}))
-prepare(data, game_directory=args.game_directory)
+if args.publication:
+    shutil.copytree(args.publication, policy.parent)
+else:
+    policy.parent.mkdir(parents=True)
+    policy.write_text(
+        json.dumps(
+            {
+                "minimum_players": 2,
+                "minimum_lobby_seconds": 60,
+                "split_parties_for_team_balance": True,
+            }
+        )
+    )
+    prepare(data, game_directory=args.game_directory)
 catalog = json.loads((policy.parent / "catalog.json").read_bytes())
 packages = json.loads((policy.parent / "packages.json").read_bytes())
 available = {row["name"] for row in packages["maps"] if row["available"]}
@@ -73,7 +90,7 @@ def documents(raw):
         end = raw.index(0, 1)
         assert end < 16384
         result.append(json.loads(raw[1:end]))
-        raw = raw[end + 1:]
+        raw = raw[end + 1 :]
     return result
 
 
@@ -85,8 +102,9 @@ offset = spare_offset()
 output = (fixture / "stdout.log").open("wb")
 process = subprocess.Popen(
     [str(EXE), str(data), "--port-offset", str(offset)],
-    stdout=output, stderr=subprocess.STDOUT,
-    creationflags=subprocess.CREATE_NO_WINDOW,
+    stdout=output,
+    stderr=subprocess.STDOUT,
+    creationflags=creation_flags,
 )
 results = []
 try:
@@ -94,9 +112,7 @@ try:
         if process.poll() is not None:
             raise RuntimeError("Isolated playlist backend exited")
         try:
-            with urllib.request.urlopen(
-                f"http://127.0.0.1:{8085 + offset}/health", timeout=0.3
-            ):
+            with urllib.request.urlopen(f"http://127.0.0.1:{8085 + offset}/health", timeout=0.3):
                 break
         except OSError:
             time.sleep(0.05)
@@ -115,22 +131,26 @@ try:
             "hardware": "pc",
         }
         assert client.task(145, 2, text(json.dumps(info)), structured=False) == b""
-        token = struct.unpack_from(
-            "<Q", client.task(145, 3, b"", structured=False), 1
-        )[0]
+        token = struct.unpack_from("<Q", client.task(145, 3, b"", structured=False), 1)[0]
         for playlist in catalog["playlists"]:
-            entries = [row for row in playlist["maps"][:20]
-                       if row["map"] in available and row["weight"] > 0]
+            entries = [
+                row
+                for row in playlist["maps"][:20]
+                if row["map"] in available and row["weight"] > 0
+            ]
             team_count = modes[entries[0]["gametype"]].get("teamCount", 0) if entries else 0
             query = {
-                "members": [client.user], "tokens": [token],
+                "members": [client.user],
+                "tokens": [token],
                 "lobby_slots": {"min": 2, "max": 200},
                 "team_balance": {"num_teams": team_count},
-                "ruleset_payload": {"filter": {
-                    "playlist_id": playlist["playlist"],
-                    "playlist_version": catalog["system"]["version"],
-                    "netcode_version": 66514,
-                }},
+                "ruleset_payload": {
+                    "filter": {
+                        "playlist_id": playlist["playlist"],
+                        "playlist_version": catalog["system"]["version"],
+                        "netcode_version": 66514,
+                    }
+                },
             }
             packet = text(json.dumps(query))
             if not entries:
@@ -159,28 +179,41 @@ try:
             assert stored["eligible_entries"] == entries
             assert stored["playlist_dvars"] == playlist.get("dvars", {})
             assert stored["map_package_revision"] == packages["revision"]
+            if "maximum_members" in stored:
+                state = json.loads(path.read_bytes())
+                assert state["maximum_members"] == stored["maximum_members"]
             assert client.task(145, 13, u64(lobby), structured=False) == (
                 text(json.dumps(host, separators=(",", ":"), sort_keys=True))
                 + text(json.dumps(backend, separators=(",", ":"), sort_keys=True))
             )
             assert client.task(145, 10, u64(lobby), structured=False) == b""
             assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
-            results.append({
-                "playlist": playlist["playlist"], "eligible": True,
-                "entry_count": len(entries), "team_count": team_count,
-                "backend_bytes": len(json.dumps(backend, separators=(",", ":"))),
-                "native_playlist_dvars": len(stored["playlist_dvars"]),
-            })
+            results.append(
+                {
+                    "playlist": playlist["playlist"],
+                    "eligible": True,
+                    "entry_count": len(entries),
+                    "team_count": team_count,
+                    "backend_bytes": len(json.dumps(backend, separators=(",", ":"))),
+                    "native_playlist_dvars": len(stored["playlist_dvars"]),
+                    "maximum_members": stored.get("maximum_members"),
+                }
+            )
     proof = {
-        "schema": 1, "passed": True,
+        "schema": 1,
+        "passed": True,
         "server_sha256": hashlib.sha256(EXE.read_bytes()).hexdigest(),
         "package_revision": packages["revision"],
-        "fixture_directory": str(fixture), "results": results,
-        "game_runs_performed": False, "native_map_load_verified": False,
+        "fixture_directory": str(fixture),
+        "results": results,
+        "game_runs_performed": False,
+        "native_map_load_verified": False,
     }
-    destination = ROOT / "data/playlist-wire-verification.json"
+    destination = args.output
     destination.write_text(json.dumps(proof, indent=2) + "\n")
-    print(f"PASS: {len(results)} owner playlists through encrypted native matchmaking; no game runs")
+    print(
+        f"PASS: {len(results)} owner playlists through encrypted native matchmaking; no game runs"
+    )
 finally:
     if process.poll() is None:
         process.terminate()

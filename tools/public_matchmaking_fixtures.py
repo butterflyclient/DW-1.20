@@ -23,6 +23,12 @@ def exercise(
     create["ruleset_payload"].update(
         join_in_progress=False, only_join_existing_lobbies=False
     )
+    # This deliberately tiny laboratory match must also publish a native
+    # two-player rule. An anchor's search max does not change shipped rules.
+    bindings = json.loads((directory / "playlists" / str(title) / "native-dvar-names.json").read_bytes())
+    create["ruleset_payload"].setdefault("dvar_overrides", {})[
+        bindings.get("party_maxplayers", "party_maxplayers")
+    ] = 2
     join = {
         **copy.deepcopy(create),
         "members": [peer_user],

@@ -11,6 +11,7 @@ namespace services
         nlohmann::json metadata;
         unsigned teamCount = 0;
         unsigned squadSize = 0;
+        unsigned maximumMembers = 0; // zero only when no native capacity rule is published
         bool splitPartiesForTeamBalance = false;
     };
 

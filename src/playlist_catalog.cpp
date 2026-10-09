@@ -3,6 +3,7 @@
 #include "wire.h"
 #include <algorithm>
 #include <cmath>
+#include <charconv>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -24,8 +25,8 @@ namespace services
 
         std::string digest(const std::string &bytes)
         {
-            const auto hash = crypto::sha256({reinterpret_cast<const uint8_t *>(bytes.data()),
-                                             bytes.size()});
+            const auto hash =
+                crypto::sha256({reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()});
             constexpr char digits[] = "0123456789abcdef";
             std::string result;
             result.reserve(hash.size() * 2);
@@ -91,6 +92,43 @@ namespace services
             const auto result = value.get<int64_t>();
             wire::require(result >= 0 && static_cast<uint64_t>(result) <= maximum);
             return static_cast<unsigned>(result);
+        }
+
+        unsigned capacityValue(const Json &value)
+        {
+            if (!value.is_string())
+            {
+                const auto capacity = number(value, 200);
+                wire::require(capacity > 0);
+                return capacity;
+            }
+            const auto text = value.get<std::string>();
+            unsigned capacity = 0;
+            const auto parsed = std::from_chars(text.data(), text.data() + text.size(), capacity);
+            wire::require(parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size() &&
+                          capacity > 0 && capacity <= 200);
+            return capacity;
+        }
+
+        std::optional<unsigned> capacityRule(const Json &rules, const Json &bindings)
+        {
+            wire::require(rules.is_object());
+            const auto native = bindings.value("party_maxplayers", std::string("party_maxplayers"));
+            std::optional<unsigned> result;
+            for (const auto &row : rules.items())
+            {
+                auto name = row.key();
+                if (name.starts_with("set "))
+                    name.erase(0, 4);
+                while (!name.empty() && (name.back() == ' ' || name.back() == '\t'))
+                    name.pop_back();
+                if (name != "party_maxplayers" && name != native)
+                    continue;
+                const auto value = capacityValue(row.value());
+                wire::require(!result || *result == value);
+                result = value;
+            }
+            return result;
         }
 
         void overrides(Json &out, const Json &source, const Json &bindings)
@@ -198,8 +236,7 @@ namespace services
                           packages.at("title") == title &&
                           packages.at("playlist_version") == version &&
                           packages.at("catalog_sha256") == catalogHash &&
-                          packages.at("maps").is_array() &&
-                          packages["maps"].size() <= 256);
+                          packages.at("maps").is_array() && packages["maps"].size() <= 256);
             const auto revision = packages.at("revision").get<std::string>();
             wire::require(revision.size() == 64 &&
                           revision.find_first_not_of("0123456789abcdef") == std::string::npos);
@@ -260,6 +297,38 @@ namespace services
             if (found == playlists.end())
                 continue;
             const auto &playlist = found->second;
+            Json searchConfiguration = Json::object();
+            if (query.contains("playlist_config"))
+            {
+                bool matched = false;
+                for (const auto &group : query["playlist_config"])
+                {
+                    if (std::none_of(group.at("playlist_ids").begin(),
+                                     group.at("playlist_ids").end(),
+                                     [&](const Json &value)
+                                     {
+                                         return number(value, 127) == id;
+                                     }))
+                        continue;
+                    Json configuration = Json::object();
+                    for (const auto *key : {"max_slots", "min_slots", "num_teams"})
+                        if (group.contains(key))
+                        {
+                            const auto value = number(group[key], 200);
+                            wire::require(key != std::string_view("max_slots") || value > 0);
+                            configuration[key] = value;
+                        }
+                    if (configuration.contains("min_slots") && configuration.contains("max_slots"))
+                        wire::require(configuration["min_slots"] <= configuration["max_slots"]);
+                    if (group.contains("build_name_context"))
+                        configuration["build_name_context"] =
+                            identifier(group["build_name_context"], 32);
+                    wire::require(!matched || configuration == searchConfiguration);
+                    matched = true;
+                    searchConfiguration = std::move(configuration);
+                }
+                wire::require(matched);
+            }
             Json weights = Json::object();
             std::vector<Json> eligible;
             // Replay's native ChooseEntry weights the first 20 entries. Every map
@@ -302,7 +371,8 @@ namespace services
             // team layout before the native client selects the actual mode.
             wire::require(teamCounts.size() <= 1);
             wire::require(!(squadMode && ordinaryMode) && squadSizes.size() <= 1);
-            const bool splitParties = policy.value("split_parties_for_team_balance", false) && !squadMode;
+            const bool splitParties =
+                policy.value("split_parties_for_team_balance", false) && !squadMode;
             Json rules = query.at("ruleset_payload"),
                  dvars = rules.value("dvar_overrides", Json::object());
             wire::require(dvars.is_object());
@@ -320,7 +390,8 @@ namespace services
                 assign(dvars, bindings, "br_minplayers", 2);
                 // Replay otherwise retains the party host's local squad
                 // assignment after parsing a correct DW squad document.
-                assign(dvars, bindings, "online_matchmaking_update_party_team_squad_assignments", 1);
+                assign(
+                    dvars, bindings, "online_matchmaking_update_party_team_squad_assignments", 1);
             }
             if (policy.contains("minimum_players"))
             {
@@ -330,7 +401,9 @@ namespace services
                 rules["min_slots_scale_percent"] = 0;
             }
             if (policy.contains("minimum_lobby_seconds"))
-                assign(dvars, bindings, "party_minLobbyTime",
+                assign(dvars,
+                       bindings,
+                       "party_minLobbyTime",
                        number(policy["minimum_lobby_seconds"], 2147483));
             if (splitParties)
             {
@@ -350,9 +423,34 @@ namespace services
             rules["filter"]["playlist_id"] = id;
             rules["filter"]["playlist_version"] = version;
             PlaylistSelection selected;
+            std::set<unsigned> capacities;
+            for (const auto &entry : eligible)
+            {
+                const auto &mode = modes.at(entry["gametype"].get<std::string>());
+                auto capacity =
+                    capacityRule(catalog.value("global_dvars", Json::object()), bindings);
+                if (const auto limit = capacityRule(mode.value("dvars", Json::object()), bindings))
+                    capacity = limit;
+                if (const auto limit =
+                        capacityRule(playlist.value("dvars", Json::object()), bindings))
+                    capacity = limit;
+                // The native selector computes each Quick Play group's slots
+                // from its full rule layers. The anchor's lobby_slots belongs
+                // to another group and must not replace the selected one.
+                if (searchConfiguration.contains("max_slots"))
+                    capacity = number(searchConfiguration["max_slots"], 200);
+                else if (capacity && (*capacity & 1))
+                    ++*capacity; // Replay Playlist_RunRules rounds before backend overrides
+                if (const auto limit = capacityRule(dvars, bindings))
+                    capacity = limit;
+                capacities.insert(capacity.value_or(0));
+            }
+            // Native mode rules precede playlist rules, then the backend override
+            // window. A mixed-mode lobby must share one effective capacity.
+            wire::require(capacities.size() == 1);
+            selected.maximumMembers = *capacities.begin();
             selected.rules = rules;
-            selected.splitPartiesForTeamBalance =
-                splitParties;
+            selected.splitPartiesForTeamBalance = splitParties;
             if (!squadSizes.empty())
                 selected.squadSize = *squadSizes.begin();
             if (!teamCounts.empty())
@@ -368,12 +466,17 @@ namespace services
                                  {"game_types", Json::object()}};
             if (!packages.is_null())
                 selected.metadata["map_package_revision"] = packages.at("revision");
+            if (selected.maximumMembers)
+                selected.metadata["maximum_members"] = selected.maximumMembers;
+            if (!searchConfiguration.empty())
+                selected.metadata["search_configuration"] = searchConfiguration;
             if (selected.splitPartiesForTeamBalance)
                 selected.metadata["split_parties_for_team_balance"] = true;
             if (selected.squadSize)
             {
                 selected.metadata["squad_size"] = selected.squadSize;
-                selected.metadata["native_team_count_dvar"] = bindings.value("party_teamCount", std::string("party_teamCount"));
+                selected.metadata["native_team_count_dvar"] =
+                    bindings.value("party_teamCount", std::string("party_teamCount"));
             }
             for (const auto &entry : eligible)
                 selected.metadata["game_types"][entry["gametype"].get<std::string>()] =

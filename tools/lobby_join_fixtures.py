@@ -43,6 +43,7 @@ def exercise(
         "members": [host_user],
         "tokens": [host_token],
         "lobby_slots": {"min": 1, "max": 2},
+        "private_lobby": {"initial_party_id": 81},
     }
     full_mm = start(host, {**create, "lobby_slots": {"min": 1, "max": 1}})
     kind, payload = host.receive()
