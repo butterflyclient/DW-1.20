@@ -49,8 +49,13 @@ for index in range(8, 16):
         REGISTERS[f"r{index}{suffix}"] = (f"r{index}", 0)
 
 
-def trace(start, end, decode, recipes, state_limit=10000):
+def trace(start, end, decode, recipes, state_limit=10000, regions=None):
     """Track register bits and argument origins through a single bounded CFG."""
+    intervals = tuple(regions or ((start, end),))
+
+    def contains(address, size=1):
+        return any(begin <= address and address + size <= limit for begin, limit in intervals)
+
     initial = {reg: ("arg:" + reg, FULL) for reg in ("rcx", "rdx", "r8", "r9")}
     initial["stack-pointer"] = (0, FULL)
     work = deque([(start, initial)])
@@ -58,14 +63,14 @@ def trace(start, end, decode, recipes, state_limit=10000):
     while work:
         address, state = work.popleft()
         stamp = (address, tuple(sorted(state.items())))
-        if stamp in seen or not start <= address < end:
+        if stamp in seen or not contains(address):
             continue
         if len(seen) >= state_limit:
             unresolved.add((address, "state-limit"))
             break
         seen.add(stamp)
         instruction = decode(address)
-        if instruction is None or instruction.address + instruction.size > end:
+        if instruction is None or not contains(instruction.address, instruction.size):
             unresolved.add((address, "decode-boundary"))
             continue
         state = state.copy()
@@ -162,18 +167,12 @@ def trace(start, end, decode, recipes, state_limit=10000):
                     old, old_known = 0, 0
                 state[root] = (value | (old & preserve), known | (old_known & preserve))
 
-        target = (
-            operands[0].imm if operands and operands[0].type == X86_OP_IMM else None
-        )
+        target = operands[0].imm if operands and operands[0].type == X86_OP_IMM else None
         if op in ("call", "jmp") and target in recipes:
             for service, task, constructor in recipes[target]:
                 resolved = []
                 for value in (service, task):
-                    fact = (
-                        state.get(value[4:], (0, 0))
-                        if isinstance(value, str)
-                        else (value, FULL)
-                    )
+                    fact = state.get(value[4:], (0, 0)) if isinstance(value, str) else (value, FULL)
                     resolved.append(fact[0] if fact[1] & 255 == 255 else None)
                 calls.add((address, target, *resolved, constructor))
         if op == "call":
@@ -241,16 +240,13 @@ def trace(start, end, decode, recipes, state_limit=10000):
                 elif op in ("movsx", "movsxd"):
                     width = operands[1].size * 8
                     if isinstance(fact[0], int) and fact[1] == (1 << width) - 1:
-                        value = (
-                            fact[0] - (1 << width)
-                            if fact[0] & (1 << (width - 1))
-                            else fact[0]
-                        )
+                        value = fact[0] - (1 << width) if fact[0] & (1 << (width - 1)) else fact[0]
                         fact = (value & FULL, FULL)
                 write(operands[0], fact)
-                if operands[0].type == X86_OP_REG and instruction.reg_name(
-                    operands[0].reg
-                ) in ("rbp", "rsp"):
+                if operands[0].type == X86_OP_REG and instruction.reg_name(operands[0].reg) in (
+                    "rbp",
+                    "rsp",
+                ):
                     destination = {"rbp": "frame-pointer", "rsp": "stack-pointer"}[
                         instruction.reg_name(operands[0].reg)
                     ]
@@ -271,9 +267,7 @@ def trace(start, end, decode, recipes, state_limit=10000):
             if not memory.index and memory.base == X86_REG_RIP:
                 fact = (following + memory.disp, FULL)
             elif not memory.index and memory.base:
-                root, shift = REGISTERS.get(
-                    instruction.reg_name(memory.base), (None, 0)
-                )
+                root, shift = REGISTERS.get(instruction.reg_name(memory.base), (None, 0))
                 value, mask = state.get(root, (0, 0))
                 fact = (
                     ((value + memory.disp) & FULL, FULL)
@@ -307,11 +301,9 @@ def trace(start, end, decode, recipes, state_limit=10000):
                 root = REGISTERS.get(instruction.reg_name(register), (None, 0))[0]
                 state.pop(root, None)
                 if root in ("rsp", "rbp"):
-                    state.pop(
-                        "stack-pointer" if root == "rsp" else "frame-pointer", None
-                    )
+                    state.pop("stack-pointer" if root == "rsp" else "frame-pointer", None)
         if op.startswith("j"):
-            if target is not None and start <= target < end:
+            if target is not None and contains(target):
                 work.append((target, state.copy()))
             elif target not in recipes:
                 unresolved.add((address, "external-or-indirect-branch"))
@@ -327,14 +319,10 @@ def main():
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args()
     output = args.output.resolve()
-    assert any(
-        output.is_relative_to(ROOT / folder) for folder in ("data", "validation")
-    )
+    assert any(output.is_relative_to(ROOT / folder) for folder in ("data", "validation"))
     raw = IMAGE.read_bytes()
     image_hash = sha256(raw).hexdigest()
-    assert (
-        image_hash == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
-    )
+    assert image_hash == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
     pe = pefile.PE(data=raw, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
     ranges, names = [], {}
@@ -343,32 +331,51 @@ def main():
     with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
         db.execute("pragma query_only=on")
         db.execute("begin")
-        for name, address, size in db.execute(
-            "select name,address,size from functions"
-        ):
+        for name, address, size in db.execute("select name,address,size from functions"):
             start = int(address)
             names[start] = name
             if 0 < size <= 65536:
                 ranges.append((start, start + size, "sqlite-fallback"))
     ranges.sort()
     starts = [row[0] for row in ranges]
-    pdata = next(
-        section for section in pe.sections if section.Name.rstrip(b"\0") == b".pdata"
+    pe.parse_data_directories(
+        directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
     )
+    entries = {row.struct.BeginAddress: row for row in pe.DIRECTORY_ENTRY_EXCEPTION}
+
+    def primary(entry):
+        visited = set()
+        while entry.unwindinfo and entry.unwindinfo.UNW_FLAG_CHAININFO:
+            start = entry.struct.BeginAddress
+            if start in visited:
+                raise ValueError("Cyclic original unwind chain")
+            visited.add(start)
+            entry = entries[entry.unwindinfo.FunctionEntry]
+        return entry.struct.BeginAddress
+
+    chunks = defaultdict(list)
+    primary_owners = {}
+    for row in entries.values():
+        begin, end = base + row.struct.BeginAddress, base + row.struct.EndAddress
+        root = base + primary(row)
+        chunks[root].append((begin, end))
+        primary_owners[begin] = root
     unwind = sorted(
-        (base + start, base + end, "pe-unwind")
-        for start, end, info in struct.iter_unpack(
-            "<III", pdata.get_data()[: (pdata.SizeOfRawData // 12) * 12]
-        )
-        if start and start < end
+        (begin, end, "pe-unwind") for regions in chunks.values() for begin, end in regions
     )
+    for regions in chunks.values():
+        regions.sort()
     unwind_starts = [row[0] for row in unwind]
 
     def owner(address):
         for entries, beginnings in ((unwind, unwind_starts), (ranges, starts)):
             position = bisect_right(beginnings, address) - 1
             if position >= 0 and entries[position][0] <= address < entries[position][1]:
-                return entries[position]
+                start, end, boundary = entries[position]
+                if boundary == "pe-unwind":
+                    root = primary_owners[start]
+                    return root, chunks[root][-1][1], boundary
+                return start, end, boundary
         return None
 
     xrefs = defaultdict(set)
@@ -381,9 +388,7 @@ def main():
             while position >= 0:
                 if position + 5 <= len(code):
                     address = base + section.VirtualAddress + position
-                    target = (
-                        address + 5 + struct.unpack_from("<i", code, position + 1)[0]
-                    )
+                    target = address + 5 + struct.unpack_from("<i", code, position + 1)[0]
                     xrefs[target].add(address)
                 position = code.find(opcode, position + 1)
     decoder = Cs(CS_ARCH_X86, CS_MODE_64)
@@ -414,16 +419,24 @@ def main():
                 else:
                     candidates.add(region)
         for start, end, boundary in sorted(candidates):
-            if start in CONSTRUCTORS or end - start > 65536:
+            regions = chunks[start] if boundary == "pe-unwind" else [(start, end)]
+            if start in CONSTRUCTORS or sum(limit - begin for begin, limit in regions) > 65536:
                 continue
             inspected[start] = dict(
                 start=start,
                 end=end,
                 boundary=boundary,
                 candidate_alias=names.get(start),
-                bytes_sha256=sha256(pe.get_data(start - base, end - start)).hexdigest(),
+                chunks=[
+                    dict(
+                        start=begin,
+                        end=limit,
+                        bytes_sha256=sha256(pe.get_data(begin - base, limit - begin)).hexdigest(),
+                    )
+                    for begin, limit in regions
+                ],
             )
-            found, unresolved = trace(start, end, decode, recipes)
+            found, unresolved = trace(start, end, decode, recipes, regions=regions)
             for result in found:
                 calls.add((start, *result))
                 _, _, service, task, constructor = result
@@ -460,8 +473,7 @@ def main():
         target_image_sha256=image_hash,
         audit_tool_sha256=sha256(Path(__file__).read_bytes()).hexdigest(),
         database=str(database),
-        database_changed_during_labels=database.stat().st_mtime_ns
-        != before.st_mtime_ns,
+        database_changed_during_labels=database.stat().st_mtime_ns != before.st_mtime_ns,
         route_count=len(routes),
         routes=[dict(service=service, task=task) for service, task in routes],
         calls=records,
@@ -473,7 +485,8 @@ def main():
         unowned_candidate_sites=sorted(unowned),
         wrapper_iterations=depth + 1,
         raw_instructions_decoded=len(cache),
-        scope="Bounded potential direct calls and forwarding wrappers. No indirect dispatch, stack argument, branch feasibility or native callback completion claim.",
+        chained_unwind_ownership_resolved=True,
+        scope="Bounded potential direct calls and forwarding wrappers across primary-owned unwind chunks. Gaps and other function chunks are excluded. No indirect dispatch, stack argument, branch feasibility or native callback completion claim.",
     )
     output.write_text(json.dumps(result, indent=2) + "\n")
     if args.receipt:
@@ -486,12 +499,10 @@ def main():
             capture_output=True,
             text=True,
         )
-        assert tests.stdout.strip() == "PASS: 24 independent x64 task-trace cases"
+        assert tests.stdout.strip() == "PASS: 28 independent x64 task-trace cases"
         exported_path = ROOT / "data/native-service-callgraph.json"
         exported = json.loads(exported_path.read_bytes())
-        text_routes = {
-            (item["service"], item["task"]) for item in exported["proven_calls"]
-        }
+        text_routes = {(item["service"], item["task"]) for item in exported["proven_calls"]}
         summary = dict(
             schema=1,
             passed=True,
@@ -499,7 +510,8 @@ def main():
             target_image_sha256=image_hash,
             audit_tool_sha256=result["audit_tool_sha256"],
             test_tool_sha256=sha256(test_path.read_bytes()).hexdigest(),
-            independent_x64_trace_cases=24,
+            independent_x64_trace_cases=28,
+            chained_unwind_ownership_resolved=True,
             route_count=len(routes),
             inspected_functions=len(inspected),
             unwind_bounded_functions=sum(
@@ -515,9 +527,7 @@ def main():
             text_routes_not_recovered_from_bytes=[
                 list(route) for route in sorted(text_routes - set(routes))
             ],
-            additional_raw_routes=[
-                list(route) for route in sorted(set(routes) - text_routes)
-            ],
+            additional_raw_routes=[list(route) for route in sorted(set(routes) - text_routes)],
             raw_inventory=dict(
                 path=output.relative_to(ROOT).as_posix(),
                 sha256=sha256(output.read_bytes()).hexdigest(),
