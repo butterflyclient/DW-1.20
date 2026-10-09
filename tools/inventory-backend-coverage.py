@@ -556,9 +556,11 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def native_byte_task_evidence():
+def native_byte_task_evidence(receipt):
     """Accept only a current, byte-bound audit; this establishes no callbacks."""
-    receipt = ROOT / "validation/20261006-native-task-byte-inventory.json"
+    receipt = receipt.resolve()
+    if not receipt.is_relative_to(ROOT / "validation"):
+        raise ValueError("Keep the native task receipt in repository validation")
     if not receipt.is_file():
         return None, []
     proof = json.loads(receipt.read_bytes())
@@ -571,7 +573,8 @@ def native_byte_task_evidence():
         == digest(ROOT / "tools/inventory-native-task-bytes.py")
         and proof.get("test_tool_sha256")
         == digest(ROOT / "tools/test-native-task-bytes.py")
-        and proof.get("independent_x64_trace_cases") == 24
+        and proof.get("independent_x64_trace_cases") == 31
+        and proof.get("chained_unwind_ownership_resolved") is True
         and proof.get("target_image_sha256") == digest(image)
         and raw_path.is_relative_to(DATA)
         and raw_path.is_file()
@@ -588,8 +591,35 @@ def native_byte_task_evidence():
         or raw["audit_tool_sha256"] != proof["audit_tool_sha256"]
         or len(raw["inspected_functions"]) != proof["inspected_functions"]
         or raw.get("database_changed_during_labels")
+        or raw.get("register_preserving_stack_probe")
+        != proof.get("register_preserving_stack_probe")
     ):
         raise ValueError("Original-byte task audit provenance is inconsistent")
+    probe = proof["register_preserving_stack_probe"]
+    probe_path = (ROOT / probe["evidence"]).resolve()
+    if not probe_path.is_relative_to(ROOT / "validation") or not probe_path.is_file():
+        raise ValueError("Native stack-probe receipt is missing")
+    probe_proof = json.loads(probe_path.read_bytes())
+    if not (
+        probe_proof.get("passed") is True
+        and probe_proof.get("target_image_sha256") == proof["target_image_sha256"]
+        and probe_proof.get("tool_sha256")
+        == digest(ROOT / "tools/research-stack-probe-target.py")
+        and probe_proof.get("original_instructions_executed") is True
+        and probe_proof.get("modeled_external_calls") is False
+        and probe_proof.get("function")
+        == {
+            "va": probe["target"],
+            "size": probe["size"],
+            "bytes_sha256": probe["bytes_sha256"],
+        }
+        and len(probe_proof.get("cases", [])) == 9
+        and all(
+            case.get("passed") is True and case.get("preserved_gprs") == 15
+            for case in probe_proof["cases"]
+        )
+    ):
+        raise ValueError("Native register-preserving call contract is unverified")
     # Keep the ledger dependency-free. Recheck bounded function bytes and each
     # direct branch against the original PE, without using SQLite display names.
     with image.open("rb") as stream:
@@ -624,22 +654,76 @@ def native_byte_task_evidence():
                         return data
             raise ValueError("Task evidence lies outside original file-backed sections")
 
+        if (
+            hashlib.sha256(original_bytes(probe["target"], probe["size"])).hexdigest()
+            != probe["bytes_sha256"]
+        ):
+            raise ValueError("Native stack-probe bytes changed")
+
+        pdata_rva, pdata_size = struct.unpack_from("<II", optional, 112 + 3 * 8)
+        if not pdata_rva or pdata_size % 12:
+            raise ValueError("Original exception directory is malformed")
+        pdata = original_bytes(base + pdata_rva, pdata_size)
+        entries = {
+            begin: (end, unwind)
+            for begin, end, unwind in struct.iter_unpack("<III", pdata)
+        }
+
+        def primary_unwind(begin):
+            visited = set()
+            while True:
+                if begin in visited or begin not in entries:
+                    raise ValueError("Original unwind chain is cyclic or missing")
+                visited.add(begin)
+                end, unwind = entries[begin]
+                header = original_bytes(base + unwind, 4)
+                if not (header[0] >> 3) & 4:
+                    return begin
+                offset = (4 + header[2] * 2 + 3) & ~3
+                parent, parent_end, parent_unwind = struct.unpack(
+                    "<III", original_bytes(base + unwind + offset, 12)
+                )
+                if entries.get(parent) != (parent_end, parent_unwind):
+                    raise ValueError("Original chained unwind parent is inconsistent")
+                begin = parent
+
+        owned_chunks = {}
+        for begin, (end, _) in entries.items():
+            owner = base + primary_unwind(begin)
+            owned_chunks.setdefault(owner, []).append((base + begin, base + end))
+        for chunks in owned_chunks.values():
+            chunks.sort()
         regions = {row["start"]: row for row in raw["inspected_functions"]}
         if len(regions) != len(raw["inspected_functions"]):
             raise ValueError("Duplicate original-byte function bounds")
         for row in regions.values():
-            size = row["end"] - row["start"]
-            if (
-                not 0 < size <= 65536
-                or hashlib.sha256(original_bytes(row["start"], size)).hexdigest()
-                != row["bytes_sha256"]
-            ):
-                raise ValueError("Original-byte function bounds or hash changed")
+            chunks = row.get("chunks", [])
+            bounds = [(chunk["start"], chunk["end"]) for chunk in chunks]
+            if not chunks or not 0 < sum(end - begin for begin, end in bounds) <= 65536:
+                raise ValueError("Original-byte owned code size is invalid")
+            if row["boundary"] == "pe-unwind":
+                if bounds != owned_chunks.get(row["start"]):
+                    raise ValueError("Original-byte unwind ownership changed")
+            elif row["boundary"] != "sqlite-fallback" or bounds != [
+                (row["start"], row["end"])
+            ]:
+                raise ValueError("Unknown original-byte boundary source")
+            for chunk in chunks:
+                size = chunk["end"] - chunk["start"]
+                if (
+                    size <= 0
+                    or hashlib.sha256(original_bytes(chunk["start"], size)).hexdigest()
+                    != chunk["bytes_sha256"]
+                ):
+                    raise ValueError("Original-byte chunk hash changed")
         for row in raw["calls"]:
             region = regions.get(row["function"])
             if (
                 not region
-                or not region["start"] <= row["callsite"] <= region["end"] - 5
+                or not any(
+                    chunk["start"] <= row["callsite"] <= chunk["end"] - 5
+                    for chunk in region["chunks"]
+                )
                 or row["constructor"] not in (0x1421170B0, 0x142156330, 0x142117C10)
             ):
                 raise ValueError("Original-byte task call ownership is invalid")
@@ -1048,6 +1132,14 @@ def main():
     parser.add_argument("--deployment", type=Path, default=DATA / "deployment.json")
     parser.add_argument("--source-root", type=Path, default=ROOT)
     parser.add_argument("--source-receipt", type=Path)
+    parser.add_argument(
+        "--task-audit",
+        type=Path,
+        default=ROOT / "validation/20261009-native-task-stack-probe-inventory.json",
+    )
+    parser.add_argument(
+        "--rest-audit", type=Path, default=DATA / "native-rest-callgraph.json"
+    )
     parser.add_argument("--protocol", type=Path)
     parser.add_argument(
         "--output", type=Path, default=DATA / "backend-coverage-inventory.json"
@@ -1069,7 +1161,7 @@ def main():
         if not output.resolve().is_relative_to(ROOT):
             raise ValueError("Keep inventory output inside the backend project")
     graph = json.loads((DATA / "native-service-callgraph.json").read_bytes())
-    byte_evidence, byte_calls = native_byte_task_evidence()
+    byte_evidence, byte_calls = native_byte_task_evidence(args.task_audit)
     deployment = json.loads(args.deployment.read_bytes())
     executable = args.server
     current_hash = digest(executable)
@@ -1281,7 +1373,9 @@ def main():
             and proof.get("positive_native_member_callback_verified")
         ):
             channel_path, channel_proof = path, proof
-    rest_path = DATA / "native-rest-callgraph.json"
+    rest_path = args.rest_audit.resolve()
+    if not rest_path.is_relative_to(DATA):
+        raise ValueError("Keep the native REST audit in repository data")
     rest_inventory = json.loads(rest_path.read_bytes()) if rest_path.exists() else None
     friend_evidence = friend_native_evidence(current_hash, deployment["sha256"])
     ab_evidence = abtesting_native_evidence(current_hash, deployment["sha256"])
@@ -1497,7 +1591,7 @@ def main():
         tasks=tasks,
         native_rest_inventory=(
             dict(
-                receipt="data/native-rest-callgraph.json",
+                receipt=rest_path.relative_to(ROOT).as_posix(),
                 sha256=digest(rest_path),
                 target_image_sha256=rest_inventory["target_image_sha256"],
                 exported_functions=rest_inventory["exported_functions"],

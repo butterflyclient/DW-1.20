@@ -49,7 +49,9 @@ for index in range(8, 16):
         REGISTERS[f"r{index}{suffix}"] = (f"r{index}", 0)
 
 
-def trace(start, end, decode, recipes, state_limit=10000, regions=None):
+def trace(
+    start, end, decode, recipes, state_limit=10000, regions=None, register_preserving_calls=()
+):
     """Track register bits and argument origins through a single bounded CFG."""
     intervals = tuple(regions or ((start, end),))
 
@@ -176,17 +178,18 @@ def trace(start, end, decode, recipes, state_limit=10000, regions=None):
                     resolved.append(fact[0] if fact[1] & 255 == 255 else None)
                 calls.add((address, target, *resolved, constructor))
         if op == "call":
-            offset, known = state.get("stack-pointer", (0, 0))
-            if known == FULL:
-                # A callee owns the 32-byte Windows x64 shadow area. Preserve
-                # saved locals beyond it, without trusting volatile stack slots.
-                forget_stack(offset, 32)
-            if "stack-escaped" in state:
-                # An unknown callee may write through a previously formed local
-                # address. Do not preserve those locals as route evidence.
-                forget_all_stack()
-            for reg in VOLATILE:
-                state.pop(reg, None)
+            if target not in register_preserving_calls:
+                offset, known = state.get("stack-pointer", (0, 0))
+                if known == FULL:
+                    # A callee owns the 32-byte Windows x64 shadow area. Preserve
+                    # saved locals beyond it, without trusting volatile stack slots.
+                    forget_stack(offset, 32)
+                if "stack-escaped" in state:
+                    # An unknown callee may write through a previously formed local
+                    # address. Do not preserve those locals as route evidence.
+                    forget_all_stack()
+                for reg in VOLATILE:
+                    state.pop(reg, None)
         elif op.startswith("cmov") and len(operands) == 2:
             work.append((following, state.copy()))
             write(operands[0], read(operands[1]))
@@ -325,6 +328,9 @@ def main():
     assert image_hash == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
     pe = pefile.PE(data=raw, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
+    stack_probe = 0x1421CCEF0
+    stack_probe_hash = "99d2cc1dbc125fe60aeb6230c1033e4ddda1e4488b7baf555c32ea70e50e79da"
+    assert sha256(pe.get_data(stack_probe - base, 81)).hexdigest() == stack_probe_hash
     ranges, names = [], {}
     database = IMAGE.with_suffix(".exe.sqlite")
     before = database.stat()
@@ -436,7 +442,14 @@ def main():
                     for begin, limit in regions
                 ],
             )
-            found, unresolved = trace(start, end, decode, recipes, regions=regions)
+            found, unresolved = trace(
+                start,
+                end,
+                decode,
+                recipes,
+                regions=regions,
+                register_preserving_calls={stack_probe},
+            )
             for result in found:
                 calls.add((start, *result))
                 _, _, service, task, constructor = result
@@ -486,6 +499,12 @@ def main():
         wrapper_iterations=depth + 1,
         raw_instructions_decoded=len(cache),
         chained_unwind_ownership_resolved=True,
+        register_preserving_stack_probe=dict(
+            target=stack_probe,
+            size=81,
+            bytes_sha256=stack_probe_hash,
+            evidence="validation/20261009-native-stack-probe.json",
+        ),
         scope="Bounded potential direct calls and forwarding wrappers across primary-owned unwind chunks. Gaps and other function chunks are excluded. No indirect dispatch, stack argument, branch feasibility or native callback completion claim.",
     )
     output.write_text(json.dumps(result, indent=2) + "\n")
@@ -499,7 +518,7 @@ def main():
             capture_output=True,
             text=True,
         )
-        assert tests.stdout.strip() == "PASS: 28 independent x64 task-trace cases"
+        assert tests.stdout.strip() == "PASS: 31 independent x64 task-trace cases"
         exported_path = ROOT / "data/native-service-callgraph.json"
         exported = json.loads(exported_path.read_bytes())
         text_routes = {(item["service"], item["task"]) for item in exported["proven_calls"]}
@@ -510,7 +529,8 @@ def main():
             target_image_sha256=image_hash,
             audit_tool_sha256=result["audit_tool_sha256"],
             test_tool_sha256=sha256(test_path.read_bytes()).hexdigest(),
-            independent_x64_trace_cases=28,
+            independent_x64_trace_cases=31,
+            register_preserving_stack_probe=result["register_preserving_stack_probe"],
             chained_unwind_ownership_resolved=True,
             route_count=len(routes),
             inspected_functions=len(inspected),

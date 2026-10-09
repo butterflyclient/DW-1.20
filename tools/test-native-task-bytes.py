@@ -19,7 +19,9 @@ def branch(prefix, target, opcode=b"\xe8"):
     return opcode + struct.pack("<i", target - (start + len(prefix) + 5))
 
 
-def check(name, code, expected, regions=None, expected_unresolved=False):
+def check(
+    name, code, expected, regions=None, expected_unresolved=False, register_preserving_calls=()
+):
     def decode(address):
         return next(decoder.disasm(code[address - start :], address, count=1), None)
 
@@ -29,6 +31,7 @@ def check(name, code, expected, regions=None, expected_unresolved=False):
         decode,
         {constructor: {("arg:rdx", "arg:r8", constructor)}},
         regions=regions,
+        register_preserving_calls=register_preserving_calls,
     )
     actual = {(row[2], row[3]) for row in found}
     assert actual == expected, (name, actual, expected)
@@ -217,4 +220,30 @@ check(
 first = prefix
 code = first + branch(first, constructor) + b"\xc3"
 check("fallthrough outside owned chunk excluded", code, set(), [(start, start + len(first))])
-print("PASS: 28 independent x64 task-trace cases")
+# A separately verified stack-probe contract preserves registers and the
+# caller's shadow area. Ordinary calls still use the invalidation cases above.
+prefix = bytes.fromhex("b2 1d 41 b0 04")
+prefix += branch(prefix, unknown)
+check(
+    "verified probe preserves volatile constants",
+    prefix + branch(prefix, constructor) + b"\xc3",
+    {(29, 4)},
+    register_preserving_calls={unknown},
+)
+prefix = branch(b"", unknown)
+check(
+    "verified probe preserves incoming arguments",
+    prefix + branch(prefix, constructor) + b"\xc3",
+    {("arg:rdx", "arg:r8")},
+    register_preserving_calls={unknown},
+)
+prefix = bytes.fromhex("c7 44 24 08 09 00 00 00")
+prefix += branch(prefix, unknown)
+prefix += bytes.fromhex("44 8b 44 24 08 ba 1d 00 00 00")
+check(
+    "verified probe preserves caller shadow slots",
+    prefix + branch(prefix, constructor) + b"\xc3",
+    {(29, 9)},
+    register_preserving_calls={unknown},
+)
+print("PASS: 31 independent x64 task-trace cases")
