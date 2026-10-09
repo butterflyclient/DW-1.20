@@ -1,8 +1,8 @@
 #pragma once
 #include <stdint.h>
 
-// Version 1 remains readable by every updater-enabled Replay release. A plan
-// always describes one direct delta from the requested image to the latest.
+// Preserve the version-1 wire layout for existing clients. Version 2 downloads
+// the complete executable; its payload hash/size equal the target hash/size.
 constexpr uint64_t DW_UPDATE_MAGIC = 0x3155505744594C50ULL;
 constexpr uint64_t DW_UPDATE_MAX_IMAGE = 512ULL * 1024 * 1024;
 #pragma pack(push, 1)
@@ -26,10 +26,10 @@ struct DWUpdatePlan
     uint8_t nonce[32];
     uint8_t baseHash[32];
     uint8_t targetHash[32];
-    uint8_t patchHash[32];
+    uint8_t patchHash[32]; // v1 delta hash; v2 full executable hash
     uint64_t baseSize;
     uint64_t targetSize;
-    uint64_t patchSize;
+    uint64_t patchSize; // v1 delta size; v2 full executable size
     uint64_t release;
 };
 

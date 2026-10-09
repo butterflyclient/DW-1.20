@@ -419,7 +419,7 @@ namespace
             reply(socket, 400, "{\"error\":\"unexpected_request_bytes\"}");
             return;
         }
-        if (path == "/updates/v1/check")
+        if (path == "/updates/v1/check" || path == "/updates/v2/check")
         {
             if (method != "POST" || length != sizeof(DWUpdateRequest) || rangeHeader)
                 reply(socket, 400, "{\"error\":\"invalid_update_request\"}");
@@ -427,6 +427,13 @@ namespace
             {
                 try
                 {
+                    DWUpdateRequest update{};
+                    std::memcpy(&update, request.data() + bodyAt, sizeof(update));
+                    if (update.version != (path == "/updates/v2/check" ? 2u : 1u))
+                    {
+                        reply(socket, 400, "{\"error\":\"update_version_mismatch\"}");
+                        return;
+                    }
                     reply(socket, 200, platform::executableUpdate(request.substr(bodyAt, length)),
                           "application/octet-stream");
                 }
@@ -436,22 +443,26 @@ namespace
                 }
             }
         }
-        else if (path.starts_with("/updates/v1/patch/"))
+        else if (path.starts_with("/updates/v1/patch/") ||
+                 path.starts_with("/updates/v2/image/"))
         {
-            const auto digest = path.substr(std::strlen("/updates/v1/patch/"));
+            const bool fullImage = path.starts_with("/updates/v2/image/");
+            const auto digest = path.substr(std::strlen(
+                fullImage ? "/updates/v2/image/" : "/updates/v1/patch/"));
             if (method != "GET" || length || rangeHeader || !executable_updates::digestName(digest))
             {
-                reply(socket, 400, "{\"error\":\"invalid_patch_request\"}");
+                reply(socket, 400, "{\"error\":\"invalid_update_payload_request\"}");
                 return;
             }
             // Immutable, content-addressed blobs. Stream bounded chunks instead
             // of allocating a full EXE-sized response per connected player.
-            const auto filePath = platform::executablePatchPath(digest);
+            const auto filePath = fullImage ? platform::executableImagePath(digest)
+                                           : platform::executablePatchPath(digest);
             std::ifstream file(filePath, std::ios::binary | std::ios::ate);
             if (!file || file.tellg() <= 0 ||
                 static_cast<uint64_t>(file.tellg()) > DW_UPDATE_MAX_IMAGE)
             {
-                reply(socket, 404, "{\"error\":\"patch_unavailable\"}");
+                reply(socket, 404, "{\"error\":\"update_payload_unavailable\"}");
                 return;
             }
             const auto size = static_cast<uint64_t>(file.tellg());

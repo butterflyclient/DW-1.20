@@ -1,7 +1,7 @@
 """Actual Windows updater, signed backend and four compiled release fixtures.
 
 These are small test executables, not native game validation. Includes an actual
-wait/replace/relaunch cycle and skipping three releases without intermediates.
+wait/replace/relaunch cycle and full-image updates across missed releases.
 """
 
 import argparse
@@ -22,7 +22,7 @@ import threading
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location(
-    "publisher", ROOT / "tools/publish-executable-update.py"
+    "publisher", ROOT / "tools/publish-full-executable.py"
 )
 publisher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(publisher)
@@ -39,9 +39,14 @@ def main():
     data, source = folder / "data", folder / "source"
     data.mkdir(parents=True)
     source.mkdir()
-    for name in ("platform-private.blob", "platform-public.blob", "replay-traffic-kdf.bin"):
+    for name in (
+        "platform-private.blob",
+        "platform-public.blob",
+        "replay-traffic-kdf.bin",
+    ):
         shutil.copyfile(ROOT / "data" / name, data / name)
-    source.joinpath("main.cpp").write_text(r"""
+    source.joinpath("main.cpp").write_text(
+        r"""
 #include <windows.h>
 #include <fstream>
 int main() {
@@ -49,8 +54,12 @@ int main() {
     if (VERSION != 4) Sleep(180000);
     return 0;
 }
-""")
-    cmake = ["cmake_minimum_required(VERSION 3.24)", "project(update_fixture LANGUAGES CXX)"]
+"""
+    )
+    cmake = [
+        "cmake_minimum_required(VERSION 3.24)",
+        "project(update_fixture LANGUAGES CXX)",
+    ]
     for version in range(1, 5):
         cmake += [
             f"add_executable(release{version} main.cpp)",
@@ -69,9 +78,19 @@ int main() {
             "-A",
             "x64",
         ],
-        ["cmake", "--build", str(folder / "build"), "--config", "Release", "--parallel", "2"],
+        [
+            "cmake",
+            "--build",
+            str(folder / "build"),
+            "--config",
+            "Release",
+            "--parallel",
+            "2",
+        ],
     ):
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, creationflags=FLAGS)
+        subprocess.run(
+            command, check=True, stdout=subprocess.DEVNULL, creationflags=FLAGS
+        )
     images = []
     for version in range(1, 5):
         image = folder / "build/Release" / f"release{version}.exe"
@@ -79,7 +98,7 @@ int main() {
         report.write_text(
             json.dumps(
                 {
-                    "sha256": publisher.digest(image.read_bytes()),
+                    "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                     "cpp": ["compiled fixture main.cpp"],
                 }
             )
@@ -89,7 +108,7 @@ int main() {
             json.dumps(
                 {
                     "fixture_only": True,
-                    "sha256": publisher.digest(image.read_bytes()),
+                    "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                     "unresolved_symbols": 0,
                 }
             )
@@ -98,15 +117,18 @@ int main() {
             json.dumps(
                 {
                     "fixture_only": True,
-                    "sha256": publisher.digest(image.read_bytes()),
+                    "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                     "passed": True,
                 }
             )
         )
-        publisher.publish(image, report, version, folder / "archive", data / "updates")
         images.append(image)
-    catalog = json.loads((data / "updates/catalog.json").read_bytes())
-    assert len(catalog["patches"]) == 3
+    publication = data / "updates"
+    catalog = publisher.publish(images[3], report, 4, publication)
+    (publication / "images").mkdir()
+    (publication / (catalog["latest"] + ".exe")).rename(
+        publication / "images" / (catalog["latest"] + ".exe")
+    )
     checks, server = [], None
     log = (folder / "server-output.log").open("wb")
 
@@ -125,12 +147,19 @@ int main() {
 
     try:
         server = subprocess.Popen(
-            [str(args.server), str(data)], stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS
+            [str(args.server), str(data)],
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            creationflags=FLAGS,
         )
         for _ in range(100):
-            assert server.poll() is None, "Fixture backend failed to start; port 8085 must be free"
+            assert (
+                server.poll() is None
+            ), "Fixture backend failed to start; port 8085 must be free"
             try:
-                urllib.request.urlopen("http://127.0.0.1:8085/health", timeout=0.2).close()
+                urllib.request.urlopen(
+                    "http://127.0.0.1:8085/health", timeout=0.2
+                ).close()
                 break
             except OSError:
                 time.sleep(0.1)
@@ -141,29 +170,41 @@ int main() {
             prepare(game, 20, f"release {version} stages latest release 4 directly")
             staged = Path(str(game) + ".update") / "next.exe"
             check(
-                f"release {version} reconstruction exact",
+                f"release {version} complete image exact",
                 staged.read_bytes() == images[3].read_bytes(),
             )
             check(
                 f"release {version} installed bytes untouched",
                 game.read_bytes() == images[version - 1].read_bytes(),
             )
-        prepare(images[3], 10, "current version requires no patch")
+        prepare(images[3], 10, "current version requires no update")
         unknown = folder / "unknown.exe"
         unknown.write_bytes(b"MZunknown-modified-image")
-        prepare(unknown, 30, "unknown or modified image receives no unsafe patch")
-        first = catalog["patches"][publisher.digest(images[0].read_bytes())]
-        patch = data / "updates/patches" / (first["sha256"] + ".delta")
+        prepare(
+            unknown,
+            20,
+            "unknown older image stages a complete release without a base archive",
+        )
+        check(
+            "unknown base stages exact compiled image",
+            (Path(str(unknown) + ".update") / "next.exe").read_bytes()
+            == images[3].read_bytes(),
+        )
+        patch = data / "updates/images" / (catalog["latest"] + ".exe")
         original = patch.read_bytes()
         patch.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
-        prepare(folder / "old-1.exe", 40, "corrupt download rejected before delta application")
+        prepare(folder / "old-1.exe", 40, "corrupt complete-image download rejected")
         patch.write_bytes(original)
         check(
-            "corrupt patch left installed EXE unchanged",
+            "corrupt download left installed EXE unchanged",
             (folder / "old-1.exe").read_bytes() == images[0].read_bytes(),
         )
         patch.rename(patch.with_suffix(".missing"))
-        prepare(folder / "old-1.exe", 40, "unpublished patch never produces a usable plan")
+        prepare(
+            folder / "old-1.exe",
+            40,
+            "missing complete image never produces a usable plan",
+        )
         patch.with_suffix(".missing").rename(patch)
         # Full process handoff, performed on the release-1 fixture EXE only.
         game = folder / "old-1.exe"
@@ -200,7 +241,9 @@ int main() {
             )
             parent.terminate()  # Controlled fixture shutdown, not a game process.
             parent.wait(timeout=10)
-            check("replacement helper exits successfully", updater.wait(timeout=20) == 0)
+            check(
+                "replacement helper exits successfully", updater.wait(timeout=20) == 0
+            )
             for _ in range(100):
                 marker = folder / "fixture-launched.txt"
                 if marker.exists() and marker.read_text() == "4":
@@ -215,7 +258,7 @@ int main() {
                 game.read_bytes() == images[3].read_bytes(),
             )
             backup = Path(str(game) + ".update") / (
-                publisher.digest(images[0].read_bytes()) + ".backup.exe"
+                hashlib.sha256(images[0].read_bytes()).hexdigest() + ".backup.exe"
             )
             check(
                 "previous executable preserved as exact recovery copy",
@@ -233,13 +276,15 @@ int main() {
         request = struct.pack(
             "<QII32s32s",
             0x3155505744594C50,
-            1,
+            2,
             0,
             os.urandom(32),
             hashlib.sha256(images[0].read_bytes()).digest(),
         )
         signed = urllib.request.urlopen(
-            urllib.request.Request("http://127.0.0.1:8085/updates/v1/check", data=request),
+            urllib.request.Request(
+                "http://127.0.0.1:8085/updates/v2/check", data=request
+            ),
             timeout=5,
         ).read()
         server.terminate()
@@ -265,7 +310,9 @@ int main() {
             worker.start()
             try:
                 prepare(
-                    replay_target, 40, "replayed signed manifest rejected by fresh request nonce"
+                    replay_target,
+                    40,
+                    "replayed signed manifest rejected by fresh request nonce",
                 )
                 ReplayResponse.response = signed[:-1] + bytes([signed[-1] ^ 1])
                 prepare(replay_target, 40, "forged signature rejected")
@@ -285,8 +332,8 @@ int main() {
         "schema": 1,
         "passed": True,
         "native_game_verified": False,
-        "server_sha256": publisher.digest(args.server.read_bytes()),
-        "helper_sha256": publisher.digest(args.helper.read_bytes()),
+        "server_sha256": hashlib.sha256(args.server.read_bytes()).hexdigest(),
+        "helper_sha256": hashlib.sha256(args.helper.read_bytes()).hexdigest(),
         "fixture": str(folder),
         "checks": checks,
     }

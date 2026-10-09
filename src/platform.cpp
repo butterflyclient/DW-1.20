@@ -1362,6 +1362,13 @@ namespace platform
         return identityDirectory / "updates" / "patches" / (digest + ".delta");
     }
 
+    std::filesystem::path executableImagePath(const std::string &digest)
+    {
+        if (!executable_updates::digestName(digest))
+            throw std::runtime_error("Invalid executable image identity");
+        return identityDirectory / "updates" / "images" / (digest + ".exe");
+    }
+
     std::string executableUpdate(const std::string &bytes)
     {
         if (bytes.size() != sizeof(DWUpdateRequest))

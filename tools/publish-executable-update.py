@@ -12,7 +12,6 @@ import hashlib
 import json
 from pathlib import Path
 import os
-import shutil
 
 MAX_IMAGE = 512 * 1024 * 1024
 
@@ -96,7 +95,8 @@ def atomic_json(path, value):
 
 def verify_image(image, report):
     target = image.read_bytes()
-    proof = json.loads(report.read_bytes())
+    report_bytes = report.read_bytes()
+    proof = json.loads(report_bytes)
     target_hash = digest(target)
     if (
         proof.get("sha256") != target_hash
@@ -116,7 +116,7 @@ def verify_image(image, report):
         raise ValueError(
             "Executable has no successful hash-bound linker and relocation verification"
         )
-    return target, target_hash
+    return target, target_hash, report_bytes
 
 
 def retain_release(image, report, release, archive):
@@ -126,14 +126,14 @@ def retain_release(image, report, release, archive):
     actual compiler/linker receipts before adding them to the source archive;
     the next publication generates and round-trips their deltas normally.
     """
-    target, target_hash = verify_image(image, report)
+    target, target_hash, report_bytes = verify_image(image, report)
     archive.mkdir(parents=True, exist_ok=True)
     lock = archive / "publish.lock"
     descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     try:
         index = archive / "releases.json"
         records = json.loads(index.read_bytes()) if index.exists() else []
-        report_hash = digest(report.read_bytes())
+        report_hash = digest(report_bytes)
         for row in records:
             if row["sha256"] == target_hash:
                 if (
@@ -147,8 +147,8 @@ def retain_release(image, report, release, archive):
                 return dict(retained=True, already_retained=True, **row)
         if release <= 0 or (records and release <= max(row["release"] for row in records)):
             raise ValueError("Retained release numbers must increase")
-        shutil.copyfile(image, archive / (target_hash + ".exe"))
-        shutil.copyfile(report, archive / (target_hash + ".build-report.json"))
+        (archive / (target_hash + ".exe")).write_bytes(target)
+        (archive / (target_hash + ".build-report.json")).write_bytes(report_bytes)
         row = dict(
             release=release, sha256=target_hash, size=len(target), report_sha256=report_hash
         )
@@ -161,7 +161,7 @@ def retain_release(image, report, release, archive):
 
 
 def publish(image, report, release, archive, output):
-    target, target_hash = verify_image(image, report)
+    target, target_hash, report_bytes = verify_image(image, report)
     archive.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
     (output / "patches").mkdir(exist_ok=True)
@@ -174,7 +174,7 @@ def publish(image, report, release, archive, output):
             records
             and records[-1]["release"] == release
             and records[-1]["sha256"] == target_hash
-            and records[-1]["report_sha256"] == digest(report.read_bytes())
+            and records[-1]["report_sha256"] == digest(report_bytes)
         )
         if retry:
             # A crash after archiving the release but before catalog publication
@@ -184,12 +184,38 @@ def publish(image, report, release, archive, output):
             raise ValueError("Release numbers must increase; republishing/rollback is explicit")
         if any(row["sha256"] == target_hash for row in records):
             raise ValueError("This exact image is already published")
+        cache_path = output / "verified-patches.json"
+        cache = json.loads(cache_path.read_bytes()) if cache_path.exists() else {}
+        if cache.get("latest") != target_hash or cache.get("target_size") != len(target):
+            cache = dict(latest=target_hash, target_size=len(target), patches={})
         patches = {}
         for row in records:
             base = (archive / (row["sha256"] + ".exe")).read_bytes()
             if digest(base) != row["sha256"] or len(base) != row["size"]:
                 raise ValueError("A retained release is missing or changed")
-            patch = make_patch(base, target)
+            saved = cache["patches"].get(row["sha256"])
+            if saved:
+                identity = saved.get("sha256")
+                if (
+                    not isinstance(identity, str)
+                    or len(identity) != 64
+                    or any(c not in "0123456789abcdef" for c in identity)
+                    or not 0 < saved["size"] <= MAX_IMAGE
+                ):
+                    raise ValueError("Invalid cached patch identity or size")
+                path = output / "patches" / (saved["sha256"] + ".delta")
+                if path.stat().st_size != saved["size"]:
+                    raise ValueError("Cached patch file size changed")
+                patch = path.read_bytes()
+                if (
+                    saved["base_size"] != len(base)
+                    or len(patch) != saved["size"]
+                    or digest(patch) != saved["sha256"]
+                    or apply_patch(base, patch) != target
+                ):
+                    raise ValueError("Cached patch no longer reproduces this exact compiler image")
+            else:
+                patch = make_patch(base, target)
             patch_hash = digest(patch)
             path = output / "patches" / (patch_hash + ".delta")
             if path.exists() and digest(path.read_bytes()) != patch_hash:
@@ -200,19 +226,23 @@ def publish(image, report, release, archive, output):
                 "size": len(patch),
                 "sha256": patch_hash,
             }
+            cache["patches"][row["sha256"]] = patches[row["sha256"]]
+            atomic_json(cache_path, cache)
             print(
                 f"Verified release {row['release']} -> {release}: {len(patch):,} patch bytes",
                 flush=True,
             )
         # Archive the exact compiled EXE and its provenance, not an edited copy.
-        shutil.copyfile(image, archive / (target_hash + ".exe"))
-        shutil.copyfile(report, archive / (target_hash + ".build-report.json"))
+        # The workstation may promote or rename its artifact during a long
+        # compression pass. Archive the immutable bytes verified at entry.
+        (archive / (target_hash + ".exe")).write_bytes(target)
+        (archive / (target_hash + ".build-report.json")).write_bytes(report_bytes)
         records.append(
             {
                 "release": release,
                 "sha256": target_hash,
                 "size": len(target),
-                "report_sha256": digest(report.read_bytes()),
+                "report_sha256": digest(report_bytes),
             }
         )
         catalog = {

@@ -36,6 +36,7 @@ namespace platform
     std::string resource(const std::string &request);
     std::string executableUpdate(const std::string &request);
     std::filesystem::path executablePatchPath(const std::string &digest);
+    std::filesystem::path executableImagePath(const std::string &digest);
     unsigned sessions();
     unsigned logins();
     AuthReply authenticate(const std::string &request);

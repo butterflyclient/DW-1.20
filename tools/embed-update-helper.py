@@ -42,7 +42,7 @@ project(replay_update_helper LANGUAGES CXX)
 add_executable(replay-update-client tools/replay-update-client.cpp integration/replay/DW_LocalPlatformCrypto.cpp)
 target_compile_features(replay-update-client PRIVATE cxx_std_20)
 target_compile_definitions(replay-update-client PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(replay-update-client PRIVATE bcrypt winhttp msdelta)
+target_link_libraries(replay-update-client PRIVATE bcrypt winhttp)
 set_property(TARGET replay-update-client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 """,
         encoding="ascii",

@@ -48,7 +48,8 @@ namespace executable_updates
                              const DWUpdateRequest &request,
                              uint64_t now)
     {
-        if (request.magic != DW_UPDATE_MAGIC || request.version != 1 || request.reserved ||
+        if (request.magic != DW_UPDATE_MAGIC ||
+            (request.version != 1 && request.version != 2) || request.reserved ||
             std::all_of(std::begin(request.nonce),
                         std::end(request.nonce),
                         [](uint8_t c)
@@ -58,12 +59,44 @@ namespace executable_updates
             throw std::runtime_error("Invalid executable update request");
         DWUpdatePlan result{};
         result.magic = DW_UPDATE_MAGIC;
-        result.version = 1;
+        result.version = request.version;
         result.status = 2;
         result.issued = now;
         result.expires = now + 86400;
         std::memcpy(result.nonce, request.nonce, 32);
         std::memcpy(result.baseHash, request.baseHash, 32);
+        if (request.version == 2)
+        {
+            const auto index = root / "updates" / "full-image-catalog.json";
+            if (!std::filesystem::exists(index))
+                return result;
+            if (std::filesystem::file_size(index) > 4096)
+                throw std::runtime_error("Full executable catalog exceeds bounds");
+            std::ifstream file(index);
+            const auto catalog = nlohmann::json::parse(file);
+            if (catalog.at("schema") != 1 || catalog.at("format") != "full-executable-v1")
+                throw std::runtime_error("Unsupported full executable catalog");
+            const auto latest = catalog.at("latest").get<std::string>();
+            decode(latest, result.targetHash);
+            result.targetSize = catalog.at("target_size").get<uint64_t>();
+            result.release = catalog.at("release").get<uint64_t>();
+            if (!result.targetSize || result.targetSize > DW_UPDATE_MAX_IMAGE ||
+                !result.release ||
+                std::filesystem::file_size(root / "updates" / "images" / (latest + ".exe")) !=
+                    result.targetSize)
+                throw std::runtime_error("Full executable is not completely published");
+            if (hex(request.baseHash) == latest)
+                result.status = 0;
+            else
+            {
+                // A complete image needs no prior-build inventory. The signed
+                // base hash still binds replacement to the player's unchanged EXE.
+                result.status = 1;
+                std::memcpy(result.patchHash, result.targetHash, 32);
+                result.patchSize = result.targetSize;
+            }
+            return result;
+        }
         const auto index = root / "updates" / "catalog.json";
         if (!std::filesystem::exists(index))
             return result;

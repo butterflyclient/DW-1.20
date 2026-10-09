@@ -3,7 +3,6 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <winhttp.h>
-#include <msdelta.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -223,7 +222,7 @@ namespace
     {
         const auto &p = reply.plan;
         const auto now = DW_LocalPlatform_Time();
-        return p.magic == DW_UPDATE_MAGIC && p.version == 1 && p.status <= 2 &&
+        return p.magic == DW_UPDATE_MAGIC && p.version == 2 && p.status <= 2 &&
                p.issued <= now + 30 && p.expires > now && p.expires > p.issued &&
                p.expires - p.issued <= 86400 &&
                DW_LocalPlatform_VerifyBytes(&p, sizeof(p), reply.signature);
@@ -239,7 +238,7 @@ namespace
         const auto base = read(exe);
         DWUpdateRequest request{};
         request.magic = DW_UPDATE_MAGIC;
-        request.version = 1;
+        request.version = 2;
         require(BCryptGenRandom(nullptr,
                                 request.nonce,
                                 sizeof(request.nonce),
@@ -249,7 +248,7 @@ namespace
         std::copy(baseHash.begin(), baseHash.end(), request.baseHash);
         const auto response =
             download(host,
-                     L"/updates/v1/check",
+                     L"/updates/v2/check",
                      {reinterpret_cast<const uint8_t *>(&request), sizeof(request)},
                      sizeof(DWUpdateReply));
         DWUpdateReply reply{};
@@ -265,28 +264,16 @@ namespace
             require(!std::memcmp(p.targetHash, p.baseHash, 32), "Invalid current-build response");
             return 10;
         }
-        require(p.baseSize == base.size() && p.targetSize && p.targetSize <= DW_UPDATE_MAX_IMAGE &&
-                    p.patchSize && p.patchSize <= DW_UPDATE_MAX_IMAGE && p.release &&
+        require(!p.baseSize && p.targetSize && p.targetSize <= DW_UPDATE_MAX_IMAGE &&
+                    p.patchSize == p.targetSize && p.release &&
+                    !std::memcmp(p.patchHash, p.targetHash, 32) &&
                     std::memcmp(p.baseHash, p.targetHash, 32),
                 "Invalid executable update bounds");
-        const auto patch =
-            download(host, L"/updates/v1/patch/" + hex(p.patchHash), {}, p.patchSize);
-        require(matches(patch, p.patchHash), "Downloaded patch failed SHA256 verification");
-        DELTA_INPUT input{const_cast<uint8_t *>(patch.data()), patch.size(), FALSE};
-        DELTA_HEADER_INFO info{};
-        require(GetDeltaInfoB(input, &info) && info.TargetSize == p.targetSize &&
-                    info.FileTypeSet == DELTA_FILE_TYPE_RAW,
-                "Delta layout or output size is invalid");
-        Bytes target(static_cast<size_t>(p.targetSize));
-        require(ApplyDeltaProvidedB(DELTA_FLAG_NONE,
-                                    {const_cast<uint8_t *>(base.data()), base.size(), FALSE},
-                                    input,
-                                    target.data(),
-                                    target.size()) != 0,
-                "Cannot reconstruct executable from this patch");
+        const auto target =
+            download(host, L"/updates/v2/image/" + hex(p.targetHash), {}, p.targetSize);
         require(target.size() > 2 && target[0] == 'M' && target[1] == 'Z' &&
                     matches(target, p.targetHash),
-                "Reconstructed executable failed verification");
+                "Downloaded executable failed verification");
         write(stage(exe) / "next.exe", target);
         write(stage(exe) / "plan.bin", response);
         return 20;
