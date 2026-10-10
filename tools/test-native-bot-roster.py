@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import re
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
@@ -48,7 +49,7 @@ def main():
         (pool, 0x10000),
         (halt, 4096),
     ]:
-        vm.mem_map(address, size)
+        vm.mem_map(address - 4096, size + 4096) if address == pool else vm.mem_map(address, size)
     pages = set()
 
     def mapped(address, size=1):
@@ -101,7 +102,7 @@ def main():
     def member(address, index):
         return address + 2192 + 488 * index
 
-    state = dict(enabled=True, lobby=True, server_bot=True, bot_count=12)
+    state = dict(enabled=True, lobby=True, server_bot=True, bot_count=12, local=0, eligible=True, initialized=True)
     registered, models, paths, human_calls = (
         {},
         {},
@@ -134,6 +135,9 @@ def main():
         for address in (pool + 88 * i, server_pool + 88 * i):
             write(address, ("Bot " + str(i)).encode() + b"\0")
             write(address + 36, b"[^3Bot]\0")
+            write(address + 48, i, "<H")
+            write(address + 52, 70 + i)
+            write(address + 56, 80 + i)
             write(address + 77, 20 + i, "<B")
             write(address + 80, 7, "<H")
             write(address + 84, 1, "<B")
@@ -148,7 +152,7 @@ def main():
         "func_14118EE80",
         "func_14118E0E0",
         "func_140CA2250",
-        "func_140CA2270",
+        "func_140CA1C80",
         "func_140CA2230",
         "func_140CA2210",
         "func_141359F90",
@@ -170,9 +174,10 @@ def main():
         "func_141B0E150",
         "func_141B0E0B0",
         "func_141B0E280",
-        "func_141B97080",
-        "func_141B97230",
-        "func_141B24690",
+        "Com_sprintf",
+        "DW_Bot_StringTableAsset",
+        "DW_Bot_StringTableRows",
+        "DW_Bot_StringTableColumn",
         "func_141B0D520",
         "func_141B0D710",
         "func_141B0D530",
@@ -210,11 +215,11 @@ def main():
         elif name == "func_14118EE80":
             returned(0)
         elif name == "func_14118E0E0":
-            returned(a[1] == 0)
+            returned(a[1] == state["local"])
         elif name == "func_140CA2250":
-            returned(1)
-        elif name == "func_140CA2270":
-            returned(state["enabled"] and a[0] < state["bot_count"] + 2)
+            returned(state["initialized"])
+        elif name == "func_140CA1C80":
+            returned(state["eligible"])
         elif name in ("func_140CA2230", "func_140CA2210"):
             returned(pool + 88 * a[0])
         elif name == "func_141359F90":
@@ -259,18 +264,25 @@ def main():
         elif name == "func_141B0E280":
             models[paths[a[0]]] = string(a[1])
             returned()
-        elif name == "func_141B97080":
-            assert a[0] == 42 and string(a[1]) == "Human 0"
-            write(a[2], 1, "<B")
-            write(a[3], struct.pack("<3i", 70, 80, 90))
-            write(read(rsp + 40, "<Q"), struct.pack("<3i", 71, 81, 91))
-            returned(1)
-        elif name == "func_141B97230":
-            assert a[0] == 42
-            write(a[2], b"\0" * 45248)
-            returned(1)
-        elif name == "func_141B24690":
+        elif name == "Com_sprintf":
+            fmt = string(a[2])
+            if fmt == "%llu":
+                value = str(a[3])
+            elif fmt == "%s%u":
+                value = string(a[3]) + str(read(rsp + 40, "<I"))
+            else:
+                raise AssertionError(fmt)
+            assert len(value.encode()) + 1 <= a[1]
+            write(a[0], value.encode() + b"\0")
+            returned(len(value))
+        elif name == "DW_Bot_StringTableAsset":
+            write(a[1], arena + 0x7000, "<Q")
             returned()
+        elif name == "DW_Bot_StringTableRows":
+            returned(200)
+        elif name == "DW_Bot_StringTableColumn":
+            write(arena + 0x7100, ("NativeBot" + str(a[1])).encode() + b"\0")
+            returned(arena + 0x7100)
         elif name == "func_141B0D520":
             returned(3)
         elif name == "func_141B0D710":
@@ -313,7 +325,7 @@ def main():
         ):
             vm.reg_write(reg, value)
         try:
-            vm.emu_start(base + symbols[name], halt, count=2000000)
+            vm.emu_start(base + symbols[name], halt, count=20000000)
         except Exception:
             print(
                 "Native probe fault:",
@@ -352,8 +364,8 @@ def main():
             models.get(f"members.{row}.isBot"),
         )
         assert (
-            models[f"members.{row}.xuid"] == "0"
-            and models[f"members.{row}.bodyWest"] == 80
+            models[f"members.{row}.xuid"] == str(0xB070000000000000 | row)
+            and models[f"members.{row}.bodyWest"] == 80 + row
         )
         assert models[f"members.{row}.clanTag"] == "[^3Bot^7]"
         assert (
@@ -365,8 +377,34 @@ def main():
     run("func_141B22B40", party, 2)
     assert models["squadMembers.count"] == 1
     checks.append(
-        "Native pregame count, names and operator/weapon models include all twelve bots; human bindings and party bytes are preserved; No Fill preview excludes bot teammates"
+        "Native pregame includes twelve distinct bot display keys, record-owned operators and customized stock weapons; no human playercard boundary is called and No Fill preview excludes bot teammates"
     )
+    keys = {models[f"members.{row}.xuid"] for row in range(2, 14)}
+    assert len(keys) == 12
+    weapon_loot = {models[f"members.{row}.weaponSetup.0.weaponLootID"] for row in range(2, 14)}
+    assert len(weapon_loot) > 1
+    assert all(models[f"members.{row}.weaponSetup.0.attachment.0.attachment"] for row in range(2, 14))
+    snapshot_models = dict(models)
+    state["eligible"] = False
+    state["local"] = 1
+    models.clear()
+    human_calls.clear()
+    run("func_141B21D50", party, 1)
+    for row in range(2, 14):
+        for key in ("gamertag", "xuid", "headWest", "bodyWest", "weaponSetup.0.weaponLootID", "weaponSetup.0.weaponCamo"):
+            assert models[f"members.{row}.{key}"] == snapshot_models[f"members.{row}.{key}"]
+    assert models["members.memberCount"] == 14
+    policy(0, 3)
+    run("func_141B21D50", party, 1)
+    run("func_141B22B40", party, 2)
+    assert models["squadMembers.count"] == 3
+    state["local"] = 0
+    run("func_141B21D50", party, 1)
+    run("func_141B22B40", party, 2)
+    assert models["squadMembers.count"] == 3
+    state["eligible"] = True
+    policy(3, 3)
+    checks.append("Both local member views show their synchronized team bots even with guest playlist eligibility false; all remote bot appearance and weapon choices agree")
     saved_pool = bytes(vm.mem_read(pool, 200 * 88))
     run("DW_BotPolicy_Prepare", party)
     expected = bytearray(saved_pool)
@@ -417,12 +455,54 @@ def main():
     for i in range(200):
         write(member(party, i) + 402, int(i in (0, 103)) * 5, "<B")
         write(pool + 88 * i + 84, 1, "<B") # stale tail records must be erased
-    original = [bytes(vm.mem_read(pool + 88 * i, 88)) for i in range(9)]
+    state["enabled"] = True
+    # Native registered package groups are the only external model lookup data.
+    # Build report records source roots separately; the generated header's
+    # matching model pairs are compiler inputs retained beside the job receipt.
+    candidates = list(Path("E:/DW/IW8/data").glob("compiler-snapshot-*/src/DW_BotBindings.h"))
+    matching = [p for p in candidates if hashlib.sha256((p.parent / "DW_BotRoster.cpp").read_bytes()).hexdigest()
+                in {r["source_sha256"] for r in report["cpp"]}]
+    assert matching
+    header_text = matching[-1].read_text()
+    section = header_text.split("DWBotOperatorSkins[] = {", 1)[1].split("};", 1)[0]
+    skin_pairs = [(int(a), int(b)) for a, b in re.findall(r"\{(\d+), (\d+)\}", section)]
+    groups = base + symbols["DW_Bot_CustomizationGroups"]
+    packages = base + symbols["DW_Bot_CustomizationPackages"]
+    write(base + symbols["DW_Bot_CustomizationEnabled"], 1)
+    ids = [sorted({p[k] for p in skin_pairs}) for k in range(2)]
+    first = 0
+    for kind, selected_ids in enumerate(ids):
+        write(groups + 16 * kind, struct.pack("<HHIII", first, 0, len(selected_ids), len(selected_ids), 0))
+        for i, primary in enumerate(selected_ids):
+            write(packages + 40 * (first + i), bytes(40))
+            write(packages + 40 * (first + i) + 22, primary, "<H")
+            write(packages + 40 * (first + i) + 28, 2)
+        first += len(selected_ids)
     run("DW_BotPolicy_BuildRoster", party, 152, 9)
     present = [i for i in range(200) if read(pool + 88 * i + 84, "<B")]
     assert present == list(range(1, 10))
-    assert [bytes(vm.mem_read(pool + 88 * i, 88)) for i in present] == original
-    checks.append("Native roster rebuilding preserves complete bot records, clears stale tail entries and places exactly nine bots around noncontiguous human indices")
+    selected_records = [bytes(vm.mem_read(pool + 88 * i, 88)) for i in present]
+    assert len({r[:36].split(b"\0")[0] for r in selected_records}) == 9
+    assert all((struct.unpack_from("<I", r, 52)[0], struct.unpack_from("<I", r, 56)[0]) in skin_pairs for r in selected_records)
+    checks.append("Roster rebuilding assigns distinct list names and exact paired operator skin IDs from native registered packages, clears stale tail entries and respects noncontiguous human slots")
+    # Expand the actual synchronized native 36-byte bot wire data on a guest.
+    for record in selected_records:
+        write(arena + 0x7200, record[48:84])
+        write(arena + 0x7300, bytes(48))
+        run("BG_GameStateInfo_ExpandBotData", arena + 0x7200, arena + 0x7300)
+        assert bytes(vm.mem_read(arena + 0x7300, 36)).split(b"\0")[0] == record[:36].split(b"\0")[0]
+    for i in range(200):
+        write(member(party, i) + 402, int(i == 0) * 5, "<B")
+        write(pool + 88 * i + 84, 1, "<B")
+    run("DW_BotPolicy_BuildRoster", party, 200, 199)
+    all_names = [string(pool + 88 * i) for i in range(1, 200)]
+    assert len(set(n.casefold() for n in all_names)) == 199
+    assert all(len(n) < 36 for n in all_names)
+    # Case/color-normalized human collision must consume another unique name.
+    write(member(party, 0) + 52, ("^3" + all_names[0].upper()).encode() + b"\0")
+    run("DW_BotPolicy_BuildRoster", party, 200, 199)
+    assert string(pool + 88) .casefold() != all_names[0].casefold()
+    checks.append("Native wire name expansion agrees on guests; 199 requested bots use unique 150-list names plus suffixed overflow and avoid case/color-normalized human name collisions")
     args.output.write_text(
         json.dumps(
             dict(

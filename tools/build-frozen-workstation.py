@@ -262,6 +262,33 @@ if (snapshot / "src/DW_ABTestingEnroll.cpp").exists():
                               "content_sha256": ab_rest["source_sha256"],
                               "source": str(private_sources / "DW_ABTestingEnroll.cpp"),
                               "derived_native_bindings": "generated/ab-rest-integration.json"})
+if (snapshot / "src/DW_LocalProgression.cpp").exists():
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_progression", ROOT / "tools/prepare-gunsmith-progression.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.prepare_local_reset(snapshot)
+    changed = snapshot / "source-units.json"
+    record = next(item for item in records if Path(item["snapshot"]) == changed)
+    record.setdefault("original_sha256", record["sha256"])
+    record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    for generated in (snapshot / "src/DW_ProgressionBindings.h", snapshot / "generated/progression-reset-integration.json"):
+        copy_file(generated, generated)
+if (snapshot / "src/DW_BotRoster.cpp").exists():
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_bots", ROOT / "tools/prepare-bot-integration.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bot_integration = module.prepare(snapshot)
+    for changed in (snapshot / "source-units.json", units_path):
+        record = next(item for item in records if Path(item["snapshot"]) == changed)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    for generated in (snapshot / "src/DW_BotBindings.h", snapshot / "generated/bot-integration.json"):
+        copy_file(generated, generated)
+    private_overrides.append({"id": bot_integration["replacement"],
+                              "content_sha256": bot_integration["source_sha256"],
+                              "source": str(private_sources / "DW_BotRoster.cpp")})
 if args.match_events:
     spec = importlib.util.spec_from_file_location(
         "prepare_private_match_events", ROOT / "tools/prepare-match-event-integration.py")

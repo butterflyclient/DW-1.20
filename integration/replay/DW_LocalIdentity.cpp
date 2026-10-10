@@ -440,6 +440,12 @@ extern "C" bool DW_LocalIdentity_Login(const char *name,
         &request.localUserId, &request.playerXp, &appliedRank) ? 1U : 0U;
     const auto configuredRank = DW_LocalConfig_Rank();
     request.startingRank = configuredRank && appliedRank != configuredRank ? configuredRank : 0;
+    if (DW_LocalProgression_ResetRequested())
+    {
+        request.options |= 2;
+        request.playerXp = 0;
+        request.startingRank = 0;
+    }
     if (!key.Public(request.publicKey))
         return false;
     unsigned length = 0;

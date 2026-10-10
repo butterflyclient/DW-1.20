@@ -1,0 +1,81 @@
+Replay DW bot presentation and full progression reset
+====================================================
+
+Player command
+--------------
+Run dw_resetProgression from the signed-in main menu, outside a lobby.
+The command opens the shipped PopupYesNo widget. No has initial focus;
+No or Escape cancels without writing the INI or progression files.
+
+Yes schedules work on the main thread, after the LUI callback returns.
+It rechecks the signed player and frontend/lobby state, writes unlock_all=0
+and rank=0 into the selected game INI, saves a checksummed zero-XP reset
+marker, invokes the native full active-source stats reset and save, and
+queues sys_restart. Other INI settings and the UTF-8 BOM are retained.
+
+The next machine login signs the reset flag, player identity and zero
+XP/rank. The backend rejects foreign identities, unknown flags and reset
+requests mixed with a nonzero restore. A recoverable transaction clears
+both achievement namespaces, missions/challenges, player/weapon XP,
+Battle Pass, earned/purchased inventory, currencies and leaderboard rows.
+Fresh-account starting equipment remains available. Identity and friends
+are separate from progression and remain intact. The native stats reset
+also resets local progression/loadout data; GamerProfile settings remain
+in their existing separate store.
+
+A failed login leaves the reset marker intact. Only a matching signed
+successful login followed by native zero XP clears it on the main thread.
+Retained request receipts prevent an already accepted old event batch
+from earning its rewards again after the reset.
+
+Bot presentation
+----------------
+The pregame reads operators directly from the synchronized native bot
+records, never a human playercard. Each bot has its own display key so
+the stock character list does not collapse all bots under XUID zero.
+The guest bot-presence consumer accepts synchronized valid bot records
+without requiring the guest's local playlist eligibility predicate.
+
+Operator head/body pairs are generated from shipped operator/skin data
+and filtered against registered native customization packages. The same
+native pair is consumed by the original bot spawn path. The unknown third
+modelIndex field is retained rather than assigned speculative semantics.
+
+DW_BotNames.h contains 150 unique base usernames. Up to 199 bots use those
+names plus numbered overflow names, with no duplicate bot names and with
+case/color-normalized human-name collisions avoided. The native 36-byte
+wire record and 88-byte bot record remain the transport and storage ABI.
+
+Pregame weapon previews use 287 shipped blueprint variants, their stock
+attachment references/variant IDs and stock camos. Reused UI rows clear
+old charms/stickers/attachments rather than inheriting host preferences.
+In-match weapon selection still uses the native bot loadout scripts;
+this change does not assert that their weapon equals the preview blueprint.
+
+Compilation and validation
+--------------------------
+The preparation tools derive symbol bindings from the pinned Replay
+function catalog and original instructions. Generated bindings are part
+of the private build sequence; no new manual source RVAs are required.
+
+The fresh client image passed linker, relocation and provenance checks.
+Focused Unicorn tests execute the linked replacements. Popup tests execute
+the captured Lua program with Lua 5.1 and the actual shipped PopupYesNo
+factory, modeling rendering and OS/native API boundaries explicitly.
+Bot tests cover both local member views, No Fill, mixed teams, exact
+registered skin pairs, noncontiguous human slots and 199 distinct names.
+Signed disposable-profile fixtures cover reset ownership, rejected flags,
+all cleared state domains, idempotency and other-account isolation.
+
+No game was launched for this change. Visual popup/character rendering and
+an end-to-end reset/restart remain owner-run checks. Do not reset a valued
+profile merely to test the command: this is intentionally destructive.
+
+Remaining backend finalization
+------------------------------
+This release does not declare the complete backend finished. There are
+126 mission-earning criteria still unimplemented, six original response
+bindings still lacking (50/22, 58/22, 193/9, 193/10, 193/12, 193/24), and
+experimental native achievement metadata/cache-transition ordering still
+excluded from the normal client. Existing unrelated working-tree changes
+are excluded from the owned build and publication cohort.

@@ -14,3 +14,8 @@ extern "C" unsigned DW_LocalConfig_Rank()
 {
     return 0;
 }
+
+extern "C" bool DW_LocalProgression_ResetRequested()
+{
+    return false;
+}

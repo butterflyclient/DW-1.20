@@ -2,11 +2,14 @@
 // Bind those records to the stock lobby models and to native ClientBegin.
 #include "com_debugstates.h"
 #include "replay_dvar.h"
+#include "DW_BotBindings.h"
+#include "DW_BotNames.h"
 #include <initializer_list>
 
 extern "C"
 {
     bool DW_LocalBackend_IsEnabled();
+    void BG_GameStateInfo_ExpandBotData(const void *, void *);
     bool func_141187FA0();                       // Lobby_IsInLobby
     void *func_141187EE0();                      // Lobby_GetPartyData
     bool func_14118E1F0(const void *, unsigned); // Party_IsMemberPresent
@@ -15,6 +18,7 @@ extern "C"
     bool func_14118EE80(const void *, unsigned); // Party_IsWaitingForPartyMember
     bool func_14118E0E0(const void *, unsigned); // Party_IsMemberLocal
     bool func_140CA2250();                       // BG_GameStateInfo_IsBotMatchMakingDataInitialized
+    bool func_140CA1C80();                       // BG_Bots_IsBotMatchMakingAllowedForPlaylist
     bool func_140CA2270(unsigned);               // BG_GameStateInfo_IsBotMemberPresent
     const void *func_140CA2230(unsigned);        // BG_GameStateInfo_GetBotMemberReadOnly
     void *func_140CA2210(unsigned);              // BG_GameStateInfo_GetBotMember
@@ -42,9 +46,6 @@ extern "C"
     void func_141B0E150(uint16_t, int);              // SetInt
     void func_141B0E0B0(uint16_t, bool);             // SetBool
     void func_141B0E280(uint16_t, const char *);     // SetString
-    void func_141B97080(uint64_t, const char *, uint8_t *, void *, void *);
-    void func_141B97230(uint64_t, const char *, void *); // PlayercardCache_GetPlayercard
-    void func_141B24690(uint16_t, const void *);         // PushWeaponCustomization
     uint16_t func_141B0D520();                           // GetGlobalModel
     uint16_t func_141B0D710(uint16_t, const char *);     // GetModelFromPath
     int func_141B0D530(uint16_t);                        // GetInt
@@ -95,10 +96,123 @@ namespace
     static_assert(offsetof(MemberRecord, xuid) == 408);
     dvar_t *s_reserved{}, *s_squadSize{};
 
+    bool SelectAppearance(BotRecord &bot)
+    {
+        if (!DW_Bot_CustomizationEnabled)
+            return false;
+        const auto *groups = reinterpret_cast<const DWBotCustomizationGroup *>(DW_Bot_CustomizationGroups);
+        const auto *packages = reinterpret_cast<const DWBotCustomizationPackage *>(DW_Bot_CustomizationPackages);
+        // Use registered random-eligible male/female packages, exactly like the
+        // native random customization consumer. Never seed the engine RNG or
+        // borrow a human's equipped skin. Stable bot name/skill select the pair.
+        const unsigned seed = unsigned(bot.nameIndex) * 2654435761u + bot.skill;
+        constexpr unsigned skinCount = sizeof(DWBotOperatorSkins) / sizeof(*DWBotOperatorSkins);
+        for (unsigned attempt = 0; attempt < skinCount; ++attempt)
+        {
+            const auto &skin = DWBotOperatorSkins[(seed + attempt) % skinCount];
+            const uint16_t wanted[] = {skin.head, skin.body};
+            const DWBotCustomizationPackage *pair[2]{};
+            for (unsigned kind = 0; kind < 2; ++kind)
+            {
+                const auto &group = groups[kind];
+                if (!group.count || group.count > DWBotCustomizationPackageLimit ||
+                    unsigned(group.first) + group.count > DWBotCustomizationPackageLimit)
+                    return false;
+                for (unsigned i = 0; i < group.count; ++i)
+                {
+                    const auto &package = packages[group.first + i];
+                    if (package.primary == wanted[kind] && !package.invalid)
+                    {
+                        pair[kind] = &package;
+                        break;
+                    }
+                }
+            }
+            if (pair[0] && pair[1] && pair[0]->category == pair[1]->category)
+            {
+                bot.modelIndex[0] = skin.head;
+                bot.modelIndex[1] = skin.body;
+                return true;
+            }
+        }
+        for (unsigned attempt = 0; attempt < 2; ++attempt)
+        {
+            const unsigned category = (seed + attempt) & 1;
+            uint16_t selected[2]{};
+            bool complete = true;
+            for (unsigned kind = 0; kind < 2; ++kind)
+            {
+                const auto &group = groups[kind];
+                if (!group.count || group.count > DWBotCustomizationPackageLimit ||
+                    unsigned(group.first) + group.count > DWBotCustomizationPackageLimit)
+                    return false;
+                unsigned eligible = 0;
+                for (unsigned i = 0; i < group.count; ++i)
+                {
+                    const auto &package = packages[group.first + i];
+                    if (package.randomEligible && !package.invalid && package.category == category &&
+                        package.primary && package.primary != UINT16_MAX)
+                        ++eligible;
+                }
+                if (!eligible)
+                {
+                    complete = false;
+                    break;
+                }
+                unsigned ordinal = (seed / (kind ? 17u : 7u)) % eligible;
+                for (unsigned i = 0; i < group.count; ++i)
+                {
+                    const auto &package = packages[group.first + i];
+                    if (package.randomEligible && !package.invalid && package.category == category &&
+                        package.primary && package.primary != UINT16_MAX && !ordinal--)
+                    {
+                        selected[kind] = package.primary;
+                        break;
+                    }
+                }
+            }
+            if (complete)
+            {
+                bot.modelIndex[0] = selected[0];
+                bot.modelIndex[1] = selected[1];
+                return true;
+            }
+        }
+        return false;
+    }
+
     const MemberRecord &Member(const void *party, unsigned index)
     {
         return reinterpret_cast<const MemberRecord *>(static_cast<const uint8_t *>(party) +
                                                       2192)[index];
+    }
+
+    bool SameName(const char *first, const char *second)
+    {
+        unsigned a = 0, b = 0;
+        while (a < 36 && b < 36)
+        {
+            if (first[a] == '^' && a + 1 < 36 && first[a + 1] >= '0' && first[a + 1] <= '9')
+            {
+                a += 2;
+                continue;
+            }
+            if (second[b] == '^' && b + 1 < 36 && second[b + 1] >= '0' && second[b + 1] <= '9')
+            {
+                b += 2;
+                continue;
+            }
+            char left = first[a++], right = second[b++];
+            if (left >= 'A' && left <= 'Z')
+                left += 'a' - 'A';
+            if (right >= 'A' && right <= 'Z')
+                right += 'a' - 'A';
+            if (left != right)
+                return false;
+            if (!left)
+                return true;
+        }
+        return false;
     }
 
     bool Ready(const void *party)
@@ -242,7 +356,7 @@ namespace
         return func_141B0D390(model, text);
     }
 
-    void PushBot(const void *party,
+    void PushBot(const void *,
                  unsigned index,
                  const BotRecord &bot,
                  uint16_t model,
@@ -252,7 +366,12 @@ namespace
         for (unsigned i = 0; i < 36; ++i)
             name[i] = bot.name[i];
         Int(model, "memberIndex", int(index));
-        Text(model, "xuid", "0");
+        // Unique UI key only. It never enters a native party member, backend
+        // identity or playercard cache. Zero for every bot collapses the stock
+        // scene's XUID-keyed character list to one character on remote clients.
+        char displayKey[24]{};
+        Com_sprintf(displayKey, sizeof(displayKey), "%llu", 0xB070000000000000ULL | bot.nameIndex);
+        Text(model, "xuid", displayKey);
         Text(model, "platformId", "0");
         Text(model, "gamertag", name);
         Text(model, "gamertagWithHash", name);
@@ -283,32 +402,52 @@ namespace
                                 "followersCount"})
             Int(model, key, 0);
         Int(model, "followerIndex", -1);
-        // Use the host's real operator/weapon customization through the stock
-        // playercard consumer; bot names/XUIDs never enter its identity cache.
-        for (unsigned i = 0; i < 200; ++i)
-            if (func_14118E0E0(party, i))
-            {
-                const auto &host = Member(party, i);
-                uint8_t selected{};
-
-                struct Appearance
+        // These are the same primary head/body IDs read by native AddMPBot
+        // into ctzHead/ctzBody, and transported in the stock 36-byte wire data.
+        Int(model, "selectedOperatorIndex", 0);
+        for (const auto *key : {"headWest", "headEast"})
+            Int(model, key, int(bot.modelIndex[0]));
+        for (const auto *key : {"bodyWest", "bodyEast"})
+            Int(model, key, int(bot.modelIndex[1]));
+        Int(model, "execWest", 0);
+        Int(model, "execEast", 0);
+        // Real Replay base loot IDs. Every bot has an independent stock weapon
+        // presentation; clear every old customization child when rows are reused
+        // so the UI never falls back to a human's favorite weapon or attachments.
+        const unsigned choice = unsigned(bot.nameIndex) + bot.skill;
+        const auto setup = func_141B0D390(model, "weaponSetup");
+        for (unsigned slot = 0; slot < 2; ++slot)
+        {
+            const auto weapon = Row(setup, slot);
+            unsigned available = 0;
+            for (const auto &candidate : DWBotWeapons)
+                if (candidate.secondary == bool(slot))
+                    ++available;
+            unsigned ordinal = choice % available;
+            const DWBotWeapon *selected = nullptr;
+            for (const auto &candidate : DWBotWeapons)
+                if (candidate.secondary == bool(slot) && !ordinal--)
                 {
-                    int head, body, execution;
-                } west{}, east{};
-
-                func_141B97080(host.xuid, host.name, &selected, &west, &east);
-                Int(model, "selectedOperatorIndex", selected);
-                Int(model, "headWest", west.head);
-                Int(model, "bodyWest", west.body);
-                Int(model, "execWest", west.execution);
-                Int(model, "headEast", east.head);
-                Int(model, "bodyEast", east.body);
-                Int(model, "execEast", east.execution);
-                alignas(16) uint8_t card[45248]{};
-                func_141B97230(host.xuid, host.name, card);
-                func_141B24690(model, card);
-                break;
+                    selected = &candidate;
+                    break;
+                }
+            Int(weapon, "weaponLootID", int(selected->loot));
+            Text(weapon, "cosmeticAttachment", "");
+            Text(weapon, "weaponCamo", DWBotCamos[(choice + slot) % (sizeof(DWBotCamos) / sizeof(*DWBotCamos))]);
+            const auto stickers = func_141B0D390(weapon, "sticker");
+            for (unsigned i = 0; i < 4; ++i)
+                func_141B0E280(Row(stickers, i), "");
+            Int(weapon, "stickerCount", 4);
+            const auto attachments = func_141B0D390(weapon, "attachment");
+            for (unsigned i = 0; i < 5; ++i)
+            {
+                const auto attachment = Row(attachments, i);
+                Int(attachment, "variant", int(selected->variants[i]));
+                Text(attachment, "attachment", selected->attachments[i]);
             }
+            Int(weapon, "attachmentCount", 5);
+        }
+        Int(model, "weaponCount", 2);
     }
 } // namespace
 
@@ -338,14 +477,105 @@ extern "C" void DW_BotPolicy_BuildRoster(const void *party, unsigned capacity, u
     // Place exactly the requested bots in unused real party indices, including
     // holes left by departing humans, using the complete native 88-byte record.
     static BotRecord selected[200]{};
+    const unsigned start = (static_cast<const BotRecord *>(func_140CA2230(0))->nameIndex +
+                            static_cast<const BotRecord *>(func_140CA2230(0))->skill) % DWBotNameCount;
+    unsigned candidate = 0;
     for (unsigned i = 0; i < count; ++i)
+    {
         selected[i] = *static_cast<const BotRecord *>(func_140CA2230(i));
+        // 73 is coprime to 150: all base names occur once before a uniquely
+        // suffixed overflow name is needed for a native 151..199-bot lobby.
+        bool unique = false;
+        while (!unique && candidate < DWBotNameCount * 3)
+        {
+            const unsigned name = (start + (candidate % DWBotNameCount) * 73) % DWBotNameCount;
+            selected[i].nameIndex = uint16_t(0x8000 | (name + (candidate / DWBotNameCount) * DWBotNameCount));
+            ++candidate;
+            BG_GameStateInfo_ExpandBotData(&selected[i].nameIndex, &selected[i]);
+            unique = true;
+            for (unsigned human = 0; human < capacity; ++human)
+                if (func_14118E020(party, human) && SameName(Member(party, human).name, selected[i].name))
+                    unique = false;
+        }
+        if (!unique)
+            return;
+        SelectAppearance(selected[i]);
+    }
     for (unsigned i = 0; i < 200; ++i)
         *static_cast<BotRecord *>(func_140CA2210(i)) = {};
     unsigned used = 0;
     for (unsigned i = 0; i < capacity && used < count; ++i)
         if (!func_14118E020(party, i))
             *static_cast<BotRecord *>(func_140CA2210(i)) = selected[used++];
+}
+
+extern "C" void BG_GameStateInfo_ExpandBotData(const void *wireData, void *displayData)
+{
+    if (!wireData || !displayData)
+        return;
+    const unsigned index = *static_cast<const uint16_t *>(wireData);
+    auto *bot = static_cast<BotRecord *>(displayData);
+    const char *name = nullptr;
+    if (DW_LocalBackend_IsEnabled() && index >= 0x8000 && index < 0x8000 + DWBotNameCount * 3)
+    {
+        const unsigned choice = index - 0x8000;
+        if (choice < DWBotNameCount)
+            name = DWBotNames[choice];
+        else
+        {
+            Com_sprintf(bot->name, sizeof(bot->name), "%s%u", DWBotNames[choice % DWBotNameCount],
+                        choice / DWBotNameCount + 1);
+            name = bot->name;
+        }
+    }
+    else
+    {
+        const void *table = nullptr;
+        DW_Bot_StringTableAsset(DW_Bot_NameTable, &table);
+        if (!table)
+        {
+            func_1412B0570(1, "ERROR: bot name file %s not found!\n", DW_Bot_NameTable);
+            name = "filemissing";
+        }
+        else if (index >= unsigned(DW_Bot_StringTableRows(table)))
+        {
+            func_1412B0570(1, "ERROR: bot index %d out of range for %d in file %s!\n", index,
+                          DW_Bot_StringTableRows(table), DW_Bot_NameTable);
+            name = "outofrange";
+        }
+        else
+            name = DW_Bot_StringTableColumn(table, index, 1);
+    }
+    unsigned character = 0;
+    if (name && name != bot->name)
+    {
+        while (character + 1 < sizeof(bot->name) && name[character])
+        {
+            bot->name[character] = name[character];
+            ++character;
+        }
+        bot->name[character] = 0;
+    }
+    else if (!name)
+        bot->name[0] = 0;
+    const char *clan = DW_LocalBackend_IsEnabled() ? BotClanTag : "[^3Bot]";
+    for (character = 0; character + 1 < sizeof(bot->clan) && clan[character]; ++character)
+        bot->clan[character] = clan[character];
+    bot->clan[character] = 0;
+}
+
+// Received bot records are authoritative even on a guest whose playlist bot
+// eligibility/controller flag differs from the host. Stock behavior is retained
+// outside DW. Do not fabricate private-party members or bot platform identities.
+extern "C" bool BG_GameStateInfo_IsBotMemberPresent(unsigned index)
+{
+    if (index >= 200)
+        return false;
+    if (DW_LocalBackend_IsEnabled())
+        return func_140CA2250() &&
+               static_cast<const BotRecord *>(func_140CA2230(index))->valid == 1;
+    return func_140CA1C80() &&
+           static_cast<const BotRecord *>(func_140CA2230(index))->valid == 1;
 }
 
 extern "C" bool func_14118E2C0(const void *party, unsigned index)

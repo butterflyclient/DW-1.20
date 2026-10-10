@@ -265,14 +265,14 @@ if not local_cases[0].get("compiled_native_local_profile_selection"):
         "Native local profile storage was not selected before compiled sign-in"
     )
 resource_proof = json.loads(
-    (ROOT / "data/platform-resource-verification.json").read_text()
+    (args.protocol_directory / "platform-resource-verification.json").read_text()
 )
 if (
     not resource_proof.get("passed")
     or resource_proof["crypto_source_sha256"] != platform_proof["crypto_source_sha256"]
     or resource_proof["server_sha256"]
     != hashlib.sha256(
-        (ROOT / "build/Release/iw8-dw-server.exe").read_bytes()
+        args.server.read_bytes()
     ).hexdigest()
 ):
     raise RuntimeError(
@@ -320,7 +320,8 @@ if (
     ).hexdigest()
 ):
     raise RuntimeError("Server changed after signed-session/auth protocol verification")
-lobby_proof = json.loads((args.startup_receipt or ROOT / "data/lobby-verification.json").read_text())
+lobby_receipt = args.startup_receipt or args.protocol_directory / "lobby-verification.json"
+lobby_proof = json.loads(lobby_receipt.read_text())
 if args.startup_receipt and lobby_proof.get("scope") != "startup":
     raise RuntimeError("Expected an explicitly scoped startup verification receipt")
 if (
@@ -457,7 +458,7 @@ receipt = {
     "platform_sources": private_objects,
     "platform_protocol_verification": str((args.protocol_directory / "platform-verification.json").resolve()),
     "auth_protocol_verification": str((args.protocol_directory / "auth-verification.json").resolve()),
-    "lobby_protocol_verification": str((args.startup_receipt or ROOT / "data/lobby-verification.json").resolve()),
+    "lobby_protocol_verification": str(lobby_receipt.resolve()),
     "server_sha256": auth_proof["server_sha256"],
     "native_tasks": True,
     "profiles": True,

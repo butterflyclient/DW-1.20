@@ -3,6 +3,8 @@
 #include "replay_dvar.h"
 #include "com_optimized.h"
 #include "dw_progression_ranks.h"
+#include "com_debugstates.h"
+#include "DW_ProgressionBindings.h"
 #include <stddef.h>
 #include <emmintrin.h>
 
@@ -10,6 +12,9 @@ extern "C"
 {
     uint64_t DW_LocalPlatform_UserId();
     bool DW_LocalBackend_IsEnabled();
+    bool Com_FrontEnd_IsInFrontEnd();
+    bool func_141187FA0(); // Lobby_IsInLobby
+    extern void *gl_151868880;
     void *func_14105BC30(); // Original OnlineProgression::GetInstance
     int func_1420838B0(void *);               // lua_gettop
     int func_1420839E0(void *, int);          // lua_isnumber
@@ -143,6 +148,12 @@ namespace
     wchar_t s_directory[1024]{}, s_path[1100]{}, s_pending[1100]{};
     bool s_loaded = false, s_valid = false, s_corrupt = false;
     unsigned s_poll = 0, s_unlockMask = 0;
+    unsigned s_resetRequested = 0;
+    uint64_t s_resetAuthenticated = 0;
+    cmd_function_s s_resetCommand{};
+    bool s_commandRegistered = false;
+    unsigned s_confirmationPending = 0, s_confirmationResult = 0;
+    uint64_t s_confirmationUser = 0;
 
     uint64_t Checksum(const DWLocalProgressionRecord &record)
     {
@@ -191,12 +202,14 @@ namespace
                           s_api.ReadFile(file, &extra, 1, &extraCount, nullptr) && !extraCount;
         s_api.CloseHandle(file);
         s_valid = read && record.magic == 0x31505852 && record.version == 1 &&
-                  record.user && record.appliedRank <= 55 && !record.reserved &&
+                  record.user && record.appliedRank <= 55 && record.reserved <= 1 &&
+                  (!record.reserved || !record.xp) &&
                   record.checksum == Checksum(record);
         s_corrupt = !s_valid;
         if (s_valid)
         {
             s_record = record;
+            __atomic_store_n(&s_resetRequested, record.reserved, __ATOMIC_RELEASE);
             __atomic_store_n(&s_savedUser, record.user, __ATOMIC_RELEASE);
             __atomic_store_n(&s_savedXp, record.xp, __ATOMIC_RELEASE);
             __atomic_store_n(&s_savedRank, record.appliedRank, __ATOMIC_RELEASE);
@@ -206,12 +219,12 @@ namespace
             Com_Printf(25, "[DW] Local progression record invalid; preserving the existing file\n");
     }
 
-    bool Save(uint64_t user, uint64_t xp)
+    bool Save(uint64_t user, uint64_t xp, bool reset = false)
     {
         if (!s_path[0] || s_corrupt)
             return false;
         s_api.CreateDirectoryW(s_directory, nullptr);
-        DWLocalProgressionRecord record{0x31505852, 1, user, xp, DW_LocalConfig_Rank(), 0, 0};
+        DWLocalProgressionRecord record{0x31505852, 1, user, xp, DW_LocalConfig_Rank(), reset ? 1U : 0U, 0};
         record.checksum = Checksum(record);
         auto file = s_api.CreateFileW(s_pending, 0x40000000, 0, nullptr, 2, 0x80, nullptr);
         if (file == reinterpret_cast<void *>(~uintptr_t{0}))
@@ -230,6 +243,100 @@ namespace
         __atomic_store_n(&s_savedValid, 1U, __ATOMIC_RELEASE);
         Com_Printf(25, "[DW] Local player progression saved: XP %llu\n", xp);
         return true;
+    }
+
+    void ApplyReset()
+    {
+        if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread())
+            return;
+        const auto user = DW_LocalPlatform_UserId();
+        if (!user || user != s_confirmationUser || !Com_FrontEnd_IsInFrontEnd() || func_141187FA0())
+        {
+            Com_Printf(25, "dw_resetProgression: leave the lobby and run this from the main menu.\n");
+            return;
+        }
+        Load();
+        auto *player = static_cast<DWReplayProgressionPrefix *>(func_14105BC30());
+        const auto source = DW_Progression_StatsSource(0);
+        if (!player || source > 1 || (s_valid && s_record.user != user) || s_corrupt ||
+            !DW_LocalConfig_ResetProgression() || !Save(user, 0, true))
+        {
+            Com_Printf(25, "dw_resetProgression: local progression unavailable; reset not started.\n");
+            return;
+        }
+        __atomic_store_n(&s_resetRequested, 1U, __ATOMIC_RELEASE);
+        __atomic_store_n(&s_resetAuthenticated, uint64_t{0}, __ATOMIC_RELEASE);
+        player->players[0] = {};
+        // Use the shipped complete six-DDL-group reset for the active source.
+        DW_Progression_ResetStats(0, source);
+        DW_Progression_SaveStats(0);
+        s_unlockMask = 0;
+        Com_Printf(25, "[DW] Full progression reset saved; rank=0, unlock_all=0. Restarting with sys_restart.\n");
+        DW_Progression_QueueCommand(0, "sys_restart\n");
+    }
+
+    int ConfirmYes(void *)
+    {
+        unsigned expected = 1;
+        if (__atomic_compare_exchange_n(&s_confirmationPending, &expected, 0U, false,
+                                        __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+            __atomic_store_n(&s_confirmationResult, 1U, __ATOMIC_RELEASE);
+        return 0;
+    }
+
+    int ConfirmNo(void *)
+    {
+        __atomic_store_n(&s_confirmationPending, 0U, __ATOMIC_RELEASE);
+        return 0;
+    }
+
+    void ResetProgression_f()
+    {
+        if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread())
+            return;
+        if (Cmd_Argc() != 1)
+        {
+            Com_Printf(25, "Usage: dw_resetProgression\n");
+            return;
+        }
+        const auto user = DW_LocalPlatform_UserId();
+        if (!user || !Com_FrontEnd_IsInFrontEnd() || func_141187FA0())
+        {
+            Com_Printf(25, "dw_resetProgression: leave the lobby and run this from the main menu.\n");
+            return;
+        }
+        if (__atomic_load_n(&s_confirmationPending, __ATOMIC_ACQUIRE) ||
+            __atomic_load_n(&s_confirmationResult, __ATOMIC_ACQUIRE))
+            return;
+        DW_Progression_LUILock();
+        if (auto *vm = gl_151868880)
+        {
+            const auto top = DW_Progression_LuaTop(vm);
+            s_confirmationUser = user;
+            __atomic_store_n(&s_confirmationPending, 1U, __ATOMIC_RELEASE);
+            DW_Progression_LuaClosure(vm, ConfirmYes, 0);
+            DW_Progression_LuaSetField(vm, -10002, "_ReplayDWResetYes");
+            DW_Progression_LuaClosure(vm, ConfirmNo, 0);
+            DW_Progression_LuaSetField(vm, -10002, "_ReplayDWResetNo");
+            constexpr char popup[] =
+                "local yes,no=_ReplayDWResetYes,_ReplayDWResetNo\n"
+                "_ReplayDWResetYes=nil;_ReplayDWResetNo=nil\n"
+                "LUI.FlowManager.RequestPopupMenu(nil,'PopupYesNo',false,0,false,{"
+                "controllerIndex=0,title='RESET ALL PROGRESSION',"
+                "message='Reset all XP, ranks, missions, challenges, operator and weapon unlocks, "
+                "and Battle Pass progress? This cannot be undone. The game will restart.',"
+                "yesLabel='Yes',noLabel='No',defaultFocusIndex=2,yesAction=yes,noAction=no})";
+            if (DW_Progression_LuaLoad(vm, popup, sizeof(popup) - 1, "ReplayDWResetConfirmation") ||
+                DW_Progression_LuaCall(vm, 0, 0, 0))
+            {
+                __atomic_store_n(&s_confirmationPending, 0U, __ATOMIC_RELEASE);
+                Com_Printf(25, "dw_resetProgression: confirmation popup unavailable; no reset performed.\n");
+            }
+            DW_Progression_LuaSetTop(vm, top);
+        }
+        else
+            Com_Printf(25, "dw_resetProgression: wait until the main menu has loaded.\n");
+        DW_Progression_LUIUnlock();
     }
 }
 
@@ -274,6 +381,13 @@ extern "C" bool DW_LocalProgression_LoginFields(uint64_t *user, uint64_t *xp, un
 
 extern "C" void DW_LocalProgression_Frame()
 {
+    if (!s_commandRegistered && Sys_IsMainThread())
+    {
+        Cmd_AddCommandInternal("dw_resetProgression", ResetProgression_f, &s_resetCommand);
+        s_commandRegistered = true;
+    }
+    if (Sys_IsMainThread() && __atomic_exchange_n(&s_confirmationResult, 0U, __ATOMIC_ACQ_REL) == 1)
+        ApplyReset();
     const auto user = DW_LocalPlatform_UserId();
     if (!user)
         return;
@@ -284,6 +398,20 @@ extern "C" void DW_LocalProgression_Frame()
         return;
     s_poll = now;
     Load();
+    if (__atomic_load_n(&s_resetRequested, __ATOMIC_ACQUIRE))
+    {
+        // Retry remains durable across failed login or a process restart. A
+        // signed successful reset login, followed by the native zero XP state,
+        // is required before ordinary monotonic save polling resumes.
+        const auto *player = static_cast<const DWReplayProgressionPrefix *>(func_14105BC30());
+        if (__atomic_load_n(&s_resetAuthenticated, __ATOMIC_ACQUIRE) == user &&
+            player && !player->players[0].xp && Save(user, 0))
+        {
+            __atomic_store_n(&s_resetRequested, 0U, __ATOMIC_RELEASE);
+            Com_Printf(25, "[DW] Progression reset confirmed and saved.\n");
+        }
+        return;
+    }
     constexpr const char *unlocks[] = {
         "NLOTNSOSKK", "OLKMKMTKRO", "LLQQNOO",
         "MNLPOPMMSK", "LSPQSSPSOL", "NQRLNKMTSL"};
@@ -316,4 +444,16 @@ extern "C" void DW_LocalProgression_Frame()
     if (!s_valid && !xp && !configuredRank)
         return;
     Save(user, xp);
+}
+
+extern "C" bool DW_LocalProgression_ResetRequested()
+{
+    return __atomic_load_n(&s_resetRequested, __ATOMIC_ACQUIRE) != 0;
+}
+
+extern "C" void DW_LocalProgression_ResetAuthenticated(uint64_t user)
+{
+    if (DW_LocalProgression_ResetRequested() &&
+        user == __atomic_load_n(&s_savedUser, __ATOMIC_ACQUIRE))
+        __atomic_store_n(&s_resetAuthenticated, user, __ATOMIC_RELEASE);
 }

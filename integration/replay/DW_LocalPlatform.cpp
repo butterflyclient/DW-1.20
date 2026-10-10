@@ -8,6 +8,7 @@
 extern "C"
 {
     bool DW_LocalBackend_IsEnabled();
+    void DW_LocalProgression_ResetAuthenticated(uint64_t);
     uint64_t DW_LocalPlatform_Time();
     bool DW_LocalPlatform_MakeNonce(uint8_t *);
     bool DW_LocalPlatform_VerifyReply(const DWLocalPlatformReply *, const uint8_t *, uint64_t);
@@ -524,7 +525,10 @@ namespace
             failure = "server-platform-resource";
         }
         if (ok)
+        {
             s_reply = reply;
+            DW_LocalProgression_ResetAuthenticated(reply.payload.userId);
+        }
         else
             Log(failure);
         // The worker publishes data only. Native game objects are touched on the

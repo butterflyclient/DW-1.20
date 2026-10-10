@@ -159,5 +159,81 @@ def main():
           f"{len(rank_items)} rank items and {len(referenced_challenges)} bound challenges")
 
 
+def prepare_local_reset(snapshot):
+    """Bind the stock full-stat reset, persistence and queued command consumers."""
+    import importlib.util
+    import sys
+    import pefile
+    from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+    from capstone.x86 import X86_OP_IMM
+
+    snapshot = snapshot.resolve()
+    assert snapshot.is_relative_to(ROOT / "data")
+    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    raw = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe").read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == catalog["image_sha256"]
+    pe = pefile.PE(data=raw, fast_load=True)
+    decoder = Cs(CS_ARCH_X86, CS_MODE_64)
+    decoder.detail = True
+
+    def named(name):
+        rows = [r for r in catalog["functions"] if name in (r["name"], *r["aliases"])
+                and not r.get("quarantined")]
+        assert len(rows) == 1, name
+        return rows[0]
+
+    lua_reset = named("LUI_CoD_LuaCall_StatsResetProceed")
+    code = pe.get_data(lua_reset["rva"], 160)
+    calls = [i.operands[0].imm - pe.OPTIONAL_HEADER.ImageBase
+             for i in decoder.disasm(code, pe.OPTIONAL_HEADER.ImageBase + lua_reset["rva"])
+             if i.mnemonic == "call" and i.operands[0].type == X86_OP_IMM]
+    reset = named("sub_1412A39C0")
+    assert calls.count(reset["rva"]) == 1
+    header = '''#pragma once
+#include <stdint.h>
+#include <stddef.h>
+extern "C" {
+unsigned DW_Progression_StatsSource(unsigned);
+void DW_Progression_ResetStats(unsigned, unsigned);
+void DW_Progression_SaveStats(unsigned);
+uintptr_t DW_Progression_QueueCommand(int, const char *);
+void DW_Progression_LUILock();
+void DW_Progression_LUIUnlock();
+int DW_Progression_LuaTop(void *);
+void DW_Progression_LuaSetTop(void *, int);
+void DW_Progression_LuaSetField(void *, int, const char *);
+void DW_Progression_LuaClosure(void *, int (*)(void *), int);
+int DW_Progression_LuaLoad(void *, const char *, size_t, const char *);
+int DW_Progression_LuaCall(void *, int, int, int);
+}
+'''
+    (snapshot / "src/DW_ProgressionBindings.h").write_text(header)
+    spec = importlib.util.spec_from_file_location("private_progression_catalog", snapshot / "tools/source_catalog.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(snapshot / "tools"))
+    spec.loader.exec_module(module)
+    bindings = []
+    for alias, name in (("DW_Progression_StatsSource", "q_LiveStorage_GetActiveStatsSource"),
+                        ("DW_Progression_ResetStats", "sub_1412A39C0"),
+                        ("DW_Progression_SaveStats", "sub_1412A3D60"),
+                        ("DW_Progression_QueueCommand", "sub_1415C1C20"),
+                        ("DW_Progression_LUILock", "sub_1419BDAD0"),
+                        ("DW_Progression_LUIUnlock", "q_LUI_LeaveCriticalSection"),
+                        ("DW_Progression_LuaTop", "lua_gettop"),
+                        ("DW_Progression_LuaSetTop", "q_j_lua_settop"),
+                        ("DW_Progression_LuaSetField", "q_j_lua_setfield"),
+                        ("DW_Progression_LuaClosure", "sub_142083EB0"),
+                        ("DW_Progression_LuaLoad", "luaL_loadbuffer"),
+                        ("DW_Progression_LuaCall", "sub_142083DA0")):
+        row = named(name)
+        module.bind_import(row["id"], alias)
+        bindings.append(dict(symbol=alias, identity=row["id"]))
+    result = dict(passed=True, image_sha256=catalog["image_sha256"], bindings=bindings,
+                  stock_reset_lua_call_sha256=hashlib.sha256(code).hexdigest(),
+                  header_sha256=hashlib.sha256(header.encode()).hexdigest(), game_launched=False)
+    (snapshot / "generated/progression-reset-integration.json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
+
+
 if __name__ == "__main__":
     main()

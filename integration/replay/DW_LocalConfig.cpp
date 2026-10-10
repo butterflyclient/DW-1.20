@@ -1,5 +1,6 @@
 #include "DW_LocalConfig.h"
 #include "com_debugstates.h"
+#include <initializer_list>
 
 extern "C"
 {
@@ -10,6 +11,12 @@ extern "C"
     __declspec(dllimport) int __stdcall CloseHandle(void *);
     __declspec(dllimport) void __stdcall Sleep(unsigned long);
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *, char *, unsigned long);
+    __declspec(dllimport) int __stdcall WriteFile(void *, const void *, unsigned long, unsigned long *, void *);
+    __declspec(dllimport) int __stdcall FlushFileBuffers(void *);
+    __declspec(dllimport) unsigned long __stdcall GetLastError();
+    __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
+    __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
+    __declspec(dllimport) int __stdcall FreeLibrary(void *);
 }
 
 namespace
@@ -28,6 +35,21 @@ namespace
     bool s_fieldOverflow = false;
     bool s_unlockAll = false;
     unsigned s_rank = 0;
+    char s_iniPath[264]{};
+
+    bool PublishIni(const char *pending, const char *destination)
+    {
+        // MoveFileExA is absent from Replay's original import table. Resolve
+        // it through the existing loader imports instead of adding an IAT ABI.
+        auto *library = LoadLibraryA("kernel32.dll");
+        if (!library)
+            return false;
+        const auto move = reinterpret_cast<int(__stdcall *)(const char *, const char *, unsigned long)>(
+            GetProcAddress(library, "MoveFileExA"));
+        const bool saved = move && move(pending, destination, 9);
+        FreeLibrary(library);
+        return saved;
+    }
 
     bool IPv4(const char *value)
     {
@@ -132,10 +154,15 @@ namespace
                 executableIni[length - 3] = 'i';
                 executableIni[length - 2] = 'n';
                 executableIni[length - 1] = 'i';
+                Join(s_iniPath, executableIni, "", "");
                 file = CreateFileA(executableIni, 0x80000000, 3, nullptr, 3, 0x80, nullptr);
             }
             if (file == reinterpret_cast<void *>(~uintptr_t{0}))
+            {
                 file = CreateFileA("replay-dw.ini", 0x80000000, 3, nullptr, 3, 0x80, nullptr);
+                if (file != reinterpret_cast<void *>(~uintptr_t{0}) || !s_iniPath[0])
+                    Join(s_iniPath, "replay-dw.ini", "", "");
+            }
             if (file != reinterpret_cast<void *>(~uintptr_t{0}))
             {
                 char text[2049]{};
@@ -410,4 +437,92 @@ extern "C" unsigned DW_LocalConfig_Rank()
 {
     Load();
     return s_rank;
+}
+
+extern "C" bool DW_LocalConfig_ResetProgression()
+{
+    Load();
+    if (!s_iniPath[0])
+        return false;
+    char input[2049]{}, output[2112]{}, pending[280]{};
+    unsigned long count = 0;
+    auto file = CreateFileA(s_iniPath, 0x80000000, 3, nullptr, 3, 0x80, nullptr);
+    if (file != reinterpret_cast<void *>(~uintptr_t{0}))
+    {
+        const bool read = ReadFile(file, input, sizeof(input) - 1, &count, nullptr) != 0;
+        CloseHandle(file);
+        if (!read || count >= sizeof(input) - 1)
+            return false;
+    }
+    else if (GetLastError() != 2 && GetLastError() != 3)
+        return false;
+    unsigned used = 0;
+    const unsigned bom = count >= 3 && static_cast<uint8_t>(input[0]) == 0xEF &&
+                         static_cast<uint8_t>(input[1]) == 0xBB &&
+                         static_cast<uint8_t>(input[2]) == 0xBF ? 3 : 0;
+    for (unsigned i = 0; i < bom; ++i)
+        output[used++] = input[i];
+    bool unlock = false, rank = false;
+    for (unsigned at = bom; at < count;)
+    {
+        unsigned end = at;
+        while (end < count && input[end] != '\n')
+            ++end;
+        if (end < count)
+            ++end;
+        const char *replacement = nullptr;
+        constexpr char unlockKey[] = "unlock_all=", rankKey[] = "rank=";
+        unsigned matched = 0;
+        while (matched < sizeof(unlockKey) - 1 && at + matched < end &&
+               input[at + matched] == unlockKey[matched])
+            ++matched;
+        if (matched == sizeof(unlockKey) - 1)
+        {
+            replacement = "unlock_all=0\r\n";
+            unlock = true;
+        }
+        matched = 0;
+        while (matched < sizeof(rankKey) - 1 && at + matched < end &&
+               input[at + matched] == rankKey[matched])
+            ++matched;
+        if (matched == sizeof(rankKey) - 1)
+        {
+            replacement = "rank=0\r\n";
+            rank = true;
+        }
+        unsigned required = end - at;
+        if (replacement)
+        {
+            required = 0;
+            while (replacement[required])
+                ++required;
+        }
+        if (required > sizeof(output) - used - 33)
+            return false;
+        if (replacement)
+            for (unsigned i = 0; replacement[i]; ++i)
+                output[used++] = replacement[i];
+        else
+            for (unsigned i = at; i < end; ++i)
+                output[used++] = input[i];
+        at = end;
+    }
+    if (used && output[used - 1] != '\n')
+        output[used++] = '\n';
+    for (const char *line : {unlock ? "" : "unlock_all=0\r\n", rank ? "" : "rank=0\r\n"})
+        while (*line)
+            output[used++] = *line++;
+    Join(pending, s_iniPath, ".pending", "");
+    file = CreateFileA(pending, 0x40000000, 0, nullptr, 2, 0x80, nullptr);
+    if (file == reinterpret_cast<void *>(~uintptr_t{0}))
+        return false;
+    unsigned long written = 0;
+    const bool saved = WriteFile(file, output, used, &written, nullptr) && written == used &&
+                       FlushFileBuffers(file);
+    CloseHandle(file);
+    if (!saved || !PublishIni(pending, s_iniPath))
+        return false;
+    s_unlockAll = false;
+    s_rank = 0;
+    return true;
 }
