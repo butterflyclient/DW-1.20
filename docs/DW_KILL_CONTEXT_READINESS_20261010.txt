@@ -1,0 +1,56 @@
+REPLAY DW KILL-CONTEXT RELEASE - 2026-10-10
+
+Implementation
+Ten additional MP mission earning stages: Ghost kills (two stages), Shrapnel
+lethal kills, reflex headshots, five-attachment marksman kills, pistol/reflex
+kills, SMG headshots, SMG/Tracker kills, variable-zoom headshots and AK-47
+headshots. The complete seven-UInt64 native kill packet retains every bit;
+only original-parser-verified meanings have named accessors.
+
+Research
+214 original Replay ProcessParams executions verify packing, all three perk
+slots, optic categories, death causes and weapon identities. Four hash-bound
+native StringTables generate the predicate constants and canonical families.
+Marksman IDs include 27, 28, 29, 33 (crossbow) and 536 (SKS). Snipers remain a
+distinct family despite sharing the native class mask. The super-ID portion
+of Param4 is excluded from perk lookup. Unknown attachments do not count.
+Criteria follow shipped mission descriptions and target fields; this does not
+claim recovery of retail cloud achievement rules.
+
+Validation and deployment
+The readiness receipt pins fresh Windows/Linux builds, each with 46 translation
+units and zero retained objects, and the exact binaries' protocol, earning and
+management proofs. It also binds the generated data, original parser evidence
+and prior native producer/asset evidence. These are backend protocol checks;
+native gameplay earning callbacks for these ten stages remain unverified.
+No game launch or game EXE rebuild is required for this release. The current
+shipping EXE, updater publication, map policy and player profiles are preserved.
+The deployment receipt identifies the running droplet image and rollback image.
+Live PID: 234478 on 162.243.115.160.
+Live server SHA256: af0b0faf2d02318460f8da256121fcf2ccfd771aec48bb70ef3769efce05622e
+Release: /opt/replay-dw/releases/20261010-af0b0faf2d02/iw8-dw-server
+Rollback: /opt/replay-dw/releases/20261010-33b7145ba39c
+Each platform passed 304 protocol, 103 earning and 14 management groups.
+The fixture now verifies expired QoS rejection, gets a fresh native lease before
+restart and separates validated pre-reply XP refreshes from task deliveries.
+No server validation rule or expiry was relaxed to pass those checks.
+
+Remaining work
+93/232 mission earning stages are implemented; 139 criteria remain open.
+Six known response bindings remain open: 50/22, 58/22, 193/9, 193/10,
+193/12 and 193/24. Native per-method callback coverage remains incomplete.
+Allocation lifetime and participant session rotation also remain open.
+The new original-image audit resolves chained unwind ownership: event-cache
+flush has six chunks and XP-cache flush has seven. Both stamp reconstructed
+events immediately after obtaining UTC. The timestamp setter's member offset
+is derived from its original instructions, not entered into engine C++.
+A setter-only match-ID change is not deployed: pre-aggregation ownership and
+SDK capacity must be handled before historical match credit can be safe.
+The full backend objective remains active and is not claimed complete.
+
+Evidence
+validation/20261010-replay-quest-kill-readiness.json
+validation/20261010-replay-kill-context-data.json
+validation/20261010-achievement-match-context.json
+data/remaining-kill-context-20261010/backend-coverage.json
+data/remaining-kill-context-20261010/deployment.json

@@ -1,5 +1,7 @@
 #include "quest_services.h"
 #include "replay_quest_data.h"
+#include "replay_kill_data.h"
+#include "replay_kill_event.h"
 #include <algorithm>
 
 namespace services
@@ -35,11 +37,20 @@ namespace services
         // aggregate caches. Do not interpret packed values as raw kill counts.
         bool killMatches(uint32_t id, const Json &values)
         {
-            const auto weapon = number(values, "Param0") & 0xFFFF;
-            const auto classification = number(values, "Param5") >> 48;
-            const auto attachments = number(values, "Param5") & 0xFF;
-            const auto cause = (number(values, "Param6") >> 16) & 0xFFFF;
-            const auto target = (number(values, "Param5") >> 16) & 0xFFFF;
+            ReplayKillEvent event{};
+            for (unsigned index = 0; index < event.parameters.size(); ++index)
+                event.parameters[index] = number(values, ("Param" + std::to_string(index)).c_str());
+            const auto weapon = event.weapon();
+            const auto classification = event.classification();
+            const auto attachments = event.attachmentCount();
+            const auto cause = event.cause();
+            const auto target = event.target();
+            const auto marksman = std::find(replay_kill_data::Marksman.begin(),
+                                            replay_kill_data::Marksman.end(), weapon) !=
+                                  replay_kill_data::Marksman.end();
+            const auto sniper = std::find(replay_kill_data::Sniper.begin(),
+                                          replay_kill_data::Sniper.end(), weapon) !=
+                                replay_kill_data::Sniper.end();
             // Shipped cp_mp/challenges.gsc also emits kill for equipment,
             // vehicles and streaks. findenemytype sets bit 0 only for players.
             if (!(target & 1))
@@ -62,11 +73,17 @@ namespace services
             case 1509:
                 // Replay packs DMRs into the same class mask. The shipped
                 // statstable distinguishes weapon_dmr from weapon_sniper.
-                return classification == 65 && weapon >= 30 && weapon <= 32;
+                return classification == 65 && sniper;
             case 1510:
                 return classification == 129;
             case 1513:
                 return cause == 21;
+            case 1514:
+            case 1563:
+                return event.hasPerk(replay_kill_data::Ghost);
+            case 1562:
+                return (classification & 0xC00) == 0xC00 &&
+                       event.hasPerk(replay_kill_data::Shrapnel);
             case 1553:
                 return weapon == 50000;
             case 1555:
@@ -84,17 +101,33 @@ namespace services
                 return (classification & 0x400) != 0;
             case 1594:
                 return attachments == 1 && (classification & 1) != 0;
+            case 1595:
+                return cause == 9 && event.optic() == replay_kill_data::Reflex &&
+                       (classification & 1) != 0;
             case 1596:
                 return classification == 17 && attachments == 5;
             case 1597:
                 return weapon == 18;
+            case 1598:
+                return classification == 65 && marksman && attachments == 5;
             case 1600:
-                return classification == 65 && weapon >= 30 && weapon <= 32 &&
+                return classification == 65 && sniper &&
                        attachments == 5 && cause == 9;
+            case 1624:
+                return classification == 129 && event.optic() == replay_kill_data::Reflex;
+            case 10000:
+                return classification == 5 && cause == 9;
+            case 10003:
+                return classification == 5 && event.hasPerk(replay_kill_data::Tracker);
+            case 10040:
+                return cause == 9 && event.optic() == replay_kill_data::VariableZoom &&
+                       (classification & 1) != 0;
             case 10044:
                 return weapon == 1;
             case 10046:
                 return weapon == 5 && attachments == 3;
+            case 10131:
+                return weapon == replay_kill_data::Ak47 && cause == 9;
             default:
                 return false;
             }

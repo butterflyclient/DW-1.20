@@ -45,7 +45,10 @@ def main():
                 1560: "thermite", 1569: "pistol", 1571: "tactical",
                 1594: "one_attachment", 1596: "lmg_five", 1597: "fr556",
                 1600: "sniper_head_five", 10007: "throwing_knife", 10044: "pistol",
-                10046: "magnum_three"}
+                10046: "magnum_three", 1514: "ghost_first", 1563: "ghost_third",
+                1562: "shrapnel_frag", 1595: "reflex_head", 1598: "sks_five",
+                1624: "reflex_pistol", 10000: "smg_head", 10003: "tracker_smg",
+                10040: "zoom_head", 10131: "ak47_head"}
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
@@ -75,6 +78,7 @@ def main():
     log = (fixture / "stdout.log").open("wb")
     process, checks = None, []
     retired_lobbies = set()
+    reward_history = []
 
     def start():
         nonlocal process
@@ -166,12 +170,28 @@ def main():
             return kind, packet
 
     def rewards(client, count):
+        # NativeClient.task queues unsolicited pushes received before its task
+        # result. lobby.cpp sends that result before the task's own deliveries.
+        # Separate only validated absolute-XP catch-up from this pre-reply
+        # queue; do not suppress any completion, rank-up or mission packet.
+        pending = []
+        for packet in client.pushes:
+            if packet.startswith(u32(67)):
+                update = decode_event67(packet, client.user)[2]
+                if update["kind"] == 0 and update["reason"] == "inProgress":
+                    assert update["id_"] == 1000000 and "xp" in update["multiProgress"]
+                    reward_history.append({"user": client.user, "pre_reply_xp_refresh": update})
+                    continue
+            pending.append(packet)
+        client.pushes[:] = pending
         out = []
         while len(out) < count:
             kind, packet = receive(client)
             assert kind == 2
             if packet.startswith(u32(67)):
-                out.append(decode_event67(packet, client.user)[2])
+                update = decode_event67(packet, client.user)[2]
+                reward_history.append({"user": client.user, "update": update})
+                out.append(update)
         return out
 
     def receive_lobby(client, expected):
@@ -266,6 +286,38 @@ def main():
             update = next(row for row in rewards(host, 2) if row["kind"] == 15)
             assert update["progress"] == 5 and update["reason"] == "completed"
             checks.append("Separate batches accumulate individual kills from zero to the exact target; partial retries neither skip stages nor re-add progress")
+            negative_kill_contexts = {
+                1514: ("pistol", "br_ghost"),
+                1563: ("pistol", "br_ghost"),
+                1562: ("frag", "shrapnel_pistol"),
+                1595: ("reflex_pistol", "acog_head"),
+                1598: ("sniper_head_five", "marksman_four", "unknown_attachments"),
+                1624: ("pistol", "reflex_assault"),
+                10000: ("smg", "reflex_head"),
+                10003: ("smg", "tracker_pistol", "br_tracker_smg"),
+                10040: ("zoom_body", "acog_head"),
+                10131: ("ak47_body", "smg_head"),
+            }
+            for identity, labels in negative_kill_contexts.items():
+                seed(host, identity, False)
+                before = states_path(host).read_bytes()
+                for index, label in enumerate(labels):
+                    send(host, f"wrong-{identity}-{index}", [event(label)])
+                    assert states_path(host).read_bytes() == before, (identity, label)
+                checks.append(f"Stage {identity} rejects wrong perk, class, optic, death cause or attachment context")
+            seed(host, 1514, False)
+            send(host, "all-native-ghost-slots", [event("ghost_first"), event("ghost_second"), event("ghost_third")])
+            update = rewards(host, 1)[0]
+            assert update["id_"] == 1514 and update["progress"] == 3 and update["reason"] == "inProgress"
+            before = states_path(host).read_bytes()
+            send(host, "upper-super-is-not-perk", [event("pistol", extra={"Param4": 52 << 48})])
+            assert states_path(host).read_bytes() == before
+            checks.append("Ghost is recognized in all three native loadout slots; the super-ID field cannot masquerade as a perk")
+            seed(host, 1598, False)
+            send(host, "shipped-marksman-family", [event("marksman_head_five"), event("sks_five"), event("crossbow_five")])
+            update = rewards(host, 1)[0]
+            assert update["id_"] == 1598 and update["progress"] == 3 and update["reason"] == "inProgress"
+            checks.append("The shipped marksman family includes classic DMR, SKS and crossbow; native shared sniper mask does not merge the families")
             for identity, label in fixtures.items():
                 seed(host, identity)
                 journal = states_path(host).with_name("events.json")
@@ -374,7 +426,8 @@ def main():
                 assert mission["progress"] == quests[identity]["target"]
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                retry_updates = rewards(host, 2)
+                assert all(row["reason"] == "inProgress" for row in retry_updates), (identity, retry_updates)
                 assert snapshot(host) == saved
             checks.append("All eight BR weapon/cash/cache pickup stages consume original aggregated fields, clamp targets and preserve retries without MP-mode cross-credit")
             for identity in (50008, 50063, 50009, 50021, 50059):
@@ -527,6 +580,7 @@ def main():
     finally:
         stop()
         log.close()
+        (fixture / "reward-history.json").write_text(json.dumps(reward_history, indent=2) + "\n")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),

@@ -4348,6 +4348,25 @@ try:
     checks.append(
         "unknown ticket, invalid verify, modified MAC and out-of-order counter rejection"
     )
+    # A full service suite can outlive the real five-minute QoS lease. Verify
+    # expiry explicitly, then obtain a new server-issued lease immediately
+    # before the restart persistence check. Never extend a production TTL or
+    # rewrite the new transaction's expiry to make the check pass.
+    qos_transactions = directory / "qos" / str(title) / "transactions" / f"{user}.json"
+    qos_rows = json.loads(qos_transactions.read_text())
+    for row in qos_rows:
+        if row["id"] == qos_transaction:
+            row["expires"] = int(time.time()) - 1
+    qos_transactions.write_text(json.dumps(qos_rows))
+    qos_lease_client = Client()
+    try:
+        qos_lease_client.task(145, 4, qos_report, error=101)
+        issued = qos_lease_client.task(145, 25, qos_query)
+        qos_transaction = json.loads(issued[1:-1])["transaction_id"]
+        qos_report = u64(qos_transaction) + qos_report[9:]
+        assert qos_lease_client.task(145, 4, qos_report) == []
+    finally:
+        qos_lease_client.close()
     # Restart only the fixture child. Actual server, game and player data stay untouched.
     account_prepare_restart()
     process.terminate()

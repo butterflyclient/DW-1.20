@@ -246,8 +246,9 @@ assert not rows[6]["accepted"] and rows[6]["parameter_count"] == 0
 # Full producer strings, including attachment/perk/operator and death-cause
 # slots. Expected semantics come from shipped tables; all packed numbers below
 # are computed by executing the original image, never by a backend encoder.
-def kill_input(weapon, attachments="no_attachments", cause="MOD_RIFLE_BULLET", target_type=1):
-    return f"1|2,{weapon},3,4,unknown_operator,0,{attachments},no_perks,{target_type},no_super,0,{cause},0,0"
+def kill_input(weapon, attachments="no_attachments", cause="MOD_RIFLE_BULLET", target_type=1,
+               perks="no_perks"):
+    return f"1|2,{weapon},3,4,unknown_operator,0,{attachments},{perks},{target_type},no_super,0,{cause},0,0"
 
 fixtures = (
     ("assault", "iw8_ar_mike4_mp", "no_attachments", "MOD_RIFLE_BULLET", 15, 3),
@@ -288,6 +289,47 @@ for label, target_type in (("equipment_target", 64), ("vehicle_target", 32),
 assert next(row for row in rows if row.get("fixture_label") == "finishing_move")["values"][6] >> 16 & 0xFFFF == 21
 assert next(row for row in rows if row.get("fixture_label") == "sniper_head_five")["values"][6] >> 16 & 0xFFFF == 9
 assert next(row for row in rows if row.get("fixture_label") == "lmg_five")["values"][5] & 255 == 5
+# Original instruction execution establishes the perk slots, five packed
+# attachment slots and optic family independently of the backend predicates.
+kill_contexts = (
+    ("ghost_first", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_ghost"),
+    ("ghost_second", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_tracker|specialty_ghost"),
+    ("ghost_third", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_tracker|specialty_extra_shrapnel|specialty_ghost"),
+    ("br_ghost", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_br_ghost"),
+    ("shrapnel_frag", "equip_frag", "no_attachments", "MOD_GRENADE_SPLASH", "specialty_extra_shrapnel"),
+    ("shrapnel_pistol", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_extra_shrapnel"),
+    ("tracker_smg", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_tracker"),
+    ("tracker_pistol", "iw8_pi_golf21_mp", "no_attachments", "MOD_PISTOL_BULLET", "specialty_tracker"),
+    ("br_tracker_smg", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_br_tracker"),
+    ("smg_head", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_HEAD_SHOT", "no_perks"),
+    ("ak47_head", "iw8_ar_akilo47_mp", "no_attachments", "MOD_HEAD_SHOT", "no_perks"),
+    ("ak47_body", "iw8_ar_akilo47_mp", "no_attachments", "MOD_RIFLE_BULLET", "no_perks"),
+    ("reflex_head", "iw8_pi_golf21_mp", "reflex", "MOD_HEAD_SHOT", "no_perks"),
+    ("reflex_pistol", "iw8_pi_golf21_mp", "reflex", "MOD_PISTOL_BULLET", "no_perks"),
+    ("reflex_assault", "iw8_ar_mike4_mp", "reflex", "MOD_RIFLE_BULLET", "no_perks"),
+    ("acog_head", "iw8_pi_golf21_mp", "acog", "MOD_HEAD_SHOT", "no_perks"),
+    ("zoom_head", "iw8_sn_alpha50_mp", "vzscope", "MOD_HEAD_SHOT", "no_perks"),
+    ("zoom_body", "iw8_sn_alpha50_mp", "vzscope", "MOD_RIFLE_BULLET", "no_perks"),
+    ("sks_five", "iw8_sn_sksierra_mp", "acog|acoglight|acog2|acog2light|reflex", "MOD_RIFLE_BULLET", "no_perks"),
+    ("crossbow_five", "iw8_sn_crossbow_mp", "acog|acoglight|acog2|acog2light|reflex", "MOD_RIFLE_BULLET", "no_perks"),
+    ("marksman_four", "iw8_sn_mike14_mp", "acog|acoglight|acog2|reflex", "MOD_RIFLE_BULLET", "no_perks"),
+    ("unknown_attachments", "iw8_sn_mike14_mp", "unknown_attachment|unknown_attachment2|unknown_attachment3|unknown_attachment4|unknown_attachment5", "MOD_RIFLE_BULLET", "no_perks"),
+)
+for label, weapon, attachments, cause, perks in kill_contexts:
+    row = case("kill", kill_input(weapon, attachments, cause, perks=perks))
+    assert row["accepted"] and row["parameter_count"] == 7, row
+    row["fixture_label"] = label
+    rows.append(row)
+context = {row["fixture_label"]: row["values"] for row in rows if "fixture_label" in row}
+for label, slot in (("ghost_first", 0), ("ghost_second", 1), ("ghost_third", 2)):
+    assert (context[label][4] >> (16 * slot)) & 0xFFFF == 52
+assert context["shrapnel_frag"][4] & 0xFFFF == 12
+assert context["tracker_smg"][4] & 0xFFFF == 56
+assert context["reflex_head"][6] & 0xFFFF == 1
+assert context["zoom_head"][6] & 0xFFFF == 6
+assert context["sks_five"][0] & 0xFFFF == 536
+assert context["crossbow_five"][0] & 0xFFFF == 33
+assert context["unknown_attachments"][5] & 0xFF == 0
 for label, name, params in (
     ("ping_enemy", "ping", "enemy, "),
     ("ping_object", "ping", "object, "),
