@@ -1,0 +1,69 @@
+Replay DW production continuation, 2026-10-10
+
+Production build
+Job: 48b2f9957f534bb3
+Source snapshot: E:\DW\IW8\data\compiler-snapshot-1791618494752760300
+Build directory: E:\DW\IW8\data\workstation-builds\build-workstation-48b2f9957f534bb3
+Installed EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: d94e0a38383da20b22d490d74fea0dabc8c047809469dd3fc17afcf29f3a81fc
+Bytes: 101027840
+Full executable updater release: 15
+
+Profile compatibility resolution
+The earlier candidate included the separately authored DW_PlayerDataPath.cpp,
+which redirects native Documents settings into a Replay-specific directory.
+Production retains the original Documents helper. A frozen integration source
+selection excludes only that separate replacement. Its working source is left
+intact. The fresh build adds only DW_ABTestingEnroll.cpp to the previous build's
+88 C++ units. Other differences are a trailing newline and updater log revision
+text. The promotion tool verifies these constraints before installing anything.
+Original native settings consumers and the LocalAppData identity/XP source
+implementations are retained. Existing INI bytes were verified unchanged.
+
+Compilation and focused checks
+All normal private compiler checks passed, including relocation/unwind checks,
+Windows SEC_IMAGE mapping and zero unresolved symbols. The linked AB writer
+passed ten cases with actual native URI helpers and the original SDK validator.
+Five client integration groups, 233 ownership cases and 100 updater/restart
+getter cases passed against this exact image hash.
+The promotion retains historical protocol evidence only for source-identical
+client implementations; it does not claim those historical game runs exercised
+the new image. The previous EXE and deployment receipt are retained privately
+under data/remaining-ab-native-rest-20261010/production for rollback.
+
+Native startup
+One instance ran from the root game folder. Signed platform/profile transitions
+completed; native DW HSM reached connected state 33; the native lobby wrapper
+was present. All 27 startup fences passed, the local profile was logged in,
+com_optimized was 1, and the full-EXE updater reported the installed image current.
+The observation is correlated to the exact owned launch and live backend image.
+No match or two-player game test was performed. The native quit command was
+dispatched but did not exit by itself; CloseMainWindow then exited the owned
+test normally, without forced termination. No game instance remains running.
+
+Server and publication
+The droplet serves full image release 15 with the installed hash above.
+Server image remains af0b0faf2d02318460f8da256121fcf2ccfd771aec48bb70ef3769efce05622e.
+Live PID during the correlated observation: 244731.
+An independent clean systemd stop/start occurred before this launch; the journal
+reports ExecMainStatus=0 and NRestarts=0. This iteration did not stop or restart
+the server or change its binary. No automatic crash restart was observed.
+
+Limits and next evidence
+This native startup uses legacy AB task 194/1. The new REST AB writer has linked
+execution evidence, but live REST enrollment/callback completion remains open.
+The extended AB allocation reader rejected the empty-allocation snapshot; its
+allocation-state coverage needs research rather than relaxed pointer checks.
+Known response bindings 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24 remain open.
+A new byte-level nomination pass records same-base cached request/response
+pointer stores. The matching streaming constructor initializes both to zero;
+that is not evidence of an upload initializer or response vtable. Nomination
+results remain separate from verified class/response ownership.
+Mission earning remains 93/232 stages. Full backend completion is not claimed.
+
+Authoritative receipts
+validation/20261010-ab-rest-production-readiness.json
+validation/20261010-ab-rest-native-startup.json
+data/remaining-ab-native-rest-20261010/production/publication/droplet-publication.json
+data/remaining-ab-native-rest-20261010/production/remote-final-state.txt
+data/remaining-objectstore-categories-20261010/native-streaming-pointer-store-candidates.json
