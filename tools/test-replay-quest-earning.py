@@ -49,7 +49,11 @@ def main():
                 1562: "shrapnel_frag", 1595: "reflex_head", 1598: "sks_five",
                 1624: "reflex_pistol", 10000: "smg_head", 10003: "tracker_smg",
                 10040: "zoom_head", 10131: "ak47_head", 10006: "double_time_smg",
-                10012: "vehicle_target", 10013: "killstreak_target"}
+                10012: "vehicle_target", 10013: "killstreak_target",
+                1570: "tdm_headshot", 1589: "tdm_pistol", 1592: "hq_pistol",
+                10004: "arena_smg", 10047: "dom_m19",
+                1512: "capture_dom", 1588: "capture_dom", 1517: "capture_hq",
+                1590: "defuse_sd"}
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
@@ -309,6 +313,11 @@ def main():
             assert update["progress"] == 5 and update["reason"] == "completed"
             checks.append("Separate batches accumulate individual kills from zero to the exact target; partial retries neither skip stages nor re-add progress")
             negative_kill_contexts = {
+                1570: ("tdm_pistol", "reflex_head", "hq_pistol"),
+                1589: ("hq_pistol", "unknown_mode_pistol"),
+                1592: ("tdm_pistol", "unknown_mode_pistol"),
+                10004: ("arena_pistol", "gungame_smg", "tdm_smg"),
+                10047: ("dom_pistol", "tdm_m19"),
                 10012: ("pistol", "equipment_target", "killstreak_target", "air_streak_target",
                         "ground_streak_target", "agent_soldier_target", "agent_juggernaut_target",
                         "agent_shield_target", "agent_suicide_target", "unknown_target_bit"),
@@ -334,6 +343,35 @@ def main():
                     send(host, f"wrong-{identity}-{index}", [event(label)])
                     assert states_path(host).read_bytes() == before, (identity, label)
                 checks.append(f"Stage {identity} rejects wrong perk, class, optic, death cause or attachment context")
+            for identity, labels in ((1512, ("capture_tdm", "capture_hq", "defuse_sd")),
+                                     (1588, ("capture_tdm", "capture_hq", "plant_sd")),
+                                     (1517, ("capture_dom", "capture_tdm", "defuse_sd")),
+                                     (1590, ("defuse_dom", "plant_dom", "capture_sd"))):
+                seed(host, identity, False)
+                before = states_path(host).read_bytes()
+                for index, label in enumerate(labels):
+                    send(host, f"obj-neg-{identity}-{index}", [event(label)])
+                    assert states_path(host).read_bytes() == before
+                checks.append(f"Stage {identity} rejects the wrong objective action or specific game type")
+            seed(host, 1512, False)
+            packet = send(host, "capture-no-modifiers", [event("capture_dom")] * 2)
+            assert rewards(host, 1)[0]["progress"] == 2
+            saved = snapshot(host)
+            assert host.task(125, 1, packet) == b""
+            assert rewards(host, 1, refresh=True)[0]["progress"] == 2 and snapshot(host) == saved
+            checks.append("Repeated zero-modifier capture packets represent separate objective actions; request retries preserve partial progress")
+            seed(host, 1590, False)
+            packet = send(host, "bomb-actions-both-modes", [event(label) for label in
+                          ("defuse_sd", "plant_sd", "defuse_cyber", "plant_cyber")])
+            assert rewards(host, 1)[0]["progress"] == 4
+            saved = snapshot(host)
+            assert host.task(125, 1, packet) == b""
+            assert rewards(host, 1, refresh=True)[0]["progress"] == 4 and snapshot(host) == saved
+            checks.append("Combined bomb criterion accepts native plant/defuse in Search and Destroy and Cyber Attack exactly once per action")
+            seed(host, 1570, False)
+            send(host, "mode-with-operator-ids", [event("kill_mode_operators")])
+            assert rewards(host, 1)[0]["progress"] == 1
+            checks.append("Specific kill game type is independent of the two packed operator IDs")
             for identity, labels in ((10012, ("ground_vehicle_target", "streak_vehicle_target")),
                                      (10013, ("air_streak_target", "ground_streak_target",
                                               "support_streak_target", "streak_vehicle_target"))):

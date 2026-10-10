@@ -1,0 +1,65 @@
+REPLAY DW MODE AND OBJECTIVE MISSION EARNING
+2026-10-10
+
+Issue
+Nine shipped mission stages had no earning rule for their specific game mode
+or objective action. Generic kill counts cannot satisfy those conditions.
+
+Research
+Retained native ScriptFile 2244 contains initchallengeandeventglobals and the
+mode lookup used by event producers. Its 39 game-type entries agree with the
+unique decoded GetByte operand sequence. The shipped game-type table and
+localize assets distinguish Gunfight (arena) from Gun Game (gun). The weapon
+table identifies M19 as weapon ID 2. No addresses or IDs from another build
+are substituted. Four BR variant values are outside this initializer and are
+not claimed by the generated 39-entry definition.
+
+Original ProcessParams execution proves seven-UInt64 kill packets put the
+game type in Param2's upper 32 bits, independently of operator IDs below it.
+Capture, plant and defuse retain two scalar UInt64 fields; their game type is
+Param0. This parser ignores later mask/operator arguments from those producers.
+Shipped onplant reports the defuse event; the combined bomb-action criterion
+accepts both native event names. One report represents one completed action.
+
+Fix
+Generate src/replay_challenge_game_type.h from the retained target-build proof.
+Add the kill game-type accessor and the full two-field objective packet layout.
+Keep unknown fields intact. Add these shipped earning rules:
+  1570: Team Deathmatch headshot.
+  1589: Team Deathmatch player kill.
+  1592: Headquarters player kill.
+  10004: SMG player kill in Gunfight.
+  10047: M19 player kill in Domination.
+  1512 and 1588: Domination objective capture.
+  1517: Headquarters objective capture.
+  1590: Plant or defuse in Search and Destroy or Cyber Attack.
+Existing session, public allocation, version, mode-family, activation-time,
+transaction, reward and successor checks remain part of the earning path.
+
+Validation and limits
+The baseline original-parser harness stays unchanged. Its companion executes
+255 native parser cases, including wrong modes and operator-field separation.
+Each clean-built platform runs 140 encrypted earning groups and 14 mission
+management groups. These include partial accumulation, exact completion,
+XP/item awards, successor activation, duplicate retries and negative contexts.
+Both builds compile all 46 translation units from the frozen source cohort.
+Exact hashes and evidence are in:
+  validation/20261010-replay-mode-objective-readiness.json
+Previous full-protocol evidence remains identified as previous-image evidence.
+This pass performs no game run and claims no new native gameplay callback proof.
+The shipping client executable and installed-map policy remain unchanged.
+
+Remaining work
+106 of 232 earning criteria now have backend rules. The remaining 126 criteria,
+delayed cached-event match ownership, six streaming/category/large-upload
+response bindings and broader native callback verification remain open.
+Match-start/end outcomes are researched but not awarded without reliable
+match ownership and match-level duplicate protection. The full backend goal
+remains active; this release is a bounded implementation step.
+
+Deployment
+Windows SHA256 418cdafd7368ca4747abeb878bd90e9550d74b5f3bcf37757da9bb468f00eb97
+Linux SHA256 1f3187f52df43315611dbebcaeea29b6ccc822e8cab43df382c84d0168618ffa
+The droplet process was verified as PID 259324 using that exact Linux image.
+The controlled stop recorded zero connected players. The previous release is
+retained for rollback. No client recompile or profile reset was performed.

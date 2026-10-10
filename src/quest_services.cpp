@@ -2,6 +2,7 @@
 #include "replay_quest_data.h"
 #include "replay_kill_data.h"
 #include "replay_kill_event.h"
+#include "replay_objective_event.h"
 #include <algorithm>
 #include <string_view>
 
@@ -45,6 +46,7 @@ namespace services
             const auto classification = event.classification();
             const auto attachments = event.attachmentCount();
             const auto cause = event.cause();
+            const auto mode = event.gameType();
             const auto marksman = std::find(replay_kill_data::Marksman.begin(),
                                             replay_kill_data::Marksman.end(), weapon) !=
                                   replay_kill_data::Marksman.end();
@@ -103,6 +105,12 @@ namespace services
                 return weapon == 50006;
             case 1571:
                 return (classification & 0x400) != 0;
+            case 1570:
+                return mode == ReplayChallengeGameType::war && cause == 9;
+            case 1589:
+                return mode == ReplayChallengeGameType::war;
+            case 1592:
+                return mode == ReplayChallengeGameType::hq;
             case 1594:
                 return attachments == 1 && (classification & 1) != 0;
             case 1595:
@@ -125,6 +133,11 @@ namespace services
                 return classification == 5 && event.hasPerk(replay_kill_data::Tracker);
             case 10006:
                 return classification == 5 && event.hasPerk(replay_kill_data::DoubleTime);
+            case 10004:
+                return classification == 5 && mode == ReplayChallengeGameType::arena;
+            case 10047:
+                return weapon == replay_challenge_mode_data::M19Weapon &&
+                       mode == ReplayChallengeGameType::dom;
             case 10040:
                 return cause == 9 && event.optic() == replay_kill_data::VariableZoom &&
                        (classification & 1) != 0;
@@ -157,6 +170,25 @@ namespace services
         uint64_t mpProgress(uint32_t id, const Json &event)
         {
             const auto &values = event.at("values");
+            const auto &name = event.at("name");
+            if ((name == "capture" || name == "plant" || name == "defuse") &&
+                completeParameters(values, 2))
+            {
+                const ReplayObjectiveEvent objective{{number(values, "Param0"), number(values, "Param1")}};
+                const auto mode = objective.gameType();
+                if (name == "capture")
+                {
+                    if (id == 1512 || id == 1588)
+                        return mode == ReplayChallengeGameType::dom;
+                    if (id == 1517)
+                        return mode == ReplayChallengeGameType::hq;
+                }
+                // Shipped onplant calls the defuse event too. Both native names
+                // describe one completed bomb action for this combined criterion.
+                if (id == 1590 && (name == "plant" || name == "defuse"))
+                    return mode == ReplayChallengeGameType::sd || mode == ReplayChallengeGameType::cyber;
+                return 0;
+            }
             if (id == 1558 && event.at("name") == "stim" && completeParameters(values, 1))
             {
                 // Original ProcessParams converts the reported health amount
@@ -315,10 +347,10 @@ namespace services
     {
         // Keep admission beside the earning rules. The achievement transport
         // must not maintain a separate list that silently drops a new family.
-        static constexpr std::array<std::string_view, 13> supported = {
+        static constexpr std::array<std::string_view, 16> supported = {
             "kill", "stim", "pickup", "driving", "alive_in_gas", "alive_not_downed",
             "revive", "gulag_end_match", "ping", "contract_start", "contract_end",
-            "use_item", "loadout"};
+            "use_item", "loadout", "capture", "plant", "defuse"};
         return std::find(supported.begin(), supported.end(), std::string_view(name)) != supported.end();
     }
 
