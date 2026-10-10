@@ -1,0 +1,52 @@
+REPLAY DW CONTRACT-LOCATION RELEASE - 2026-10-10
+
+Issue
+22 shipped BR mission stages could be selected but did not earn progress when
+starting contracts at the specified locations.
+
+Research
+Shipped challenges.gsc setupchallengelocales reads location_volume entities.
+33 locale value operands were verified in unchanged original ScriptFile bytes.
+The complete native Verdansk entity span contains 46 authored location volumes.
+Original ProcessParams executes 176 cases, including all 33 independent
+contract-card and player-location cases. Param1 is the card's locale, Param0
+is the player's locale. The atoi path consumes the first pipe-separated locale.
+
+Implementation
+22 location predicates join the existing common progress/XP/items/successor/
+receipt transaction. Wrong player-only/card/unknown locations and non-BR
+reports receive no mission credit; retry refresh does not duplicate rewards.
+The card-at-location criterion is reconstructed from shipped descriptions and
+original fields. It is not a recovered retail cloud rule. Airport=layover,
+Military Base=airfield and Train Station=transit are geographic inferences from
+authored origins and UI labels; the initializer itself does not name aliases.
+
+Build and deployment
+Windows and Linux each built 46 fresh translation units with no retained objects.
+Both exact binaries passed 304 protocol, 65 earning and 14 management groups.
+No game launch or gameplay-generated completion is claimed for this batch.
+Linux server SHA256: 43f13b0359d7138d704c8beb5c53d792e51b356886b4bef016b286b9026ca7a1
+Release: /opt/replay-dw/releases/20261010-43f13b0359d7/iw8-dw-server
+Shipping game SHA256: 80277fed1fe1488310ff271fc1af21272e2bc4ea453e5179312bc0d80f57494d
+The shipping game and 12-map policy are unchanged; no new client EXE is needed.
+The previous release is retained for rollback. Stop/start were separate steps
+with no connected players. Running process and file hashes match the tests.
+
+Completion audit
+67 of 232 mission earning stages are implemented; 165 criteria remain open.
+The current target inventory has 140 known routes, 134 handlers and six missing
+bindings: 50/22, 58/22, 193/9, 193/10, 193/12, 193/24.
+Their native streaming/category/large-upload readers still need verification.
+Queued events after allocation retirement and participant session rotation need
+an independently verified lifetime contract. Native gameplay earning/reward/
+successor callbacks and the broader per-method runtime audit remain open.
+Full backend completion is not claimed or marked complete.
+
+Evidence and reproducible tools
+validation/20261010-replay-quest-location-readiness.json
+validation/20261010-replay-runtime-locale-assignments.json
+data/remaining-contract-locations-20261010/backend-coverage.json
+data/remaining-contract-locations-20261010/backend-coverage.txt
+tools/research-replay-locale-assignments.py
+tools/research-challenge-event-parser.py
+tools/test-replay-quest-earning.py

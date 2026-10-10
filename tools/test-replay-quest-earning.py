@@ -454,6 +454,31 @@ def main():
                 assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: native UI reference-table ping ID excludes other ping kinds and unknown names; completion and retry preserve shipped rewards")
+            contracts = {50012: 4, 50015: 33, 50019: 15, 50022: 32, 50026: 6,
+                         50029: 31, 50033: 11, 50036: 2, 50040: 10, 50043: 5,
+                         50047: 7, 50050: 8, 50054: 1, 50057: 20, 50061: 21,
+                         50064: 16, 50068: 15, 50071: 1, 50075: 32, 50078: 6,
+                         50082: 33, 50085: 7}
+            for identity, locale in contracts.items():
+                seed(host, identity)
+                before = snapshot(host)
+                for label in (f"contract_player_{locale}", "contract_no_locale",
+                              f"contract_card_{locale % 33 + 1}"):
+                    send(host, f"cn{identity}-{label[-3:]}", [event(label, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                label = f"contract_card_{locale}"
+                send(host, f"cm{identity}", [event(label, mode=2)])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                packet = send(host, f"cy{identity}", [event(label, mode=24)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["id_"] == identity and update["reason"] == "completed"
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert snapshot(host) == saved
+                checks.append(f"Stage {identity}: original contract-card locale {locale} excludes player-only/wrong/unknown locations and MP mode; rewards and retry remain atomic")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -472,10 +497,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 21, checks=checks,
+                                         supported_stage_count=len(fixtures) + 43, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 21} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 43} stages; {args.output}")
 
 
 if __name__ == "__main__":

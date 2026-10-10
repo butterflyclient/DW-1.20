@@ -34,7 +34,7 @@ Implemented MP earning stages (24):
   1501, 1503, 1505..1510, 1513, 1553, 1555..1557, 1559, 1560,
   1569, 1571, 1594, 1596, 1597, 1600, 10007, 10044, 10046.
 
-Implemented BR earning stages (21):
+Implemented BR earning stages (43):
   Enemy/object/danger pings: 50000, 50001, 50003.
   Weapon pickups: 50005.
   Cash pickups: 50007, 50042, 50066, 50069.
@@ -43,12 +43,15 @@ Implemented BR earning stages (21):
   minutes without being downed: 50059.
   Self-revival: 50014, 50077; reviving a teammate: 50049.
   Winning a Gulag fight: 50048, 50076.
+  Starting contracts at named locations: 50012, 50015, 50019, 50022, 50026,
+    50029, 50033, 50036, 50040, 50043, 50047, 50050, 50054, 50057, 50061,
+    50064, 50068, 50071, 50075, 50078, 50082, 50085.
 
 The shipped ScriptFile producer and original parser agree on separate weapon,
 cash and cache pickup counters. Native caches can aggregate these counts.
 Timer producers report gettime() differences in milliseconds; fractional units
 persist as timerRemainderMs and are never rounded up. Original ParseOperators
-instructions are also executed in the 108-case parser proof. Recovered script
+instructions are also executed in the 176-case parser proof. Recovered script
 and original-bytecode-correlated disassembly hashes are retained separately;
 this is producer contract evidence, not a native gameplay run.
 
@@ -72,10 +75,22 @@ by event/reward/successor transactions, without seeding intermediate heads.
 Verdansk's native MapEnts root and entity char-array span have been correlated
 to original loader instructions. All 47,545 encoded entities parse, retaining
 numeric canonical keys and explicit literal-key records; 12 authored locale
-area triggers are present. Authored labels and brush-model indices do not
-establish the runtime locale IDs consumed by contract_start. Those IDs remain
-unbound; the semantic MapEnts exporter still reports a failure separately from
-the complete native reader walk.
+area triggers are present. The shipped setupchallengelocales initializer instead
+reads location_volume entities; 46 are authored in this MapEnts payload. Its
+33 locale assignments are verified against the unchanged original GetByte
+operands. Unknown volume labels retain no locale ID. Brush-model indices are
+never used as locale IDs. The semantic MapEnts exporter still reports a failure
+separately from the complete native reader walk and entity-span extraction.
+
+contract_start Param0 is the player's first touching mapped locale, Param1 the
+contract card's first touching mapped locale, and Param2 the operator mask.
+The backend uses the card's location for "Start a contract at" missions; this
+criterion is reconstructed from the shipped descriptions and actor/card fields,
+not a recovered retail cloud rule. The original atoi path uses the first locale
+in a pipe-separated producer string, not a bitmask or every touching volume.
+Internal layover/airfield/transit labels are associated with Airport/Military
+Base/Train Station using authored origins and UI area labels; those geographic
+aliases are inferences rather than explicit aliases in the initializer.
 
 Credit requires a native version-1 report, a selected
 matching built-in stage, a timestamp at or after activation, and current live
@@ -104,7 +119,7 @@ confirmation, weapon progression, rank entitlements and Battle Pass behavior
 retain their original paths.
 
 Open contracts:
-  187 remaining mission earning predicates, including completed/won matches,
+  165 remaining mission earning predicates, including completed/won matches,
   perk/ADS/distance/multikill/life-window flags, objectives, killstreaks, BR POIs,
   other counters, placements, pickups and co-op criteria.
   Events queued until after allocation retirement need an independently bound
@@ -118,6 +133,8 @@ Tooling:
       verified by linear decoding of owned unwind chunks. This is not CFG or
       indirect-call coverage and does not prove runtime consumption.
   tools/research-challenge-event-parser.py: original parser execution fixtures.
+  tools/research-replay-locale-assignments.py: pinned initializer switch,
+      original value operands and complete authored location-volume fields.
   tools/read-replay-mission-descriptions.py: complete Localize-tail extraction.
   tools/test-replay-quest-earning.py: encrypted request/recovery/restart checks
       using original parser outputs, not a second packed-field implementation.

@@ -331,6 +331,23 @@ for label, expected in {"pickup_totals": [2, 3, 4, 0], "driving_ms": [45000, 0],
                          "contract_locales": [4, 4, 0], "stim_health": [17]}.items():
     row = next(row for row in rows if row.get("fixture_label") == label)
     assert row.get("values") == expected, row
+for locale in range(1, 34):
+    row = case("contract_start", f"0,{locale}, ,1")
+    assert row["values"] == [0, locale, 0], row
+    row["fixture_label"] = f"contract_card_{locale}"
+    rows.append(row)
+    row = case("contract_start", f"{locale},0, ,1")
+    assert row["values"] == [locale, 0, 0], row
+    row["fixture_label"] = f"contract_player_{locale}"
+    rows.append(row)
+for label, params, expected in (
+    ("contract_player_only", "4,0, ,1", [4, 0, 0]),
+    ("contract_no_locale", "0,0, ,1", [0, 0, 0]),
+):
+    row = case("contract_start", params)
+    assert row["values"] == expected, row
+    row["fixture_label"] = label
+    rows.append(row)
 names = set()
 for instruction in instructions:
     for operand in instruction.operands:

@@ -107,12 +107,12 @@ GAPS = {
         "unchanged writes. Published Total XP ranking shares accepted snapshots and registered "
         "account names. The REST envelope retains the full Reply, including cross-player pushes. "
         "All 232 shipped MP/BR/co-op mission descriptions and prior-string aliases are recovered "
-        "from two matching English fastfiles. Forty-five original-parser-bound MP kill and BR counter/action mission "
+        "from two matching English fastfiles. Sixty-seven original-parser-bound MP kill and BR counter/action/location mission "
         "predicates commit stage progress, shipped XP/items, next-stage activation and retry "
         "identity together with player/weapon XP and Battle Pass writes. Native public in_game "
         "membership and activation timestamps gate earning; private/expired/stale assignments "
         "cannot earn credit. Exact earning proof and linked-image identity are retained in "
-        "validation/20261010-replay-quest-entry-readiness.json. The remaining 187 mission "
+        "validation/20261010-replay-quest-location-readiness.json. The remaining 165 mission "
         "predicates, delayed-event match lifetime, exactly-once push acknowledgements and new "
         "native mission gameplay/completion/reward/successor callback validation remain open."
     ),
@@ -158,8 +158,8 @@ GAPS["125"] += (
     "All 447 table rows and all 32 initialized native mission groups were matched. "
     "A hash-bound shipping-game proof verifies 125/5 callbacks and 125/3 restoration "
     "of MP/co-op/BR selections across a new game process. Other platform/operator "
-    "mission eligibility and the remaining 187 earning predicates remain open; "
-    "45 compiled MP/BR predicates have separate original-parser and encrypted-wire "
+    "mission eligibility and the remaining 165 earning predicates remain open; "
+    "67 compiled MP/BR predicates have separate original-parser and encrypted-wire "
     "earning/reward/recovery evidence, without native gameplay callback claims."
 )
 GAPS["198"] += (
@@ -1191,6 +1191,7 @@ def live_streaming_layout_evidence():
 
 def mission_earning_evidence(server_hash):
     for filename, stages, cases in (
+        ("20261010-replay-quest-location-readiness.json", 67, 176),
         ("20261010-replay-quest-entry-readiness.json", 45, 108),
         ("20261009-replay-quest-action-readiness.json", 42, 104),
         ("20261009-replay-quest-counter-readiness.json", 37, 100),

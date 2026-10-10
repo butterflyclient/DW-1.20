@@ -119,6 +119,39 @@ namespace services
         {
             const auto &values = event.at("values");
             const auto &name = event.at("name").get_ref<const std::string &>();
+            uint64_t contractLocale = 0;
+            // Shipped setupchallengelocales assigns IDs to location_volume
+            // script_noteworthy labels. Param1 is the contract card's locale;
+            // Param0 is the player's locale and can differ near a boundary.
+            switch (id)
+            {
+            case 50012: contractLocale = 4; break; // dam
+            case 50015:
+            case 50082: contractLocale = 33; break; // tvstation
+            case 50019:
+            case 50068: contractLocale = 15; break; // port
+            case 50022:
+            case 50075: contractLocale = 32; break; // transit / train station
+            case 50026:
+            case 50078: contractLocale = 6; break; // farms
+            case 50029: contractLocale = 31; break; // super
+            case 50033: contractLocale = 11; break; // lumber
+            case 50036: contractLocale = 2; break; // boneyard
+            case 50040: contractLocale = 10; break; // layover / airport
+            case 50043: contractLocale = 5; break; // downtown
+            case 50047:
+            case 50085: contractLocale = 7; break; // gulag / prison complex
+            case 50050: contractLocale = 8; break; // hospital
+            case 50054:
+            case 50071: contractLocale = 1; break; // airfield / military base
+            case 50057: contractLocale = 20; break; // stadium
+            case 50061: contractLocale = 21; break; // storagetown
+            case 50064: contractLocale = 16; break; // quarry
+            default: break;
+            }
+            if (contractLocale)
+                return name == "contract_start" && completeParameters(values, 3) &&
+                       number(values, "Param1") == contractLocale ? 1 : 0;
             switch (id)
             {
             case 50000:
