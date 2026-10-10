@@ -1,0 +1,72 @@
+REPLAY MISSION EVENT CONTRACTS
+
+The backend uses Replay's own quest_challenges.csv IDs, targets, next-stage
+names, XP and item rewards. All 232 supported MP/BR/co-op stage descriptions
+were recovered independently from shipped eng_global_mp and eng_ui fastfiles.
+Both copies agree, including prior-string references. Localize decoding rejects
+ambiguous stream prefixes and validates the entire declared trailing asset set.
+
+The original Replay image is pinned by SHA256:
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+Original ProcessParams: 0x140F35980..0x140F385DC. These research addresses are
+not game hooks or backend dispatch addresses. Unicorn executes original parser
+instructions with explicit string/CRT/table/log/cookie/match-ID boundaries.
+The retained table hashes are recorded for each case. Parser tests prove the
+packed data contract, not delivery of gameplay events or native callback use.
+
+MP kill fields:
+  Param0 low 16: first weapon/equipment ID, resolved through mp/statstable.csv
+                and loot ID tables. Blueprint names are not producer names.
+  Param5 high 16: weapon/equipment class mask.
+  Param5 low byte: attachment count; 255 means no_attachments.
+  Param6 bits 16..31: means-of-death ordinal (9 headshot, 21 execution).
+  version: 1; gamemode: 2 for MP (original AddGamemode 0x140F33A00).
+
+The engine shares class mask 65 between DMRs and sniper rifles. Backend sniper
+criteria also require the shipped weapon_sniper base IDs 30, 31 or 32.
+Equipment class mask 1024 is generic equipment; 3072 identifies lethal equipment.
+Kill events have seven packed parameters and bypass the <=4-parameter aggregate
+event caches. A kill event is one action, regardless of its packed numeric values.
+
+Implemented earning stages (24):
+  1501, 1503, 1505..1510, 1513, 1553, 1555..1557, 1559, 1560,
+  1569, 1571, 1594, 1596, 1597, 1600, 10007, 10044, 10046.
+
+Credit requires a native version-1 MP kill with all seven parameters, a selected
+matching built-in stage, a timestamp at or after activation, and current live
+public matchmaking membership. The host session must remain authoritative and
+the host document must say in_game. Private/custom games, tournament lobbies,
+expired/disbanded allocations and stale sessions do not satisfy this gate.
+
+The stage, successor selection, XP, inventory and event receipt share the common
+flushed/recoverable achievement transaction. A kill which finishes one stage
+does not also credit its newly activated successor. Only actual successor
+activation emits ACTIVATE_ACHIEVEMENT. Completed successors are preserved.
+Receipt retries refresh current absolute state and owned rewards without adding
+XP/progress again or replaying the completion/activation UI. Archived receipts
+retain the same mission identities. Serialized delivery checks reject snapshots
+superseded by progress or a different selected MP mission.
+
+Battle Pass and mission updates merge the same staged states/inventory document.
+They never publish duplicate destinations in one transaction. Existing local XP
+confirmation, weapon progression, rank entitlements and Battle Pass behavior
+retain their original paths.
+
+Open contracts:
+  208 remaining mission earning predicates, including completed/won matches,
+  perk/ADS/distance/multikill/life-window flags, objectives, killstreaks, BR POIs,
+  counters, placements, pickups and co-op criteria.
+  Events queued until after allocation retirement need an independently bound
+  match-context lifetime contract; they currently receive no public-match credit.
+  Native gameplay-generated mission completion, reward and successor callbacks
+  require a focused game run. Encrypted fixtures are not native gameplay proof.
+  The complete DW goal and six remaining known response bindings remain open.
+
+Tooling:
+  tools/research-native-rip-literals.py: whole-image candidate RIP references,
+      verified by linear decoding of owned unwind chunks. This is not CFG or
+      indirect-call coverage and does not prove runtime consumption.
+  tools/research-challenge-event-parser.py: original parser execution fixtures.
+  tools/read-replay-mission-descriptions.py: complete Localize-tail extraction.
+  tools/test-replay-quest-earning.py: encrypted request/recovery/restart checks
+      using original parser outputs, not a second packed-field implementation.

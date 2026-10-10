@@ -2042,6 +2042,29 @@ namespace services
         return lobby::onlineIdentity(sender.titleId, participant);
     }
 
+    bool matchmakingPublicMatchActive(const std::filesystem::path &directory,
+                                      const platform::LobbyIdentity &id)
+    {
+        const auto root = directory / "matchmaking" / std::to_string(id.titleId);
+        matchmaking_store::recover(root, id.titleId);
+        const auto index = currentLobbies(root, id);
+        const auto key = std::to_string(id.userId);
+        if (!index.at("lobbies").contains(key))
+            return false;
+        const auto assigned = index.at("lobbies").at(key).get<uint64_t>();
+        const auto path = root / "lobbies" / (std::to_string(assigned) + ".json");
+        if (!std::filesystem::exists(path))
+            return false;
+        const auto state = loadLobby(path, id);
+        return member(state, id.userId) && state.contains("public_pool") &&
+               !state.at("backend_doc").contains("private_lobby") &&
+               !state.at("backend_doc").contains("tournament") &&
+               !state.value("disbanded", false) &&
+               state.at("expires").get<uint64_t>() > now() &&
+               hostSessionActive(state, id.titleId) &&
+               state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game";
+    }
+
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,
                                   uint32_t title,
                                   const Delivery &delivery)

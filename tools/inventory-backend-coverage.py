@@ -95,7 +95,27 @@ GAPS = {
     "95": "Additional title/build tuning documents need explicit publication; unknown namespaces remain unavailable.",
     "104": "Full bounded message publication and owned view receipts implemented. Native positive view callback and redemption-action consumers remain separate validation gates.",
     "123": "Positive native redemption callbacks and game reward consumers still need validation.",
-    "125": "Native mp_addxp deltas update career XP and Replay rank thresholds. Every recipient journal/retry receipt is preflighted before a complete flushed event intent; conflicting retries make no changes, interrupted writes roll forward before queries or local-profile restoration, and state/journal/archive checks reject malformed or conflicting snapshots. Encrypted fixtures cover late recipient conflicts, real second-file interruptions, snapshot validation and a backend process restart without double awards. Further progression/reward/quest definitions require explicit publication; native scored match XP/reward/activation callback consumption remains unverified. Published Total XP ranking now shares explicit accepted progression snapshots and existing registered account names without rewriting stat journals. The REST envelope now retains the complete domain Reply, including fresh and cross-player progression notifications. Matching positive-XP retries refresh the latest accepted absolute total from hot or archived receipts, and serialized delivery checks reject superseded snapshots. Windows/Linux wire fixtures cover actual commit recovery, restart and both transports; the original consumer VM proves absolute assignment without rank-up UI on refresh. Ingestion alone does not fabricate other rewards; The schema-1 event journal also retains an optional pending XP snapshot until nonce-bound local persistence confirmation; stale signed local snapshots cannot erase accepted awards, while explicit rank changes remain authoritative. The existing idle publisher sends the native title-context snapshot to each fresh authenticated endpoint without another task and coalesces successful unchanged writes. Exactly-once push acknowledgement and positive native gameplay consumption remain separate unverified scopes.",
+    "125": (
+        "Native mp_addxp deltas update career XP and Replay rank thresholds. Complete flushed "
+        "event intents preflight every recipient journal/retry receipt; conflicts make no changes "
+        "and interrupted writes recover before queries/local restoration. Positive-XP retries "
+        "refresh the latest absolute total from hot or archived receipts; serialized delivery "
+        "checks reject superseded snapshots. Windows/Linux fixtures cover recovery, restart and "
+        "both transports; original consumer execution proves absolute assignment without rank-up "
+        "UI on refresh. Pending XP waits for nonce-bound local persistence confirmation; stale "
+        "local snapshots cannot erase accepted awards. The idle publisher coalesces successful "
+        "unchanged writes. Published Total XP ranking shares accepted snapshots and registered "
+        "account names. The REST envelope retains the full Reply, including cross-player pushes. "
+        "All 232 shipped MP/BR/co-op mission descriptions and prior-string aliases are recovered "
+        "from two matching English fastfiles. Twenty-four original-parser-bound MP kill mission "
+        "predicates commit stage progress, shipped XP/items, next-stage activation and retry "
+        "identity together with player/weapon XP and Battle Pass writes. Native public in_game "
+        "membership and activation timestamps gate earning; private/expired/stale assignments "
+        "cannot earn credit. Exact earning proof and linked-image identity are retained in "
+        "validation/20261009-replay-quest-earning-readiness.json. The remaining 208 mission "
+        "predicates, delayed-event match lifetime, exactly-once push acknowledgements and new "
+        "native mission gameplay/completion/reward/successor callback validation remain open."
+    ),
     "145": "Presence joins and public lobby filling have authenticated party tokens, live-host/capacity checks, shared documents and typed event-2001/2006 pushes. Public selection also binds playlist/map publication, native netcode/rules, privacy and native in_game join-in-progress policy; two authenticated clients are covered by encrypted-wire fixtures. Primary-player additional reservations are validated/published and counted in public/presence capacity, team occupancy and fullest-lobby selection. Replay bnet platform restrictions are validated without splitting equivalent cross-play pools. Legacy zero-reservation documents remain compatible; native split-screen consumption/gameplay remain unverified. Complete native host snapshots retire omitted/READY_TO_REMOVE members across teams/squads/optional metadata, preserve shared searches and newer assignments, and commit through recoverable transactions. Document clocks advance monotonically to prevent equal-second native update loss; native departure callbacks remain unverified. Party-elected task-145/15 host claims bind current membership/search tokens and registered native addresses after the original host lease ends; ownership, migration order and departed-member cleanup share the existing durable transaction while DTLS keys/map/rules remain intact. Six encrypted fixture groups cover stale/live-host denial, successor claims and interrupted publication. A native friend-menu session-info exchange and assigned lobby/host were verified on the recorded server hash; native public-search callbacks, playable two-game connections and native host-migration callbacks remain open. Native tournament task-18 searches now use authenticated party tokens, published same-team enrollment and recoverable formation-search/index transactions; exact event-2009 join pushes bind the returned search ID, with retry/deduplication/cancellation/expiry checks covered by two encrypted clients. Capacity-based tournament publications now accept unassigned registrations and allocate real authenticated parties without splitting them; native teams/rounds are generated and PLAYING requires every slot and live-session acknowledgement. Formation/enrollment/search/index changes share flushed recoverable transactions with an explicitly fixed cross-domain enrollment target. Forming-party withdrawal releases slots, resets peer acceptance while retaining registration and emits exact event-2011 with durable catch-up/revocation. Capacity publications with pinned round rules now allocate closed native round lobbies through the shared playlist/map policy and document builder after complete session-bound readiness. Exact create/join pushes retain actual party search IDs and native tournament/team/round metadata; formation, lobby, searches, account index and enrollment share one recoverable transaction. Eight signed machine accounts verify map-policy waiting, interrupted publication, four independent first-round lobbies, temporary same-session join catch-up and all seven result-driven matches. Canonical tournament map pools supply both native publisher dvar strings and backend round selection, with durable revision/hash protection and immutable competition snapshots. The compiled selector matches original Replay x64 instructions across 32 cases; four native strings and their revision survive same-process backend reconnect. Native join/formation/round callback validation, forfeits and native result/ready/accept/leave/rejoin callbacks remain open. Host-authorized task 21 results, durable journals, bracket advancement, exact event-2010 updates and opt-in idle publication/disband pushes with recipient/snapshot revalidation are implemented. Native registration/state callbacks, FORMING/PLAYING parsing, idle publication updates and event-2012 disband were verified with explicitly seeded enrollment; playable tournaments remain open. Remote relay deployment/migration and native two-game forwarding remain open.",
     "150": "Positive native scheduled match operations; local publication required.",
     "151": "Published local registration only; retail esports registration workflow is not emulated.",
@@ -1167,6 +1187,27 @@ def live_streaming_layout_evidence():
     )
 
 
+def mission_earning_evidence(server_hash):
+    path = ROOT / "validation/20261009-replay-quest-earning-readiness.json"
+    if not path.is_file():
+        return None
+    proof = json.loads(path.read_bytes())
+    if not (proof.get("passed") and proof.get("linux_server_sha256") == server_hash
+            and proof.get("native_game_callback_verified") is False
+            and proof.get("supported_earning_stages") == 24
+            and proof.get("shipped_mission_descriptions") == 232):
+        return None
+    for reference in proof["evidence"]:
+        evidence = (ROOT / reference["path"]).resolve()
+        if not evidence.is_relative_to(ROOT) or digest(evidence) != reference["sha256"]:
+            raise ValueError("Mission earning evidence changed")
+    return dict(receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
+                original_parser_cases=78, supported_earning_stages=24,
+                shipped_mission_descriptions=232, remaining_earning_stages=208,
+                native_game_callback_verified=False,
+                scope="Original parameter parser and matching shipped criteria; encrypted earning, recovery and restart fixtures. Native gameplay completion and unbound predicates remain open.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1226,6 +1267,9 @@ def main():
         for task in tasks:
             assert (service, task) not in routes, (service, task)
             routes[service, task] = "src/" + filename
+    for name in ("src/quest_services.cpp", "src/quest_services.h", "src/replay_quest_data.h",
+                 "src/battlepass_services.cpp", "src/achievement_store.cpp"):
+        sources[name] = digest(source_root / name)
     # Source locations aid further review. These do not establish execution or
     # every optional/malformed path, even when the enclosing suite has passed.
     references = {}
@@ -1587,6 +1631,7 @@ def main():
         live_streaming_target_layout_evidence=live_streaming_layout_evidence(),
         private_native_counter_read_evidence=private_counter_read,
         native_progression_callback_evidence=native_progression_callback_evidence(current_hash),
+        mission_earning_evidence=mission_earning_evidence(current_hash),
         selected_protocol_fixture=fixture_path,
         target_exported_function_count=graph.get("exported_function_count"),
         ambiguous_display_aliases=graph.get("ambiguous_display_aliases", []),

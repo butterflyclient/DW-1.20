@@ -49,6 +49,8 @@ namespace services
         const std::filesystem::path &directory,
         const platform::LobbyIdentity &sender,
         uint64_t participant);
+    bool matchmakingPublicMatchActive(const std::filesystem::path &directory,
+                                      const platform::LobbyIdentity &identity);
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,
                                   uint32_t title,
                                   const Delivery &delivery);

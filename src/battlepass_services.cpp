@@ -352,7 +352,14 @@ namespace services
         const auto config = rules(root);
         if (config.is_null())
             return;
-        auto data = states(statePath(root, id, context));
+        const auto stateWrite = std::find_if(writes.begin(), writes.end(), [&](const auto &write)
+        {
+            return write.owner == id.userId && write.context == context &&
+                   write.kind == Destination::states;
+        });
+        const auto stateIndex = static_cast<size_t>(stateWrite - writes.begin());
+        const bool stagedStates = stateWrite != writes.end();
+        auto data = stagedStates ? stateWrite->document : states(statePath(root, id, context));
         Json inventory;
         auto existing = std::find_if(writes.begin(),
                                      writes.end(),
@@ -468,7 +475,10 @@ namespace services
         else
             writes.push_back(
                 {id.userId, id.platformAccountId, "5800", {}, inventory, Destination::inventory});
-        writes.push_back({id.userId, id.platformAccountId, context, {}, data, Destination::states});
+        if (stagedStates)
+            writes[stateIndex].document = data;
+        else
+            writes.push_back({id.userId, id.platformAccountId, context, {}, data, Destination::states});
         for (auto season : changedSeasons)
             deliveries.push_back(update(id,
                                         context,

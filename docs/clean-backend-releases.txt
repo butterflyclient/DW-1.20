@@ -11,7 +11,7 @@ publications into an immutable source cohort under the project's data folder.
 Record every input hash and the archive hash. Configure a fresh CMake build
 directory against that cohort and compile every backend translation unit.
 Record the linked image hash and every newly compiled object hash. The current
-backend has 45 translation units. Recheck the frozen input hashes afterward.
+backend has 46 translation units. Recheck the frozen input hashes afterward.
 
 Do not use retained-object hashes as proof that an object represents a claimed
 source cohort. The 2026-10-09 retained-object build accepted a presence join

@@ -9,6 +9,7 @@
 #include "replay_quest_data.h"
 #include "marketplace_services.h"
 #include "battlepass_services.h"
+#include "quest_services.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <algorithm>
@@ -932,6 +933,18 @@ namespace services
                                       {
                                           return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
                                       }));
+            if (receipt.contains("quest_updates"))
+            {
+                const auto &updates = receipt.at("quest_updates");
+                wire::require(updates.is_array() && updates.size() <= replayQuests.size());
+                std::set<uint64_t> seen;
+                for (const auto &value : updates)
+                {
+                    wire::require(value.is_number_unsigned());
+                    const auto identity = value.get<uint64_t>();
+                    wire::require(quest(identity) && seen.insert(identity).second);
+                }
+            }
             if (receipt.contains("users"))
             {
                 const auto &users = receipt.at("users");
@@ -1132,12 +1145,20 @@ namespace services
             // duplicating accepted events during upgrade.
             const auto aliases = requestAliases(request);
             bool accepted = false;
+            std::set<uint32_t> refreshedQuests;
+            const auto restoreQuests = [&](const Json &receipt)
+            {
+                if (receipt.contains("quest_updates"))
+                    for (const auto &value : receipt.at("quest_updates"))
+                        refreshedQuests.insert(value.get<uint32_t>());
+            };
             for (const auto &receipt : data.at("requests"))
                 if (includes(aliases, receipt.at("id").get<std::string>()))
                 {
                     if (receipt.at("digest") != digest)
                         return {106, {}, "achievement-event-retry-conflict"};
                     accepted = true;
+                    restoreQuests(receipt);
                 }
             for (const auto &alias : aliases)
             {
@@ -1148,11 +1169,12 @@ namespace services
                 if (receipt.at("digest") != digest)
                     return {106, {}, "achievement-event-retry-conflict"};
                 accepted = true;
+                restoreQuests(receipt);
             }
             if (accepted)
             {
                 Reply result{0, {}, "achievement-events-idempotent", true, {}};
-                const bool earnedXp =
+                bool earnedXp =
                     std::any_of(events.begin(),
                                 events.end(),
                                 [](const Json &event)
@@ -1185,7 +1207,32 @@ namespace services
                         }
                     }
                 std::optional<RankInventory> awards;
-                const auto selected = rankItems(snapshots, xp);
+                auto selected = rankItems(snapshots, xp);
+                QuestProgress questRefresh;
+                if (!refreshedQuests.empty())
+                {
+                    questRefresh.states = document(path.parent_path() / "states.json", Json::array());
+                    wire::require(questRefresh.states.is_array() && questRefresh.states.size() <= 15000);
+                    for (const auto &row : questRefresh.states)
+                    {
+                        (void)state(row);
+                        const auto identity = integer(row, "id");
+                        if (!refreshedQuests.contains(static_cast<uint32_t>(identity)))
+                            continue;
+                        const auto *definition = quest(identity);
+                        wire::require(definition);
+                        const bool completed = integer(row, "status") == 3;
+                        questRefresh.updates[definition->id] = completed;
+                        if (completed)
+                        {
+                            earnedXp = earnedXp || definition->xpReward > 0;
+                            if (definition->itemReward)
+                                selected.push_back(definition->itemReward);
+                        }
+                    }
+                    std::sort(selected.begin(), selected.end());
+                    selected.erase(std::unique(selected.begin(), selected.end()), selected.end());
+                }
                 if (!selected.empty())
                     awards = prepareRankInventory(root, id, selected, true);
                 if (awards && awards->changed)
@@ -1212,6 +1259,15 @@ namespace services
                         id, context, total, false, &weapon(weaponId), awards ? &*awards : nullptr));
                 if (!refreshed.empty())
                     result.operation = "achievement-events-idempotent-refresh";
+                if (!questRefresh.updates.empty())
+                {
+                    auto deliveries = replayQuestUpdates(id, context, questRefresh,
+                                                          awards ? &*awards : nullptr, true);
+                    result.deliveries.insert(result.deliveries.end(),
+                                             std::make_move_iterator(deliveries.begin()),
+                                             std::make_move_iterator(deliveries.end()));
+                    result.operation = "achievement-events-idempotent-refresh";
+                }
                 std::vector<achievement_store::Write> refreshWrites;
                 battlepassEvents(root, id, context, events, refreshWrites, result.deliveries, true);
                 return result;
@@ -1240,6 +1296,24 @@ namespace services
                     total += weaponDelta;
                 }
             }
+            QuestProgress questProgress;
+            if (id.titleId == 5800 && std::any_of(events.begin(), events.end(),
+                [](const Json &event) { return event.at("name") == "kill"; }))
+            {
+                const auto stored = document(path.parent_path() / "states.json", Json::array());
+                wire::require(stored.is_array() && stored.size() <= 15000);
+                std::set<uint64_t> identities;
+                for (const auto &row : stored)
+                {
+                    (void)state(row);
+                    wire::require(identities.insert(integer(row, "id")).second);
+                }
+                if (!stored.empty())
+                    questProgress = advanceReplayQuests(stored, events,
+                                                          matchmakingPublicMatchActive(root, id));
+                wire::require(xp <= UINT64_MAX - questProgress.xp);
+                xp += questProgress.xp;
+            }
             WeaponXp changedWeapons;
             for (const auto &[weaponId, total] : weapons)
             {
@@ -1248,7 +1322,10 @@ namespace services
                     changedWeapons.emplace(weaponId, total);
             }
             std::optional<RankInventory> awards;
-            const auto selected = rankItems(changedWeapons, xp);
+            auto selected = rankItems(changedWeapons, xp);
+            selected.insert(selected.end(), questProgress.items.begin(), questProgress.items.end());
+            std::sort(selected.begin(), selected.end());
+            selected.erase(std::unique(selected.begin(), selected.end()), selected.end());
             if (!selected.empty())
                 awards = prepareRankInventory(root, id, selected, true);
             data["player_xp"] = xp;
@@ -1267,6 +1344,15 @@ namespace services
                 data["events"].push_back(Json{{"id", next++}, {"event", event}});
             data["next"] = next;
             Json receipt{{"id", request}, {"digest", digest}};
+            if (!questProgress.updates.empty())
+            {
+                receipt["quest_updates"] = Json::array();
+                for (const auto &[identity, completed] : questProgress.updates)
+                {
+                    (void)completed;
+                    receipt["quest_updates"].push_back(uint64_t{identity});
+                }
+            }
             if (!owners.is_null())
                 receipt["users"] = owners;
             data["requests"].push_back(std::move(receipt));
@@ -1282,6 +1368,9 @@ namespace services
                 data["requests"].erase(data["requests"].begin());
             }
             writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
+            if (!questProgress.updates.empty())
+                writes.push_back({id.userId, id.platformAccountId, context, {}, questProgress.states,
+                                  achievement_store::Destination::states});
             if (awards && awards->changed)
                 writes.push_back({id.userId,
                                   id.platformAccountId,
@@ -1295,6 +1384,11 @@ namespace services
                 achievement_store::commit(root, id.titleId, writes, validateEventWrite);
             Reply result{0, {}, "achievement-events-recorded", true, {}};
             result.deliveries = std::move(battlepassDeliveries);
+            auto missionDeliveries = replayQuestUpdates(id, context, questProgress,
+                                                         awards ? &*awards : nullptr);
+            result.deliveries.insert(result.deliveries.end(),
+                                     std::make_move_iterator(missionDeliveries.begin()),
+                                     std::make_move_iterator(missionDeliveries.end()));
             if (xp != previousXp)
             {
                 result.deliveries.push_back(
@@ -1640,6 +1734,15 @@ namespace services
                                   uint32_t title,
                                   const Delivery &delivery)
     {
+        if (!delivery.questContext.empty())
+        {
+            wire::require(title == 5800 && delivery.user && delivery.user != UINT64_MAX &&
+                          (delivery.questContext == "5800" || delivery.questContext == "iw8"));
+            achievement_store::recover(root, title, validateEventWrite);
+            const auto path = root / "achievements" / std::to_string(title) /
+                              delivery.questContext / std::to_string(delivery.user) / "states.json";
+            return replayQuestDeliveryValid(document(path, Json::array()), delivery);
+        }
         if (delivery.progressionContext.empty())
             return true;
         wire::require(

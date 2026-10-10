@@ -42,6 +42,8 @@ namespace services
         bool progressionRefresh = false;
         uint64_t progressionId = 1000000;
         std::string progressionRewardsHash;
+        std::string questContext, questStateHash;
+        uint32_t questId = 0;
     };
 
     struct Reply
