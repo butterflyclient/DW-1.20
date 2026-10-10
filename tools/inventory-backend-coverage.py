@@ -107,12 +107,12 @@ GAPS = {
         "unchanged writes. Published Total XP ranking shares accepted snapshots and registered "
         "account names. The REST envelope retains the full Reply, including cross-player pushes. "
         "All 232 shipped MP/BR/co-op mission descriptions and prior-string aliases are recovered "
-        "from two matching English fastfiles. Thirty-seven original-parser-bound MP kill and BR counter mission "
+        "from two matching English fastfiles. Forty-two original-parser-bound MP kill and BR counter/action mission "
         "predicates commit stage progress, shipped XP/items, next-stage activation and retry "
         "identity together with player/weapon XP and Battle Pass writes. Native public in_game "
         "membership and activation timestamps gate earning; private/expired/stale assignments "
         "cannot earn credit. Exact earning proof and linked-image identity are retained in "
-        "validation/20261009-replay-quest-counter-readiness.json. The remaining 195 mission "
+        "validation/20261009-replay-quest-action-readiness.json. The remaining 190 mission "
         "predicates, delayed-event match lifetime, exactly-once push acknowledgements and new "
         "native mission gameplay/completion/reward/successor callback validation remain open."
     ),
@@ -158,8 +158,8 @@ GAPS["125"] += (
     "All 447 table rows and all 32 initialized native mission groups were matched. "
     "A hash-bound shipping-game proof verifies 125/5 callbacks and 125/3 restoration "
     "of MP/co-op/BR selections across a new game process. Other platform/operator "
-    "mission eligibility and the remaining 195 earning predicates remain open; "
-    "37 compiled MP/BR predicates have separate original-parser and encrypted-wire "
+    "mission eligibility and the remaining 190 earning predicates remain open; "
+    "42 compiled MP/BR predicates have separate original-parser and encrypted-wire "
     "earning/reward/recovery evidence, without native gameplay callback claims."
 )
 GAPS["198"] += (
@@ -1190,25 +1190,46 @@ def live_streaming_layout_evidence():
 
 
 def mission_earning_evidence(server_hash):
-    path = ROOT / "validation/20261009-replay-quest-counter-readiness.json"
+    for filename, stages, cases in (
+        ("20261009-replay-quest-action-readiness.json", 42, 104),
+        ("20261009-replay-quest-counter-readiness.json", 37, 100),
+    ):
+        path = ROOT / "validation" / filename
+        if not path.is_file():
+            continue
+        proof = json.loads(path.read_bytes())
+        if not (proof.get("passed") and proof.get("linux_server_sha256") == server_hash
+                and proof.get("native_game_callback_verified") is False
+                and proof.get("supported_earning_stages") == stages
+                and proof.get("original_parser_cases") == cases
+                and proof.get("shipped_mission_descriptions") == 232):
+            continue
+        for reference in proof["evidence"]:
+            evidence = (ROOT / reference["path"]).resolve()
+            if not evidence.is_relative_to(ROOT) or digest(evidence) != reference["sha256"]:
+                raise ValueError("Mission earning evidence changed")
+        return dict(receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
+                    original_parser_cases=cases, supported_earning_stages=stages,
+                    shipped_mission_descriptions=232, remaining_earning_stages=232-stages,
+                    native_game_callback_verified=False,
+                    scope="Original parameter/operator/cache decisions and original-bytecode-correlated shipped producers; encrypted earning, fractional timers, recovery and restart fixtures. Native gameplay completion and unbound predicates remain open.")
+    return None
+
+
+def category_constructor_evidence():
+    path = ROOT / "validation/20261009-objectstore-category-constructors.json"
     if not path.is_file():
         return None
     proof = json.loads(path.read_bytes())
-    if not (proof.get("passed") and proof.get("linux_server_sha256") == server_hash
-            and proof.get("native_game_callback_verified") is False
-            and proof.get("supported_earning_stages") == 37
-            and proof.get("original_parser_cases") == 100
-            and proof.get("shipped_mission_descriptions") == 232):
-        return None
-    for reference in proof["evidence"]:
-        evidence = (ROOT / reference["path"]).resolve()
-        if not evidence.is_relative_to(ROOT) or digest(evidence) != reference["sha256"]:
-            raise ValueError("Mission earning evidence changed")
+    assert proof["passed"] and len(proof["cases"]) == 8
+    assert proof["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    assert proof["tool_sha256"] == digest(ROOT / "tools/research-objectstore-category-constructors.py")
+    assert all(row["passed"] and row["captured"]["service"] == 193 for row in proof["cases"])
+    assert {(row["captured"]["task"], row["response_offset"]) for row in proof["cases"]} == {(9, 8), (10, 432)}
+    assert proof["native_response_reader_verified"] is False
     return dict(receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
-                original_parser_cases=100, supported_earning_stages=37,
-                shipped_mission_descriptions=232, remaining_earning_stages=195,
-                native_game_callback_verified=False,
-                scope="Original parameter/operator parsers and original-bytecode-correlated shipped producers; encrypted earning, fractional timers, recovery and restart fixtures. Native gameplay completion and unbound predicates remain open.")
+                scope=proof["scope"], native_response_reader_verified=False,
+                native_runtime_verified=False)
 
 
 def main():
@@ -1631,6 +1652,7 @@ def main():
         callgraph_sha256=digest(DATA / "native-service-callgraph.json"),
         native_byte_task_inventory=byte_evidence,
         objectstore_completion_target_evidence=objectstore_completion_evidence(),
+        objectstore_category_constructor_evidence=category_constructor_evidence(),
         live_streaming_target_layout_evidence=live_streaming_layout_evidence(),
         private_native_counter_read_evidence=private_counter_read,
         native_progression_callback_evidence=native_progression_callback_evidence(current_hash),

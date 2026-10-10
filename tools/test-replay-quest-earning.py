@@ -398,6 +398,30 @@ def main():
                 update = next(row for row in rewards(host, 2) if row["kind"] == 15)
                 assert update["progress"] == quests[identity]["target"] and update["reason"] == "completed"
             checks.append("Five BR gas/driving/non-downed timers preserve fractional units and retries; seconds/minutes do not round up from milliseconds")
+            actions = {50014: "self_revive", 50077: "self_revive", 50049: "teammate_revive",
+                       50048: "gulag_win", 50076: "gulag_win"}
+            for identity, label in actions.items():
+                seed(host, identity)
+                before = snapshot(host)
+                wrong = ("teammate_revive" if label == "self_revive" else "self_revive")
+                negatives = ("gulag_loss",) if label == "gulag_win" else (
+                    wrong, "being_revived", "invalid_revive_flags")
+                for negative in negatives:
+                    send(host, f"an{identity}-{negative[:8]}", [event(negative, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                send(host, f"wm{identity}", [event(label, mode=2)])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                packet = send(host, f"br-action-{identity}", [event(label, mode=24)])
+                mission = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert mission["id_"] == identity and mission["reason"] == "completed"
+                assert mission["progress"] == quests[identity]["target"]
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert snapshot(host) == saved
+            checks.append("Five BR revive/Gulag stages distinguish the actor, self-revival and win/loss; malformed flags, MP mode and retries cannot duplicate credit")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -416,10 +440,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 13, checks=checks,
+                                         supported_stage_count=len(fixtures) + 18, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 13} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 18} stages; {args.output}")
 
 
 if __name__ == "__main__":

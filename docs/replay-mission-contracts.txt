@@ -34,20 +34,31 @@ Implemented MP earning stages (24):
   1501, 1503, 1505..1510, 1513, 1553, 1555..1557, 1559, 1560,
   1569, 1571, 1594, 1596, 1597, 1600, 10007, 10044, 10046.
 
-Implemented BR earning stages (13):
+Implemented BR earning stages (18):
   Weapon pickups: 50005.
   Cash pickups: 50007, 50042, 50066, 50069.
   Cache opens: 50010, 50031, 50084.
   Gas seconds: 50008, 50063; driving minutes: 50009, 50021;
   minutes without being downed: 50059.
+  Self-revival: 50014, 50077; reviving a teammate: 50049.
+  Winning a Gulag fight: 50048, 50076.
 
 The shipped ScriptFile producer and original parser agree on separate weapon,
 cash and cache pickup counters. Native caches can aggregate these counts.
 Timer producers report gettime() differences in milliseconds; fractional units
 persist as timerRemainderMs and are never rounded up. Original ParseOperators
-instructions are also executed in the 100-case parser proof. Recovered script
+instructions are also executed in the 104-case parser proof. Recovered script
 and original-bytecode-correlated disassembly hashes are retained separately;
 this is producer contract evidence, not a native gameplay run.
+
+Original cache-decision instructions identify only driving, alive_in_gas,
+alive_not_downed and pickup as cached families. Revive and Gulag reports use the
+individual-action branch. The shipped revive producer reports [1,1] for self,
+[1,0] to the player being revived, and [0,1] to the player reviving a teammate.
+The latter two must not receive each other's mission credit. Invalid non-boolean
+actor flags receive no mission credit. The shipped Gulag winner path reports
+result 1, while the loser path reports 2. Mission results and their retries share
+the existing flushed event/stage/XP/inventory transaction.
 
 Credit requires a native version-1 report, a selected
 matching built-in stage, a timestamp at or after activation, and current live
@@ -76,7 +87,7 @@ confirmation, weapon progression, rank entitlements and Battle Pass behavior
 retain their original paths.
 
 Open contracts:
-  195 remaining mission earning predicates, including completed/won matches,
+  190 remaining mission earning predicates, including completed/won matches,
   perk/ADS/distance/multikill/life-window flags, objectives, killstreaks, BR POIs,
   other counters, placements, pickups and co-op criteria.
   Events queued until after allocation retirement need an independently bound

@@ -288,6 +288,10 @@ for label, name, params in (
     ("not_downed_remaining_ms", "alive_not_downed", "15000, "),
     ("self_revive", "revive", "1,1, "),
     ("teammate_revive", "revive", "0,1, "),
+    ("being_revived", "revive", "1,0, "),
+    ("invalid_revive_flags", "revive", "2,2, "),
+    ("gulag_win", "gulag_end_match", "1, "),
+    ("gulag_loss", "gulag_end_match", "2, "),
     ("placement_15", "match_placement", "5,15, "),
     ("loadout", "loadout", "1, "),
     ("contract_locales", "contract_start", "4|33,4|33, ,1"),
@@ -302,6 +306,8 @@ for label, name, params in (
 for label, expected in {"pickup_totals": [2, 3, 4, 0], "driving_ms": [45000, 0],
                          "gas_ms": [1250, 0], "not_downed_ms": [61000, 0],
                          "self_revive": [1, 1, 0], "teammate_revive": [0, 1, 0],
+                         "being_revived": [1, 0, 0], "invalid_revive_flags": [2, 2, 0],
+                         "gulag_win": [1, 0], "gulag_loss": [2, 0],
                          "placement_15": [5, 15, 0], "loadout": [1, 0],
                          "contract_locales": [4, 4, 0], "stim_health": [17]}.items():
     row = next(row for row in rows if row.get("fixture_label") == label)

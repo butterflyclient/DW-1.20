@@ -1302,7 +1302,8 @@ namespace services
                 {
                     const auto &name = event.at("name").get_ref<const std::string &>();
                     return name == "kill" || name == "pickup" || name == "driving" ||
-                           name == "alive_in_gas" || name == "alive_not_downed";
+                           name == "alive_in_gas" || name == "alive_not_downed" ||
+                           name == "revive" || name == "gulag_end_match";
                 }))
             {
                 const auto stored = document(path.parent_path() / "states.json", Json::array());

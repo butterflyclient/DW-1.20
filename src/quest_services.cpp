@@ -121,6 +121,17 @@ namespace services
             const auto &name = event.at("name").get_ref<const std::string &>();
             switch (id)
             {
+            case 50014:
+            case 50077:
+                return name == "revive" && completeParameters(values, 3) &&
+                       number(values, "Param0") == 1 && number(values, "Param1") == 1 ? 1 : 0;
+            case 50049:
+                return name == "revive" && completeParameters(values, 3) &&
+                       number(values, "Param0") == 0 && number(values, "Param1") == 1 ? 1 : 0;
+            case 50048:
+            case 50076:
+                return name == "gulag_end_match" && completeParameters(values, 2) &&
+                       number(values, "Param0") == 1 ? 1 : 0;
             case 50005:
                 return name == "pickup" && completeParameters(values, 4)
                            ? counter(values, "Param0") : 0;
