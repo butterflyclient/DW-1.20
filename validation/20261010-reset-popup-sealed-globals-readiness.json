@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "passed": true,
+  "client_sha256": "bd792a7c871c683baf34409f1024fe5688e18d77f3ed3a34f8f1b109530bedfb",
+  "client_job": "db93cf3019904230",
+  "client_deployed": true,
+  "full_image_release": 17,
+  "public_update_verified": true,
+  "root_cause": "Native lua_setfield created callback globals after shipped LUIStartup sealed _G; unprotected Lua status 2 forms 0xE24C4A02",
+  "regression": "Release16 compiled callback registration reproduces the sealed-global panic; corrected linked program passes callbacks as chunk arguments under the shipped guard",
+  "agent_game_launches": 0,
+  "native_popup_render_verified": false,
+  "real_profile_reset_performed": false,
+  "backend_code_changed": false,
+  "backend_restarted": false,
+  "full_backend_complete": false,
+  "evidence": [
+    {
+      "path": "data/service-bindings-20261010/reset-client-r1/workstation-job.json",
+      "sha256": "4ddbd3681ab365f9051569437f966d56bc95d2a7b60826993b43f1b8058edcf1"
+    },
+    {
+      "path": "data/service-bindings-20261010/reset-client-r1/compiler-snapshot-receipt.json",
+      "sha256": "fb3aca82471ccb43dd97bf25f20dbd0d5a538b0c38b303fa4192152cad691bc9"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-db93cf3019904230/build-report.json",
+      "sha256": "7abe871378df6d4127257043acd0714743e0b684b71560c751f437c3f369f922"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-db93cf3019904230/verification-report.json",
+      "sha256": "03d8e20a00faaa9002b4efa5fffa3ffa03e27a6ef224f7b0ac06bd188e410184"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-db93cf3019904230/relocation-audit.json",
+      "sha256": "2423999ea13f998dc09d94c631d674d621a1d104469075a3d59645fda154ebba"
+    },
+    {
+      "path": "data/service-bindings-20261010/linked-reset-strict-lua.json",
+      "sha256": "d2ccfd20b5eb60e66586292397250f47c5f22323448c6e8514b7e30784a487de"
+    },
+    {
+      "path": "data/service-bindings-20261010/linked-unlock-policy.json",
+      "sha256": "88bd9192d4b4a4e7bb71d3517ba5be43f2f97ec9dd5c12cb763de1a11c518c8f"
+    },
+    {
+      "path": "data/service-bindings-20261010/linked-bots.json",
+      "sha256": "87bb912c9e789400fef90dfc25861c7df1bf88234e1017029165e854de37e464"
+    },
+    {
+      "path": "data/service-bindings-20261010/reset-popup-source-proof.json",
+      "sha256": "14a1c82ff4af64ecf1879f93934c578886bb811e3c4a2d78d4459a957f35c57c"
+    },
+    {
+      "path": "data/service-bindings-20261010/lua-exception-code.json",
+      "sha256": "1c116ad85f9481bad94a181936d2db0613b8548485b93fb9008a801da0be2752"
+    },
+    {
+      "path": "data/service-bindings-20261010/old-client-strict-lua.log",
+      "sha256": "1e393fb1facb09ede0355eb7b83273facc6d2107f0cf1ed195d6cbc719c4d175"
+    },
+    {
+      "path": "data/service-bindings-20261010/reset-deployment.json",
+      "sha256": "21ea9fd9e7356d157fb1c12d62bb0935ab74ff7d237af92d6b3a22b6e3dec2d7"
+    },
+    {
+      "path": "data/service-bindings-20261010/reset-remote-deployment.json",
+      "sha256": "d08d9f6af0fc0245d263073ee1d7d60765a4a7ee77b8591f5e9ed3aaf9ee50cc"
+    },
+    {
+      "path": "data/service-bindings-20261010/full-image-release17/droplet-publication.json",
+      "sha256": "867114eb7e2a79a6523d3719c0ef7f53559463dcf378111786e19968d24f970b"
+    },
+    {
+      "path": "data/service-bindings-20261010/live-update-verification.json",
+      "sha256": "52ab32295f8111f04f2921b944986484ec211724bba33ece117cf5154bb35bf2"
+    }
+  ]
+}
