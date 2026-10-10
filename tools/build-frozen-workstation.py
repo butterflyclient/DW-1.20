@@ -20,6 +20,8 @@ parser.add_argument(
 )
 parser.add_argument("--optimized", action="store_true",
                     help="Include the existing runtime com_optimized 0/1/2 controls in this private DW build")
+parser.add_argument("--include-player-data-path", action="store_true",
+                    help="Explicitly include the separate Documents/Replay profile relocation; production retains the native path")
 parser.add_argument("--receipt-directory", type=Path,
                     help="Keep this private build's job and source receipts separate from concurrent workstation builds")
 args = parser.parse_args()
@@ -203,6 +205,10 @@ private_sources = (args.integration_root or ROOT / "integration" / "replay").res
 if not private_sources.is_dir():
     raise RuntimeError("Private DW integration source directory is unavailable")
 for source in sorted(private_sources.iterdir()):
+    if source.name == "DW_PlayerDataPath.cpp" and not args.include_player_data_path:
+        # Keep this separately authored source intact. Selecting all private
+        # integration files must not silently move existing player profiles.
+        continue
     # This existing unit is supplied by its saved editor revision above.
     if source.name == "DW_LocalBackend_Frame.cpp" or source.suffix not in (
         ".cpp",

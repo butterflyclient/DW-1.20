@@ -19,6 +19,9 @@ intact. The fresh build adds only DW_ABTestingEnroll.cpp to the previous build's
 text. The promotion tool verifies these constraints before installing anything.
 Original native settings consumers and the LocalAppData identity/XP source
 implementations are retained. Existing INI bytes were verified unchanged.
+Future private builds retain the native production profile path by default.
+--include-player-data-path explicitly opts into the separate relocation source;
+the production promotion gate rejects that source. No source file is deleted.
 
 Compilation and focused checks
 All normal private compiler checks passed, including relocation/unwind checks,
