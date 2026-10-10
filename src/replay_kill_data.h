@@ -15,6 +15,7 @@ namespace replay_kill_data
     inline constexpr uint16_t Ghost = 52;
     inline constexpr uint16_t Shrapnel = 12;
     inline constexpr uint16_t Tracker = 56;
+    inline constexpr uint16_t DoubleTime = 7;
     inline constexpr uint16_t Reflex = 1;
     inline constexpr uint16_t VariableZoom = 6;
     inline constexpr uint16_t Ak47 = 16;

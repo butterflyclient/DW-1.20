@@ -3,6 +3,7 @@
 #include "replay_kill_data.h"
 #include "replay_kill_event.h"
 #include <algorithm>
+#include <string_view>
 
 namespace services
 {
@@ -119,6 +120,8 @@ namespace services
                 return classification == 5 && cause == 9;
             case 10003:
                 return classification == 5 && event.hasPerk(replay_kill_data::Tracker);
+            case 10006:
+                return classification == 5 && event.hasPerk(replay_kill_data::DoubleTime);
             case 10040:
                 return cause == 9 && event.optic() == replay_kill_data::VariableZoom &&
                        (classification & 1) != 0;
@@ -146,6 +149,21 @@ namespace services
             const auto value = number(values, name);
             wire::require(value <= UINT32_MAX);
             return value;
+        }
+
+        uint64_t mpProgress(uint32_t id, const Json &event)
+        {
+            const auto &values = event.at("values");
+            if (id == 1558 && event.at("name") == "stim" && completeParameters(values, 1))
+            {
+                // Original ProcessParams converts the reported health amount
+                // to an integer before the native event cache aggregates it.
+                // Count that amount, rather than treating each use as one heal.
+                return counter(values, "Param0");
+            }
+            if (event.at("name") == "kill" && completeParameters(values, 7))
+                return killMatches(id, values) ? uint64_t{1} : uint64_t{0};
+            return 0;
         }
 
         uint64_t brProgress(uint32_t id, const Json &event, Json &state)
@@ -290,6 +308,17 @@ namespace services
         }
     } // namespace
 
+    bool replayQuestEventMayEarn(const std::string &name)
+    {
+        // Keep admission beside the earning rules. The achievement transport
+        // must not maintain a separate list that silently drops a new family.
+        static constexpr std::array<std::string_view, 13> supported = {
+            "kill", "stim", "pickup", "driving", "alive_in_gas", "alive_not_downed",
+            "revive", "gulag_end_match", "ping", "contract_start", "contract_end",
+            "use_item", "loadout"};
+        return std::find(supported.begin(), supported.end(), std::string_view(name)) != supported.end();
+    }
+
     QuestProgress advanceReplayQuests(const Json &stored, const Json &events,
                                        std::optional<unsigned> publicCategory)
     {
@@ -329,8 +358,7 @@ namespace services
                     continue;
                 const auto oldRemainder = number(state, "timerRemainderMs");
                 const auto increment = category == 1 ? brProgress(identity, event, state)
-                    : (event.at("name") == "kill" && completeParameters(values, 7) &&
-                       killMatches(identity, values) ? uint64_t{1} : uint64_t{0});
+                    : mpProgress(identity, event);
                 if (!increment && oldRemainder == number(state, "timerRemainderMs"))
                     continue;
                 const auto total = before + std::min(increment, uint64_t{row.target} - before);

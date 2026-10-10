@@ -314,6 +314,10 @@ kill_contexts = (
     ("crossbow_five", "iw8_sn_crossbow_mp", "acog|acoglight|acog2|acog2light|reflex", "MOD_RIFLE_BULLET", "no_perks"),
     ("marksman_four", "iw8_sn_mike14_mp", "acog|acoglight|acog2|reflex", "MOD_RIFLE_BULLET", "no_perks"),
     ("unknown_attachments", "iw8_sn_mike14_mp", "unknown_attachment|unknown_attachment2|unknown_attachment3|unknown_attachment4|unknown_attachment5", "MOD_RIFLE_BULLET", "no_perks"),
+    ("double_time_smg", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_hustle"),
+    ("double_time_second", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_ghost|specialty_hustle"),
+    ("double_time_third", "iw8_sm_mpapa5_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_ghost|specialty_tracker|specialty_hustle"),
+    ("double_time_assault", "iw8_ar_mike4_mp", "no_attachments", "MOD_RIFLE_BULLET", "specialty_hustle"),
 )
 for label, weapon, attachments, cause, perks in kill_contexts:
     row = case("kill", kill_input(weapon, attachments, cause, perks=perks))
@@ -324,6 +328,8 @@ context = {row["fixture_label"]: row["values"] for row in rows if "fixture_label
 for label, slot in (("ghost_first", 0), ("ghost_second", 1), ("ghost_third", 2)):
     assert (context[label][4] >> (16 * slot)) & 0xFFFF == 52
 assert context["shrapnel_frag"][4] & 0xFFFF == 12
+for label, slot in (("double_time_smg", 0), ("double_time_second", 1), ("double_time_third", 2)):
+    assert (context[label][4] >> (16 * slot)) & 0xFFFF == 7
 assert context["tracker_smg"][4] & 0xFFFF == 56
 assert context["reflex_head"][6] & 0xFFFF == 1
 assert context["zoom_head"][6] & 0xFFFF == 6
@@ -357,6 +363,9 @@ for label, name, params in (
     ("loadout", "loadout", "1, "),
     ("contract_locales", "contract_start", "4|33,4|33, ,1"),
     ("stim_health", "stim", "17.500000"),
+    ("stim_fraction", "stim", "0.750000"),
+    ("stim_zero", "stim", "0"),
+    ("stim_remaining_health", "stim", "2483.999"),
 ):
     try:
         row = case(name, params)
@@ -372,7 +381,9 @@ for label, expected in {"pickup_totals": [2, 3, 4, 0], "driving_ms": [45000, 0],
                          "being_revived": [1, 0, 0], "invalid_revive_flags": [2, 2, 0],
                          "gulag_win": [1, 0], "gulag_loss": [2, 0],
                          "placement_15": [5, 15, 0], "loadout": [1, 0],
-                         "contract_locales": [4, 4, 0], "stim_health": [17]}.items():
+                         "contract_locales": [4, 4, 0], "stim_health": [17],
+                         "stim_fraction": [0], "stim_zero": [0],
+                         "stim_remaining_health": [2483]}.items():
     row = next(row for row in rows if row.get("fixture_label") == label)
     assert row.get("values") == expected, row
 for locale in range(1, 34):

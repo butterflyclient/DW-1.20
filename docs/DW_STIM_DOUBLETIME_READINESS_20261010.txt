@@ -1,0 +1,67 @@
+Replay DW Stim and Double Time earning, 2026-10-10
+
+Implementation
+Stage 1558 accumulates native integer Stim-health amounts toward 2500 health.
+Stage 10006 counts player-target SMG kills with Double Time in any of the three
+native perk slots. The perk ID is generated from the verified perktable row
+specialty_hustle; it is not a guessed weapon/perk number.
+The achievement transport previously maintained a separate earning-event list
+which omitted stim. Admission now lives beside the mission rules and preserves
+the existing match membership, category, version, activation-time and retry
+checks. Unknown event families do not acquire an earning rule.
+
+Target evidence
+221 original Replay ProcessParams executions verify the packed fields and
+scalar conversion. Stim input 17.500000 produces 17, sub-unit health produces 0,
+and 2483.999 produces 2483. Double Time resolves to ID 7 in all three perk slots.
+Primary quest definitions and localized descriptions supply targets and rewards.
+This reconstructs shipped behavior; it does not recover retail cloud rules.
+
+Compilation and tests
+Fresh Windows build: E:\DW\IW8\data\backend-snapshot-1791621242432347900
+Windows SHA256: ede81fbd79e61fdd1b41f6cef8b1ab1c91197635ee24aa26ecbff8222aa4d9c0
+Fresh Linux build: /opt/replay-dw/quest-stim-doubletime-20261010-f6168f6b90c9
+Linux SHA256: da698ee27e7fedc042890c0f989e969503fa1317990967210419b8edc7e6f603
+Each platform compiled 46 translation units with zero retained objects.
+Each exact binary passed 304 protocol, 107 earning and 14 management groups.
+The earning fixture verifies zero/fractional/wrong-mode exclusion, accumulated
+health, exact completion, configured XP/item, successor activation and retry.
+Double Time tests exclude missing perks and wrong weapon classes.
+
+Fixture corrections
+An accepted zero-credit event legitimately changes its receipt journal. Tests
+assert unchanged mission state, inventory and player/weapon XP instead of
+requiring every journal byte to remain unchanged.
+The disposable successor stage is reset before testing fresh auto-activation;
+an already completed successor should not be reactivated by production code.
+An asynchronous absolute-XP snapshot can arrive on either side of a task result.
+The receiver matches result kinds and current accepted XP, keeps every packet
+in diagnostic history, and retains completions, rank-ups and product grants.
+A new-rank snapshot cannot replace its completed notification. Explicit retries
+and recovered commits expect inProgress refreshes rather than another rank-up.
+No backend validation or transaction rule was weakened to pass these tests.
+
+Deployment
+Live release: /opt/replay-dw/releases/20261010-da698ee27e7f
+Live PID at verification: 250879
+Rollback: /opt/replay-dw/releases/20261010-af0b0faf2d02
+Staging and the separate stop step both verified zero online players.
+The original 12-map policy hash remains:
+03fbbc68e99bb083302e8acb0ca5c3bf2986e42d2608b26664cc68eb737e2fc4
+The game EXE, INI, local player files and full-EXE updater release 15 were not
+changed by this backend release. No game was launched in this iteration.
+Native gameplay earning/completion callbacks for the new stages remain untested.
+
+Remaining scope
+95/232 mission earning stages are implemented; 137 criteria remain open.
+Known response bindings 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24 remain
+unresolved. Original pointer/member scans yielded constructor/consumer evidence
+but did not establish response serializers or wire order; no guessed handler
+was registered. Delayed-event ownership, participant/session rotation and
+broader native per-method completion remain open. Full backend is not complete.
+
+Receipts
+validation/20261010-replay-quest-stim-readiness.json
+validation/20261010-replay-stim-doubletime-data.json
+data/remaining-stim-doubletime-20261010/backend-coverage.json
+data/remaining-stim-doubletime-20261010/deployment.json

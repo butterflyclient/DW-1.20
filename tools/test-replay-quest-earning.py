@@ -48,7 +48,7 @@ def main():
                 10046: "magnum_three", 1514: "ghost_first", 1563: "ghost_third",
                 1562: "shrapnel_frag", 1595: "reflex_head", 1598: "sks_five",
                 1624: "reflex_pistol", 10000: "smg_head", 10003: "tracker_smg",
-                10040: "zoom_head", 10131: "ak47_head"}
+                10040: "zoom_head", 10131: "ak47_head", 10006: "double_time_smg"}
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
@@ -79,6 +79,7 @@ def main():
     process, checks = None, []
     retired_lobbies = set()
     reward_history = []
+    reward_ranks = {}
 
     def start():
         nonlocal process
@@ -169,28 +170,47 @@ def main():
                     continue
             return kind, packet
 
-    def rewards(client, count):
-        # NativeClient.task queues unsolicited pushes received before its task
-        # result. lobby.cpp sends that result before the task's own deliveries.
-        # Separate only validated absolute-XP catch-up from this pre-reply
-        # queue; do not suppress any completion, rank-up or mission packet.
-        pending = []
-        for packet in client.pushes:
-            if packet.startswith(u32(67)):
-                update = decode_event67(packet, client.user)[2]
-                if update["kind"] == 0 and update["reason"] == "inProgress":
-                    assert update["id_"] == 1000000 and "xp" in update["multiProgress"]
-                    reward_history.append({"user": client.user, "pre_reply_xp_refresh": update})
-                    continue
-            pending.append(packet)
-        client.pushes[:] = pending
+    def rewards(client, count, refresh=False):
+        # Match the task's semantic results, not a fixed number of intervening
+        # asynchronous packets. Keep every packet in the diagnostic history.
+        # A stale absolute XP snapshot cannot stand in for the current award,
+        # and a new-rank snapshot cannot stand in for its completed notification.
+        expected = {1: {15}, 2: {0, 15}, 3: {0, 15, 20}}[count]
+        expected_xp = json.loads(states_path(client).with_name("events.json").read_bytes())["player_xp"]
+        previous_rank = reward_ranks.get(client.user, 0)
+
+        def xp_snapshot(update):
+            if update["kind"] != 0:
+                return None
+            assert update["id_"] == 1000000 and update["name"] == "player_xp"
+            assert update["type"] == "ACHIEVEMENT"
+            progress = update["multiProgress"]
+            assert set(progress) == {"xp", "rank"}
+            for value in progress.values():
+                assert set(value) == {"value"}
+                assert type(value["value"]) is int and value["value"] >= 0
+            return progress["xp"]["value"], progress["rank"]["value"]
+
         out = []
-        while len(out) < count:
+        received = set()
+        while received != expected:
             kind, packet = receive(client)
             assert kind == 2
             if packet.startswith(u32(67)):
                 update = decode_event67(packet, client.user)[2]
                 reward_history.append({"user": client.user, "update": update})
+                xp = xp_snapshot(update)
+                plain = xp is not None and update["reason"] == "inProgress" and "triggers" not in update
+                if plain and (xp[0] != expected_xp or (xp[1] > previous_rank and not refresh) or
+                              0 not in expected or 0 in received):
+                    reward_history[-1]["asynchronous_absolute_snapshot"] = True
+                    continue
+                assert update["kind"] in expected and update["kind"] not in received, update
+                if xp is not None:
+                    assert xp[0] == expected_xp
+                    assert update["reason"] == ("completed" if xp[1] > previous_rank and not refresh else "inProgress")
+                    reward_ranks[client.user] = xp[1]
+                received.add(update["kind"])
                 out.append(update)
         return out
 
@@ -281,12 +301,13 @@ def main():
             assert stored[1501]["progress"] == 2 and stored[1501]["status"] == 1
             saved = snapshot(host)
             assert host.task(125, 1, partial) == b""
-            assert rewards(host, 1)[0]["progress"] == 2 and snapshot(host) == saved
+            assert rewards(host, 1, refresh=True)[0]["progress"] == 2 and snapshot(host) == saved
             send(host, "remaining-kills", [event("pistol")] * 3)
             update = next(row for row in rewards(host, 2) if row["kind"] == 15)
             assert update["progress"] == 5 and update["reason"] == "completed"
             checks.append("Separate batches accumulate individual kills from zero to the exact target; partial retries neither skip stages nor re-add progress")
             negative_kill_contexts = {
+                10006: ("smg", "double_time_assault"),
                 1514: ("pistol", "br_ghost"),
                 1563: ("pistol", "br_ghost"),
                 1562: ("frag", "shrapnel_pistol"),
@@ -338,7 +359,7 @@ def main():
                     assert any(t["type"] == "ACTIVATE_ACHIEVEMENT" and t["name"] == quests[next_id]["name"] for t in mission["triggers"])
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                retry = rewards(host, 2)
+                retry = rewards(host, 2, refresh=True)
                 assert all(row["reason"] == "inProgress" for row in retry)
                 assert snapshot(host) == saved
                 assert not any(t["type"] == "ACTIVATE_ACHIEVEMENT" for row in retry for t in row.get("triggers", []))
@@ -350,6 +371,50 @@ def main():
                 send(host, f"excluded-{identity}", [event(label)])
                 assert states_path(host).read_bytes() == before
             checks.append("Marksman/sniper distinction, missing attachments, wrong weapon and unbound completion criteria remain correct")
+            for label in ("double_time_second", "double_time_third"):
+                seed(host, 10006)
+                packet = send(host, label, [event(label)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["id_"] == 10006 and update["reason"] == "completed"
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
+                assert snapshot(host) == saved
+            checks.append("Double Time qualifies in each of the three original perk slots; wrong weapon/missing perk and completion retries remain excluded")
+
+            # Earlier kill tests completed the successor. Put this disposable
+            # stage back into its fresh inactive state before testing activation.
+            seed(host, 1559, False)
+            seed(host, 1558, False)
+            before = snapshot(host)
+            def no_stim_credit(after):
+                assert after[0] == before[0] and after[2] == before[2]
+                old_journal, new_journal = json.loads(before[1]), json.loads(after[1])
+                for key in ("player_xp", "weapon_xp"):
+                    assert old_journal.get(key) == new_journal.get(key)
+
+            for label in ("stim_zero", "stim_fraction"):
+                send(host, label, [event(label)])
+                no_stim_credit(snapshot(host))
+            send(host, "stim-wrong-mode", [event("stim_health", mode=8)])
+            no_stim_credit(snapshot(host))
+            send(host, "stim-first-health", [event("stim_health")])
+            update = rewards(host, 1)[0]
+            assert update["id_"] == 1558 and update["progress"] == 17
+            assert update["reason"] == "inProgress"
+            partial = snapshot(host)
+            packet = send(host, "stim-finish-health", [event("stim_remaining_health")])
+            update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+            assert update["id_"] == 1558 and update["progress"] == 2500
+            assert update["reason"] == "completed"
+            saved = snapshot(host)
+            assert saved[0] != partial[0] and saved[2] != partial[2]
+            assert host.task(125, 1, packet) == b""
+            assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
+            assert snapshot(host) == saved
+            stored = {row["id"]: row for row in json.loads(states_path(host).read_bytes())}
+            assert stored[1558]["status"] == 3 and stored[1559]["status"] == 1
+            checks.append("Stim counts native integer health rather than uses; fractional/zero/wrong-mode reports, exact target, XP/item/successor and retry are correct")
             seed(host, 1503)
             # Mixed mission, normal player XP and Battle Pass credit in one native
             # batch must produce one states write and one merged inventory write.
@@ -398,8 +463,8 @@ def main():
             assert not intent.exists()
             saved_peer = snapshot(peer)
             assert host.task(125, 2, batch) == b""
-            assert rewards(peer, 2)[0]["reason"] == "inProgress"
-            assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+            assert rewards(peer, 2, refresh=True)[0]["reason"] == "inProgress"
+            assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
             assert snapshot(peer) == saved_peer
             checks.append("Authenticated listen-host remote mission report recovers a real interrupted mixed commit and its retry without duplicating rewards")
             host.task(145, 10, u64(int(lobby.stem)), structured=False)
@@ -426,7 +491,7 @@ def main():
                 assert mission["progress"] == quests[identity]["target"]
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                retry_updates = rewards(host, 2)
+                retry_updates = rewards(host, 2, refresh=True)
                 assert all(row["reason"] == "inProgress" for row in retry_updates), (identity, retry_updates)
                 assert snapshot(host) == saved
             checks.append("All eight BR weapon/cash/cache pickup stages consume original aggregated fields, clamp targets and preserve retries without MP-mode cross-credit")
@@ -443,7 +508,7 @@ def main():
                 assert row["timerRemainderMs"] == (250 if identity in (50008, 50063) else 45000)
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert rewards(host, 1)[0]["reason"] == "inProgress" and snapshot(host) == saved
+                assert rewards(host, 1, refresh=True)[0]["reason"] == "inProgress" and snapshot(host) == saved
                 finish_label = "gas_remaining_ms" if identity in (50008, 50063) else "driving_remaining_ms"
                 if identity == 50059:
                     finish_label = "not_downed_remaining_ms"
@@ -472,7 +537,7 @@ def main():
                 assert mission["progress"] == quests[identity]["target"]
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
             checks.append("Five BR revive/Gulag stages distinguish the actor, self-revival and win/loss; malformed flags, MP mode and retries cannot duplicate credit")
             pings = {50000: "ping_enemy", 50001: "ping_object", 50003: "ping_danger"}
@@ -505,7 +570,7 @@ def main():
                 assert update["id_"] == identity and update["reason"] == "completed"
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: native UI reference-table ping ID excludes other ping kinds and unknown names; completion and retry preserve shipped rewards")
             contracts = {50012: 4, 50015: 33, 50019: 15, 50022: 32, 50026: 6,
@@ -530,7 +595,7 @@ def main():
                 assert update["id_"] == identity and update["reason"] == "completed"
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: original contract-card locale {locale} excludes player-only/wrong/unknown locations and MP mode; rewards and retry remain atomic")
             context_actions = {
@@ -563,7 +628,7 @@ def main():
                 assert update["progress"] == quests[identity]["target"]
                 saved = snapshot(host)
                 assert host.task(125, 1, packet) == b""
-                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: shipped item/loadout/contract actor fields exclude wrong actions and MP mode; completion/rewards/retry remain atomic")
             seed(host, 50009)
@@ -585,10 +650,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 59, checks=checks,
+                                         supported_stage_count=len(fixtures) + 60, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 59} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 60} stages; {args.output}")
 
 
 if __name__ == "__main__":

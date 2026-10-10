@@ -51,7 +51,8 @@ def generate(proof_path, output):
     assert optics["reflex"] == optics["reflexmini"] == 1
     assert optics["vzscope"] == 6
     constants = dict(Ghost=perks["specialty_ghost"], Shrapnel=perks["specialty_extra_shrapnel"],
-                     Tracker=perks["specialty_tracker"], Reflex=optics["reflex"],
+                     Tracker=perks["specialty_tracker"], DoubleTime=perks["specialty_hustle"],
+                     Reflex=optics["reflex"],
                      VariableZoom=optics["vzscope"], Ak47=canonical["iw8_ar_akilo47"])
     assert all(0 < value <= 0xFFFF for value in constants.values())
     assert all(values and len(values) == len(set(values)) and

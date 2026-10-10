@@ -3,9 +3,12 @@
 #include "marketplace_services.h"
 #include <map>
 #include <set>
+#include <string>
 
 namespace services
 {
+    // Admission alone never establishes public-match/category eligibility.
+    bool replayQuestEventMayEarn(const std::string &name);
     struct QuestProgress
     {
         nlohmann::json states;
