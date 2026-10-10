@@ -249,7 +249,8 @@ def main():
     original_ini = b"\xef\xbb\xbfhost=162.243.115.160\r\nplayer_name=FixturePlayer\r\nunlock_all=1\r\nrank=53\r\n"
     files, handles, imports, dynamic, commands, callbacks = {ini: original_ini}, {}, {}, {}, {}, {}
     operations, queued, popup = [], [], []
-    state = dict(user=42, lobby=False, frontend=True, tick=1000, lua_error=False, file_error=2)
+    state = dict(user=42, lobby=False, frontend=True, tick=1000,
+                 lua_error=False, lua_load_error=False, file_error=2)
     source = Path(r"E:\replay-compiler\evidence\workstation-luafile-decompiled-all\ui\widgets\popups.lua.2561.lua").read_text()
     factory = source[source.index("local function var_0_4("):source.index("local function var_0_5(")]
     factory = factory.replace("local function var_0_4(", "function ReplayPopupFactory(", 1)
@@ -266,6 +267,13 @@ def main():
         popup.append(dialog)
 
     lua.globals().LUI = lua.table_from({"FlowManager": lua.table_from({"RequestPopupMenu": request_popup})})
+    startup_path = Path(r"E:\replay-compiler\evidence\workstation-luafile-decompiled-all\ui\luistartup.lua.2067.lua")
+    startup = startup_path.read_text()
+    # Use the shipped guard itself. A plain Lua VM misses this frontend contract.
+    guard = startup[startup.index("local var_0_1 = getmetatable(_G)"):]
+    assert 'LUI Error: Tried to create global variable ' in guard
+    lua.execute(guard)
+    callbacks["arguments"] = []
     vm_pointer = arena + 0x6000
     write(symbols["gl_151868880"], struct.pack("<Q", vm_pointer))
     for i, name in enumerate(("GetModuleFileNameA", "CreateFileA", "ReadFile", "WriteFile", "FlushFileBuffers", "CloseHandle", "GetLastError", "LoadLibraryA", "GetProcAddress", "FreeLibrary")):
@@ -375,8 +383,12 @@ def main():
             returned(11)
         elif address == symbols["DW_Progression_LuaClosure"]:
             callbacks["pending"] = a[1]
+            pointer = a[1]
+            def callback(*unused, pointer=pointer):
+                assert call(pointer, vm_pointer) == 0
+            callbacks["arguments"].append(lua.eval("function(call) return function(...) return call(...) end end")(callback))
             returned()
-        elif address == symbols["DW_Progression_LuaSetField"]:
+        elif address == symbols.get("DW_Progression_LuaSetField"):
             assert a[1] & 0xFFFFFFFF == (-10002 & 0xFFFFFFFF)
             pointer = callbacks["pending"]
             def callback(*unused, pointer=pointer):
@@ -385,13 +397,14 @@ def main():
             returned()
         elif address == symbols["DW_Progression_LuaLoad"]:
             callbacks["source"] = bytes(vm.mem_read(a[1], a[2])).decode()
-            returned(0)
+            callbacks["arguments"] = []
+            returned(int(state["lua_load_error"]))
         elif address == symbols["DW_Progression_LuaCall"]:
-            assert a[1:] == [0, 0, 0]
+            assert a[1:] == [2, 0, 0] and len(callbacks["arguments"]) == 2
             if state["lua_error"]:
                 returned(1)
             else:
-                lua.execute(callbacks["source"])
+                lua.execute(callbacks["source"], *callbacks["arguments"])
                 returned(0)
         elif address == symbols["DW_Progression_LuaSetTop"]:
             assert a[1] == 11
@@ -417,6 +430,12 @@ def main():
     call("DW_LocalProgression_Frame")
     assert files == untouched and not queued
     state["lua_error"] = False
+    state["lua_load_error"] = True
+    count = len(popup)
+    call(reset_command)
+    call("DW_LocalProgression_Frame")
+    assert len(popup) == count and files == untouched and not queued
+    state["lua_load_error"] = False
     state["lobby"] = True
     count = len(popup)
     call(reset_command)
@@ -458,11 +477,12 @@ def main():
     call("DW_LocalProgression_Frame")
     assert struct.unpack("<IIQQIIQ", files[reset_file])[2:6] == (42, 0, 0, 0)
     assert call("DW_LocalProgression_ResetRequested") == 0 and queued == ["sys_restart\n"]
-    checks.append("Compiled command executes real Lua 5.1 and shipped PopupYesNo factory with No default; No/cancel/failed popup/lobby/changed identity cause no reset; Yes queues main-thread full native reset, atomic BOM-preserving INI zeros, durable signed-reset marker and sys_restart in order; only matching authenticated reset acknowledgement clears the marker on the main thread")
+    checks.append("Compiled command passes native callbacks as chunk arguments under the shipped LUIStartup global-table guard and PopupYesNo factory with No default; No/cancel/failed popup/lobby/changed identity cause no reset; Yes queues main-thread full native reset, atomic BOM-preserving INI zeros, durable signed-reset marker and sys_restart in order; only matching authenticated reset acknowledgement clears the marker on the main thread")
 
     args.output.write_text(json.dumps(dict(schema=1, passed=True, checks=checks,
         executable_sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
         native_game_verified=False,
+        shipped_lui_startup_sha256=hashlib.sha256(startup_path.read_bytes()).hexdigest(),
         modeled_boundaries=["Win32 loading/path/time/storage", "identity/frontend/lobby getters", "dvar lookup/set", "native row selector", "native stats reset/save/command queue", "Lua C closure and load/call boundary with real Lua 5.1 and shipped PopupYesNo factory", "native stack probe"],
         tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()), indent=2) + "\n")
     print(f"PASS: {len(checks)} linked client integration groups; no game launched")

@@ -314,20 +314,23 @@ namespace
             const auto top = DW_Progression_LuaTop(vm);
             s_confirmationUser = user;
             __atomic_store_n(&s_confirmationPending, 1U, __ATOMIC_RELEASE);
-            DW_Progression_LuaClosure(vm, ConfirmYes, 0);
-            DW_Progression_LuaSetField(vm, -10002, "_ReplayDWResetYes");
-            DW_Progression_LuaClosure(vm, ConfirmNo, 0);
-            DW_Progression_LuaSetField(vm, -10002, "_ReplayDWResetNo");
             constexpr char popup[] =
-                "local yes,no=_ReplayDWResetYes,_ReplayDWResetNo\n"
-                "_ReplayDWResetYes=nil;_ReplayDWResetNo=nil\n"
+                // LUIStartup seals _G. Keep native callbacks as chunk arguments,
+                // retained by the popup's Lua closures, instead of new globals.
+                "local yes,no=...\n"
                 "LUI.FlowManager.RequestPopupMenu(nil,'PopupYesNo',false,0,false,{"
                 "controllerIndex=0,title='RESET ALL PROGRESSION',"
                 "message='Reset all XP, ranks, missions, challenges, operator and weapon unlocks, "
                 "and Battle Pass progress? This cannot be undone. The game will restart.',"
                 "yesLabel='Yes',noLabel='No',defaultFocusIndex=2,yesAction=yes,noAction=no})";
-            if (DW_Progression_LuaLoad(vm, popup, sizeof(popup) - 1, "ReplayDWResetConfirmation") ||
-                DW_Progression_LuaCall(vm, 0, 0, 0))
+            auto error = DW_Progression_LuaLoad(vm, popup, sizeof(popup) - 1, "ReplayDWResetConfirmation");
+            if (!error)
+            {
+                DW_Progression_LuaClosure(vm, ConfirmYes, 0);
+                DW_Progression_LuaClosure(vm, ConfirmNo, 0);
+                error = DW_Progression_LuaCall(vm, 2, 0, 0);
+            }
+            if (error)
             {
                 __atomic_store_n(&s_confirmationPending, 0U, __ATOMIC_RELEASE);
                 Com_Printf(25, "dw_resetProgression: confirmation popup unavailable; no reset performed.\n");

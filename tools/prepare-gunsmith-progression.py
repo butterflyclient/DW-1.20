@@ -201,7 +201,6 @@ void DW_Progression_LUILock();
 void DW_Progression_LUIUnlock();
 int DW_Progression_LuaTop(void *);
 void DW_Progression_LuaSetTop(void *, int);
-void DW_Progression_LuaSetField(void *, int, const char *);
 void DW_Progression_LuaClosure(void *, int (*)(void *), int);
 int DW_Progression_LuaLoad(void *, const char *, size_t, const char *);
 int DW_Progression_LuaCall(void *, int, int, int);
@@ -221,7 +220,6 @@ int DW_Progression_LuaCall(void *, int, int, int);
                         ("DW_Progression_LUIUnlock", "q_LUI_LeaveCriticalSection"),
                         ("DW_Progression_LuaTop", "lua_gettop"),
                         ("DW_Progression_LuaSetTop", "q_j_lua_settop"),
-                        ("DW_Progression_LuaSetField", "q_j_lua_setfield"),
                         ("DW_Progression_LuaClosure", "sub_142083EB0"),
                         ("DW_Progression_LuaLoad", "luaL_loadbuffer"),
                         ("DW_Progression_LuaCall", "sub_142083DA0")):

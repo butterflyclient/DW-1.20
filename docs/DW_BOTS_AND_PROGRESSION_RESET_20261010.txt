@@ -6,6 +6,9 @@ Player command
 Run dw_resetProgression from the signed-in main menu, outside a lobby.
 The command opens the shipped PopupYesNo widget. No has initial focus;
 No or Escape cancels without writing the INI or progression files.
+Callbacks are passed as local Lua chunk arguments. LUIStartup seals _G;
+creating callback globals before lua_pcall caused release 16 to throw an
+unprotected Lua error instead of showing the popup.
 
 Yes schedules work on the main thread, after the LUI callback returns.
 It rechecks the signed player and frontend/lobby state, writes unlock_all=0
@@ -60,8 +63,12 @@ of the private build sequence; no new manual source RVAs are required.
 
 The fresh client image passed linker, relocation and provenance checks.
 Focused Unicorn tests execute the linked replacements. Popup tests execute
-the captured Lua program with Lua 5.1 and the actual shipped PopupYesNo
-factory, modeling rendering and OS/native API boundaries explicitly.
+the captured Lua program with Lua 5.1, the actual shipped PopupYesNo
+factory and LUIStartup's sealed-global guard. Rendering and OS/native
+API boundaries remain explicit models. Release 16 reproduces the global
+creation panic under this guard; the corrected source passes without any
+new callback globals. The native throw routine forms the owner's observed
+0xE24C4A02 code from Lua status 2 and the 0xE24C4A00 exception family.
 Bot tests cover both local member views, No Fill, mixed teams, exact
 registered skin pairs, noncontiguous human slots and 199 distinct names.
 Signed disposable-profile fixtures cover reset ownership, rejected flags,
