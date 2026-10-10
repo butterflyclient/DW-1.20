@@ -1,0 +1,54 @@
+REPLAY DW BR CONTEXT RELEASE - 2026-10-10
+
+Issue and implementation
+16 additional earning predicates are implemented: 2 loadout collection stages,
+3 armor-use stages and 11 contract-completion stages. Consuming an armor plate
+is distinct from collecting it. Preset/custom successful loadout selections both
+count for generic collection. A contract success from the owner team counts,
+including a dead owner; hunted targets, failures and invalid/unknown fields do not.
+
+Research
+Original Replay ProcessParams executed 192 cases. common_br_mp supplies the
+native mp/brmissions.csv (IDs 1..11) and mp/brkioskpurchases.csv. Its reference
+table is byte-identical to UI, including armor_plate=7. Four shipped ScriptFiles
+have hash-bound original payloads and normalization limited to signed-24 local
+and switch references. Original GetByte operands verify owner=1/target=2.
+The shipped game-type table maps br=24 and dm=5; the earlier placement parser
+fixture with 5 was not BR semantic evidence. Placement earning remains open.
+These mission criteria follow shipped descriptions/fields, not retail cloud rules.
+
+Build and release
+Windows and Linux compiled 46 fresh translation units with no retained objects.
+Each exact binary passed 304 protocol, 81 earning and 14 management checks.
+Boot Camp's first five stages advance through actual native-wire event/reward/
+successor transactions with no seeding after the initial activation. No game
+runs or native gameplay completion callbacks are claimed for this batch.
+Linux SHA256: 33b7145ba39cfa8bc24671e4ab1df8e4265540dfda312a5226dae740a7764d5a
+Release: /opt/replay-dw/releases/20261010-33b7145ba39c/iw8-dw-server
+Game SHA256: 80277fed1fe1488310ff271fc1af21272e2bc4ea453e5179312bc0d80f57494d
+The shipping EXE and 12-map policy are unchanged. No client download is needed.
+Deployment checked zero players, used separate stop/start steps and verified the
+running process hash. The preceding release remains available for rollback.
+
+Audit and remaining work
+83/232 mission earning stages are implemented; 149 criteria remain open.
+The known target inventory has 140 routes, 134 handlers and 6 missing bindings:
+50/22, 58/22, 193/9, 193/10, 193/12 and 193/24. ObjectStore/extended streaming
+field tracing has not established their concrete response readers. Unwind-owned
+memory hits and unowned raw candidates remain separate; no guessed handler was
+registered and missing literal hits do not establish absence of a reader.
+Read-only anonymized accepted journals contain start/end markers. None of 16
+paired end-marker samples matched the preceding native ID in any end field.
+Those observations are not proof that every report was game-generated. They
+constrain further lifetime research, without changing account data or granting
+retired-match credit. Allocation lifetime/session rotation, new native earning
+callbacks and the broader per-method runtime audit remain open.
+The full backend objective remains active and is not claimed complete.
+
+Evidence
+validation/20261010-replay-quest-context-readiness.json
+validation/20261010-replay-br-context-producers.json
+validation/20261010-challenge-br-asset-tables.json
+validation/20261010-objectstore-field-candidates.json
+validation/20261010-match-marker-observation.json
+data/remaining-br-context-20261010/backend-coverage.json

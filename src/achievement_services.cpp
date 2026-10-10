@@ -1304,7 +1304,8 @@ namespace services
                     return name == "kill" || name == "pickup" || name == "driving" ||
                            name == "alive_in_gas" || name == "alive_not_downed" ||
                            name == "revive" || name == "gulag_end_match" || name == "ping" ||
-                           name == "contract_start";
+                           name == "contract_start" || name == "contract_end" ||
+                           name == "use_item" || name == "loadout";
                 }))
             {
                 const auto stored = document(path.parent_path() / "states.json", Json::array());

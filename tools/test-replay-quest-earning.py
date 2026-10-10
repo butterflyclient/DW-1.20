@@ -427,6 +427,7 @@ def main():
             for identity, label, successor in (
                 (50000, "ping_enemy", 50001), (50001, "ping_object", 50003),
                 (50003, "ping_danger", 50005), (50005, "pickup_weapons", 50006),
+                (50006, "loadout_preset", 50007),
             ):
                 # Only the first stage is activated explicitly. Every following
                 # head comes from the shipped successor transaction, without
@@ -438,7 +439,7 @@ def main():
                 following = next(row for row in states if row["id"] == successor)
                 assert following["status"] == 1 and following["progress"] == 0
             saved_peer = snapshot(peer)
-            checks.append("Native activation of BR Boot Camp advances its first four stages through actual event/reward/successor transactions without seeding subsequent heads")
+            checks.append("Native activation of BR Boot Camp advances its first five stages, including preset loadout collection, through actual event/reward/successor transactions without seeding subsequent heads")
             for identity, label in pings.items():
                 seed(host, identity)
                 before = snapshot(host)
@@ -479,6 +480,39 @@ def main():
                 assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: original contract-card locale {locale} excludes player-only/wrong/unknown locations and MP mode; rewards and retry remain atomic")
+            context_actions = {
+                50006: ("loadout", ("loadout_invalid",)),
+                50034: ("loadout_preset", ("loadout_invalid",)),
+                50011: ("use_armor", ("use_respawn_token", "use_unknown", "collect_armor")),
+                50024: ("use_armor", ("use_respawn_token", "use_unknown", "collect_armor")),
+                50070: ("use_armor", ("use_respawn_token", "use_unknown", "collect_armor")),
+            }
+            for identity in (50016, 50023, 50030, 50037, 50044, 50051,
+                             50058, 50065, 50072, 50079, 50086):
+                context_actions[identity] = (
+                    "contract_success_dead" if identity % 2 else "contract_success_alive",
+                    ("contract_failed", "contract_target_survived", "contract_invalid_alive",
+                     "contract_invalid_role", "contract_unknown_result", "contract_unknown_category"),
+                )
+            for identity, (label, negatives) in context_actions.items():
+                seed(host, identity)
+                before = snapshot(host)
+                for index, negative in enumerate(negatives):
+                    send(host, f"bn{identity}-{index}", [event(negative, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                send(host, f"bm{identity}", [event(label, mode=2)])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                packet = send(host, f"by{identity}", [event(label, mode=24)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["id_"] == identity and update["reason"] == "completed"
+                assert update["progress"] == quests[identity]["target"]
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert snapshot(host) == saved
+                checks.append(f"Stage {identity}: shipped item/loadout/contract actor fields exclude wrong actions and MP mode; completion/rewards/retry remain atomic")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -497,10 +531,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 43, checks=checks,
+                                         supported_stage_count=len(fixtures) + 59, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 43} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 59} stages; {args.output}")
 
 
 if __name__ == "__main__":

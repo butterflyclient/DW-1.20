@@ -34,7 +34,7 @@ Implemented MP earning stages (24):
   1501, 1503, 1505..1510, 1513, 1553, 1555..1557, 1559, 1560,
   1569, 1571, 1594, 1596, 1597, 1600, 10007, 10044, 10046.
 
-Implemented BR earning stages (43):
+Implemented BR earning stages (59):
   Enemy/object/danger pings: 50000, 50001, 50003.
   Weapon pickups: 50005.
   Cash pickups: 50007, 50042, 50066, 50069.
@@ -46,12 +46,16 @@ Implemented BR earning stages (43):
   Starting contracts at named locations: 50012, 50015, 50019, 50022, 50026,
     50029, 50033, 50036, 50040, 50043, 50047, 50050, 50054, 50057, 50061,
     50064, 50068, 50071, 50075, 50078, 50082, 50085.
+  Loadout collection: 50006, 50034.
+  Consuming armor plates: 50011, 50024, 50070.
+  Completing owned contracts: 50016, 50023, 50030, 50037, 50044, 50051,
+    50058, 50065, 50072, 50079, 50086.
 
 The shipped ScriptFile producer and original parser agree on separate weapon,
 cash and cache pickup counters. Native caches can aggregate these counts.
 Timer producers report gettime() differences in milliseconds; fractional units
 persist as timerRemainderMs and are never rounded up. Original ParseOperators
-instructions are also executed in the 176-case parser proof. Recovered script
+instructions are also executed in the 192-case parser proof. Recovered script
 and original-bytecode-correlated disassembly hashes are retained separately;
 this is producer contract evidence, not a native gameplay run.
 
@@ -69,7 +73,7 @@ danger=10 and object=13. A different-build dump uses object=11; Replay instead
 uses 11 for map_enemy. These values are bound to the current UI FF/FP hashes,
 complete original reader walk and typed table export. The original parser now
 loads the missing table through a verified supplemental asset manifest.
-Boot Camp's first four stages are covered as a native-wire activation followed
+Boot Camp's first five stages are covered as a native-wire activation followed
 by event/reward/successor transactions, without seeding intermediate heads.
 
 Verdansk's native MapEnts root and entity char-array span have been correlated
@@ -91,6 +95,24 @@ in a pipe-separated producer string, not a bitmask or every touching volume.
 Internal layover/airfield/transit labels are associated with Airport/Military
 Base/Train Station using authored origins and UI area labels; those geographic
 aliases are inferences rather than explicit aliases in the initializer.
+
+The native common_br_mp StringTables supply mp/brmissions.csv and
+mp/brkioskpurchases.csv. Its achievementenginerefs.csv is byte-identical to the
+UI copy. Contract categories occupy IDs 1..11. The original contract parser
+emits category, outcome, alive flag, team role and operator mask. The shipped
+releaseteamonquest producer reports success=1/failure=2 to owners with role=1;
+hunted targets receive role=2 with an inverted result. Only a successful owner
+report earns completion; dead owner-team members remain eligible. Unknown
+categories, invalid flags, failures and hunted-target reports receive no credit.
+These criteria follow the shipped descriptions and producer fields, not an
+unavailable retail cloud rule.
+
+Armor consumption reports use_item with reference 7; collect_item with the same
+reference is a different action. Loadout reports follow successful crate class
+selection and identify preset=0/custom=1; both count for generic collection.
+The shipped game_type_col maps br=24 and dm=5. A parser fixture with placement
+column 5 does not establish BR placement semantics. Placement earning still
+requires the separate delayed-event allocation-lifetime contract.
 
 Credit requires a native version-1 report, a selected
 matching built-in stage, a timestamp at or after activation, and current live
@@ -119,7 +141,7 @@ confirmation, weapon progression, rank entitlements and Battle Pass behavior
 retain their original paths.
 
 Open contracts:
-  165 remaining mission earning predicates, including completed/won matches,
+  149 remaining mission earning predicates, including completed/won matches,
   perk/ADS/distance/multikill/life-window flags, objectives, killstreaks, BR POIs,
   other counters, placements, pickups and co-op criteria.
   Events queued until after allocation retirement need an independently bound

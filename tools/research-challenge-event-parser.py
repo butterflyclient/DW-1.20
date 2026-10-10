@@ -25,8 +25,10 @@ parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
 assert args.output.resolve().is_relative_to(ROOT)
 extra_tables = {}
-table_manifest = ROOT / "validation/20261010-challenge-asset-tables.json"
-if table_manifest.is_file():
+for filename in ("20261010-challenge-asset-tables.json", "20261010-challenge-br-asset-tables.json"):
+    table_manifest = ROOT / "validation" / filename
+    if not table_manifest.is_file():
+        continue
     manifest = json.loads(table_manifest.read_bytes())
     assert manifest["passed"] and manifest["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
     for source in (manifest["source"], *manifest["source"]["patches"]):
@@ -346,6 +348,28 @@ for label, params, expected in (
 ):
     row = case("contract_start", params)
     assert row["values"] == expected, row
+    row["fixture_label"] = label
+    rows.append(row)
+for label, name, params in (
+    ("use_armor", "use_item", "armor_plate, "),
+    ("use_respawn_token", "use_item", "respawn_token, "),
+    ("use_unknown", "use_item", "unknown, "),
+    ("collect_armor", "collect_item", "armor_plate, "),
+    ("loadout_preset", "loadout", "0, "),
+    ("loadout_invalid", "loadout", "2, "),
+    ("contract_success_alive", "contract_end", "scavenger,1,1,1, "),
+    ("contract_success_dead", "contract_end", "scavenger,1,0,1, "),
+    ("contract_failed", "contract_end", "scavenger,2,1,1, "),
+    ("contract_target_survived", "contract_end", "assassination,1,1,2, "),
+    ("contract_invalid_alive", "contract_end", "scavenger,1,2,1, "),
+    ("contract_invalid_role", "contract_end", "scavenger,1,1,3, "),
+    ("contract_unknown_result", "contract_end", "scavenger,0,1,1, "),
+    ("contract_unknown_category", "contract_end", "unknown,1,1,1, "),
+    ("placement_br_15", "match_placement", "24,15, "),
+    ("placement_br_16", "match_placement", "24,16, "),
+):
+    row = case(name, params)
+    assert row["accepted"], row
     row["fixture_label"] = label
     rows.append(row)
 names = set()

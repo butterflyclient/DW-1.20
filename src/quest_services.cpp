@@ -154,6 +154,37 @@ namespace services
                        number(values, "Param1") == contractLocale ? 1 : 0;
             switch (id)
             {
+            case 50006:
+            case 50034:
+                // Successful crate selection reports both preset (0) and custom
+                // (1) classes. The generic collection stages accept either.
+                return name == "loadout" && completeParameters(values, 2) &&
+                       number(values, "Param0") <= 1 ? 1 : 0;
+            case 50011:
+            case 50024:
+            case 50070:
+                // Replay's shared UI/BR reference table maps armor_plate to 7.
+                // Collecting a plate is distinct from consuming it.
+                return name == "use_item" && completeParameters(values, 2) &&
+                       number(values, "Param0") == 7 ? 1 : 0;
+            case 50016:
+            case 50023:
+            case 50030:
+            case 50037:
+            case 50044:
+            case 50051:
+            case 50058:
+            case 50065:
+            case 50072:
+            case 50079:
+            case 50086:
+                // brmissions.csv defines IDs 1..11. releaseteamonquest reports
+                // success=1 to contract owners (role=1), including dead team
+                // members; hunted targets (role=2) receive a separate outcome.
+                return name == "contract_end" && completeParameters(values, 5) &&
+                       number(values, "Param0") >= 1 && number(values, "Param0") <= 11 &&
+                       number(values, "Param1") == 1 && number(values, "Param2") <= 1 &&
+                       number(values, "Param3") == 1 ? 1 : 0;
             case 50000:
             case 50001:
             case 50003:
