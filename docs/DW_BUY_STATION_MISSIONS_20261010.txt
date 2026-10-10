@@ -1,0 +1,72 @@
+REPLAY DW BUY STATION MISSION EARNING
+2026-10-10
+
+Issue
+The backend did not admit buy_item for mission earning. Four shipped BR
+criteria therefore had no purchase rule:
+  50035: Buy killstreaks.
+  50052: Buy teammates back.
+  50055: Buy loadout drops.
+  50062: Buy munitions boxes.
+
+Research
+Replay's original ProcessParams emits three UInt64 fields: category ID,
+item ID, and operator mask. The generated purchase table retains all ten
+native mp/brkioskpurchases.csv rows, with category IDs from the same build's
+mp/achievementenginerefs.csv. Item IDs and prices are not action counts.
+The script reports completed purchases after validation/grant/payment, skips
+the relevant failure branches, and also reports token teammate redeploys
+with zero currency payment. A currency-spent threshold would be incorrect.
+
+The original native StringTable lookup and hash were executed with the full
+48-byte header, cell-index array, hash array, and string dictionary. Lookup
+folds ASCII case and selects the last matching row. The previous research
+boundary incorrectly used a case-sensitive first-row lookup; the shipped
+fieldUpgrade producer spelling now resolves to the fieldupgrade category.
+All 258 retained parent cases were re-executed after correcting that boundary.
+The extended suite contains 276 original parser cases, including 18 purchases.
+
+One native ambiguity remains explicit: an unknown item lookup becomes zero,
+which is also the valid armor_bundle ID. None of these four criteria credits
+armor bundles. Future armor-purchase criteria require additional success
+provenance; a valid numeric pair alone cannot distinguish that unknown input.
+
+Fix
+src/replay_kiosk_purchase_data.h is generated from the complete shipped table.
+src/replay_buy_item_event.h retains all three UInt64 parameters. Pair matching
+does not truncate oversized IDs. quest_services.cpp credits exactly one action
+for the correct category/item pair, through the existing public allocation,
+session, activation-time, mode, reward, successor, and retry checks.
+The parser research tool releases each isolated VM callback after execution,
+so large proof extensions do not retain hundreds of mapped images.
+
+Validation
+Fresh Windows and Linux builds compile all 46 backend translation units from
+the same frozen C++ inputs. Each platform passes 157 encrypted earning groups
+covering 110 mission stages and 14 mission-management groups. New checks cover
+every shipped purchase kind, partial accumulation, exact rewards, duplicate
+retries, missing fields, oversized values, wrong/unknown pairs, MP-mode denial,
+nonzero operator masks, and signed listen-host REST reporting for a party peer.
+These are backend and original-instruction tests; no game was launched and no
+new native gameplay callback is claimed. The shipping client remains release
+17; this backend-only change requires no game executable recompile.
+
+Evidence
+  validation/20261010-replay-quest-kiosk-readiness.json
+  validation/20261010-replay-kiosk-purchase-layout.json
+  validation/20261010-replay-stringtable-lookup.json
+  data/remaining-kiosk-20261010/
+
+Deployment
+The verified Linux image is deployed on the primary droplet. Activation
+uses stop-release.py and start-release.py as separate steps, with an idle-player
+guard, process/image hash verification, health check, unchanged installed-map
+policy, and rollback to the previous release. The idle guard can be overridden
+only for an explicitly owner-authorized restart with connected players.
+This activation used the owner's explicit authorization. The running process
+hash and readiness checks match the fresh Linux image; no game was launched.
+
+Remaining scope
+110 of 232 mission criteria have earning rules; 122 criteria remain.
+Six streaming/category/large-upload response bindings and broader native
+callback validation remain open. The backend is not declared complete.

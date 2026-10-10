@@ -198,7 +198,13 @@ def case(name, params):
             rows = tables[rcx]
             selected = text(r8)
             column = uc.reg_read(UC_X86_REG_R9)
-            value = allocate(next((row[column] for row in rows if row[rdx] == selected), ""))
+            # Original native lookup folds ASCII case and scans from the last
+            # row. Verified by research-replay-stringtable-lookup.py; the
+            # producer's fieldUpgrade must match the shipped fieldupgrade row.
+            fold = lambda value: value.translate(str.maketrans(
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"))
+            value = allocate(next((row[column] for row in reversed(rows)
+                                   if fold(row[rdx]) == fold(selected)), ""))
         else:
             raise RuntimeError(f"Unmodeled call {address:#x} for {name}")
         uc.reg_write(UC_X86_REG_RAX, value)
@@ -207,11 +213,15 @@ def case(name, params):
         uc.reg_write(UC_X86_REG_RSP, sp + 8)
         uc.reg_write(UC_X86_REG_RIP, destination)
 
-    vm.hook_add(UC_HOOK_CODE, hook)
+    hook_handle = vm.hook_add(UC_HOOK_CODE, hook)
     try:
         vm.emu_start(entry, stop, count=500000)
     except Exception as error:
         raise RuntimeError(f"{error}; rip={vm.reg_read(UC_X86_REG_RIP):#x}; rax={vm.reg_read(UC_X86_REG_RAX):#x}") from error
+    finally:
+        # Break the callback's reference to this VM after each isolated case.
+        # Large proof extensions must not retain hundreds of mapped images.
+        vm.hook_del(hook_handle)
     assert vm.reg_read(UC_X86_REG_RIP) == stop
     data = bytes(vm.mem_read(output, 88))
     count = data[80]

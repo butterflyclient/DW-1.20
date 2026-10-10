@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "3392dd9dac5a030d21666b34737e14f2b8c0758fd4df427cc8b18ad3ca83a710",
+  "lookup_va": "0x1413e2ba0",
+  "hash_va": "0x1413e3410",
+  "lookup_bytes_sha256": "3614cb48e11900dd6175f697bb49da293b219277c1d95027ff250e9bc58f55aa",
+  "hash_bytes_sha256": "d5ae463fb2844e3d255ff7f517dcb121f6ab7b20389555d180f73e659c7d36ac",
+  "native_table_layout": {
+    "bytes": 48,
+    "columns": 8,
+    "rows": 12,
+    "dictionary_count": 16,
+    "cell_indices": 24,
+    "hashes": 32,
+    "strings": 40
+  },
+  "cases": [
+    {
+      "table": "replay120-achievementenginerefs.csv",
+      "table_sha256": "45a80d0059bcb44e37c6f09fcee7b1795b13fb4b965a07b3857c9fd18f1d4526",
+      "selected": "fieldUpgrade",
+      "result": "4"
+    },
+    {
+      "table": "replay120-achievementenginerefs.csv",
+      "table_sha256": "45a80d0059bcb44e37c6f09fcee7b1795b13fb4b965a07b3857c9fd18f1d4526",
+      "selected": "KILLSTREAK",
+      "result": "2"
+    },
+    {
+      "table": "replay120-achievementenginerefs.csv",
+      "table_sha256": "45a80d0059bcb44e37c6f09fcee7b1795b13fb4b965a07b3857c9fd18f1d4526",
+      "selected": "teamrevive",
+      "result": "3"
+    },
+    {
+      "table": "replay120-achievementenginerefs.csv",
+      "table_sha256": "45a80d0059bcb44e37c6f09fcee7b1795b13fb4b965a07b3857c9fd18f1d4526",
+      "selected": "unknown",
+      "result": ""
+    },
+    {
+      "table": "replay120-brkioskpurchases.csv",
+      "table_sha256": "b2e69accad8bc1c5820d50cfec71be81f3b585c4d14f17e52759325fba816f70",
+      "selected": "UAV",
+      "result": "5"
+    },
+    {
+      "table": "replay120-brkioskpurchases.csv",
+      "table_sha256": "b2e69accad8bc1c5820d50cfec71be81f3b585c4d14f17e52759325fba816f70",
+      "selected": "supply_drop",
+      "result": "9"
+    },
+    {
+      "table": "replay120-brkioskpurchases.csv",
+      "table_sha256": "b2e69accad8bc1c5820d50cfec71be81f3b585c4d14f17e52759325fba816f70",
+      "selected": "super_AMMO_drop",
+      "result": "8"
+    },
+    {
+      "table": "replay120-brkioskpurchases.csv",
+      "table_sha256": "b2e69accad8bc1c5820d50cfec71be81f3b585c4d14f17e52759325fba816f70",
+      "selected": "unknown",
+      "result": ""
+    }
+  ],
+  "duplicate_lookup_result": "last",
+  "ascii_case_insensitive": true,
+  "last_matching_row_selected": true,
+  "modeled_boundaries": [
+    "0x1422136bc"
+  ],
+  "game_runs_performed": false
+}

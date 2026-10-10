@@ -936,6 +936,62 @@ def main():
                 assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: shipped item/loadout/contract actor fields exclude wrong actions and MP mode; completion/rewards/retry remain atomic")
+            kiosk_purchases = {
+                50035: ("buy_uav", "buy_toma_strike", "buy_manual_turret", "buy_precision_airstrike", "buy_uav_operators"),
+                50052: ("buy_teamrevive",),
+                50055: ("buy_supply_drop",),
+                50062: ("buy_super_ammo_drop", "buy_field_upgrade_case"),
+            }
+            native_purchase_labels = {label for label in cases if label.startswith("buy_")}
+            for identity, positives in kiosk_purchases.items():
+                seed(host, identity, False)
+                before = snapshot(host)
+                # All ten purchase rows, unknown names and cross-category
+                # combinations come from original ProcessParams execution.
+                for index, negative in enumerate(sorted(native_purchase_labels - set(positives))):
+                    send(host, f"kn{identity}-{index}", [event(negative, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                for index in range(3):
+                    send(host, f"ki{identity}-{index}", [event(positives[0], mode=8, omit=(f"Param{index}",))])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                for index in range(2):
+                    raw = cases[positives[0]]["values"][index] + (1 << 32)
+                    send(host, f"kw{identity}-{index}", [event(positives[0], mode=8, extra={f"Param{index}": raw})])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                send(host, f"km{identity}", [event(positives[0], mode=2)])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                for index in range(quests[identity]["target"]):
+                    label = positives[index % len(positives)]
+                    packet = send(host, f"ky{identity}-{index}", [event(label, mode=24)])
+                    finished = index + 1 == quests[identity]["target"]
+                    updates = rewards(host, 2 if finished else 1)
+                    update = next(row for row in updates if row["kind"] == 15)
+                    assert update["id_"] == identity and update["progress"] == index + 1
+                    assert update["reason"] == ("completed" if finished else "inProgress")
+                    saved = snapshot(host)
+                    assert host.task(125, 1, packet) == b""
+                    assert all(row["reason"] == "inProgress" for row in rewards(host, 2 if finished else 1, refresh=True))
+                    assert snapshot(host) == saved
+                checks.append(f"Stage {identity}: each native kiosk report credits one purchase; wrong/unknown pairs, incomplete/oversized fields and MP mode earn nothing; exact rewards and retry remain atomic")
+            # Exercise the other valid streaks and nonzero operator mask too,
+            # rather than testing only the two purchases needed for completion.
+            for index, label in enumerate(("buy_manual_turret", "buy_precision_airstrike", "buy_uav_operators")):
+                seed(host, 50035, False)
+                send(host, f"ko{index}", [event(label, mode=8)])
+                update = rewards(host, 1)[0]
+                assert update["id_"] == 50035 and update["progress"] == 1
+            checks.append("All four shipped killstreak purchases and operator-masked packets earn one action, not their item ID")
+            seed(peer, 50052)
+            before = snapshot(host)
+            send_remote(host, peer, "kiosk-listen-host-rest", [event("buy_teamrevive", mode=8)], rest=True)
+            update = next(row for row in rewards(peer, 2) if row["kind"] == 15)
+            assert update["id_"] == 50052 and update["reason"] == "completed"
+            assert snapshot(host) == before
+            checks.append("Signed listen-host REST purchase reporting credits only the authorized remote buyer and grants its exact reward")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -1036,10 +1092,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 60, checks=checks,
+                                         supported_stage_count=len(fixtures) + 64, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 60} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 64} stages; {args.output}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,106 @@
+{
+  "passed": true,
+  "windows_server_sha256": "4bf59f8ab24c09f2b3dfbb43d49cd926e0362642e02df5eee271e27e8e236698",
+  "linux_server_sha256": "72ca23e9fb40b236edc93e599930dd9e487316403b4d81f0191d6569c6f9c06e",
+  "compiled_translation_units": 46,
+  "retained_objects": 0,
+  "exact_dual_platform_compiled_sources": true,
+  "supported_earning_stages": 110,
+  "remaining_earning_stages": 122,
+  "shipped_mission_descriptions": 232,
+  "original_parser_cases": 276,
+  "added_earning_stages": [
+    50035,
+    50052,
+    50055,
+    50062
+  ],
+  "encrypted_earning_checks_per_platform": 157,
+  "management_checks_per_platform": 14,
+  "native_game_callback_verified": false,
+  "game_runs_performed": false,
+  "full_backend_completed": false,
+  "server_deployed": true,
+  "shipping_client_sha256": "bd792a7c871c683baf34409f1024fe5688e18d77f3ed3a34f8f1b109530bedfb",
+  "client_recompile_required": false,
+  "previous_client_deployment": {
+    "path": "data/service-bindings-20261010/reset-deployment.json",
+    "sha256": "21ea9fd9e7356d157fb1c12d62bb0935ab74ff7d237af92d6b3a22b6e3dec2d7"
+  },
+  "native_item_zero_caveat": "Unknown item lookup aliases armor_bundle ID zero; none of the four implemented criteria credits armor_bundle. Future armor-purchase earning requires additional success provenance.",
+  "evidence": [
+    {
+      "path": "data/backend-snapshot-1791674259127561400/build-receipt.json",
+      "sha256": "981d3c42fe0eb8a229fcb4e2fcd22c4f24ab5e706de3c3d6eb752d7c89c1a6d1"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/windows-object-proof.json",
+      "sha256": "134094c5b05a8e8f57a1f1a646cac23725138b9f524587d0d54fc6b38968bea8"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/linux-build-receipt.json",
+      "sha256": "0231e9118432cd4dca4116ecc0a7017c7f6bd3a9ee0c602a3d19486548b89e21"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/windows-earning.json",
+      "sha256": "1e0ed2a8786a746fe5746f26f253ae93fa9bc449e0977748fd0d877aa38cfc41"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/windows-management.json",
+      "sha256": "16caf0e172ff9ec089f95ff8e9f250f4cadfa33f3b17ffd595c15618bb30d02f"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/linux-earning.json",
+      "sha256": "ceb4a6aebca3e5843d2e9e76c01baaa925e01277b3e0e97117d74ef9c46da61e"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/linux-management.json",
+      "sha256": "a11d013e07c7be3a280005704882a546e084487e5937128a0fd7aee44e7f7c4f"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/challenge-parser-verified.json",
+      "sha256": "2b748adc64024f4b0c044cb49b5c3d02c10d63c9a13d85709eb906bfaa9285a9"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/zero-item-ambiguity.json",
+      "sha256": "084b74f4915c1eb0d261fab87aa27c0e4ed88e8bac8e04004787adf8c26fe506"
+    },
+    {
+      "path": "validation/20261010-replay-kiosk-purchase-layout.json",
+      "sha256": "e83da072f8aeccf4fd79a8d4eed63a61e1204ea4d64e2546c1544449dc918f77"
+    },
+    {
+      "path": "validation/20261010-replay-stringtable-lookup.json",
+      "sha256": "760d3c13ab633c541d154b3274494bfb2e24ff17d869c5cd89516740e8bbf9ee"
+    }
+  ],
+  "scope": "Original buy_item parser and native StringTable helper execution; complete shipped purchase table; original-bytecode purchase-report branches; encrypted mission earning/rewards/retry/ownership and management fixtures. No new game run or native gameplay callback proof.",
+  "live_process": {
+    "pid": 281922,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261010-72ca23e9fb40/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261010-72ca23e9fb40/iw8-dw-server",
+    "sha256": "72ca23e9fb40b236edc93e599930dd9e487316403b4d81f0191d6569c6f9c06e",
+    "process_sha256": "72ca23e9fb40b236edc93e599930dd9e487316403b4d81f0191d6569c6f9c06e",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "deployed_map_policy_sha256": "03fbbc68e99bb083302e8acb0ca5c3bf2986e42d2608b26664cc68eb737e2fc4",
+  "deployment_evidence": [
+    {
+      "path": "data/remaining-kiosk-20261010/staged-release.json",
+      "sha256": "ca53083f88a3c23018a8e640de4ddc39fc90a3b3fb45566013c8ad44e08009b7"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/controlled-stop.json",
+      "sha256": "dcdcb93d131efb8900e28b110507a3540a62b33650900f2cbc7fbc92ecfde05e"
+    },
+    {
+      "path": "data/remaining-kiosk-20261010/deployment.json",
+      "sha256": "2b0575a392bbe57a314adaca0ed1af66091bed3ca1ba5cb03a12a41babd54567"
+    }
+  ],
+  "owner_authorized_connected_restart": true
+}

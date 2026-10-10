@@ -1191,6 +1191,7 @@ def live_streaming_layout_evidence():
 
 def mission_earning_evidence(server_hash):
     for filename, stages, cases in (
+        ("20261010-replay-quest-kiosk-readiness.json", 110, 276),
         ("20261010-replay-quest-stim-readiness.json", 95, 221),
         ("20261010-replay-quest-kill-readiness.json", 93, 214),
         ("20261010-replay-quest-context-readiness.json", 83, 192),

@@ -3,6 +3,7 @@
 #include "replay_kill_data.h"
 #include "replay_kill_event.h"
 #include "replay_objective_event.h"
+#include "replay_buy_item_event.h"
 #include <algorithm>
 #include <string_view>
 
@@ -205,6 +206,26 @@ namespace services
         {
             const auto &values = event.at("values");
             const auto &name = event.at("name").get_ref<const std::string &>();
+            if (name == "buy_item" && completeParameters(values, 3))
+            {
+                const ReplayBuyItemEvent purchase{{number(values, "Param0"),
+                                                    number(values, "Param1"),
+                                                    number(values, "Param2")}};
+                const auto *item = purchase.purchase();
+                if (!item)
+                    return 0;
+                // Every report is one completed purchase. Native scripts also
+                // report free/token redeploys; no currency threshold belongs
+                // here. Pair validation excludes cross-category item IDs.
+                switch (id)
+                {
+                case 50035: return item->category == ReplayKioskCategory::Killstreak;
+                case 50052: return item->id == ReplayKioskItem::Teamrevive;
+                case 50055: return item->id == ReplayKioskItem::SupplyDrop;
+                case 50062: return item->id == ReplayKioskItem::SuperAmmoDrop;
+                default: return 0;
+                }
+            }
             uint64_t contractLocale = 0;
             // Shipped setupchallengelocales assigns IDs to location_volume
             // script_noteworthy labels. Param1 is the contract card's locale;
@@ -347,10 +368,10 @@ namespace services
     {
         // Keep admission beside the earning rules. The achievement transport
         // must not maintain a separate list that silently drops a new family.
-        static constexpr std::array<std::string_view, 16> supported = {
+        static constexpr std::array<std::string_view, 17> supported = {
             "kill", "stim", "pickup", "driving", "alive_in_gas", "alive_not_downed",
             "revive", "gulag_end_match", "ping", "contract_start", "contract_end",
-            "use_item", "loadout", "capture", "plant", "defuse"};
+            "use_item", "loadout", "capture", "plant", "defuse", "buy_item"};
         return std::find(supported.begin(), supported.end(), std::string_view(name)) != supported.end();
     }
 
