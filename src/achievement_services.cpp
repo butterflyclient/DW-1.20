@@ -5,6 +5,7 @@
 #include "matchmaking_services.h"
 #include "progression_ranks.h"
 #include "weapon_progression_data.h"
+#include "leaderboard_row.h"
 #include "gunsmith_rank_unlock_data.h"
 #include "replay_quest_data.h"
 #include "marketplace_services.h"
@@ -18,6 +19,7 @@
 #include <set>
 #include <map>
 #include <chrono>
+#include <span>
 
 namespace services
 {
@@ -1028,6 +1030,13 @@ namespace services
 
         void validateEventWrite(const achievement_store::Write &write)
         {
+            if (write.kind == achievement_store::Destination::leaderboard)
+            {
+                wire::require(write.document.is_object() && write.document.size() <= 1000);
+                for (const auto &entry : write.document.items())
+                    leaderboard_row::validate(entry.value());
+                return;
+            }
             if (write.kind == achievement_store::Destination::inventory)
             {
                 validateRankInventory(write.document);
@@ -1301,7 +1310,8 @@ namespace services
                 std::optional<PublicMatchContext> allocation;
                 std::optional<unsigned> legacyCategory;
                 if (std::any_of(events.begin(), events.end(), [](const Json &event)
-                    { return event.at("name") == "start_match"; }))
+                    { return event.at("name") == "start_match" ||
+                        event.at("values").contains("dw_match_id"); }))
                     allocation = matchmakingPublicMatchContext(root, id, false);
                 if (std::any_of(events.begin(), events.end(), [](const Json &event)
                     { return !event.at("values").contains("dw_match_id") &&
@@ -1464,6 +1474,99 @@ namespace services
             return result;
         }
 
+        std::optional<platform::LobbyIdentity> reportIdentityForEvents(
+            const std::filesystem::path &root,
+            const platform::LobbyIdentity &sender,
+            const std::string &context,
+            uint64_t participant,
+            std::span<const Json> events)
+        {
+            wire::require(context == std::to_string(sender.titleId) || context == "iw8");
+            if (participant == sender.userId)
+                return sender;
+            const auto current = matchmakingReportIdentity(root, sender, participant);
+            const bool historical =
+                std::any_of(events.begin(),
+                            events.end(),
+                            [](const Json &event)
+                            {
+                                return event.at("values").contains("dw_match_id") &&
+                                       event.at("name") != "start_match";
+                            });
+            if (!historical)
+                return current;
+            if (sender.titleId != 5800 || !participant || participant == UINT64_MAX)
+                return std::nullopt;
+
+            const auto path = root / "achievements" / std::to_string(sender.titleId) / context /
+                              std::to_string(participant) / "events.json";
+            const auto journal = document(path, Json::object());
+            if (!journal.contains("matches"))
+                return std::nullopt;
+            const auto &matches = journal.at("matches");
+            validateReplayMatches(matches);
+            const auto reporter = Json{{"user", sender.userId},
+                                       {"session", wire::base64Encode(crypto::sha256(sender.key))}};
+            const auto allocation = current ? matchmakingPublicMatchContext(root, *current, false) : std::nullopt;
+            const auto time =
+                static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                                          std::chrono::system_clock::now().time_since_epoch())
+                                          .count());
+            std::set<std::string> sessions;
+            bool captured = false, requiresCurrent = false;
+            for (const auto &event : events)
+            {
+                const auto &values = event.at("values");
+                if (!values.contains("dw_match_id") || event.at("name") == "start_match")
+                {
+                    requiresCurrent = true;
+                    continue;
+                }
+                const auto found =
+                    matches.find(std::to_string(replayMatchNumber(values, "dw_match_id")));
+                if (found == matches.end())
+                    return std::nullopt;
+                const auto &row = *found;
+                const bool retained = row.contains("reporters") &&
+                    std::find(row.at("reporters").begin(), row.at("reporters").end(), reporter) != row.at("reporters").end();
+                const bool currentOwns = current && allocation && row.at("end") == 0 &&
+                    allocation->hostUser == sender.userId &&
+                    allocation->hostSession == reporter.at("session").get_ref<const std::string &>() &&
+                    replayMatchAllocationMatches(row, *allocation, wire::base64Encode(crypto::sha256(current->key)));
+                const auto timestamp = replayMatchNumber(event, "timestamp");
+                const auto family = values.value("gamemode", uint64_t{0});
+                const bool familyMatches =
+                    row.at("category") == 0 ? family == 2 : family == 8 || family == 24;
+                if ((!retained && !currentOwns) ||
+                    replayMatchNumber(row, "expires") < time || timestamp > time + 300 ||
+                    timestamp < replayMatchNumber(row, "start") ||
+                    timestamp > replayMatchNumber(row, "expires") ||
+                    values.value("version", uint64_t{0}) != 1 || !familyMatches)
+                    return std::nullopt;
+                requiresCurrent = requiresCurrent || currentOwns;
+                const auto &authorized = row.at("sessions");
+                std::set<std::string> next;
+                for (const auto &session : authorized)
+                    if (!captured || sessions.contains(session.get<std::string>()))
+                        next.insert(session.get<std::string>());
+                sessions = std::move(next);
+                captured = true;
+                if (sessions.empty())
+                    return std::nullopt;
+            }
+            if (requiresCurrent)
+            {
+                if (!current ||
+                    !sessions.contains(wire::base64Encode(crypto::sha256(current->key))))
+                    return std::nullopt;
+                return current;
+            }
+            for (const auto &session : sessions)
+                if (auto recipient = lobby::onlineIdentity(sender.titleId, participant, session))
+                    return recipient;
+            return std::nullopt;
+        }
+
         Reply recordAttributedEvents(const std::filesystem::path &root,
                                      const platform::LobbyIdentity &sender,
                                      const std::string &context,
@@ -1483,13 +1586,18 @@ namespace services
             for (const auto &owner : owners)
             {
                 const auto user = integer(owner, "userID");
-                const auto recipient = matchmakingReportIdentity(root, sender, user);
+                const auto count = integer(owner, "eventCount", 128);
+                wire::require(count && offset + count <= events.size());
+                const auto &rows = events.get_ref<const Json::array_t &>();
+                const auto pending = std::span<const Json>(rows).subspan(offset, count);
+                for (const auto &event : pending)
+                    validateEvent(event);
+                const auto recipient =
+                    reportIdentityForEvents(root, sender, context, user, pending);
                 if (!recipient || !firstPartyOwner({integer(owner, "firstPartyUserID"),
                                                     string(owner, "firstPartyAccountType", 10)},
                                                    *recipient))
                     return {101, {}, "achievement-event-owner-denied"};
-                const auto count = integer(owner, "eventCount", 128);
-                wire::require(count && offset + count <= events.size());
                 auto &batch = batches[user];
                 batch.recipient = *recipient;
                 batch.owners.push_back(owner);
@@ -1616,9 +1724,7 @@ namespace services
                         }
                     }
                     wire::require(batchSeen == 26 && !pending.empty() && platform == 113);
-                    const auto recipient = matchmakingReportIdentity(root, id, owner.user);
-                    if (!recipient || !eventOwner(owner, *recipient) ||
-                        !firstPartyOwner(firstParty, *recipient))
+                    if (owner.type != "bnet" && owner.type != "uno")
                         return {101, {}, "achievement-event-owner-denied"};
                     owners.push_back(attribution(owner, firstParty, pending.size()));
                     for (auto &event : pending)
@@ -2017,6 +2123,51 @@ namespace services
         achievement_store::commit(root, title, writes, validateEventWrite);
     }
 
+    void resetAchievementProgression(const std::filesystem::path &root,
+                                     uint32_t title, uint64_t user, uint32_t platformAccount)
+    {
+        wire::require(title == 5800 && user && user != UINT64_MAX && platformAccount);
+        achievement_store::recover(root, title, validateEventWrite);
+        platform::LobbyIdentity identity;
+        identity.titleId = title;
+        identity.userId = user;
+        identity.platformAccountId = platformAccount;
+        // Recover an already accepted purchase before replacing its inventory;
+        // a stale pending-purchase journal must not restore old ownership later.
+        (void)prepareRankInventory(root, identity, {}, false);
+        std::vector<achievement_store::Write> writes;
+        for (const std::string context : {"5800", "iw8"})
+        {
+            const auto path = root / "achievements" / "5800" / context / std::to_string(user);
+            const Json empty{{"schema", 1}, {"next", uint64_t{1}},
+                             {"events", Json::array()}, {"requests", Json::array()}};
+            const auto old = document(path / "events.json", empty);
+            validateJournal(old, identity);
+            // Keep idempotency history without keeping any mission counters,
+            // active objectives, season XP, match bindings or earned progress.
+            Json journal = empty;
+            journal["next"] = old.at("next");
+            journal["requests"] = old.at("requests");
+            journal["player_xp"] = uint64_t{0};
+            journal["weapon_xp"] = Json::object();
+            journal["matches"] = Json::object();
+            writes.push_back({user, platformAccount, context, {}, std::move(journal)});
+            writes.push_back({user, platformAccount, context, {}, Json::array(),
+                              achievement_store::Destination::states});
+        }
+        Json inventory{{"items", Json::array()}, {"balances", Json::array()}};
+        for (const auto item : replayInitialItems)
+            inventory["items"].push_back({{"1", item}, {"2", uint32_t{1}}});
+        writes.push_back({user, platformAccount, "5800", {}, std::move(inventory),
+                          achievement_store::Destination::inventory});
+        writes.push_back({user, platformAccount, "5800", {}, Json::object(),
+                          achievement_store::Destination::leaderboard});
+        // One durable roll-forward intent covers both achievement namespaces,
+        // fresh-account ownership/currencies and every leaderboard. Identity,
+        // friends and ordinary settings are separate domains and remain intact.
+        achievement_store::commit(root, title, writes, validateEventWrite);
+    }
+
     Reply achievementEventsRest(const std::filesystem::path &root,
                                 const platform::LobbyIdentity &id,
                                 const std::string &context,
@@ -2061,8 +2212,7 @@ namespace services
                 stage = "owner";
                 const auto owner = integer(batch, "userID");
                 const auto type = string(batch, "accountType", 10);
-                const auto recipient = matchmakingReportIdentity(root, id, owner);
-                if (!recipient || !eventOwner({owner, type}, *recipient))
+                if (type != "bnet" && type != "uno")
                     return {101, {}, "achievement-event-owner-denied"};
                 const auto rows = array(batch, "events", 128);
                 wire::require(!rows.empty());
@@ -2079,8 +2229,6 @@ namespace services
                                   string(batch, "platform", 16) == "bnet");
                     EventAccount firstParty{integer(batch, "firstPartyUserID"),
                                             string(batch, "firstPartyAccountType", 10)};
-                    if (!firstPartyOwner(firstParty, *recipient))
-                        return {101, {}, "achievement-event-owner-denied"};
                     owners.push_back(attribution({owner, type}, firstParty, rows.size()));
                     attributed = true;
                 }

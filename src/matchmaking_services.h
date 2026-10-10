@@ -58,6 +58,8 @@ namespace services
         uint64_t lobby = 0;
         unsigned category = 0;
         std::string session;
+        uint64_t hostUser = 0;
+        std::string hostSession;
         std::set<std::string> gameTypes;
     };
     // Capture while the exact issuing session belongs to a public allocation.

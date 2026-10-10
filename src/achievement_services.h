@@ -21,6 +21,8 @@ namespace services
                                        uint32_t title, uint64_t user, uint64_t xp,
                                        bool restore, unsigned startingRank,
                                        uint32_t platformAccount = 0);
+    void resetAchievementProgression(const std::filesystem::path &, uint32_t title,
+                                     uint64_t user, uint32_t platformAccount);
     std::optional<Reply> achievementServices(const std::filesystem::path &,
                                              const platform::LobbyIdentity &,
                                              uint8_t,

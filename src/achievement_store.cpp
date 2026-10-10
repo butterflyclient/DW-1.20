@@ -101,8 +101,10 @@ namespace achievement_store
             auto kind = Destination::event;
             if (row.contains("kind"))
             {
-                wire::require(row.at("kind") == "inventory" || row.at("kind") == "states");
-                kind = row.at("kind") == "inventory" ? Destination::inventory : Destination::states;
+                wire::require(row.at("kind") == "inventory" || row.at("kind") == "states" ||
+                              row.at("kind") == "leaderboard");
+                kind = row.at("kind") == "inventory" ? Destination::inventory :
+                       row.at("kind") == "states" ? Destination::states : Destination::leaderboard;
             }
             wire::require(kind == Destination::states ? row.at("after").is_array()
                                                      : row.at("after").is_object());
@@ -130,6 +132,12 @@ namespace achievement_store
             wire::require(write.receiptKey.empty());
             return root / "achievements" / std::to_string(title) / write.context /
                    std::to_string(write.owner) / "states.json";
+        }
+        if (write.kind == Destination::leaderboard)
+        {
+            wire::require(write.context == "5800" && write.receiptKey.empty());
+            return root / "leaderboard-stats" / std::to_string(title) /
+                   (std::to_string(write.owner) + ".json");
         }
         wire::require(write.kind == Destination::event);
         const auto folder = root / "achievements" / std::to_string(title) /
@@ -201,6 +209,8 @@ namespace achievement_store
                 entries.back()["kind"] = "inventory";
             else if (write.kind == Destination::states)
                 entries.back()["kind"] = "states";
+            else if (write.kind == Destination::leaderboard)
+                entries.back()["kind"] = "leaderboard";
         }
         // The complete intent reaches stable storage before any account journal
         // or archived retry receipt is changed. Keep it on every failure.

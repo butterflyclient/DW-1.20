@@ -36,7 +36,7 @@ struct DWLocalClientLoginRequestV2
     uint8_t challenge[32];
     uint8_t publicKey[72];
     char name[36];
-    uint32_t options; // bit 0: restore a locally stored progression record
+    uint32_t options; // bit 0: local restore; bit 1: explicit owner-signed XP/weapon reset
     uint64_t localUserId;
     uint64_t playerXp;
     uint32_t startingRank; // 0 automatic; 1..55 is Replay's career rank floor

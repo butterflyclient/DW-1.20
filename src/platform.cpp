@@ -864,7 +864,8 @@ namespace platform
             std::memcpy(&local, bytes.data(), sizeof(local));
             std::memcpy(&request, &local, offsetof(DWLocalClientLoginRequest, signature));
             std::memcpy(request.signature, local.signature, sizeof(request.signature));
-            if (local.options > 1 || local.startingRank > 55 || local.reserved ||
+            if (local.options > 3 || local.startingRank > 55 || local.reserved ||
+                ((local.options & 2) && (!(local.options & 1) || local.playerXp || local.startingRank)) ||
                 (!(local.options & 1) && (local.localUserId || local.playerXp)))
                 throw std::runtime_error("Invalid local progression login fields");
         }
@@ -926,7 +927,9 @@ namespace platform
         // Service dispatch takes storeMutex before consulting platform sessions.
         // Release the issuer lock before restoring its service mirror.
         lock.unlock();
-        if (extended)
+        if (extended && (local.options & 2))
+            services::resetLocalProgression(5800, user, platformAccount);
+        else if (extended)
             services::restoreLocalProgression(5800,
                                               user,
                                               local.playerXp,

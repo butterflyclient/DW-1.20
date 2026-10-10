@@ -549,6 +549,12 @@ namespace services
         restoreAchievementProgression(directory, title, user, xp, restore, startingRank, platformAccount);
     }
 
+    void resetLocalProgression(uint32_t title, uint64_t user, uint32_t platformAccount)
+    {
+        std::lock_guard lock(storeMutex);
+        resetAchievementProgression(directory, title, user, platformAccount);
+    }
+
     std::vector<Delivery> disconnected(uint32_t title, uint64_t user)
     {
         std::lock_guard lock(storeMutex);

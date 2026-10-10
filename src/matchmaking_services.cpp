@@ -2137,6 +2137,8 @@ namespace services
         PublicMatchContext result;
         result.lobby = assigned;
         result.session = sessionFingerprint(id);
+        result.hostUser = state.at("owner").get<uint64_t>();
+        result.hostSession = state.at("owner_session").get<std::string>();
         for (const auto &entry : selection.at("eligible_entries"))
         {
             const auto mode = entry.at("gametype").get<std::string>();

@@ -17,6 +17,7 @@ import struct
 import subprocess
 import time
 import urllib.request
+import uuid
 
 from native_wire_client import NativeClient, binary, fields, integer, structure, text, u32, u64
 from progression_delivery_fixtures import decode_event67
@@ -152,6 +153,60 @@ def main():
         assert client.task(125, 1, packet) == b""
         return packet
 
+    def send_remote(client, recipient, request, events, error=0, rest=False, first_party=None):
+        identity = integer(1, recipient.user) + text(2, "uno")
+        platform_user = recipient.platform_account_id if first_party is None else first_party
+        platform = integer(1, platform_user) + text(2, "bnet")
+        token_bytes = hashlib.sha256(request.encode()).digest()[:16]
+        token = base64.urlsafe_b64encode(token_bytes).decode().rstrip("=")
+        entry = binary(1, identity) + b"".join(binary(2, e) for e in events)
+        entry += binary(3, platform) + integer(4, 113)
+        # Context may follow the owner batch. Authorization waits until the
+        # complete request is parsed rather than depending on protobuf order.
+        packet = structure(binary(2, entry) + text(1, "5800") + text(3, token))
+        service, task, structured = 125, 2, True
+        if rest:
+            rows = []
+            for raw in events:
+                parsed = fields(raw)
+                values = {}
+                for pair in parsed.get(3, []):
+                    pair_fields = fields(pair)
+                    values[pair_fields[1][0].decode()] = pair_fields[2][0]
+                rows.append(dict(name=parsed[1][0].decode(), timestamp=parsed[2][0], values=values))
+            body = dict(titleID=5800, idempotentRequestID=str(uuid.UUID(bytes=token_bytes[::-1])),
+                        userEvents=[dict(userID=recipient.user, accountType="uno", events=rows,
+                                         firstPartyUserID=platform_user, firstPartyAccountType="bnet", platform="bnet")])
+            params = integer(1, 1) + integer(2, 0) + integer(3, 1) + integer(100, 10000)
+            params += binary(200, bytes(256)) + text(300, "user_events") + text(301, "report_user_events_batch")
+            message = binary(1, params) + integer(2, 1) + integer(10, 0x504F5354)
+            message += text(11, "/v2/user-events/$batch/?context=5800&client=replaylocal&titleID=5800")
+            message += text(101, "ae.demonware.net") + integer(102, 1) + integer(302, 1)
+            payload = json.dumps(body).encode()
+            blob = lambda raw: b"\x13" + u32(len(raw)) + raw
+            packet = u32(713) + blob(message) + b"\x01\x01" + blob(payload)
+            service, task, structured = 255, 10, False
+        try:
+            result = client.task(service, task, packet, structured=structured)
+        except RuntimeError as failure:
+            assert error and str(failure) == f"Native task {service}/{task} returned {error}", failure
+            return
+        assert not error
+        if rest:
+            assert result[:7] == u32(713) + b"\x13\x08"
+            size = struct.unpack_from("<I", result, 7)[0]
+            # The common REST metadata includes fixed64 clock fields. The
+            # achievement-field decoder handles varints and strings only;
+            # status is the verified first varint in this ordinary envelope.
+            assert result[11:11 + size].startswith(integer(1, 200))
+            position = 11 + size
+            assert result[position:position + 4] == b"\x01\x01\x13\x08"
+            length = struct.unpack_from("<I", result, position + 4)[0]
+            assert len(result) == position + 8 + length
+            assert json.loads(result[position + 8:]) == {"allSucceeded": True}
+        else:
+            assert result == b""
+
     def ordinary_text(value):
         return b"\x10" + value.encode() + b"\0"
 
@@ -208,7 +263,7 @@ def main():
                 reward_history.append({"user": client.user, "update": update})
                 xp = xp_snapshot(update)
                 if xp is not None and update["reason"] == "inProgress" and xp[0] == expected_xp and \
-                        (0 not in expected or 0 in received):
+                        (0 not in expected or 0 in received or (xp[1] > previous_rank and not refresh)):
                     inventory_path = data / "marketplace/5800" / str(client.user) / "inventory.json"
                     persisted = json.loads(inventory_path.read_bytes()) if inventory_path.exists() else {"items": []}
                     owned = {row["1"]: row["2"] for row in persisted["items"]}
@@ -318,6 +373,7 @@ def main():
             captured = json.loads(journal_path.read_bytes())["matches"][str(native_match)]
             assert captured["lobby"] == int(lobby.stem) and captured["sessions"] == [host.session_fingerprint]
             assert captured["mode"] == 6 and captured["category"] == 0
+            assert captured["reporters"] == [{"user": host.user, "session": host.session_fingerprint}]
             send(host, "history-start-repeat", [event("start_tdm", timestamp=1001, extra=start_tag)])
             assert json.loads(journal_path.read_bytes())["matches"][str(native_match)] == captured
             send(host, "history-live-kill", [event("tdm_pistol", timestamp=1001, extra=tag)])
@@ -329,7 +385,43 @@ def main():
             retired_lobbies.add(int(lobby.stem))
             send(host, "history-after-departure", [event("tdm_pistol", timestamp=1002, extra=tag)])
             assert rewards(host, 1)[0]["progress"] == 2
+            seed(peer, 1501, False)
+            delayed = [event("tdm_pistol", timestamp=1002, extra=tag)]
+            send_remote(host, peer, "history-remote", delayed)
+            assert rewards(peer, 1)[0]["progress"] == 1
+            saved_peer = snapshot(peer)
+            send_remote(host, peer, "history-remote", delayed, rest=True)
+            assert rewards(peer, 1, refresh=True)[0]["progress"] == 1
+            assert snapshot(peer) == saved_peer
+            checks.append("The captured listen-host session can report for its exact online recipient after departure; binary/REST retries retain one award and journal")
+            later_host = create_match(peer, host)
+            before_host, before_peer = snapshot(host), snapshot(peer)
+            send_remote(peer, host, "history-future-host", delayed, error=101)
+            assert snapshot(host) == before_host and snapshot(peer) == before_peer
+            checks.append("A future lobby host cannot report against a member's earlier native match, even when current membership would authorize ordinary host reports")
+            peer.task(145, 10, u64(int(later_host.stem)), structured=False)
+            receive_lobby(peer, 2002)
+            receive_lobby(host, 2002)
+            retired_lobbies.add(int(later_host.stem))
             private_later = create_match(host, peer, private=True)
+            before_peer = snapshot(peer)
+            send_remote(host, peer, "history-family-denied", [event("tdm_pistol", mode=8, timestamp=1003, extra=tag)], error=101)
+            send_remote(host, peer, "history-alias-denied", delayed, error=101, first_party=peer.platform_account_id + 1)
+            send_remote(host, peer, "history-unknown-owner", [event("tdm_pistol", timestamp=1003, extra={"dw_match_id": native_match + 1})], error=101)
+            assert snapshot(peer) == before_peer
+            checks.append("Historical reporting rejects wrong families, first-party aliases and unknown match IDs without any recipient state or receipt write")
+            peer_journal = states_path(peer).with_name("events.json")
+            complete_journal = peer_journal.read_bytes()
+            try:
+                legacy = json.loads(complete_journal)
+                del legacy["matches"][str(native_match)]["reporters"]
+                peer_journal.write_text(json.dumps(legacy) + "\n")
+                before_peer = snapshot(peer)
+                send_remote(host, peer, "history-unbound-host", delayed, error=101, rest=True)
+                assert snapshot(peer) == before_peer
+            finally:
+                peer_journal.write_bytes(complete_journal)
+            checks.append("Older nine-field match records remain readable, but do not invent retained listen-host authority")
             send(host, "history-different-lobby", [event("tdm_pistol", timestamp=1003, extra=tag)])
             assert rewards(host, 1)[0]["progress"] == 3
             before = states_path(host).read_bytes()
@@ -378,6 +470,40 @@ def main():
             receive_lobby(host, 2002)
             receive_lobby(peer, 2002)
             retired_lobbies.add(int(private_later.stem))
+            lobby = create_match(host, peer)
+            # A named native host handoff within the same allocation does not
+            # emit another GSC start. The successor must acquire only this match.
+            migrated_match = native_match + 101
+            send(host, "migration-start-host", [event("start_tdm", timestamp=1100,
+                 extra={"Param0": migrated_match, "dw_lobby_id": int(lobby.stem)})])
+            send(peer, "migration-start-peer", [event("start_tdm", timestamp=1100,
+                 extra={"Param0": migrated_match, "dw_lobby_id": int(lobby.stem)})])
+            docs = documents(host.task(145, 13, u64(int(lobby.stem)), structured=False))
+            handoff = copy.deepcopy(docs[0])
+            handoff["dw_migration_target"] = peer.user
+            handoff["player_state"] = {str(host.user): 2, str(peer.user): 2}
+            assert host.task(145, 15, u64(int(lobby.stem)) + u64(docs[1]["update_id"])
+                             + ordinary_text(json.dumps(handoff)), structured=False) == b"\x01\x01"
+            current = documents(receive_lobby(host, 2006)[23:])
+            receive_lobby(peer, 2006)
+            successor = copy.deepcopy(current[0])
+            address = json.loads((data / "matchmaking/5800/players" / f"{peer.user}.json").read_bytes())["info"]["listen_server"]["local_address"]
+            successor["listen_server"] = {"host_player_id": peer.user, "host_address": address}
+            assert peer.task(145, 15, u64(int(lobby.stem)) + u64(current[1]["update_id"])
+                             + ordinary_text(json.dumps(successor)), structured=False) == b"\x01\x01"
+            receive_lobby(host, 2006)
+            receive_lobby(peer, 2006)
+            send_remote(peer, host, "migrated-same-allocation-report", [event("driving_ms", timestamp=1101,
+                        extra={"dw_match_id": migrated_match})])
+            reporters = json.loads(journal_path.read_bytes())["matches"][str(migrated_match)]["reporters"]
+            assert {r["user"] for r in reporters} == {host.user, peer.user}
+            peer.task(145, 10, u64(int(lobby.stem)), structured=False)
+            receive_lobby(host, 2002)
+            receive_lobby(peer, 2002)
+            retired_lobbies.add(int(lobby.stem))
+            send_remote(peer, host, "migrated-captured-report-after-departure", [event("driving_ms", timestamp=1102,
+                        extra={"dw_match_id": migrated_match})], rest=True)
+            checks.append("Same-allocation authenticated host migration retains the successor without a second native start, and its exact session can report after departure")
             lobby = create_match(host, peer)
             seed(host, 1503, False)
             before = states_path(host).read_bytes()

@@ -2,6 +2,7 @@
 
 import os
 import struct
+import json
 import urllib.error
 import urllib.request
 
@@ -22,12 +23,12 @@ def exercise(root, data, offset, checks):
         with urllib.request.urlopen(urllib.request.Request(url + path, body), timeout=5) as response:
             return response.read()
 
-    def login(version=2, user=0, xp=0, rank=0, restore=False):
+    def login(version=2, user=0, xp=0, rank=0, restore=False, reset=False, options=None):
         nonce = os.urandom(32)
         challenge = post("/platform/client/challenge", blob + nonce)
         prefix = struct.pack("<II", 0x31494452, version) + nonce + challenge + blob + name
         if version == 2:
-            prefix += struct.pack("<IQQII", int(restore), user, xp, rank, 0)
+            prefix += struct.pack("<IQQII", (int(restore) | (2 if reset else 0)) if options is None else options, user, xp, rank, 0)
         r, s = utils.decode_dss_signature(key.sign(prefix, ec.ECDSA(hashes.SHA256())))
         return post("/platform/client/login", prefix + r.to_bytes(32, "big") + s.to_bytes(32, "big"))
 
@@ -54,3 +55,45 @@ def exercise(root, data, offset, checks):
         assert error.code in (400, 401)
     assert path.read_bytes() == before
     checks.append("signed machine login restores locally owned XP and selects Replay rank, retains legacy login compatibility, and rejects another identity's progression")
+    account = path.parent
+    inventory = data / "marketplace/5800" / str(user) / "inventory.json"
+    inventory.parent.mkdir(parents=True, exist_ok=True)
+    inventory.write_text(json.dumps({"items": [{"1": 429001, "2": 2}], "balances": [{"currency": 20, "amount": 9000}]}))
+    leaderboard = data / "leaderboard-stats/5800" / f"{user}.json"
+    leaderboard.parent.mkdir(parents=True, exist_ok=True)
+    leaderboard.write_text('{}')
+    contexts = [data / "achievements/5800" / c / str(user) for c in ("5800", "iw8")]
+    for folder in contexts:
+        folder.mkdir(parents=True, exist_ok=True)
+        if not (folder / "events.json").exists():
+            (folder / "events.json").write_text(json.dumps({"schema": 1, "next": 1, "events": [], "requests": []}))
+        (folder / "states.json").write_text(json.dumps([
+            {"id": 1501, "name": "reset-mission", "kind": 15, "status": 3, "progress": 100, "target": 100},
+            {"id": 2000015, "name": "iw8_ar_mike4", "kind": 5, "status": 1, "progress": 0, "target": 0,
+             "multiProgress": [{"name": "xp", "current": 20000, "target": 0}, {"name": "rank", "current": 20, "target": 0}]},
+            {"id": 300001, "name": "reset-battlepass", "kind": 20, "status": 3, "progress": 100, "target": 100}]))
+    before = {p: p.read_bytes() for p in [inventory, leaderboard, *(f / 'events.json' for f in contexts), *(f / 'states.json' for f in contexts)]}
+    for arguments in [dict(user=user + 1, restore=True, reset=True),
+                      dict(user=user, restore=True, reset=True, xp=1),
+                      dict(user=user, restore=True, reset=True, rank=2),
+                      dict(user=user, options=2), dict(user=user, options=4)]:
+        try:
+            login(**arguments)
+            raise AssertionError('Invalid full-reset request accepted')
+        except urllib.error.HTTPError as error:
+            assert error.code in (400, 401)
+        assert all(p.read_bytes() == value for p, value in before.items())
+    _, value = total(login(user=user, restore=True, reset=True))
+    assert value == {"xp": 0, "rank": 0}
+    for folder in contexts:
+        journal = json.loads((folder / 'events.json').read_bytes())
+        assert journal['player_xp'] == 0 and journal['weapon_xp'] == {} and journal['matches'] == {}
+        assert json.loads((folder / 'states.json').read_bytes()) == []
+    fresh = json.loads(inventory.read_bytes())
+    assert fresh['balances'] == [] and not any(i['1'] == 429001 for i in fresh['items'])
+    assert json.loads(leaderboard.read_bytes()) == {}
+    # Retrying a nonce-signed reset cannot resurrect the discarded state.
+    final = {p: p.read_bytes() for p in before}
+    _, value = total(login(user=user, restore=True, reset=True))
+    assert value == {"xp": 0, "rank": 0} and all(p.read_bytes() == v for p, v in final.items())
+    checks.append('full reset requires a signed matching identity, rejects mixed restore/rank/XP flags without mutation, atomically clears missions/weapon ranks/Battle Pass/inventory/currency/leaderboards in both contexts and remains idempotent')

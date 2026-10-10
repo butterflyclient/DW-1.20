@@ -10,7 +10,8 @@ namespace achievement_store
     {
         event,
         inventory,
-        states
+        states,
+        leaderboard
     };
 
     struct Write

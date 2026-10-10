@@ -15,6 +15,10 @@ namespace services
     {
         throw std::runtime_error("Unexpected progression restore in lease contract test");
     }
+    void resetLocalProgression(uint32_t, uint64_t, uint32_t)
+    {
+        throw std::runtime_error("Unexpected progression reset in lease contract test");
+    }
 }
 
 namespace
