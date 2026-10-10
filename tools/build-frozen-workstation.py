@@ -3,6 +3,7 @@
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -232,6 +233,25 @@ units_path.write_text(json.dumps(units_document, indent=2) + "\n")
 units_record = next(item for item in records if Path(item["snapshot"]) == units_path)
 units_record["original_sha256"] = units_record["sha256"]
 units_record["sha256"] = hashlib.sha256(units_path.read_bytes()).hexdigest()
+if (snapshot / "src/DW_ABTestingEnroll.cpp").exists():
+    # Native dependencies and member offsets are derived while building this
+    # frozen job. No shared source/editor revision or manual layout is changed.
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_ab_rest", ROOT / "tools/prepare-ab-rest-integration.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    ab_rest = module.prepare(snapshot)
+    for changed in (snapshot / "source-units.json", units_path):
+        record = next(item for item in records if Path(item["snapshot"]) == changed)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    for generated in (snapshot / "src/DW_ABTestingEnrollBindings.h",
+                      snapshot / "generated/ab-rest-integration.json"):
+        copy_file(generated, generated)
+    private_overrides.append({"id": ab_rest["original_writer"]["function_id"],
+                              "content_sha256": ab_rest["source_sha256"],
+                              "source": str(private_sources / "DW_ABTestingEnroll.cpp"),
+                              "derived_native_bindings": "generated/ab-rest-integration.json"})
 # A normal build generates its own static updater from the selected, frozen
 # client trust/ABI sources. Explicit reviewed integration snapshots may retain
 # their already-built helper header, whose bytes remain compiler dependencies.

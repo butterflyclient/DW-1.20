@@ -1,0 +1,75 @@
+Replay DW AB REST writer integration, 2026-10-10
+
+Issue
+The original bdABTestingEnrollRequest writer sets the URI, POST, JSON Accept,
+resource and operation, but leaves serviceName empty. Original SDK request
+validation rejects an empty service before transport.
+
+Research and implementation
+The original Replay image, SHA256
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0,
+provides the instruction and unwind evidence. The private compilation sequence
+derives the writer identity, repeated-call topology, twelve native imports,
+path-reset fields, auth fields and wire enums. Engine C++ contains no manually
+entered RVA or member offset. Bindings use stable same-image function IDs.
+Original URI construction and failure propagation are retained. The source
+replacement supplies serviceName "abtesting" only when DW is enabled.
+The backend already implements the corresponding abtesting/abtesting/enroll
+REST route; its protocol layout is not changed in this iteration.
+
+Fresh compilation
+Job b5401f1942104678 succeeded using the private source snapshot:
+E:\DW\IW8\data\compiler-snapshot-1791617240937543800
+Build directory:
+E:\DW\IW8\data\workstation-builds\build-workstation-b5401f1942104678
+Candidate:
+E:\DW\IW8\data\workstation-output\b5401f1942104678\game_dx12_ship_replay.exe
+SHA256: 8b6cce4a6dcd879e22a31cdd384823b09e00b550280e1612e69696736cab54a9
+Bytes: 101031936
+
+Validation
+The normal compiler passed replacement, callback, unwind, relocation, native
+memcpy/memmove, canonical-string, script-bytecode and provenance checks,
+including Windows SEC_IMAGE mapping and zero unresolved symbols.
+Fourteen compiled-object and ten linked-image cases execute native URI helpers
+and the original SDK request validator. They cover DW enabled/disabled,
+zero/max UInt64 users, escaped account type and native failure propagation.
+DW-enabled output passes the original service/URI/resource validation.
+Five client integration groups, 233 ownership policy cases and 100 updater
+getter/restart cases also pass against this exact candidate hash.
+Explicit VM boundaries are DW enablement, JSON Accept, CRT helpers and the
+validator's POST/MIME/header utilities. These are not a live REST enrollment
+or native response callback completion proof. No game was launched.
+
+Promotion state
+The working shipping EXE and full-image updater release are unchanged.
+Current saved source also includes a separately authored Documents/Replay
+player-data-root replacement absent from the shipping image. The candidate is
+retained privately until that path's compatibility with existing local profile
+consumers is reviewed. Its source is preserved and is not included in this
+commit. Other source differences are a trailing newline and an updater stage
+revision string; the readiness receipt enumerates exact source hashes.
+Droplet PID 234478 and image af0b0faf2d02318460f8da256121fcf2ccfd771aec48bb70ef3769efce05622e
+were verified still running. No server restart or production state mutation
+was required.
+
+Remaining backend bindings
+Known routes 50/22, 58/22, 193/9, 193/10, 193/12 and 193/24 still require
+target-bound response layouts. Byte-level tracing distinguishes category
+listing from the already supported metadata/vector callers in cached content
+and store code. A misleading SQLite name is not accepted as a DTO layout.
+The reference audit now retains raw unowned displacement nominations and
+reports incomplete chunk decoding; absence of matches is not absence of code.
+Current category audit: 21 candidate chunks, 20 matching owners, zero unowned
+nominations, zero incomplete chunks. Native reachability remains a separate
+gate. Mission earning remains 93/232 stages, with 139 criteria open. Event-cache
+ownership and participant/session rotation are also pending. This iteration
+does not claim full backend completion.
+
+Reproduction
+python -B tools/build-frozen-workstation.py --optimized --receipt-directory data/remaining-ab-native-rest-20261010
+python -B tools/verify-ab-rest-routing.py --snapshot data/compiler-snapshot-1791617240937543800 --object data/workstation-builds/build-workstation-b5401f1942104678/DW_ABTestingEnroll.obj --output data/remaining-ab-native-rest-20261010/compiled-writer-proof.json
+python -B tools/verify-ab-rest-routing.py --snapshot data/compiler-snapshot-1791617240937543800 --linked-image data/workstation-builds/build-workstation-b5401f1942104678/game_dx12_ship_replay_recompiled.exe --report data/workstation-builds/build-workstation-b5401f1942104678/build-report.json --output data/remaining-ab-native-rest-20261010/linked-writer-proof.json
+Compiler dispatch generates a new snapshot/job identity each run. Select its
+actual paths rather than reusing the recorded job ID for a subsequent build.
+Readiness: validation/20261010-ab-rest-compiled-readiness.json
