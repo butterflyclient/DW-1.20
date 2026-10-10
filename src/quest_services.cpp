@@ -121,6 +121,15 @@ namespace services
             const auto &name = event.at("name").get_ref<const std::string &>();
             switch (id)
             {
+            case 50000:
+            case 50001:
+            case 50003:
+                if (name != "ping" || !completeParameters(values, 2))
+                    return 0;
+                // Native UI StringTable mp/achievementenginerefs.csv. Other
+                // builds differ: Replay's object is 13, not map_enemy (11).
+                return number(values, "Param0") ==
+                       (id == 50000 ? 9u : id == 50001 ? 13u : 10u) ? 1 : 0;
             case 50014:
             case 50077:
                 return name == "revive" && completeParameters(values, 3) &&

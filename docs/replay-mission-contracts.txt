@@ -34,7 +34,8 @@ Implemented MP earning stages (24):
   1501, 1503, 1505..1510, 1513, 1553, 1555..1557, 1559, 1560,
   1569, 1571, 1594, 1596, 1597, 1600, 10007, 10044, 10046.
 
-Implemented BR earning stages (18):
+Implemented BR earning stages (21):
+  Enemy/object/danger pings: 50000, 50001, 50003.
   Weapon pickups: 50005.
   Cash pickups: 50007, 50042, 50066, 50069.
   Cache opens: 50010, 50031, 50084.
@@ -47,7 +48,7 @@ The shipped ScriptFile producer and original parser agree on separate weapon,
 cash and cache pickup counters. Native caches can aggregate these counts.
 Timer producers report gettime() differences in milliseconds; fractional units
 persist as timerRemainderMs and are never rounded up. Original ParseOperators
-instructions are also executed in the 104-case parser proof. Recovered script
+instructions are also executed in the 108-case parser proof. Recovered script
 and original-bytecode-correlated disassembly hashes are retained separately;
 this is producer contract evidence, not a native gameplay run.
 
@@ -59,6 +60,22 @@ The latter two must not receive each other's mission credit. Invalid non-boolean
 actor flags receive no mission credit. The shipped Gulag winner path reports
 result 1, while the loser path reports 2. Mission results and their retries share
 the existing flushed event/stage/XP/inventory transaction.
+
+Replay's UI StringTable mp/achievementenginerefs.csv identifies enemy=9,
+danger=10 and object=13. A different-build dump uses object=11; Replay instead
+uses 11 for map_enemy. These values are bound to the current UI FF/FP hashes,
+complete original reader walk and typed table export. The original parser now
+loads the missing table through a verified supplemental asset manifest.
+Boot Camp's first four stages are covered as a native-wire activation followed
+by event/reward/successor transactions, without seeding intermediate heads.
+
+Verdansk's native MapEnts root and entity char-array span have been correlated
+to original loader instructions. All 47,545 encoded entities parse, retaining
+numeric canonical keys and explicit literal-key records; 12 authored locale
+area triggers are present. Authored labels and brush-model indices do not
+establish the runtime locale IDs consumed by contract_start. Those IDs remain
+unbound; the semantic MapEnts exporter still reports a failure separately from
+the complete native reader walk.
 
 Credit requires a native version-1 report, a selected
 matching built-in stage, a timestamp at or after activation, and current live
@@ -87,7 +104,7 @@ confirmation, weapon progression, rank entitlements and Battle Pass behavior
 retain their original paths.
 
 Open contracts:
-  190 remaining mission earning predicates, including completed/won matches,
+  187 remaining mission earning predicates, including completed/won matches,
   perk/ADS/distance/multikill/life-window flags, objectives, killstreaks, BR POIs,
   other counters, placements, pickups and co-op criteria.
   Events queued until after allocation retirement need an independently bound

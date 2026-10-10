@@ -24,6 +24,18 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
 assert args.output.resolve().is_relative_to(ROOT)
+extra_tables = {}
+table_manifest = ROOT / "validation/20261010-challenge-asset-tables.json"
+if table_manifest.is_file():
+    manifest = json.loads(table_manifest.read_bytes())
+    assert manifest["passed"] and manifest["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+    for source in (manifest["source"], *manifest["source"]["patches"]):
+        assert hashlib.sha256(Path(source["path"]).read_bytes()).hexdigest() == source["sha256"]
+    for row in manifest["tables"]:
+        path = (ROOT / row["path"]).resolve()
+        assert path.is_relative_to(ROOT) and row["type_id"] == 54
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == row["sha256"]
+        extra_tables[row["name"]] = path
 image = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe")
 raw = image.read_bytes()
 assert hashlib.sha256(raw).hexdigest() == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
@@ -167,7 +179,8 @@ def case(name, params):
         elif address == 0x1413E2B00:  # native StringTable asset boundary
             asset = text(rcx)
             root = Path(r"E:\replay-compiler\evidence\workstation-stringtable-actsexport-fixed\mw19replay\code_post_gfx\mw19replay\code_post_gfx\assets\stringtable")
-            paths = list((root / Path(asset).parent).glob(Path(asset).name + ".*.csv"))
+            paths = ([extra_tables[asset]] if asset in extra_tables else
+                     list((root / Path(asset).parent).glob(Path(asset).name + ".*.csv")))
             assert len(paths) == 1, asset
             rows = list(csv.reader(paths[0].read_text(encoding="utf-8-sig").splitlines()))
             table_hashes[asset] = hashlib.sha256(paths[0].read_bytes()).hexdigest()
@@ -274,6 +287,10 @@ assert next(row for row in rows if row.get("fixture_label") == "finishing_move")
 assert next(row for row in rows if row.get("fixture_label") == "sniper_head_five")["values"][6] >> 16 & 0xFFFF == 9
 assert next(row for row in rows if row.get("fixture_label") == "lmg_five")["values"][5] & 255 == 5
 for label, name, params in (
+    ("ping_enemy", "ping", "enemy, "),
+    ("ping_object", "ping", "object, "),
+    ("ping_danger", "ping", "danger, "),
+    ("ping_unknown", "ping", "unknown, "),
     ("pickup_totals", "pickup", "2,3,4, "),
     ("pickup_weapons", "pickup", "2,0,0, "),
     ("pickup_cash", "pickup", "0,3,0, "),
@@ -304,6 +321,8 @@ for label, name, params in (
     except Exception as error:
         rows.append(dict(name=name, input=params, fixture_label=label, error=str(error)))
 for label, expected in {"pickup_totals": [2, 3, 4, 0], "driving_ms": [45000, 0],
+                         "ping_enemy": [9, 0], "ping_object": [13, 0],
+                         "ping_danger": [10, 0], "ping_unknown": [0, 0],
                          "gas_ms": [1250, 0], "not_downed_ms": [61000, 0],
                          "self_revive": [1, 1, 0], "teammate_revive": [0, 1, 0],
                          "being_revived": [1, 0, 0], "invalid_revive_flags": [2, 2, 0],

@@ -422,6 +422,38 @@ def main():
                 assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
                 assert snapshot(host) == saved
             checks.append("Five BR revive/Gulag stages distinguish the actor, self-revival and win/loss; malformed flags, MP mode and retries cannot duplicate credit")
+            pings = {50000: "ping_enemy", 50001: "ping_object", 50003: "ping_danger"}
+            select(peer, 50000)
+            for identity, label, successor in (
+                (50000, "ping_enemy", 50001), (50001, "ping_object", 50003),
+                (50003, "ping_danger", 50005), (50005, "pickup_weapons", 50006),
+            ):
+                # Only the first stage is activated explicitly. Every following
+                # head comes from the shipped successor transaction, without
+                # seeding progress or overriding a selected state in between.
+                send(peer, f"bc{identity}", [event(label, mode=8)])
+                update = next(row for row in rewards(peer, 2) if row["kind"] == 15)
+                assert update["id_"] == identity and update["reason"] == "completed"
+                states = json.loads(states_path(peer).read_bytes())
+                following = next(row for row in states if row["id"] == successor)
+                assert following["status"] == 1 and following["progress"] == 0
+            saved_peer = snapshot(peer)
+            checks.append("Native activation of BR Boot Camp advances its first four stages through actual event/reward/successor transactions without seeding subsequent heads")
+            for identity, label in pings.items():
+                seed(host, identity)
+                before = snapshot(host)
+                for negative in ("ping_unknown", *[value for value in pings.values() if value != label]):
+                    send(host, f"pn{identity}-{negative[-6:]}", [event(negative, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                packet = send(host, f"py{identity}", [event(label, mode=24)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["id_"] == identity and update["reason"] == "completed"
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert snapshot(host) == saved
+                checks.append(f"Stage {identity}: native UI reference-table ping ID excludes other ping kinds and unknown names; completion and retry preserve shipped rewards")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -440,10 +472,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 18, checks=checks,
+                                         supported_stage_count=len(fixtures) + 21, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 18} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 21} stages; {args.output}")
 
 
 if __name__ == "__main__":
