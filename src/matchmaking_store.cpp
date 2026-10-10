@@ -157,34 +157,26 @@ namespace matchmaking_store
                         state.at("revision").is_number_unsigned() &&
                         state.at("lobby_id").is_number_unsigned() &&
                         state.at("query").is_object() && state.at("active").is_boolean());
-                if (state.contains("tournament_id"))
+                // Session bindings use the same persisted layout for public,
+                // private and tournament searches. Older unbound ordinary
+                // searches are readable, but cannot authorize report credit.
+                if (state.contains("member_sessions") || state.contains("owner_session") ||
+                    state.contains("tournament_id"))
                 {
                     require(
-                        state["tournament_id"].is_number_unsigned() &&
-                        state["tournament_id"].get<uint64_t>() &&
                         state.at("owner_session").is_string() &&
                         state["owner_session"].get_ref<const std::string &>().size() == 44 &&
                         state.at("member_sessions").is_object() &&
-                        !state["member_sessions"].empty() && state["member_sessions"].size() <= 4 &&
+                        !state["member_sessions"].empty() && state["member_sessions"].size() <= 200 &&
                         state["query"].at("members").is_array() &&
                         state["query"]["members"].size() == state["member_sessions"].size() &&
                         state["query"].at("tokens").is_array() &&
                         state["query"]["tokens"].size() == state["member_sessions"].size() &&
-                        state["query"].at("tournament").at("team_size").is_number_unsigned() &&
-                        state["query"]["tournament"]["team_size"].get<uint64_t>() >= 1 &&
-                        state["query"]["tournament"]["team_size"].get<uint64_t>() <= 4 &&
-                        state["member_sessions"].size() <=
-                            state["query"]["tournament"]["team_size"].get<uint64_t>() &&
                         state["member_sessions"].contains(
                             std::to_string(state["user"].get<uint64_t>())) &&
                         state["member_sessions"][std::to_string(state["user"].get<uint64_t>())] ==
                             state["owner_session"]);
                     std::set<uint64_t> members;
-                    if (state["lobby_id"] != 0)
-                        require(state.at("round_id").is_number_unsigned() &&
-                                state["round_id"].get<uint64_t>() < 4 &&
-                                state.at("match_id").is_number_unsigned() &&
-                                state["match_id"].get<uint64_t>() < 8);
                     for (size_t i = 0; i < state["query"]["members"].size(); ++i)
                     {
                         const auto &member = state["query"]["members"][i];
@@ -197,6 +189,22 @@ namespace matchmaking_store
                         require(session.is_string() &&
                                 session.get_ref<const std::string &>().size() == 44);
                     }
+                }
+                if (state.contains("tournament_id"))
+                {
+                    require(state["tournament_id"].is_number_unsigned() &&
+                            state["tournament_id"].get<uint64_t>() &&
+                            state["member_sessions"].size() <= 4 &&
+                            state["query"].at("tournament").at("team_size").is_number_unsigned() &&
+                            state["query"]["tournament"]["team_size"].get<uint64_t>() >= 1 &&
+                            state["query"]["tournament"]["team_size"].get<uint64_t>() <= 4 &&
+                            state["member_sessions"].size() <=
+                                state["query"]["tournament"]["team_size"].get<uint64_t>());
+                    if (state["lobby_id"] != 0)
+                        require(state.at("round_id").is_number_unsigned() &&
+                                state["round_id"].get<uint64_t>() < 4 &&
+                                state.at("match_id").is_number_unsigned() &&
+                                state["match_id"].get<uint64_t>() < 8);
                 }
                 else
                     require(state["lobby_id"].get<uint64_t>() != 0);

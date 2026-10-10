@@ -7,6 +7,7 @@ import json
 import struct
 
 from native_wire_client import binary, fields, integer, structure, text as pb_text
+from fixture_io import retry_sharing
 
 
 def canonical(value):
@@ -104,7 +105,7 @@ def exercise(client, other, directory, title, buyer, helpers, checks):
     def restore(images):
         for owner, raw in images.items():
             if raw is None:
-                paths[owner].unlink(missing_ok=True)
+                retry_sharing(lambda: paths[owner].unlink(missing_ok=True))
             else:
                 paths[owner].parent.mkdir(parents=True, exist_ok=True)
                 paths[owner].write_bytes(raw)
@@ -247,7 +248,7 @@ def exercise(client, other, directory, title, buyer, helpers, checks):
         saved_journal = journal_path.read_bytes()
         other.task(80, 69, query, structured=True, error=102)
         assert snapshot() == saved and journal_path.read_bytes() == saved_journal
-        journal_path.unlink()
+        retry_sharing(journal_path.unlink)
     checks.append(
         "complete journal checksum/title/owner/size/current-image validation precedes every checkpoint; damaged or conflicting intents block reads without overwriting any account"
     )
@@ -315,7 +316,7 @@ def prepare_restart(fixture):
     for owner, raw in fixture["before"].items():
         path = fixture["paths"][owner]
         if raw is None:
-            path.unlink(missing_ok=True)
+            retry_sharing(lambda: path.unlink(missing_ok=True))
         else:
             path.write_bytes(raw)
     owner = fixture["recipient"]
@@ -335,7 +336,7 @@ def check_restart(client, fixture, checks):
     )
     path = fixture["paths"][fixture["recipient"]]
     if fixture["recipient_original"] is None:
-        path.unlink()
+        retry_sharing(path.unlink)
     else:
         path.write_bytes(fixture["recipient_original"])
     checks.append(

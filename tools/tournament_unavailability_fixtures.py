@@ -4,6 +4,7 @@ import copy
 import json
 import time
 
+from fixture_io import retry_sharing
 from tournament_fixtures import no_update, updates
 
 
@@ -11,14 +12,7 @@ def journal_snapshot(path):
     # Windows rejects a read while the backend's durable writer owns its
     # exclusive handle. Wait only for that sharing window, never for malformed
     # JSON or a failed state assertion.
-    deadline = time.monotonic() + 1
-    while True:
-        try:
-            return json.loads(path.read_bytes())
-        except PermissionError as error:
-            if getattr(error, "winerror", None) not in (32, 33) or time.monotonic() >= deadline:
-                raise
-            time.sleep(0.01)
+    return json.loads(retry_sharing(path.read_bytes))
 
 
 def exercise(directory, title, clients, publication, helpers, publish, checks):

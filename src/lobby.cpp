@@ -633,7 +633,8 @@ namespace lobby
         return std::nullopt;
     }
 
-    bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint)
+    std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user,
+                                                        const std::string &fingerprint)
     {
         std::optional<platform::LobbyIdentity> identity;
         {
@@ -648,7 +649,14 @@ namespace lobby
         }
         // Authentication can replace a ticket/key while the old socket is idle.
         // Check its issuer lease too, without holding the connection registry lock.
-        return identity && platform::valid(*identity);
+        if (identity && platform::refreshLease(*identity))
+            return identity;
+        return std::nullopt;
+    }
+
+    bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint)
+    {
+        return onlineIdentity(title, user, fingerprint).has_value();
     }
 
     void serve(const IO &transport)

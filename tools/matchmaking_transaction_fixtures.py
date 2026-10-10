@@ -68,6 +68,12 @@ def exercise(client, directory, title, user, query, helpers, checks):
         "wrong-phase",
         "too-many-entries",
         "duplicate-json-key",
+        "missing-member-session",
+        "missing-owner-session",
+        "foreign-owner-session",
+        "extra-member-session",
+        "bad-member-session",
+        "duplicate-search-member",
     ):
         changed = copy.deepcopy(pending)
         changed["writes"][0]["document"]["host_doc"]["game_state"]["state"] = "fixture-invalid"
@@ -89,6 +95,24 @@ def exercise(client, directory, title, user, query, helpers, checks):
             changed["phase"] = "applied"
         elif mode == "too-many-entries":
             changed["writes"] *= 68
+        elif mode in ("missing-member-session", "missing-owner-session", "foreign-owner-session",
+                      "extra-member-session", "bad-member-session", "duplicate-search-member"):
+            search = next(entry["document"] for entry in changed["writes"]
+                          if entry["path"] == search_name)
+            if mode == "missing-member-session":
+                del search["member_sessions"][str(user)]
+            elif mode == "missing-owner-session":
+                del search["owner_session"]
+            elif mode == "foreign-owner-session":
+                search["owner_session"] = "A" * 44
+            elif mode == "extra-member-session":
+                search["member_sessions"][str(user + 1)] = "A" * 44
+            elif mode == "bad-member-session":
+                search["member_sessions"][str(user)] = 123
+            elif mode == "duplicate-search-member":
+                search["query"]["members"] *= 2
+                search["query"]["tokens"] *= 2
+                search["member_sessions"][str(user + 1)] = "A" * 44
         encoded = json.dumps(changed)
         if mode == "duplicate-json-key":
             encoded = '{"schema":1,' + encoded[1:]
@@ -101,7 +125,7 @@ def exercise(client, directory, title, user, query, helpers, checks):
         assert not (root.parent / "outside.json").exists()
     journal_path.write_bytes(pending_bytes)
     checks.append(
-        "transaction recovery preflights every snapshot and rejects escaping/duplicate paths, foreign titles, invalid identities/capacity, overflowing index IDs, duplicate JSON keys and malformed completion markers before mutation"
+        "transaction recovery preflights every snapshot and rejects escaping/duplicate paths, foreign titles, invalid identities/capacity, overflowing index IDs, duplicate JSON keys, malformed completion markers and incomplete/foreign/duplicate member-session bindings before mutation"
     )
 
     block.rmdir()

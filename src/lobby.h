@@ -34,6 +34,8 @@ namespace lobby
     unsigned onlinePlayers();
     bool online(uint32_t title, uint64_t user);
     std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user);
+    std::optional<platform::LobbyIdentity> onlineIdentity(uint32_t title, uint64_t user,
+                                                        const std::string &fingerprint);
     bool sessionOnline(uint32_t title, uint64_t user, const std::string &fingerprint);
     extern std::atomic<unsigned> connections, authenticated, frames, tasks, failures;
 } // namespace lobby

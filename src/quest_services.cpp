@@ -157,7 +157,7 @@ namespace services
             if (id == 1558 && event.at("name") == "stim" && completeParameters(values, 1))
             {
                 // Original ProcessParams converts the reported health amount
-                // to an integer before the native event cache aggregates it.
+                // to an integer before it is submitted as Param0.
                 // Count that amount, rather than treating each use as one heal.
                 return counter(values, "Param0");
             }

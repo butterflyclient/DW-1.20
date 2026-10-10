@@ -265,11 +265,26 @@ namespace services
                                                 event == 2005 || event == 2001 ? mmId : 0});
         }
 
-        Json searchState(const platform::LobbyIdentity &id,
+        Json searchState(const std::filesystem::path &root,
+                         const platform::LobbyIdentity &id,
                          const Json &query,
                          const Json &lobby,
                          uint64_t mmId)
         {
+            Json sessions = Json::object();
+            for (size_t position = 0; position < query.at("members").size(); ++position)
+            {
+                auto identity = id;
+                identity.userId = query.at("members")[position].get<uint64_t>();
+                const auto key = std::to_string(identity.userId);
+                const auto player = read(root / "players" / (key + ".json"), identity);
+                const auto session = player.at("token_session").get<std::string>();
+                wire::require(player.at("token") == query.at("tokens")[position] &&
+                              player.at("token_expires").get<uint64_t>() > now() &&
+                              lobby::sessionOnline(id.titleId, identity.userId, session));
+                sessions[key] = session;
+            }
+            wire::require(sessions.at(std::to_string(id.userId)) == sessionFingerprint(id));
             return {{"schema", 1},
                     {"title", id.titleId},
                     {"user", id.userId},
@@ -277,8 +292,51 @@ namespace services
                     {"id", mmId},
                     {"lobby_id", lobby.at("id")},
                     {"query", query},
+                    {"owner_session", sessionFingerprint(id)},
+                    {"member_sessions", std::move(sessions)},
                     {"expires", lobby.at("expires")},
                     {"active", true}};
+        }
+
+        std::optional<std::string> allocationSession(const std::filesystem::path &root,
+                                                     const Json &state,
+                                                     uint32_t title,
+                                                     uint64_t user)
+        {
+            const auto key = std::to_string(user);
+            const auto &assignments = state.at("backend_doc").at("player_id_to_mm_id");
+            if (!assignments.contains(key))
+                return std::nullopt;
+            const auto searchId = assignments.at(key).get<uint64_t>();
+            const auto path = root / "searches" / (std::to_string(searchId) + ".json");
+            if (!std::filesystem::exists(path))
+                return std::nullopt;
+            wire::require(std::filesystem::file_size(path) <= 128 * 1024);
+            std::ifstream stream(path);
+            if (!stream)
+                throw std::runtime_error("Matchmaker allocation read failed");
+            Json search;
+            stream >> search;
+            matchmaking_store::validateWrite({"searches/" + path.filename().string(), search},
+                                             title);
+            // Historical unbound searches remain readable for cleanup, but
+            // cannot authorize a new login to report for the old allocation.
+            if (!search.contains("member_sessions"))
+                return std::nullopt;
+            const auto &sessions = search.at("member_sessions");
+            if (search.at("lobby_id") != state.at("id") || search.at("active") != true ||
+                search.at("expires").get<uint64_t>() <= now() || !sessions.contains(key))
+                return std::nullopt;
+            return sessions.at(key).get<std::string>();
+        }
+
+        bool allocatedSession(const std::filesystem::path &root,
+                              const Json &state,
+                              const platform::LobbyIdentity &id)
+        {
+            const auto session = allocationSession(root, state, id.titleId, id.userId);
+            return session && *session == sessionFingerprint(id) &&
+                   lobby::sessionOnline(id.titleId, id.userId, *session);
         }
 
         Json currentLobbies(const std::filesystem::path &root, const platform::LobbyIdentity &id)
@@ -825,7 +883,7 @@ namespace services
             const std::array<matchmaking_store::Write, 3> writes = {
                 matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", lobby},
                 matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
-                                         searchState(id, query, lobby, mmId)},
+                                         searchState(root, id, query, lobby, mmId)},
                 matchmaking_store::Write{"current-lobbies.json", assignments}};
             matchmaking_store::commit(root, id.titleId, writes);
             wire::Writer result;
@@ -1095,7 +1153,7 @@ namespace services
                 const std::array<matchmaking_store::Write, 3> writes = {
                     matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", lobby},
                     matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
-                                             searchState(id, query, lobby, mmId)},
+                                             searchState(root, id, query, lobby, mmId)},
                     matchmaking_store::Write{"current-lobbies.json", assignments}};
                 matchmaking_store::commit(root, id.titleId, writes);
                 wire::Writer result;
@@ -2039,7 +2097,13 @@ namespace services
         // Native listen hosts submit match events for their remote members.
         // Validate their first-party claims against that member's live signed
         // identity, never against an arbitrary client-supplied account.
-        return lobby::onlineIdentity(sender.titleId, participant);
+        const auto path = root / "lobbies" /
+                          (std::to_string(assignments.at(owner).get<uint64_t>()) + ".json");
+        const auto state = loadLobby(path, sender);
+        const auto session = allocationSession(root, state, sender.titleId, participant);
+        if (!allocatedSession(root, state, sender) || !session)
+            return std::nullopt;
+        return lobby::onlineIdentity(sender.titleId, participant, *session);
     }
 
     std::optional<unsigned> matchmakingPublicMatchCategory(
@@ -2064,7 +2128,7 @@ namespace services
                state.at("expires").get<uint64_t>() > now() &&
                hostSessionActive(state, id.titleId) &&
                state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game";
-        if (!active)
+        if (!active || !allocatedSession(root, state, id))
             return std::nullopt;
         const auto &selection = state.at("match_selection");
         std::optional<unsigned> category;

@@ -219,11 +219,12 @@ def main():
             kind, packet = receive(client)
             if packet.startswith(u32(67)):
                 update = decode_event67(packet, client.user)[2]
-                # The earlier unqualified kill created the native absolute-zero
-                # XP journal. Its one idle catch-up is independent of lobby
-                # creation and must not be mistaken for the create response.
+                # An idle absolute XP catch-up is independent of lobby creation.
+                # Check it against persisted XP, including after a reconnect.
                 assert update["kind"] == 0 and update["reason"] == "inProgress"
-                assert update["multiProgress"]["xp"]["value"] == 0
+                journal = states_path(client).with_name("events.json")
+                expected_xp = json.loads(journal.read_bytes()).get("player_xp", 0)
+                assert update["multiProgress"]["xp"]["value"] == expected_xp
                 continue
             assert kind == 2 and packet.startswith(u32(expected)), packet[:32].hex()
             return packet
@@ -634,6 +635,83 @@ def main():
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
+            host.task(145, 10, u64(int(lobby.stem)), structured=False)
+            receive_lobby(host, 2002)
+            receive_lobby(peer, 2002)
+            lobby = create_match(host, peer)
+            allocation = json.loads(lobby.read_bytes())
+            search_id = allocation["backend_doc"]["player_id_to_mm_id"][str(peer.user)]
+            search_path = data / "matchmaking/5800/searches" / f"{search_id}.json"
+            search = json.loads(search_path.read_bytes())
+            assert search["owner_session"] == host.session_fingerprint
+            assert search["member_sessions"] == {
+                str(host.user): host.session_fingerprint,
+                str(peer.user): peer.session_fingerprint,
+            }
+            checks.append("Ordinary allocations persist the exact authenticated session for every party member")
+            seed(peer, 1501, False)
+            resumed_identity = peer.fixture_auth_identity
+            peer.close()
+            with NativeClient(fixture, profile="quest-peer", port_offset=offset,
+                              auth_identity=resumed_identity) as resumed:
+                send(resumed, "same-ticket-resume", [event("pistol")])
+                stage = next(row for row in json.loads(states_path(resumed).read_bytes()) if row["id"] == 1501)
+                assert stage["progress"] == 1
+                checks.append("A transport reconnect with the same signed session retains its allocation and earns mission credit")
+            with NativeClient(fixture, profile="quest-peer", port_offset=offset) as rotated:
+                assert rotated.user == peer.user and rotated.session_fingerprint != peer.session_fingerprint
+                before = snapshot(rotated)
+                rejected_request = send(rotated, "rotated-old-allocation", [event("pistol")])
+                assert states_path(rotated).read_bytes() == before[0]
+                checks.append("A new login for the same account cannot earn mission credit against its old allocation")
+
+                def remote_report(request, error):
+                    owner = integer(1, rotated.user) + text(2, "uno")
+                    platform = integer(1, rotated.platform_account_id) + text(2, "bnet")
+                    entry = binary(1, owner) + binary(2, event("pistol")) + binary(3, platform) + integer(4, 113)
+                    token = base64.urlsafe_b64encode(hashlib.sha256(request.encode()).digest()[:16]).decode().rstrip("=")
+                    raw = structure(text(1, "5800") + binary(2, entry) + text(3, token))
+                    try:
+                        result = host.task(125, 2, raw)
+                    except RuntimeError as failure:
+                        assert error and str(failure) == f"Native task 125/2 returned {error}", failure
+                        return
+                    assert error == 0 and result == b""
+
+                before = snapshot(rotated)
+                remote_report("rotated-host-denied", 101)
+                assert snapshot(rotated) == before
+                checks.append("Listen-host reports cannot adopt a remote member's newer login; denial writes no rewards or receipts")
+                with NativeClient(fixture, profile="quest-peer", port_offset=offset,
+                                  auth_identity=resumed_identity) as old_session:
+                    assert old_session.task(12, 6, b"", structured=False).startswith(b"\x08")
+                    lobby = create_match(host, rotated)
+                    renewed = json.loads(lobby.read_bytes())
+                    search_id = renewed["backend_doc"]["player_id_to_mm_id"][str(rotated.user)]
+                    renewed_path = data / "matchmaking/5800/searches" / f"{search_id}.json"
+                    bound = renewed_path.read_bytes()
+                    legacy = json.loads(bound)
+                    del legacy["owner_session"], legacy["member_sessions"]
+                    try:
+                        renewed_path.write_text(json.dumps(legacy) + "\n")
+                        before = snapshot(rotated)
+                        send(rotated, "legacy-unbound-direct", [event("pistol")])
+                        assert states_path(rotated).read_bytes() == before[0]
+                        before = snapshot(rotated)
+                        remote_report("legacy-unbound-host", 101)
+                        assert snapshot(rotated) == before
+                    finally:
+                        renewed_path.write_bytes(bound)
+                    checks.append("Historical unbound searches remain readable but cannot authorize self or host mission attribution")
+                    before = states_path(rotated).read_bytes()
+                    assert rotated.task(125, 1, rejected_request) == b""
+                    assert states_path(rotated).read_bytes() == before
+                    send(rotated, "renewed-session-direct", [event("pistol")])
+                    remote_report("renewed-session-host", 0)
+                    stage = next(row for row in json.loads(states_path(rotated).read_bytes()) if row["id"] == 1501)
+                    assert stage["progress"] == 3
+                    saved_peer = snapshot(rotated)
+                    checks.append("Fresh authorized matchmaking binds the token's exact session even with two live logins; direct and host credit resume without re-crediting an old request")
             saved_host = snapshot(host)
         stop()
         start()

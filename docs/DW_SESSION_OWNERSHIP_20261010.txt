@@ -1,0 +1,67 @@
+REPLAY DW SESSION OWNERSHIP
+2026-10-10
+
+Issue
+Ordinary matchmaking searches persisted account IDs and tokens without the
+session that issued each token. Mission qualification used the account's
+current lobby assignment. Host reports selected any online identity for that
+account. A new login could consequently inherit an older allocation, and
+multiple live sessions made identity selection ambiguous.
+
+Implementation
+Public and private searches now persist owner_session and member_sessions in
+the existing atomic lobby/search/index transaction. Each member is bound to
+the exact live session that issued its validated matchmaking token.
+
+Public mission qualification requires an active allocation with the matching
+session, live host, current membership and in-game phase. Listen-host reports
+resolve the allocated member session explicitly; an arbitrary live login for
+the same account cannot replace it. Token refresh in the same session does not
+invalidate a running allocation. A fresh authorized join renews its binding.
+
+The shared search validator covers the complete session/member/token layout
+for ordinary and tournament searches, including unique member IDs and owner
+consistency. Historical unbound ordinary records remain readable for cleanup,
+but cannot authorize new public mission credit or remote report attribution.
+Existing generic self-report and ordinary XP policy was not expanded by this
+change. The session registry releases its mutex before checking issuer leases.
+
+Validation
+See validation/20261010-replay-session-ownership-readiness.json for exact build,
+fixture and deployment receipts. Both platform builds are private clean builds
+of 46 translation units. Their source hashes must match before promotion.
+The checks include same-ticket reconnect, new login, exact-session rejoin with
+two live logins, remote report denial without writes, legacy unbound searches,
+retry behavior, malformed transaction recovery and backend restart persistence.
+No game launch is required for this backend-only iteration. Native gameplay
+callback completion is not inferred from protocol fixtures.
+
+Original Replay research
+Hash-bound original instruction scans locate the native match-ID random writer,
+the small match-ID store called by the party go receiver and SP initialization,
+and six direct caller owners for the original challenge parser. The parser
+scan has complete candidate decoding and no unowned nominations. The global
+reference scan retains three unowned nominations explicitly. SQLite labels
+remain hints. These scans do not establish branch feasibility, indirect aliases
+or equality between the native match ID and a backend lobby ID.
+
+Remaining work
+This release does not solve delayed cached-event allocation lifetime. Original
+producer ownership must be captured before aggregation and bound to allocation
+history, with SDK capacity and reset/departure/migration ordering verified.
+There are still 137 unimplemented earning criteria among 232 shipped mission
+descriptions, plus six known response bindings: 50/22, 58/22, 193/9, 193/10,
+193/12 and 193/24. Broader per-method native callback coverage remains open.
+The complete-backend goal remains active; this is a validated ownership fix.
+
+Final release
+Windows SHA256 30a762693ad07b09d162c189f12b82def547c62ea1f8053f037e33d47f0704f3
+Linux SHA256 3675d62fcd8e941f342cbbb17476ac57f0f04a245c51aa2373d0dc712e02e3ce
+Live droplet 162.243.115.160, verified PID 255006.
+Each platform passed 304 protocol groups, 113 earning groups and 14 mission
+management groups. No game was launched. Playlist policy retained all 12 maps.
+The Windows fixture sharing helper is recorded separately from the immutable
+Linux fixture cohort. The backend source hashes are identical across platforms.
+The generated kill header differs from its producer receipt only by Git CRLF
+to LF normalization, verified byte for byte after that transformation.
+Shipping client EXE and INI hashes are unchanged; no new client download needed.
