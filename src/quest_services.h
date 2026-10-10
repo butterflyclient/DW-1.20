@@ -18,11 +18,20 @@ namespace services
         uint64_t xp = 0;
     };
 
+    struct ReplayQuestEventContext
+    {
+        std::optional<unsigned> category;
+        uint64_t activationCutoff = UINT64_MAX;
+    };
+
     // Original Replay parser fields and shipped mission criteria only.
     // Unbound producer predicates leave their selected stages unchanged.
     QuestProgress advanceReplayQuests(const nlohmann::json &states,
                                        const nlohmann::json &events,
                                        std::optional<unsigned> publicCategory);
+    QuestProgress advanceReplayQuests(const nlohmann::json &states,
+                                       const nlohmann::json &events,
+                                       std::span<const ReplayQuestEventContext> publicContexts);
     std::vector<Delivery> replayQuestUpdates(const platform::LobbyIdentity &identity,
                                               const std::string &context,
                                               const QuestProgress &progress,

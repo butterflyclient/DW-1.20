@@ -4343,7 +4343,30 @@ try:
         if mode == "mac":
             record[-1] ^= 1
         c.s.sendall(record)
-        assert c.s.recv(1) == b""
+        # Authentication may already have queued a valid idle notification.
+        # Decode every preceding frame before requiring FIN/RST. A task reply,
+        # invalid authenticated frame, timeout or notification flood still fails.
+        deadline = time.monotonic() + 3
+        closed = False
+        for _ in range(64):
+            remaining = deadline - time.monotonic()
+            assert remaining > 0, "Malformed native record did not close its connection"
+            c.s.settimeout(remaining)
+            try:
+                if c.s.recv(1, socket.MSG_PEEK) == b"":
+                    closed = True
+                    break
+                kind, packet = c.receive_record()
+            except ConnectionResetError:
+                closed = True
+                break
+            assert kind == 2
+            if packet.startswith(u32(67)):
+                from progression_delivery_fixtures import decode_reward
+                decode_reward(packet)
+            else:
+                assert packet == u32(18), "Unexpected response before malformed-record close"
+        assert closed, "Malformed native record caused a notification flood without closing"
         c.close()
     checks.append(
         "unknown ticket, invalid verify, modified MAC and out-of-order counter rejection"

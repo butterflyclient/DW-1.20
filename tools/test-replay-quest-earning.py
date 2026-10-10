@@ -134,12 +134,14 @@ def main():
         stage.pop("completionCount", None)
         path.write_text(json.dumps(stored) + "\n")
 
-    def event(label, timestamp=1000, mode=2, name="kill", extra=None):
+    def event(label, timestamp=1000, mode=2, name="kill", extra=None, omit=()):
         values = {f"Param{i}": value for i, value in enumerate(cases[label]["values"])}
         if name == "kill":
             name = cases[label]["name"]
         values.update(version=1, gamemode=mode)
         values.update(extra or {})
+        for key in omit:
+            values.pop(key)
         raw = text(1, name) + integer(2, timestamp) + integer(4, 0)
         for key, value in values.items():
             raw += binary(3, text(1, key) + integer(2, value))
@@ -205,6 +207,21 @@ def main():
                 update = decode_event67(packet, client.user)[2]
                 reward_history.append({"user": client.user, "update": update})
                 xp = xp_snapshot(update)
+                if xp is not None and update["reason"] == "inProgress" and xp[0] == expected_xp and \
+                        (0 not in expected or 0 in received):
+                    inventory_path = data / "marketplace/5800" / str(client.user) / "inventory.json"
+                    persisted = json.loads(inventory_path.read_bytes()) if inventory_path.exists() else {"items": []}
+                    owned = {row["1"]: row["2"] for row in persisted["items"]}
+                    for trigger in update.get("triggers", []):
+                        assert trigger["type"] == "GRANT_PRODUCT" and set(trigger) == {"type", "inventory"}
+                        assert set(trigger["inventory"]) == {"granted_items"}
+                        seen_items = set()
+                        for item in trigger["inventory"]["granted_items"]:
+                            assert set(item) == {"id", "quantity"} and item["id"] not in seen_items
+                            assert 0 < item["quantity"] <= owned.get(item["id"], 0)
+                            seen_items.add(item["id"])
+                    reward_history[-1]["asynchronous_existing_inventory_snapshot"] = True
+                    continue
                 plain = xp is not None and update["reason"] == "inProgress" and "triggers" not in update
                 if plain and (xp[0] != expected_xp or (xp[1] > previous_rank and not refresh) or
                               0 not in expected or 0 in received):
@@ -275,6 +292,9 @@ def main():
             send(host, "no-public-match", [event("frag")])
             assert states_path(host).read_bytes() == before
             private = create_match(host, peer, private=True)
+            send(host, "history-private-start", [event("start_tdm", extra={
+                "dw_match_id": 987654321, "dw_lobby_id": int(private.stem)})])
+            assert not json.loads(states_path(host).with_name("events.json").read_bytes()).get("matches")
             send(host, "private-match", [event("frag")])
             assert states_path(host).read_bytes() == before
             host.task(145, 10, u64(int(private.stem)), structured=False)
@@ -282,6 +302,85 @@ def main():
             receive_lobby(peer, 2002)
             retired_lobbies.add(int(private.stem))
             lobby = create_match(host, peer)
+            seed(host, 1501, False)
+            native_match = cases["start_tdm"]["values"][0]
+            tag = {"dw_match_id": native_match}
+            start_tag = {**tag, "dw_lobby_id": int(lobby.stem)}
+            before = states_path(host).read_bytes()
+            send(host, "history-unregistered", [event("tdm_pistol", extra=tag)])
+            assert states_path(host).read_bytes() == before
+            send(host, "history-no-allocation", [event("start_tdm", extra=tag)])
+            send(host, "history-wrong-allocation", [event("start_tdm", extra={**start_tag, "dw_lobby_id": int(lobby.stem) + 1})])
+            assert not json.loads(states_path(host).with_name("events.json").read_bytes()).get("matches")
+            send(host, "history-start", [event("start_tdm", extra=start_tag)])
+            send(peer, "history-peer-start", [event("start_tdm", extra=start_tag)])
+            journal_path = states_path(host).with_name("events.json")
+            captured = json.loads(journal_path.read_bytes())["matches"][str(native_match)]
+            assert captured["lobby"] == int(lobby.stem) and captured["sessions"] == [host.session_fingerprint]
+            assert captured["mode"] == 6 and captured["category"] == 0
+            send(host, "history-start-repeat", [event("start_tdm", timestamp=1001, extra=start_tag)])
+            assert json.loads(journal_path.read_bytes())["matches"][str(native_match)] == captured
+            send(host, "history-live-kill", [event("tdm_pistol", timestamp=1001, extra=tag)])
+            assert rewards(host, 1)[0]["progress"] == 1
+            checks.append("Native start captures the exact public allocation/session; private and unregistered tags cannot earn and new-UUID starts cannot replace that snapshot")
+            host.task(145, 10, u64(int(lobby.stem)), structured=False)
+            receive_lobby(host, 2002)
+            receive_lobby(peer, 2002)
+            retired_lobbies.add(int(lobby.stem))
+            send(host, "history-after-departure", [event("tdm_pistol", timestamp=1002, extra=tag)])
+            assert rewards(host, 1)[0]["progress"] == 2
+            private_later = create_match(host, peer, private=True)
+            send(host, "history-different-lobby", [event("tdm_pistol", timestamp=1003, extra=tag)])
+            assert rewards(host, 1)[0]["progress"] == 3
+            before = states_path(host).read_bytes()
+            send(host, "history-unknown-tag", [event("tdm_pistol", timestamp=1004, extra={"dw_match_id": native_match + 1})])
+            assert states_path(host).read_bytes() == before
+            checks.append("Tagged events retain their original public allocation after departure and during a later private lobby; an unknown ID never inherits the latest lobby")
+            saved_journal = journal_path.read_bytes()
+            valid_journal = json.loads(saved_journal)
+            broken = copy.deepcopy(valid_journal)
+            broken["matches"][str(native_match)]["sessions"].append(host.session_fingerprint)
+            row_text = json.dumps(valid_journal["matches"][str(native_match)])
+            duplicate = "{" + ",".join(json.dumps(key) + ":" +
+                ("{" + json.dumps(str(native_match)) + ":" + row_text + "," +
+                 json.dumps(str(native_match)) + ":" + row_text + "}" if key == "matches" else json.dumps(value))
+                for key, value in valid_journal.items()) + "}"
+            raw_paths = [states_path(host), journal_path,
+                         data / "marketplace/5800" / str(host.user) / "inventory.json"]
+            for index, damaged in enumerate((json.dumps(broken), duplicate)):
+                try:
+                    journal_path.write_text(damaged + "\n")
+                    before = [path.read_bytes() if path.exists() else None for path in raw_paths]
+                    try:
+                        send(host, f"history-corrupt-ledger-{index}", [event("tdm_pistol", timestamp=1004, extra=tag)])
+                    except RuntimeError as failure:
+                        assert "Native task 125/1 returned" in str(failure)
+                    else:
+                        raise AssertionError("Corrupt match ledger was accepted")
+                    assert [path.read_bytes() if path.exists() else None for path in raw_paths] == before
+                finally:
+                    journal_path.write_bytes(saved_journal)
+            checks.append("Malformed retained ownership and duplicate persisted IDs are rejected before any mission, XP, inventory or receipt write")
+            send(host, "history-incomplete-end", [event("end_match_mode_operators", timestamp=1004, extra=tag, omit=("Param4",))])
+            assert json.loads(journal_path.read_bytes())["matches"][str(native_match)]["end"] == 0
+            send(host, "history-wrong-family-end", [event("end_match_mode_operators", timestamp=1004, mode=8, extra=tag)])
+            assert json.loads(journal_path.read_bytes())["matches"][str(native_match)]["end"] == 0
+            send(host, "history-end", [event("end_match_mode_operators", timestamp=1004, extra=tag)])
+            closed = json.loads(journal_path.read_bytes())["matches"][str(native_match)]
+            assert closed["end"] == 1004 and closed["outcome"] == 1
+            send(host, "history-end-repeat", [event("end_match_mode_operators", timestamp=1005, extra=tag)])
+            assert json.loads(journal_path.read_bytes())["matches"][str(native_match)] == closed
+            before = states_path(host).read_bytes()
+            send(host, "history-post-end-kill", [event("tdm_pistol", timestamp=1005, extra=tag)])
+            assert states_path(host).read_bytes() == before
+            checks.append("Wrong-family ends cannot close a match; the first valid outcome is immutable and new-UUID repeats cannot reopen it or credit post-end immediate actions")
+            host.task(145, 10, u64(int(private_later.stem)), structured=False)
+            receive_lobby(host, 2002)
+            receive_lobby(peer, 2002)
+            retired_lobbies.add(int(private_later.stem))
+            lobby = create_match(host, peer)
+            seed(host, 1503, False)
+            before = states_path(host).read_bytes()
             for label, modifications in (("tactical", {}), ("frag", {"mode": 8}),
                                           ("frag", {"timestamp": 122}), ("frag", {"extra": {"version": 0}}),
                                           ("frag", {"name": "death"})):
@@ -532,6 +631,27 @@ def main():
             retired_lobbies.add(int(lobby.stem))
             # Wire-only BR allocation; no map is loaded or game launched.
             lobby = create_match(host, peer, br=True)
+            original_states = states_path(host).read_bytes()
+            native_br_match = native_match + 1
+            br_tag = {"dw_match_id": native_br_match}
+            # This changes only the fixture's scalar match-ID boundary, not
+            # the original parser's mode/operator packing or counter fields.
+            send(host, "history-br-start", [event("start_br", mode=8,
+                extra={**br_tag, "Param0": native_br_match, "dw_lobby_id": int(lobby.stem)})])
+            send(host, "history-br-end", [event("end_br", timestamp=1100, mode=8, extra=br_tag)])
+            seed(host, 50009, False)
+            send(host, "history-late-timer", [event("driving_ms", timestamp=1101, mode=8, extra=br_tag)])
+            assert rewards(host, 1)[0]["progress"] == 0
+            selected = json.loads(states_path(host).read_bytes())
+            timer = next(row for row in selected if row["id"] == 50009)
+            assert timer["timerRemainderMs"] == 45000
+            timer["activationTimestamp"] = 1102
+            states_path(host).write_text(json.dumps(selected) + "\n")
+            before = states_path(host).read_bytes()
+            send(host, "history-later-mission", [event("driving_ms", timestamp=1103, mode=8, extra=br_tag)])
+            assert states_path(host).read_bytes() == before
+            states_path(host).write_bytes(original_states)
+            checks.append("A native cached timer can arrive after match closure, but cannot credit a mission activated after that match ended")
             br_pickups = {50005: "Param0", 50007: "Param1", 50042: "Param1", 50066: "Param1",
                           50069: "Param1", 50010: "Param2", 50031: "Param2", 50084: "Param2"}
             for identity, key in br_pickups.items():
@@ -722,6 +842,10 @@ def main():
                 rejected_request = send(rotated, "rotated-old-allocation", [event("pistol")])
                 assert states_path(rotated).read_bytes() == before[0]
                 checks.append("A new login for the same account cannot earn mission credit against its old allocation")
+                before = states_path(rotated).read_bytes()
+                send(rotated, "history-new-login-denied", [event("tdm_pistol", timestamp=1006, extra=tag)])
+                assert states_path(rotated).read_bytes() == before
+                checks.append("Retained native-match ownership remains bound to its authorized sessions; a later login cannot inherit it")
 
                 def remote_report(request, error):
                     owner = integer(1, rotated.user) + text(2, "uno")

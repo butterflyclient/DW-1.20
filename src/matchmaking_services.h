@@ -4,6 +4,7 @@
 #include "matchmaking_store.h"
 #include "operator_controls.h"
 #include <optional>
+#include <set>
 
 namespace services
 {
@@ -52,6 +53,19 @@ namespace services
     std::optional<unsigned> matchmakingPublicMatchCategory(
         const std::filesystem::path &directory,
         const platform::LobbyIdentity &identity);
+    struct PublicMatchContext
+    {
+        uint64_t lobby = 0;
+        unsigned category = 0;
+        std::string session;
+        std::set<std::string> gameTypes;
+    };
+    // Capture while the exact issuing session belongs to a public allocation.
+    // Starting events may arrive before the native host reports in_game.
+    std::optional<PublicMatchContext> matchmakingPublicMatchContext(
+        const std::filesystem::path &directory,
+        const platform::LobbyIdentity &identity,
+        bool requireInGame = true);
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,
                                   uint32_t title,
                                   const Delivery &delivery);

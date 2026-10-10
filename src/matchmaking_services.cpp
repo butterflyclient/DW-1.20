@@ -2106,9 +2106,10 @@ namespace services
         return lobby::onlineIdentity(sender.titleId, participant, *session);
     }
 
-    std::optional<unsigned> matchmakingPublicMatchCategory(
+    std::optional<PublicMatchContext> matchmakingPublicMatchContext(
         const std::filesystem::path &directory,
-        const platform::LobbyIdentity &id)
+        const platform::LobbyIdentity &id,
+        bool requireInGame)
     {
         const auto root = directory / "matchmaking" / std::to_string(id.titleId);
         matchmaking_store::recover(root, id.titleId);
@@ -2127,11 +2128,15 @@ namespace services
                !state.value("disbanded", false) &&
                state.at("expires").get<uint64_t>() > now() &&
                hostSessionActive(state, id.titleId) &&
-               state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game";
+               (!requireInGame ||
+                state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game");
         if (!active || !allocatedSession(root, state, id))
             return std::nullopt;
         const auto &selection = state.at("match_selection");
         std::optional<unsigned> category;
+        PublicMatchContext result;
+        result.lobby = assigned;
+        result.session = sessionFingerprint(id);
         for (const auto &entry : selection.at("eligible_entries"))
         {
             const auto mode = entry.at("gametype").get<std::string>();
@@ -2143,8 +2148,20 @@ namespace services
             if (category && *category != candidate)
                 return std::nullopt;
             category = candidate;
+            result.gameTypes.insert(script);
         }
-        return category;
+        if (!category)
+            return std::nullopt;
+        result.category = *category;
+        return result;
+    }
+
+    std::optional<unsigned> matchmakingPublicMatchCategory(
+        const std::filesystem::path &directory,
+        const platform::LobbyIdentity &id)
+    {
+        const auto context = matchmakingPublicMatchContext(directory, id);
+        return context ? std::optional<unsigned>(context->category) : std::nullopt;
     }
 
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,

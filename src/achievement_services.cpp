@@ -10,12 +10,14 @@
 #include "marketplace_services.h"
 #include "battlepass_services.h"
 #include "quest_services.h"
+#include "replay_match_events.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <fstream>
 #include <algorithm>
 #include <charconv>
 #include <set>
 #include <map>
+#include <chrono>
 
 namespace services
 {
@@ -134,7 +136,22 @@ namespace services
             std::ifstream in(path);
             if (!in)
                 throw std::runtime_error("Achievement document read failed");
-            return Json::parse(in);
+            std::vector<std::set<std::string>> keys;
+            bool unique = true;
+            const auto callback = [&](int depth, Json::parse_event_t event, Json &value)
+            {
+                wire::require(depth <= 32);
+                if (event == Json::parse_event_t::object_start)
+                    keys.emplace_back();
+                else if (event == Json::parse_event_t::key)
+                    unique = keys.back().insert(value.get<std::string>()).second && unique;
+                else if (event == Json::parse_event_t::object_end)
+                    keys.pop_back();
+                return true;
+            };
+            auto result = Json::parse(in, callback);
+            wire::require(unique);
+            return result;
         }
 
         void publish(const std::filesystem::path &path, const Json &data)
@@ -976,6 +993,8 @@ namespace services
             if (data.contains("player_xp"))
                 (void)integer(data, "player_xp");
             validatePendingXp(data);
+            if (data.contains("matches"))
+                validateReplayMatches(data.at("matches"));
             (void)storedWeaponXp(data, {});
             uint64_t previous = 0;
             std::set<std::string> requests;
@@ -1274,6 +1293,25 @@ namespace services
             }
             const auto previousXp =
                 data.contains("player_xp") ? integer(data, "player_xp") : initialPlayerXp(path);
+            ReplayMatchProgress matches;
+            if (id.titleId == 5800)
+            {
+                const auto time = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count());
+                std::optional<PublicMatchContext> allocation;
+                std::optional<unsigned> legacyCategory;
+                if (std::any_of(events.begin(), events.end(), [](const Json &event)
+                    { return event.at("name") == "start_match"; }))
+                    allocation = matchmakingPublicMatchContext(root, id, false);
+                if (std::any_of(events.begin(), events.end(), [](const Json &event)
+                    { return !event.at("values").contains("dw_match_id") &&
+                        replayQuestEventMayEarn(event.at("name").get_ref<const std::string &>()); }))
+                    legacyCategory = matchmakingPublicMatchCategory(root, id);
+                matches = prepareReplayMatchEvents(data.value("matches", Json::object()), events, id,
+                    allocation, legacyCategory, time);
+                if (!matches.matches.empty() || data.contains("matches"))
+                    data["matches"] = matches.matches;
+            }
             auto xp = previousXp;
             const auto previousWeapons = storedWeaponXp(data, path);
             auto weapons = previousWeapons;
@@ -1314,7 +1352,7 @@ namespace services
                 }
                 if (!stored.empty())
                     questProgress = advanceReplayQuests(stored, events,
-                                                          matchmakingPublicMatchCategory(root, id));
+                        std::span<const ReplayQuestEventContext>(matches.contexts));
                 wire::require(xp <= UINT64_MAX - questProgress.xp);
                 xp += questProgress.xp;
             }

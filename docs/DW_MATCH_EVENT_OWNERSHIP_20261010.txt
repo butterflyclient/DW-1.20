@@ -1,0 +1,82 @@
+REPLAY DW MATCH EVENT OWNERSHIP
+2026-10-10
+
+Issue
+Native cached counters can be delivered after leaving a match or entering a
+different lobby. Current-assignment checks alone cannot establish their origin.
+Match outcomes also need durable closure before match-level earning is safe.
+
+Server implementation
+src/replay_match_events.h defines the complete optional matches record inside
+each account/context event journal. Each record contains schema, allocation,
+specific game type, game family, authorized sessions, start, expiry, end and
+outcome. It shares the existing progression/inventory/mission transaction.
+
+start_match must contain its complete two-field native packet and dw_lobby_id.
+Its Param0 is the native match ID; an optional dw_match_id must agree with it.
+The explicit lobby must match a server-validated public allocation
+and the exact session that issued its matchmaking token. Private, unregistered,
+wrong-lobby and incompatible-mode starts do not establish ownership. The start
+may arrive before the host's in_game document. A second request cannot replace
+the original match. An authorized new login can join a still-running matching
+allocation, but cannot reopen a closed result.
+
+Tagged events resolve against their retained match, rather than the account's
+latest lobby. Unknown IDs and unrelated sessions cannot inherit current-lobby
+credit. A complete five-field, mode/family-compatible end_match records the
+first outcome. Immediate actions stamped after that end cannot earn. Native
+cached counters may arrive afterward, but their activation cutoff stays at the
+match end so they cannot credit a subsequently activated mission.
+
+Records expire by server time after seven days. Live records are not evicted to
+make room. The 4096-record and 64-session bounds reject oversized transactions.
+Existing untagged clients retain the previous qualification path. No new win or
+completion criteria are awarded by this foundation alone.
+
+The shared achievement document reader now rejects duplicate object keys and
+excessive nesting. Match records validate their entire schema and reject duplicate
+sessions, inconsistent mode/family, invalid timestamps and malformed IDs before
+any journal, mission, inventory or receipt publication.
+
+Target-build research
+tools/research-replay-achievement-event.py executes original construction,
+append, reset, timestamp and name instructions. Twenty-three cases pass with no
+modeled callees. The object is 800 bytes, with ten 64-byte pair slots, a 101-byte
+name buffer and 21-byte pair keys including their terminators. Append eleven
+silently retains only ten; duplicate keys append rather than replace. Adjacent
+32-byte guards remain intact. Timestamp updates preserve other storage.
+Three of those cases execute the original current-lobby getter for zero and
+full-width IDs. Its eight-byte read agrees with the existing lobby-control
+binding. That primitive proof does not establish its transition lifetime.
+
+The original parameter harness remains unchanged. Its companion proves 258
+cases, including two-field native starts, five-field ends, mode/operator packing
+and existing gameplay packets. Its GetMatchId boundary supplies a declared
+fixture ID; it does not prove that the native ID equals a backend lobby ID.
+The two IDs therefore remain separate. A start has room for both metadata keys;
+a seven-field kill plus version/gamemode has room for only dw_match_id.
+
+Private original call scans identify timestamp, reset and flush callers without
+using SQLite display names as type evidence. These are static nominations, not
+branch-feasibility or live consumption claims.
+
+Validation and remaining work
+Exact build/test/deployment evidence belongs in the corresponding readiness
+receipt. No game run is permitted or performed in this iteration.
+Client metadata emission and cache flush ordering at native ID/mode transitions
+remain to be integrated and verified by compiled instruction tests. Historical
+listen-host attribution after departure also remains open. This backend ledger
+does not establish complete native producer ownership by itself.
+The full backend goal remains active, including the remaining earning criteria,
+six unresolved response bindings and broader native callback verification.
+
+Current validation
+Both exact-image platform builds pass 304 encrypted protocol groups, 146
+earning/ownership groups and 14 mission-management groups. Each builds all 46
+translation units without retained objects. Original instruction checks pass
+258 parameter cases and 23 construction/capacity/getter cases.
+Windows SHA256 a4524a161a47f0d67997cb08bdfa12cddac264553825d0b9411e1dfe32581a37
+Linux SHA256 a01387d1c8afb40fc0e5cf16efeddb63f7c795a320b33226ff7ea3423dff46b6
+Readiness: validation/20261010-replay-match-event-readiness.json
+The live restart was deferred because players were connected. No release was
+activated, no game was run and the shipping EXE remains unchanged.

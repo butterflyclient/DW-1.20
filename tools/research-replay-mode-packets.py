@@ -78,6 +78,15 @@ def main():
             assert row['values'] == [8, 0]
         row['fixture_label'] = name + '_mode_operators'
         proof['cases'].append(row)
+    for label, name, params, expected in (
+        ('start_tdm', 'start_match', '6', [987654321, 6]),
+        ('start_br', 'start_match', '24', [987654321, 24]),
+        ('end_br', 'end_match', '24,1,0,0,0', [24, 1, 0, 0, 0]),
+    ):
+        row = case(name, params)
+        assert row['accepted'] and row['parameter_count'] == len(expected) and row['values'] == expected
+        row['fixture_label'] = label
+        proof['cases'].append(row)
     proof.update(base_tool_sha256=hashlib.sha256(original.read_bytes()).hexdigest(),
                  tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                  parent_parser_sha256=hashlib.sha256(parent_path.read_bytes()).hexdigest())

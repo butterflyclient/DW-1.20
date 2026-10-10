@@ -60,12 +60,16 @@ def main():
         text = json.loads(files[0].read_bytes())
         descriptions.append(dict(mode=name, key=key, value=text['value'],
                                  path=files[0].relative_to(ROOT).as_posix(), sha256=digest(files[0])))
-    lines = ['#pragma once', '#include <cstdint>', '',
+    lines = ['#pragma once', '#include <cstdint>', '#include <string_view>', '',
              '// Generated from Replay initchallengeandeventglobals and native operands.',
              '// These are specific game types, distinct from the gamemode family field.',
              'enum class ReplayChallengeGameType : uint32_t', '{']
     lines += [f'    {name} = {value},' for name, value in modes.items()]
-    lines += ['};', '', 'namespace replay_challenge_mode_data', '{',
+    lines += ['};', '', 'inline std::string_view replayChallengeGameTypeName(uint32_t value)',
+              '{', '    switch (static_cast<ReplayChallengeGameType>(value))', '    {']
+    lines += [f'    case ReplayChallengeGameType::{name}: return "{name}";' for name in modes]
+    lines += ['    default: return {};', '    }', '}', '',
+              'namespace replay_challenge_mode_data', '{',
               f'    inline constexpr uint16_t M19Weapon = {m19};', '}', '']
     header.write_text('\n'.join(lines), encoding='utf-8')
     result = dict(passed=True, tool_sha256=digest(Path(__file__)),

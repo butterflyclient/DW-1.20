@@ -357,13 +357,24 @@ namespace services
     QuestProgress advanceReplayQuests(const Json &stored, const Json &events,
                                        std::optional<unsigned> publicCategory)
     {
+        const std::vector<ReplayQuestEventContext> contexts(events.size(), {publicCategory, UINT64_MAX});
+        return advanceReplayQuests(stored, events, std::span(contexts));
+    }
+
+    QuestProgress advanceReplayQuests(const Json &stored, const Json &events,
+                                       std::span<const ReplayQuestEventContext> publicContexts)
+    {
         wire::require(stored.is_array() && stored.size() <= 15000);
+        wire::require(events.is_array() && publicContexts.size() == events.size());
         QuestProgress result;
         result.states = stored;
-        if (!publicCategory)
-            return result;
-        for (const auto &event : events)
+        for (size_t index = 0; index < events.size(); ++index)
         {
+            const auto &context = publicContexts[index];
+            const auto publicCategory = context.category;
+            if (!publicCategory)
+                continue;
+            const auto &event = events[index];
             const auto &values = event.at("values");
             // The original AddGamemode emits 2 for MP, 8/24 for BR. Neither
             // client gamemode nor a public-looking name proves lobby membership.
@@ -386,7 +397,8 @@ namespace services
                 const auto &row = *quest(identity);
                 auto &state = *find(result.states, identity);
                 if (state.at("name") != row.name || number(state, "target") != row.target ||
-                    number(event, "timestamp") < number(state, "activationTimestamp"))
+                    number(event, "timestamp") < number(state, "activationTimestamp") ||
+                    context.activationCutoff < number(state, "activationTimestamp"))
                     continue;
                 const auto before = number(state, "progress");
                 if (before >= row.target)

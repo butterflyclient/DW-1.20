@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <string_view>
 
 // Generated from Replay initchallengeandeventglobals and native operands.
 // These are specific game types, distinct from the gamemode family field.
@@ -45,6 +46,53 @@ enum class ReplayChallengeGameType : uint32_t
     cp_survival = 42,
     cp_wave_sv = 43,
 };
+
+inline std::string_view replayChallengeGameTypeName(uint32_t value)
+{
+    switch (static_cast<ReplayChallengeGameType>(value))
+    {
+    case ReplayChallengeGameType::dm: return "dm";
+    case ReplayChallengeGameType::war: return "war";
+    case ReplayChallengeGameType::sd: return "sd";
+    case ReplayChallengeGameType::dom: return "dom";
+    case ReplayChallengeGameType::conf: return "conf";
+    case ReplayChallengeGameType::sr: return "sr";
+    case ReplayChallengeGameType::grind: return "grind";
+    case ReplayChallengeGameType::ball: return "ball";
+    case ReplayChallengeGameType::infect: return "infect";
+    case ReplayChallengeGameType::tjugg: return "tjugg";
+    case ReplayChallengeGameType::gun: return "gun";
+    case ReplayChallengeGameType::grnd: return "grnd";
+    case ReplayChallengeGameType::siege: return "siege";
+    case ReplayChallengeGameType::koth: return "koth";
+    case ReplayChallengeGameType::ctf: return "ctf";
+    case ReplayChallengeGameType::dd: return "dd";
+    case ReplayChallengeGameType::tdef: return "tdef";
+    case ReplayChallengeGameType::front: return "front";
+    case ReplayChallengeGameType::cmd: return "cmd";
+    case ReplayChallengeGameType::br: return "br";
+    case ReplayChallengeGameType::arena: return "arena";
+    case ReplayChallengeGameType::cyber: return "cyber";
+    case ReplayChallengeGameType::rush: return "rush";
+    case ReplayChallengeGameType::esc: return "esc";
+    case ReplayChallengeGameType::vip: return "vip";
+    case ReplayChallengeGameType::btm: return "btm";
+    case ReplayChallengeGameType::rugby: return "rugby";
+    case ReplayChallengeGameType::arm: return "arm";
+    case ReplayChallengeGameType::mtmc: return "mtmc";
+    case ReplayChallengeGameType::snatch: return "snatch";
+    case ReplayChallengeGameType::hq: return "hq";
+    case ReplayChallengeGameType::defcon: return "defcon";
+    case ReplayChallengeGameType::pill: return "pill";
+    case ReplayChallengeGameType::blitz: return "blitz";
+    case ReplayChallengeGameType::brm: return "brm";
+    case ReplayChallengeGameType::hvt: return "hvt";
+    case ReplayChallengeGameType::trial: return "trial";
+    case ReplayChallengeGameType::cp_survival: return "cp_survival";
+    case ReplayChallengeGameType::cp_wave_sv: return "cp_wave_sv";
+    default: return {};
+    }
+}
 
 namespace replay_challenge_mode_data
 {
