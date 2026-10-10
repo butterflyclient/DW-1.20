@@ -73,6 +73,12 @@ if any(item["source"].endswith("DW_TestHomePath.cpp") for item in report["cpp"])
     raise RuntimeError(
         "Private native-pair test build: do not replace the normal DW executable"
     )
+if any(Path(item["source"]).name == "DW_AchievementEvent.cpp" for item in report["cpp"]):
+    # The opt-in build proves metadata construction and relocation. It is not
+    # yet a release candidate: cached native producers need transition coverage.
+    raise RuntimeError(
+        "Private match-event integration build: verify cache transition ordering before normal deployment"
+    )
 source_root = Path(report["source_root"]).resolve()
 snapshot_receipt = None
 if source_root != COMPILER.resolve():

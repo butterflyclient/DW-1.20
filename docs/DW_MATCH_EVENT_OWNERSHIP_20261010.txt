@@ -80,3 +80,37 @@ Linux SHA256 a01387d1c8afb40fc0e5cf16efeddb63f7c795a320b33226ff7ea3423dff46b6
 Readiness: validation/20261010-replay-match-event-readiness.json
 The live restart was deferred because players were connected. No release was
 activated, no game was run and the shipping EXE remains unchanged.
+
+Compiled client integration
+The private --match-events build adds DW_AchievementEvent.cpp. Its timestamp
+replacement preserves the original timestamp and native parameter pairs. A
+start_match receives dw_lobby_id; other recognized native match events receive
+dw_match_id. Existing ownership keys retain their first value. Ordinary Replay,
+numeric/unrelated events, zero IDs and full ten-pair events retain their native
+behavior. The normal build excludes this experimental replacement.
+
+prepare-match-event-integration.py derives the complete event/pair layout from
+hash-bound original instructions. It resolves the singleton and methods by
+catalog identity, without manually entered addresses or C++ member offsets.
+The singleton binding does not require a pre-existing address-shaped import.
+
+Twelve compiled component cases pass, with original SDK construction, reset,
+name, append and getter instructions. Twelve cases also pass inside the freshly
+linked EXE, executing its relocated native methods and globals. Nonvolatile GPRs,
+XMM6-XMM15, stack restoration and both adjacent event guards remain intact.
+The only modeled boundary selects DW enabled/ordinary behavior. These checks
+execute instructions in Unicorn; they do not start the game.
+
+The component test prevents linker folding of distinct getter test stubs.
+The linked-image test uses real relocated imports rather than those stubs.
+Future opt-in private builds run the linked-image check automatically after
+the normal compiler checks. The normal deployment script rejects this private
+integration while cache transition ordering remains unverified.
+
+Private job: 3bd8df748363480c
+Client SHA256 bc06b5865b1990250946afe920ff98c2d2a785f9b9f75302ef3879d3edb39d31
+Readiness: validation/20261010-compiled-match-event-readiness.json
+Native ID/mode transition flushing and historical listen-host attribution
+remain open. This integration is not a complete producer-ownership proof.
+The current source publication target is butterflyclient/DW-1.20 on main.
+Both original branches' full commit histories are retained on that branch.

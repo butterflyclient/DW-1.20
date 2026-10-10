@@ -22,6 +22,8 @@ parser.add_argument("--optimized", action="store_true",
                     help="Include the existing runtime com_optimized 0/1/2 controls in this private DW build")
 parser.add_argument("--include-player-data-path", action="store_true",
                     help="Explicitly include the separate Documents/Replay profile relocation; production retains the native path")
+parser.add_argument("--match-events", action="store_true",
+                    help="Opt into the separately validated native match-event metadata replacement")
 parser.add_argument("--receipt-directory", type=Path,
                     help="Keep this private build's job and source receipts separate from concurrent workstation builds")
 args = parser.parse_args()
@@ -205,6 +207,8 @@ private_sources = (args.integration_root or ROOT / "integration" / "replay").res
 if not private_sources.is_dir():
     raise RuntimeError("Private DW integration source directory is unavailable")
 for source in sorted(private_sources.iterdir()):
+    if source.name == "DW_AchievementEvent.cpp" and not args.match_events:
+        continue
     if source.name == "DW_PlayerDataPath.cpp" and not args.include_player_data_path:
         # Keep this separately authored source intact. Selecting all private
         # integration files must not silently move existing player profiles.
@@ -258,6 +262,23 @@ if (snapshot / "src/DW_ABTestingEnroll.cpp").exists():
                               "content_sha256": ab_rest["source_sha256"],
                               "source": str(private_sources / "DW_ABTestingEnroll.cpp"),
                               "derived_native_bindings": "generated/ab-rest-integration.json"})
+if args.match_events:
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_match_events", ROOT / "tools/prepare-match-event-integration.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    match_events = module.prepare(snapshot)
+    for changed in (snapshot / "source-units.json", units_path):
+        record = next(item for item in records if Path(item["snapshot"]) == changed)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    for generated in (snapshot / "src/DW_AchievementEventBindings.h",
+                      snapshot / "generated/match-event-integration.json"):
+        copy_file(generated, generated)
+    private_overrides.append({"id": match_events["replacement"],
+                              "content_sha256": match_events["source_sha256"],
+                              "source": str(private_sources / "DW_AchievementEvent.cpp"),
+                              "derived_native_bindings": "generated/match-event-integration.json"})
 # A normal build generates its own static updater from the selected, frozen
 # client trust/ABI sources. Explicit reviewed integration snapshots may retain
 # their already-built helper header, whose bytes remain compiler dependencies.
@@ -530,6 +551,24 @@ while True:
         phase = current.get("phase")
         print(current["status"], phase, flush=True)
     if current["status"] not in ("queued", "running"):
+        if current["status"] == "succeeded" and args.match_events:
+            print("running Verify linked native match-event instructions", flush=True)
+            report_path = ROOT / "data" / "workstation-builds" / (
+                "build-workstation-" + job["id"]
+            ) / "build-report.json"
+            match_receipt = receipts / "linked-match-events.json"
+            checked = subprocess.run([
+                sys.executable, "-B", str(ROOT / "tools/test-compiled-match-events.py"),
+                "--build-report", str(report_path), "--output", str(match_receipt),
+            ])
+            current["match_event_verification"] = {
+                "passed": checked.returncode == 0,
+                "receipt": str(match_receipt),
+                "game_runs_performed": False,
+            }
+            if checked.returncode:
+                receipt.write_text(json.dumps(current, indent=2) + "\n")
+                raise SystemExit("Linked match-event verification failed; do not deploy this private build")
         receipt.write_text(json.dumps(current, indent=2) + "\n")
         print(current.get("error", ""), flush=True)
         raise SystemExit(0 if current["status"] == "succeeded" else 1)

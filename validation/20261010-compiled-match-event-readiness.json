@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-10T20:14:06.840435+00:00",
+  "passed": true,
+  "scope": "compiled component and linked metadata instructions",
+  "checks": 12,
+  "client_sha256": "bc06b5865b1990250946afe920ff98c2d2a785f9b9f75302ef3879d3edb39d31",
+  "original_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "unresolved_symbols": 0,
+  "private_job": "3bd8df748363480c",
+  "derived_layout": true,
+  "manual_source_rvas_or_layouts": false,
+  "win64_registers_and_stack_preserved": true,
+  "linked_executable_instructions_verified": true,
+  "game_runs_performed": false,
+  "client_deployed": false,
+  "full_backend_complete": false,
+  "cache_transition_ordering_verified": false,
+  "full_compiler_verification_pending": false,
+  "evidence": [
+    {
+      "path": "integration/replay/DW_AchievementEvent.cpp",
+      "sha256": "d11b8925dd7df837623acd6ee6603b19e3936bfb25b7103827791d9ff7d12501"
+    },
+    {
+      "path": "tools/prepare-match-event-integration.py",
+      "sha256": "5321f9900e79721a390b87c4ed2bfb5362c9309e0d3d6e844119df27eba96a08"
+    },
+    {
+      "path": "tools/test-compiled-match-events.py",
+      "sha256": "2827d097031e19870c7719100616c9aba8719df729772b30d70185bbfe7f7331"
+    },
+    {
+      "path": "tools/build-frozen-workstation.py",
+      "sha256": "a00963f1776bab30999f5df15a2948ba39798cd63164f8fb37342200697b8f3d"
+    },
+    {
+      "path": "tools/deploy-game.py",
+      "sha256": "bdd95e7d71c453ad99f6e7eb894f012d161ce8ae8bfe868646bd8e92be1c5e6d"
+    },
+    {
+      "path": "data/remaining-client-match-events-20261010/compiled-metadata.json",
+      "sha256": "c3ef2c2dd272e57e01417820bb49bc485073cf8ad55b8b5019eb9439fa369e4f"
+    },
+    {
+      "path": "data/remaining-client-match-events-20261010/build-receipts/linked-match-events.json",
+      "sha256": "e830561be7d65212e5ae9ce547632b18dbdddebcf7595e9d5a296245d04d1378"
+    },
+    {
+      "path": "data/remaining-client-match-events-20261010/build-receipts/compiler-snapshot-receipt.json",
+      "sha256": "58d930b6c6707fbf7739fac422ca468e3d661f8c3339a6257f61bf60ffda47fa"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-3bd8df748363480c/verification-report.json",
+      "sha256": "94ddaf9ab61d5a4e485ad605db9e8d1ceb8bd60e9c0b6bd04679958f52ded064"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-3bd8df748363480c/relocation-audit.json",
+      "sha256": "ab2aa809ee8306f28f9a1eb7457ca80fa3eba96d5ea34eaa5b1b439fe750bfae"
+    },
+    {
+      "path": "data/remaining-client-match-events-20261010/build-receipts/workstation-job.json",
+      "sha256": "80eaea78d1ed86445e178217e696895f1cd6166fc8781159ca6240ff40c2f832"
+    }
+  ],
+  "full_compiler_verification_passed": true,
+  "relocation_audit_passed": true
+}
