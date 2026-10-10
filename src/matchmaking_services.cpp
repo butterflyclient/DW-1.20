@@ -2042,27 +2042,45 @@ namespace services
         return lobby::onlineIdentity(sender.titleId, participant);
     }
 
-    bool matchmakingPublicMatchActive(const std::filesystem::path &directory,
-                                      const platform::LobbyIdentity &id)
+    std::optional<unsigned> matchmakingPublicMatchCategory(
+        const std::filesystem::path &directory,
+        const platform::LobbyIdentity &id)
     {
         const auto root = directory / "matchmaking" / std::to_string(id.titleId);
         matchmaking_store::recover(root, id.titleId);
         const auto index = currentLobbies(root, id);
         const auto key = std::to_string(id.userId);
         if (!index.at("lobbies").contains(key))
-            return false;
+            return std::nullopt;
         const auto assigned = index.at("lobbies").at(key).get<uint64_t>();
         const auto path = root / "lobbies" / (std::to_string(assigned) + ".json");
         if (!std::filesystem::exists(path))
-            return false;
+            return std::nullopt;
         const auto state = loadLobby(path, id);
-        return member(state, id.userId) && state.contains("public_pool") &&
+        const bool active = member(state, id.userId) && state.contains("public_pool") &&
                !state.at("backend_doc").contains("private_lobby") &&
                !state.at("backend_doc").contains("tournament") &&
                !state.value("disbanded", false) &&
                state.at("expires").get<uint64_t>() > now() &&
                hostSessionActive(state, id.titleId) &&
                state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game";
+        if (!active)
+            return std::nullopt;
+        const auto &selection = state.at("match_selection");
+        std::optional<unsigned> category;
+        for (const auto &entry : selection.at("eligible_entries"))
+        {
+            const auto mode = entry.at("gametype").get<std::string>();
+            const auto script = selection.at("game_types").at(mode).at("script").get<std::string>();
+            const unsigned candidate = script == "br" ? 1u : 0u;
+            // Playlist context (e.g. "big") selects a build namespace. The
+            // native rules' script determines the game family. Mixed-family
+            // allocations need an explicit chosen-mode binding before credit.
+            if (category && *category != candidate)
+                return std::nullopt;
+            category = candidate;
+        }
+        return category;
     }
 
     bool matchmakingDeliveryValid(const std::filesystem::path &directory,

@@ -42,6 +42,16 @@ that retirement commits its terminal state and clears owned assignments without
 inventing player registration, readiness or match results. Restore fixture
 files exactly after testing.
 
+An idle tournament delivery can allocate an already-ready round immediately
+after its map policy becomes available. That valid transaction need not rewrite
+unchanged enrollment. To test coupled ready-up/enrollment recovery, re-arm one
+ready flag in disposable fixture data while maps remain unavailable, then install
+the assignment-write fault before enabling maps and sending the final ready
+request. Direct fixture publication does not itself promise a native push when
+live updates are disabled. Keep the strict enrollment/lobby/search/index intent
+assertions and retain failed logs; do not change backend behavior to win a race
+with the test harness.
+
 Deploy a validated Linux image into a new immutable release directory. Stop
 the service, switch the current symlink atomically, restart, check health and
 hash the running /proc/<pid>/exe. Retain the old release for rollback. Restore

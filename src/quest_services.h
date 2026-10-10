@@ -15,11 +15,11 @@ namespace services
         uint64_t xp = 0;
     };
 
-    // Original Replay kill parser fields and shipped mission criteria only.
+    // Original Replay parser fields and shipped mission criteria only.
     // Unbound producer predicates leave their selected stages unchanged.
     QuestProgress advanceReplayQuests(const nlohmann::json &states,
                                        const nlohmann::json &events,
-                                       bool publicMatch);
+                                       std::optional<unsigned> publicCategory);
     std::vector<Delivery> replayQuestUpdates(const platform::LobbyIdentity &identity,
                                               const std::string &context,
                                               const QuestProgress &progress,

@@ -10,6 +10,7 @@ from pathlib import Path
 import struct
 import argparse
 import csv
+import re
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
@@ -30,6 +31,14 @@ pe = pefile.PE(data=raw, fast_load=True)
 base = pe.OPTIONAL_HEADER.ImageBase
 entry, end = 0x140F35980, 0x140F385DC
 code = pe.get_data(entry - base, end - entry)
+pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])
+helper_entry = 0x140F358D0
+helper_rows = [row.struct for row in pe.DIRECTORY_ENTRY_EXCEPTION
+               if base + row.struct.BeginAddress == helper_entry]
+assert len(helper_rows) == 1
+helper_end = base + helper_rows[0].EndAddress
+assert helper_entry < helper_end <= entry
+helper_bytes = pe.get_data(helper_entry - base, helper_end - helper_entry)
 decoder = Cs(CS_ARCH_X86, CS_MODE_64)
 decoder.detail = True
 instructions = list(decoder.disasm(code, entry))
@@ -117,7 +126,7 @@ def case(name, params):
 
     def hook(uc, address, size, _):
         nonlocal allocated
-        if entry <= address < end:
+        if entry <= address < end or helper_entry <= address < helper_end:
             return
         if address == stop:
             uc.emu_stop()
@@ -133,8 +142,12 @@ def case(name, params):
             assert len(string) < rdx
             uc.mem_write(rcx, string + b"\0")
         elif address == 0x1421FB0E4:  # CRT atoi, signed 32-bit return
-            string = text(rcx).strip()
-            value = int(string) & 0xFFFFFFFF if string else 0
+            prefix = re.match(r"\s*([+-]?[0-9]+)", text(rcx))
+            parsed = int(prefix.group(1)) if prefix else 0
+            # Model only defined in-range atoi inputs; do not invent this CRT's
+            # overflow/errno behavior. Native floats serialize as decimal text.
+            assert -(1 << 31) <= parsed < (1 << 31)
+            value = parsed & 0xFFFFFFFF
         elif address == 0x142225F88:  # CRT strtok
             value = tokenize(rcx, text(rdx).encode(), 0)
         elif address == 0x142036F40:  # I_strtok_r
@@ -218,8 +231,8 @@ assert not rows[6]["accepted"] and rows[6]["parameter_count"] == 0
 # Full producer strings, including attachment/perk/operator and death-cause
 # slots. Expected semantics come from shipped tables; all packed numbers below
 # are computed by executing the original image, never by a backend encoder.
-def kill_input(weapon, attachments="no_attachments", cause="MOD_RIFLE_BULLET"):
-    return f"1|2,{weapon},3,4,unknown_operator,0,{attachments},no_perks,0,no_super,0,{cause},0,0"
+def kill_input(weapon, attachments="no_attachments", cause="MOD_RIFLE_BULLET", target_type=1):
+    return f"1|2,{weapon},3,4,unknown_operator,0,{attachments},no_perks,{target_type},no_super,0,{cause},0,0"
 
 fixtures = (
     ("assault", "iw8_ar_mike4_mp", "no_attachments", "MOD_RIFLE_BULLET", 15, 3),
@@ -251,9 +264,48 @@ for label, weapon, attachments, cause, expected_id, expected_class in fixtures:
     assert row["values"][5] >> 48 == expected_class, row
     row["fixture_label"] = label
     rows.append(row)
+for label, target_type in (("equipment_target", 64), ("vehicle_target", 32),
+                           ("killstreak_target", 2), ("unknown_target", 0)):
+    row = case("kill", kill_input("iw8_pi_golf21_mp", target_type=target_type))
+    assert row["values"][5] >> 16 & 0xFFFF == target_type
+    row["fixture_label"] = label
+    rows.append(row)
 assert next(row for row in rows if row.get("fixture_label") == "finishing_move")["values"][6] >> 16 & 0xFFFF == 21
 assert next(row for row in rows if row.get("fixture_label") == "sniper_head_five")["values"][6] >> 16 & 0xFFFF == 9
 assert next(row for row in rows if row.get("fixture_label") == "lmg_five")["values"][5] & 255 == 5
+for label, name, params in (
+    ("pickup_totals", "pickup", "2,3,4, "),
+    ("pickup_weapons", "pickup", "2,0,0, "),
+    ("pickup_cash", "pickup", "0,3,0, "),
+    ("pickup_caches", "pickup", "0,0,4, "),
+    ("driving_ms", "driving", "45000, "),
+    ("gas_ms", "alive_in_gas", "1250, "),
+    ("not_downed_ms", "alive_not_downed", "61000, "),
+    ("gas_partial_ms", "alive_in_gas", "250, "),
+    ("gas_remaining_ms", "alive_in_gas", "750, "),
+    ("driving_remaining_ms", "driving", "15000, "),
+    ("not_downed_partial_ms", "alive_not_downed", "45000, "),
+    ("not_downed_remaining_ms", "alive_not_downed", "15000, "),
+    ("self_revive", "revive", "1,1, "),
+    ("teammate_revive", "revive", "0,1, "),
+    ("placement_15", "match_placement", "5,15, "),
+    ("loadout", "loadout", "1, "),
+    ("contract_locales", "contract_start", "4|33,4|33, ,1"),
+    ("stim_health", "stim", "17.500000"),
+):
+    try:
+        row = case(name, params)
+        row["fixture_label"] = label
+        rows.append(row)
+    except Exception as error:
+        rows.append(dict(name=name, input=params, fixture_label=label, error=str(error)))
+for label, expected in {"pickup_totals": [2, 3, 4, 0], "driving_ms": [45000, 0],
+                         "gas_ms": [1250, 0], "not_downed_ms": [61000, 0],
+                         "self_revive": [1, 1, 0], "teammate_revive": [0, 1, 0],
+                         "placement_15": [5, 15, 0], "loadout": [1, 0],
+                         "contract_locales": [4, 4, 0], "stim_health": [17]}.items():
+    row = next(row for row in rows if row.get("fixture_label") == label)
+    assert row.get("values") == expected, row
 names = set()
 for instruction in instructions:
     for operand in instruction.operands:
@@ -270,9 +322,12 @@ for name in sorted(names):
 result = dict(target_image_sha256=hashlib.sha256(raw).hexdigest(),
               tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               function=dict(address=entry, end=end, bytes_sha256=hashlib.sha256(code).hexdigest()),
+              executed_helpers=[dict(address=helper_entry,end=helper_end,
+                                    bytes_sha256=hashlib.sha256(helper_bytes).hexdigest(),
+                                    boundary_source="Original PE unwind entry")],
               enabled_dvar_pointers=sorted(flags), cases=rows,
               scope="Original parser instructions; enabled dvars and explicit CRT/log/cookie boundaries. No event delivery or earning predicate claim.")
-assert all("error" not in row for row in rows), rows
+assert all("error" not in row for row in rows), [row for row in rows if "error" in row]
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(result, indent=2) + "\n")
 print("PASS:", len(rows), "original challenge parser cases;", len({row["name"] for row in rows if row["accepted"]}), "accepted event names")

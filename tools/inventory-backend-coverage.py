@@ -107,12 +107,12 @@ GAPS = {
         "unchanged writes. Published Total XP ranking shares accepted snapshots and registered "
         "account names. The REST envelope retains the full Reply, including cross-player pushes. "
         "All 232 shipped MP/BR/co-op mission descriptions and prior-string aliases are recovered "
-        "from two matching English fastfiles. Twenty-four original-parser-bound MP kill mission "
+        "from two matching English fastfiles. Thirty-seven original-parser-bound MP kill and BR counter mission "
         "predicates commit stage progress, shipped XP/items, next-stage activation and retry "
         "identity together with player/weapon XP and Battle Pass writes. Native public in_game "
         "membership and activation timestamps gate earning; private/expired/stale assignments "
         "cannot earn credit. Exact earning proof and linked-image identity are retained in "
-        "validation/20261009-replay-quest-earning-readiness.json. The remaining 208 mission "
+        "validation/20261009-replay-quest-counter-readiness.json. The remaining 195 mission "
         "predicates, delayed-event match lifetime, exactly-once push acknowledgements and new "
         "native mission gameplay/completion/reward/successor callback validation remain open."
     ),
@@ -158,7 +158,9 @@ GAPS["125"] += (
     "All 447 table rows and all 32 initialized native mission groups were matched. "
     "A hash-bound shipping-game proof verifies 125/5 callbacks and 125/3 restoration "
     "of MP/co-op/BR selections across a new game process. Other platform/operator "
-    "mission eligibility, earned mission counters and reward rules remain open."
+    "mission eligibility and the remaining 195 earning predicates remain open; "
+    "37 compiled MP/BR predicates have separate original-parser and encrypted-wire "
+    "earning/reward/recovery evidence, without native gameplay callback claims."
 )
 GAPS["198"] += (
     " The original outgoing text length excludes its NUL terminator. The backend "
@@ -1188,13 +1190,14 @@ def live_streaming_layout_evidence():
 
 
 def mission_earning_evidence(server_hash):
-    path = ROOT / "validation/20261009-replay-quest-earning-readiness.json"
+    path = ROOT / "validation/20261009-replay-quest-counter-readiness.json"
     if not path.is_file():
         return None
     proof = json.loads(path.read_bytes())
     if not (proof.get("passed") and proof.get("linux_server_sha256") == server_hash
             and proof.get("native_game_callback_verified") is False
-            and proof.get("supported_earning_stages") == 24
+            and proof.get("supported_earning_stages") == 37
+            and proof.get("original_parser_cases") == 100
             and proof.get("shipped_mission_descriptions") == 232):
         return None
     for reference in proof["evidence"]:
@@ -1202,10 +1205,10 @@ def mission_earning_evidence(server_hash):
         if not evidence.is_relative_to(ROOT) or digest(evidence) != reference["sha256"]:
             raise ValueError("Mission earning evidence changed")
     return dict(receipt=path.relative_to(ROOT).as_posix(), sha256=digest(path),
-                original_parser_cases=78, supported_earning_stages=24,
-                shipped_mission_descriptions=232, remaining_earning_stages=208,
+                original_parser_cases=100, supported_earning_stages=37,
+                shipped_mission_descriptions=232, remaining_earning_stages=195,
                 native_game_callback_verified=False,
-                scope="Original parameter parser and matching shipped criteria; encrypted earning, recovery and restart fixtures. Native gameplay completion and unbound predicates remain open.")
+                scope="Original parameter/operator parsers and original-bytecode-correlated shipped producers; encrypted earning, fractional timers, recovery and restart fixtures. Native gameplay completion and unbound predicates remain open.")
 
 
 def main():

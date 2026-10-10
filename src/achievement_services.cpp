@@ -1298,7 +1298,12 @@ namespace services
             }
             QuestProgress questProgress;
             if (id.titleId == 5800 && std::any_of(events.begin(), events.end(),
-                [](const Json &event) { return event.at("name") == "kill"; }))
+                [](const Json &event)
+                {
+                    const auto &name = event.at("name").get_ref<const std::string &>();
+                    return name == "kill" || name == "pickup" || name == "driving" ||
+                           name == "alive_in_gas" || name == "alive_not_downed";
+                }))
             {
                 const auto stored = document(path.parent_path() / "states.json", Json::array());
                 wire::require(stored.is_array() && stored.size() <= 15000);
@@ -1310,7 +1315,7 @@ namespace services
                 }
                 if (!stored.empty())
                     questProgress = advanceReplayQuests(stored, events,
-                                                          matchmakingPublicMatchActive(root, id));
+                                                          matchmakingPublicMatchCategory(root, id));
                 wire::require(xp <= UINT64_MAX - questProgress.xp);
                 xp += questProgress.xp;
             }

@@ -39,6 +39,11 @@ namespace services
             const auto classification = number(values, "Param5") >> 48;
             const auto attachments = number(values, "Param5") & 0xFF;
             const auto cause = (number(values, "Param6") >> 16) & 0xFFFF;
+            const auto target = (number(values, "Param5") >> 16) & 0xFFFF;
+            // Shipped cp_mp/challenges.gsc also emits kill for equipment,
+            // vehicles and streaks. findenemytype sets bit 0 only for players.
+            if (!(target & 1))
+                return false;
             switch (id)
             {
             case 1501:
@@ -95,13 +100,72 @@ namespace services
             }
         }
 
+        bool completeParameters(const Json &values, unsigned count)
+        {
+            for (unsigned index = 0; index < count; ++index)
+                if (!values.contains("Param" + std::to_string(index)))
+                    return false;
+            return true;
+        }
+
+        uint64_t counter(const Json &values, const char *name)
+        {
+            const auto value = number(values, name);
+            wire::require(value <= UINT32_MAX);
+            return value;
+        }
+
+        uint64_t brProgress(uint32_t id, const Json &event, Json &state)
+        {
+            const auto &values = event.at("values");
+            const auto &name = event.at("name").get_ref<const std::string &>();
+            switch (id)
+            {
+            case 50005:
+                return name == "pickup" && completeParameters(values, 4)
+                           ? counter(values, "Param0") : 0;
+            case 50007:
+            case 50042:
+            case 50066:
+            case 50069:
+                return name == "pickup" && completeParameters(values, 4)
+                           ? counter(values, "Param1") : 0;
+            case 50010:
+            case 50031:
+            case 50084:
+                return name == "pickup" && completeParameters(values, 4)
+                           ? counter(values, "Param2") : 0;
+            default:
+                break;
+            }
+            uint64_t divisor = 0;
+            if ((id == 50008 || id == 50063) && name == "alive_in_gas")
+                divisor = 1000;
+            else if ((id == 50009 || id == 50021) && name == "driving")
+                divisor = 60000;
+            else if (id == 50059 && name == "alive_not_downed")
+                divisor = 60000;
+            if (!divisor || !completeParameters(values, 2))
+                return 0;
+            // The original script reports gettime() differences in ms. Timers
+            // and pickup counts are summed by native event caches. Preserve
+            // sub-unit time across batches and restarts, never round up.
+            const auto remainder = number(state, "timerRemainderMs");
+            wire::require(remainder < divisor);
+            const auto total = remainder + counter(values, "Param0");
+            state["timerRemainderMs"] = total % divisor;
+            return total / divisor;
+        }
+
         std::string snapshotHash(const Json &states, const Json &state)
         {
             auto selected = Json::array();
+            const auto *owner = quest(number(state, "id"));
+            wire::require(owner);
             for (const auto &candidate : states)
                 if (number(candidate, "kind") == 15 && number(candidate, "status") == 1)
                     if (const auto *definition = quest(number(candidate, "id"));
-                        definition && definition->category == 0)
+                        definition && definition->category == owner->category)
                         selected.push_back(number(candidate, "id"));
             const auto bytes = Json{{"state", state}, {"selected", selected}}.dump();
             return wire::base64Encode(crypto::sha256(
@@ -109,48 +173,52 @@ namespace services
         }
     } // namespace
 
-    QuestProgress advanceReplayQuests(const Json &stored, const Json &events, bool publicMatch)
+    QuestProgress advanceReplayQuests(const Json &stored, const Json &events,
+                                       std::optional<unsigned> publicCategory)
     {
         wire::require(stored.is_array() && stored.size() <= 15000);
         QuestProgress result;
         result.states = stored;
-        if (!publicMatch)
+        if (!publicCategory)
             return result;
         for (const auto &event : events)
         {
-            if (event.at("name") != "kill")
-                continue;
             const auto &values = event.at("values");
             // The original AddGamemode emits 2 for MP, 8/24 for BR. Neither
             // client gamemode nor a public-looking name proves lobby membership.
-            if (number(values, "version") != 1 || number(values, "gamemode") != 2)
+            const auto mode = number(values, "gamemode");
+            if (number(values, "version") != 1 || (mode != 2 && mode != 8 && mode != 24))
                 continue;
-            bool complete = true;
-            for (unsigned index = 0; index < 7; ++index)
-                complete &= values.contains("Param" + std::to_string(index));
-            if (!complete)
+            const auto category = mode == 2 ? 0u : 1u;
+            if (category != *publicCategory)
                 continue;
             std::vector<uint32_t> active;
             for (const auto &state : result.states)
                 if (number(state, "kind") == 15 && number(state, "status") == 1)
-                    if (const auto *row = quest(number(state, "id")); row && row->category == 0)
+                    if (const auto *row = quest(number(state, "id")); row && row->category == category)
                         active.push_back(row->id);
             wire::require(active.size() <= 1);
-            // Snapshot active selections before processing this event: one kill
+            // Snapshot active selections before processing this event: one report
             // cannot also satisfy the successor activated by that same kill.
             for (const auto identity : active)
             {
                 const auto &row = *quest(identity);
                 auto &state = *find(result.states, identity);
                 if (state.at("name") != row.name || number(state, "target") != row.target ||
-                    number(event, "timestamp") < number(state, "activationTimestamp") ||
-                    !killMatches(identity, values))
+                    number(event, "timestamp") < number(state, "activationTimestamp"))
                     continue;
                 const auto before = number(state, "progress");
                 if (before >= row.target)
                     continue;
-                state["progress"] = before + 1;
-                const bool finished = before + 1 == row.target;
+                const auto oldRemainder = number(state, "timerRemainderMs");
+                const auto increment = category == 1 ? brProgress(identity, event, state)
+                    : (event.at("name") == "kill" && completeParameters(values, 7) &&
+                       killMatches(identity, values) ? uint64_t{1} : uint64_t{0});
+                if (!increment && oldRemainder == number(state, "timerRemainderMs"))
+                    continue;
+                const auto total = before + std::min(increment, uint64_t{row.target} - before);
+                state["progress"] = total;
+                const bool finished = total == row.target;
                 result.updates[identity] = finished;
                 if (!finished)
                     continue;

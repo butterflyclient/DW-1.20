@@ -247,6 +247,18 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         no_update(clients[0][1])
         no_update(clients[1][1])
 
+        # Both native ready requests above are already durable. If maps become
+        # available now, the idle delivery path can legitimately allocate the
+        # round before the next request, without rewriting unchanged enrollment.
+        # Re-arm one ready flag in this disposable fixture while maps remain
+        # unavailable, so the interrupted transaction must include the native
+        # request's new enrollment state as well as the round assignment.
+        waiting = json.loads(enrollment_path.read_bytes())
+        last_player = waiting["players"][str(clients[1][0])]
+        assert last_player["ready"] is True
+        last_player["ready"] = False
+        publish(enrollment_path, waiting)
+
         # Force interruption after the bracket/lobby/search snapshots have been
         # prepared, before the account assignment index can be published.
         blocker = mm_root / "current-lobbies.json.pending"

@@ -34,7 +34,8 @@ def main():
     original = json.loads(args.parser_proof.read_bytes())
     assert original["target_image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
     cases = {row["fixture_label"]: row for row in original["cases"] if "fixture_label" in row}
-    assert all(row["accepted"] and row["parameter_count"] == 7 for row in cases.values())
+    assert all(row["accepted"] for row in cases.values())
+    assert all(row["parameter_count"] == 7 for row in cases.values() if row["name"] == "kill")
     metadata = json.loads((ROOT / "validation/20261008-replay-quest-rewards-assets.json").read_bytes())
     quests = {row["id"]: row for row in metadata["quests"]}
     fixtures = {1501: "pistol", 1503: "frag", 1505: "assault", 1506: "smg",
@@ -49,7 +50,7 @@ def main():
     data = fixture / "data"
     data.mkdir(parents=True)
     shutil.copy2(ROOT / "data/replay-traffic-kdf.bin", data)
-    catalog = runpy.run_path(str(ROOT / "tools/prepare-playlist-catalog.py"))["prepare"](data, ["mp_shipment"], 1)
+    catalog = runpy.run_path(str(ROOT / "tools/prepare-playlist-catalog.py"))["prepare"](data, ["mp_shipment", "mp_donetsk"], 1)
     runpy.run_path(str(ROOT / "tools/publish-replay-battlepass.py"))["publish"](args.battlepass_publication, data)
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     for profile in ("quest-host", "quest-peer"):
@@ -115,7 +116,7 @@ def main():
         path = states_path(client)
         stored = json.loads(path.read_bytes())
         for row in stored:
-            if row["id"] != identity and row.get("status") == 1 and quests.get(row["id"], {}).get("category") == 0:
+            if row["id"] != identity and row.get("status") == 1 and quests.get(row["id"], {}).get("category") == quests[identity]["category"]:
                 row["status"] = 2
         stage = next(row for row in stored if row["id"] == identity)
         stage.update(status=1, progress=quests[identity]["target"] - 1 if near_completion else 0)
@@ -125,6 +126,8 @@ def main():
 
     def event(label, timestamp=1000, mode=2, name="kill", extra=None):
         values = {f"Param{i}": value for i, value in enumerate(cases[label]["values"])}
+        if name == "kill":
+            name = cases[label]["name"]
         values.update(version=1, gamemode=mode)
         values.update(extra or {})
         raw = text(1, name) + integer(2, timestamp) + integer(4, 0)
@@ -185,7 +188,7 @@ def main():
             assert kind == 2 and packet.startswith(u32(expected)), packet[:32].hex()
             return packet
 
-    def create_match(host, peer, private=False, phase="in_game"):
+    def create_match(host, peer, private=False, phase="in_game", br=False):
         tokens = []
         for client in (host, peer):
             info = {"dedicated_server": {"build_name": "replay-quest-fixture"},
@@ -201,6 +204,10 @@ def main():
                                                   "playlist_version": catalog["version"]}}}
         if private:
             query["private_lobby"] = {"initial_party_id": 61}
+        if br:
+            query["ruleset_payload"]["filter"]["playlist_id"] = 25
+            query["lobby_slots"] = {"min": 1, "max": 150}
+            query["team_balance"] = {"num_teams": 1, "lock_squad": True}
         client_result = documents(host.task(145, 18, ordinary_text(json.dumps(query)), structured=False))
         created = receive_lobby(host, 2005)
         assert created.startswith(u32(2005) + u64(client_result[0]["mm_id"])), (created[:32].hex(), client_result)
@@ -240,6 +247,12 @@ def main():
             send(host, "inactive", [event("frag")])
             assert states_path(host).read_bytes() == before
             checks.append("No active public match, wrong game mode/version/event, stale time, tactical equipment and deactivated stages cannot earn mission credit")
+            seed(host, 1501, False)
+            before = states_path(host).read_bytes()
+            for label in ("equipment_target", "vehicle_target", "killstreak_target", "unknown_target"):
+                send(host, label, [event(label)])
+                assert states_path(host).read_bytes() == before
+            checks.append("The shared kill event cannot credit player kills for equipment, vehicles, streaks or unknown target types")
             seed(host, 1501, False)
             partial = send(host, "partial-kills", [event("pistol"), event("pistol")])
             update = rewards(host, 1)[0]
@@ -337,12 +350,64 @@ def main():
             assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
             assert snapshot(peer) == saved_peer
             checks.append("Authenticated listen-host remote mission report recovers a real interrupted mixed commit and its retry without duplicating rewards")
+            host.task(145, 10, u64(int(lobby.stem)), structured=False)
+            receive(host)
+            receive(peer)
+            retired_lobbies.add(int(lobby.stem))
+            # Wire-only BR allocation; no map is loaded or game launched.
+            lobby = create_match(host, peer, br=True)
+            br_pickups = {50005: "Param0", 50007: "Param1", 50042: "Param1", 50066: "Param1",
+                          50069: "Param1", 50010: "Param2", 50031: "Param2", 50084: "Param2"}
+            for identity, key in br_pickups.items():
+                seed(host, identity)
+                before = snapshot(host)
+                send(host, f"wrong-br-mode-{identity}", [event("pickup_totals", mode=2)])
+                assert states_path(host).read_bytes() == before[0]
+                label = {"Param0": "pickup_weapons", "Param1": "pickup_cash", "Param2": "pickup_caches"}[key]
+                wrong = "pickup_cash" if key == "Param0" else "pickup_weapons"
+                send(host, f"wrong-counter-{identity}", [event(wrong, mode=8)])
+                assert states_path(host).read_bytes() == before[0]
+                packet = send(host, f"br-pickup-{identity}", [event(label, mode=24)])
+                updates = rewards(host, 2)
+                mission = next(row for row in updates if row["kind"] == 15)
+                assert mission["id_"] == identity and mission["reason"] == "completed"
+                assert mission["progress"] == quests[identity]["target"]
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2))
+                assert snapshot(host) == saved
+            checks.append("All eight BR weapon/cash/cache pickup stages consume original aggregated fields, clamp targets and preserve retries without MP-mode cross-credit")
+            for identity in (50008, 50063, 50009, 50021, 50059):
+                seed(host, identity)
+                label = "gas_partial_ms" if identity in (50008, 50063) else "driving_ms"
+                if identity == 50059:
+                    label = "not_downed_partial_ms"
+                packet = send(host, f"timer-partial-{identity}", [event(label, mode=8)])
+                update = rewards(host, 1)[0]
+                assert update["kind"] == 15 and update["reason"] == "inProgress"
+                row = next(row for row in json.loads(states_path(host).read_bytes()) if row["id"] == identity)
+                assert row["progress"] == quests[identity]["target"] - 1
+                assert row["timerRemainderMs"] == (250 if identity in (50008, 50063) else 45000)
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert rewards(host, 1)[0]["reason"] == "inProgress" and snapshot(host) == saved
+                finish_label = "gas_remaining_ms" if identity in (50008, 50063) else "driving_remaining_ms"
+                if identity == 50059:
+                    finish_label = "not_downed_remaining_ms"
+                send(host, f"timer-finish-{identity}", [event(finish_label, mode=24)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["progress"] == quests[identity]["target"] and update["reason"] == "completed"
+            checks.append("Five BR gas/driving/non-downed timers preserve fractional units and retries; seconds/minutes do not round up from milliseconds")
+            seed(host, 50009)
+            packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
+            rewards(host, 1)
             saved_host = snapshot(host)
         stop()
         start()
         with NativeClient(fixture, profile="quest-host", port_offset=offset) as host, \
              NativeClient(fixture, profile="quest-peer", port_offset=offset) as peer:
             assert snapshot(host) == saved_host and snapshot(peer) == saved_peer
+            assert next(row for row in json.loads(states_path(host).read_bytes()) if row["id"] == 50009)["timerRemainderMs"] == 45000
         checks.append("Both accounts retain mission XP, items, completion and successor selections across a real backend restart")
     finally:
         stop()
@@ -351,10 +416,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures), checks=checks,
+                                         supported_stage_count=len(fixtures) + 13, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures)} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 13} stages; {args.output}")
 
 
 if __name__ == "__main__":
