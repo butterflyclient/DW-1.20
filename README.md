@@ -10,8 +10,9 @@ separate evidence gates.
 
 ## Repository and formatting
 
-Development source is maintained in the private `IDARETW/IW8-Replay-DW`
-repository. Commit new backend implementations after the relevant build,
+Development source is maintained in [`butterflyclient/DW-1.20`](https://github.com/butterflyclient/DW-1.20)
+on the `main` branch. The complete history of both previous repository branches
+is retained on `main`. Commit new backend implementations after the relevant build,
 independent fixtures and available native validation pass. `format-backend.ps1`
 applies the checked-in C++ style; `format-backend.ps1 -Check` verifies it without
 rewriting files. Keep functions, control flow and declarations in readable blocks.

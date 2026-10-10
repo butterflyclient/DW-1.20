@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-10T20:01:01.010361+00:00",
+  "old_repository": "https://github.com/IDARETW/IW8-Replay-DW",
+  "new_repository": "https://github.com/butterflyclient/DW-1.20",
+  "destination_branch": "main",
+  "old_main": "93c3ea05fbb3357b9d30926725bdf15298cbce32",
+  "old_development": "b7cde4fc6acbbec4bb803885e23a9998bec7f2bb",
+  "published_main": "b7cde4fc6acbbec4bb803885e23a9998bec7f2bb",
+  "old_main_commits": 102,
+  "combined_commits": 162,
+  "missing_commits": [],
+  "history_rewritten": false,
+  "uncommitted_work_preserved": true,
+  "game_or_server_deployed": false
+}
