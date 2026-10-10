@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "passed": true,
+  "full_backend_complete": false,
+  "game_runs_performed": false,
+  "native_game_verified": false,
+  "compiled_translation_units": 46,
+  "retained_objects": 0,
+  "windows_server_sha256": "010562a584844e1b3445651f2b94fdd5e89375db1d1106761688803226c632af",
+  "linux_server_sha256": "c051e14b714ffc0ed31eb1ed74669d4c78e2615f907f85d4fc1f8d2aff960f79",
+  "source_archive_sha256": "f6a954e90df21cdf8315ae23c65e7a05c44555d6bdd566acf12423897e11a39d",
+  "client_sha256": "fc2241548ebd1d3e5a62e7f374b6ca72c10cd1616dd5467decc33ccbe55d362c",
+  "client_job": "4a26220b8e594f78",
+  "bot_base_usernames": 150,
+  "bot_maximum_distinct_names": 199,
+  "operator_skin_pairs": 742,
+  "weapon_preview_blueprints": 287,
+  "popup": "shipped PopupYesNo; default No; No/cancel are nonmutating",
+  "reset_command": "dw_resetProgression",
+  "evidence": [
+    {
+      "path": "data/backend-build-latest.json",
+      "sha256": "0bc296a174e0111d05bed54a08a5904734e032d359be27fd8b8295e80d12b4ad"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linux-build-receipt.json",
+      "sha256": "3c92cc057a77e6a1c7cea6b31e297d4790028cf5e296a1a99eddf6de85d84f9b"
+    },
+    {
+      "path": "data/bot-appearance-20261010/windows-earning.json",
+      "sha256": "5c66a6086cf4ae1ed803a80df696b09ac8063957267302a824f06def32a0c5e1"
+    },
+    {
+      "path": "data/bot-appearance-20261010/windows-team-reset.json",
+      "sha256": "7fa1a4659e1822c91ad6c6513ab5c976cb82549238cd9162cb4f6373b544d2b8"
+    },
+    {
+      "path": "data/bot-appearance-20261010/protocol/lobby-verification.json",
+      "sha256": "337a1e648e0083bcc55d0b48e110a2bdff79c9f9d99f648085f4600e1160b254"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linux-earning.json",
+      "sha256": "bf2d518115ace7ff9d6a5dc5b5d73ab817d7f1340121b028315c4358d7a9e7b2"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linux-team-reset.json",
+      "sha256": "885d65d718af19d470672aa0e04026a153ddc9258480f2d46b29ce76f55751dd"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linux-protocol.json",
+      "sha256": "c12fcc5167ad8af3db02d5ec375ec1a66e2b1ac7eecc3a45d1d6adb75e4231ce"
+    },
+    {
+      "path": "data/bot-appearance-20261010/client-r2/workstation-job.json",
+      "sha256": "fb635cfb82a8fefc8862ca809a28b2aff45b27de4adddc15e3fd4b94f2eac95c"
+    },
+    {
+      "path": "data/bot-appearance-20261010/client-r2/compiler-snapshot-receipt.json",
+      "sha256": "007fc49ce7291d9a6efbf63e97851951f89d1bbb564597be42231721c6284e03"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-4a26220b8e594f78/build-report.json",
+      "sha256": "346fb740b8467e028f70f151adc30032dfc03baa9a746215fa3467a7083776a3"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-4a26220b8e594f78/relocation-audit.json",
+      "sha256": "81da9f4ef9f6acfd90206a2d5ea42d7978380058dc74fadab1f4fdacb14f11a2"
+    },
+    {
+      "path": "data/workstation-builds/build-workstation-4a26220b8e594f78/verification-report.json",
+      "sha256": "2fbc81fe707c4586cb9d26e986d7d9dd05678b2c8ca7917bd8256307dfb250d1"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linked-client-reset.json",
+      "sha256": "62d7eb0fba322d94b17005c09dfb9fe169847d49590c0fc66bd68f85d64ba593"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linked-bots.json",
+      "sha256": "66fb9d7d948ea57db127ac7b01c6016398eafe2389cdd7f20efd5c01838a9458"
+    },
+    {
+      "path": "data/bot-appearance-20261010/linked-unlock-policy.json",
+      "sha256": "e901599a0ba00f84e4d8d95c4f4b339cfc5529562c8ef65e9aac2ce51a706b22"
+    },
+    {
+      "path": "data/bot-appearance-20261010/protocol/platform-verification.json",
+      "sha256": "fb45a4ef0d72e8d3711400510ef0eb403a7c34f17c8e69526901c9bf7137d300"
+    },
+    {
+      "path": "data/bot-appearance-20261010/protocol/auth-verification.json",
+      "sha256": "7ca3bf5f182479f565315583085e6b7c6112e2496f66b65e055249547e82e3ab"
+    },
+    {
+      "path": "data/bot-appearance-20261010/protocol/platform-resource-verification.json",
+      "sha256": "488ecec41cb6d3c4c0ad2b8d549b40b83378ad91dc3114d11e327ab531e3d38b"
+    },
+    {
+      "path": "data/bot-appearance-20261010/local-player-verification.json",
+      "sha256": "8854c57427acf7b111f1fab6e51596f633bdba8ddfb9a328b7546fdb4c5aea9a"
+    },
+    {
+      "path": "data/bot-appearance-20261010/identity-build-receipt.json",
+      "sha256": "235577ce680b5cd9ce498354e49796902c735ba6486272c0ed3a34eaa2cec5cf"
+    },
+    {
+      "path": "data/bot-appearance-20261010/full-image-release16/droplet-publication.json",
+      "sha256": "4edf3e6398c3492fc60496a7f0995cbf2e732b845c17901f3bd9f52c1f23430c"
+    },
+    {
+      "path": "data/bot-appearance-20261010/live-update-verification.json",
+      "sha256": "805082fcba153481df49176914324b67c4b9b53734ad33b21d12cb0e508d3931"
+    },
+    {
+      "path": "data/bot-appearance-20261010/deployment.json",
+      "sha256": "9c2b3aa6e1ad33a3f533cca746750ad7a4258e7e44f9159b0c2846f7909f38cc"
+    },
+    {
+      "path": "data/deployment.json",
+      "sha256": "fb3db810e18302480dc2d85e04851b10e500707173b85aff03603123f4979858"
+    }
+  ],
+  "source_revision": "f891a7d91fab343b9479a8d4b0f79e57f0014706",
+  "windows_object_sha256": {
+    "abtesting_services.obj": "e786440c76ba4ec5144c5e03090ce9eeb24baa2d86dc4adce4328e2601cb05cf",
+    "account_services.obj": "3ab16aab1bd20cf85e8ed8d72e6e7462afd2dff2fb81c2a69f18b2b7f0a39763",
+    "achievement_services.obj": "f9fc41019f6cb9bd47699057cd6763958ca0dab5c080d65d2b8b5e151f47bd7b",
+    "achievement_store.obj": "8f804f4c619b05b944b91ef7101634d2147f8c038c01c5df761f69d3bfe09348",
+    "anticheat_services.obj": "3de556e972689316f1ec1a8683fee68be5de481c116bfdd7ae4e7f4093f3f0a6",
+    "bandwidth.obj": "12b9f0656f979d6867b08cdd033899c10859baa41728c9f60a3d6201b1ecc814",
+    "battlepass_services.obj": "81df6f214718f344c87969e73bd017a3c183fab5a55ac25dad11a786177d98ab",
+    "channel_services.obj": "ef0894302c2314a5c1e4e2f629ebc88887ca0d383be6af9bcffa52aa898fd2ed",
+    "channel_store.obj": "1d27bfb84554bcdefa6ada8b5d1ffd7afbcaffc5793e7d0d88f525c0e7286bf6",
+    "clan_services.obj": "d50fd90722ca2a84e07eee6ba7e64ba75b9e63dcf35fee447d612c0b4b8b1a28",
+    "content_services.obj": "982b4a37a21e0a392daa09f8d6478f93468e2d47f0bccb301b6763a64707535f",
+    "counter_services.obj": "7ea7b2997101c5ed39d22006d44fe86aaeb2d7c665171e10fb192e6812f6ff2d",
+    "crypto.obj": "a6949dc38b6dea494d756ed0a32272aef79073fc8e0466dc5adcf4e543faf3e3",
+    "crypto_provider.obj": "9f4d77cdce8fd8b3d18bdc07dd701b46f8a9c2e8d3d6928ac29a9e68449f4a3f",
+    "engagement_services.obj": "09fc6b7a735248aa76a030db1df30388ae0b2193c46d4836d4514ea7812556d6",
+    "host_os.obj": "a5193bc48b7da0fd7b41bc2e663eb673fb42e720111009a6571663788d1612d1",
+    "identity_rest_services.obj": "81fd48f53779848fef6aba8be88086ba1cd3a95016b9ceec950b8fae9e121256",
+    "identity_services.obj": "1e194d403a6e7aeca813fb3045d4f3ad1672acc4f0afa22c9827d44355922a8f",
+    "inventory_validation_services.obj": "6515607a3f9bdad18e16a9294783f397f7ec1626456bdc078d1f52ad7864cf95",
+    "leaderboard_services.obj": "1ada1c9af451d48511b26d680a34c0606db88878647fb2154a49f31bc615c77c",
+    "lobby.obj": "8230f27807c56b90ecbc6ef4461a85ffffbd5a937e269925ea65c8d4f716cf80",
+    "mail_services.obj": "cd5f3ac7d4bc88961ca99bb01f1fc7b241a04163abab91d2fe388cdf6ae6a4cf",
+    "marketplace_services.obj": "dc39da398053f34ca5385b1fb7693bf57bd9c82b4c51b47c0775f8334c97ddf9",
+    "matchmaking_services.obj": "f51451e6e7d5bacd217d612e9c336810d4dd3897ce3039bc91ea0a16722c735b",
+    "matchmaking_store.obj": "4d38f7aa636ff2b608d6df2b45cabfe0e4cd065e6e28faee4305a1ab771c8d31",
+    "network.obj": "5b35508540270eec073ecf98866b981d351789500be7ab804b784b280a7a030b",
+    "objectstore_services.obj": "815e6a5b6190199d992415b78bf1e60b064c370a43890a9ed72df7a7e080ce2e",
+    "platform.obj": "ea41567d9ccc874a42ab7763711390f25db0ef08a4c4db064853129596cee328",
+    "platform_account_store.obj": "6f0e66ac2f215b263a6af80a46b4f857b241b2def7bd93650dcec42f03edc39f",
+    "platform_resources.obj": "e423d8bce6b5f77abc2a7480343c706a95a58fac4163c4ce8704046ed6d15a67",
+    "playlist_catalog.obj": "830bb7015beb7e2843b1b32e5eeb87870f30930aa5f891545bbac53ef2926a0d",
+    "qos_provider.obj": "67ae3bf77fda56eafad201bb1b4c5d3eb34abafc4646f24bc023f143b3ad5ea6",
+    "qos_services.obj": "9aef648be022543237bba49cfef96cc726b308bc34fe891c75f4c57a1fb6ca35",
+    "quest_services.obj": "91966379955008d232b221c1b6fb53b82078013259a33d82d78db960164a9d78",
+    "regulation_services.obj": "c2c1ba3de5a1ffdc6db9b68553b89a932199159099494f66a5a695bebb97c523",
+    "relay_provider.obj": "08e18dfa09b10e693103ade124d30b1aa84e273fb248b136eeb43a641e582b30",
+    "relay_services.obj": "2ea4a5ae1104f5b14c052e334eb577bb0c63861c557eba0f5832e3321d3e4b72",
+    "rest_services.obj": "55cab69b3860441ba08073bf3d324000c8022b4d03d5b6c2aab8e4ce7f54f1f5",
+    "scheduled_services.obj": "0fb38e8f6b8a252dd61eed446f1c7c0249d0884620d814bb74d4e0e14e9f7600",
+    "server.obj": "203e26e142b6af4fa37b44cee294dfbcac8d49e4c2d2b50c88408454178e4f79",
+    "services.obj": "4db972783c067990bd7aeb68b43dc69b416736a87f479d074a390c8e838981c2",
+    "social_services.obj": "a9e47301010f0c8aafc29c27e93dad15f3a7acd673b30a668a1c5ec8cea84613",
+    "startup_services.obj": "08c2435bf6bc128eb8bf604ea6e1690d0bf7a8f141bd25bca977ff09ffb3f1aa",
+    "team_services.obj": "007320c944feccd6dcadf2c8badd7ad1c17d7312823acacf5a8bc70b4571a85f",
+    "tournament_map_policy.obj": "850eec64181703e3afb2eaf3fc47e7d50c32e9c1cb3b511a5ae410a00b454780",
+    "tournament_services.obj": "d8994a453c8a6878e0b26123c15b0155891a77e952d146e8eddd8754b1cc26fb"
+  },
+  "server_deployed": true,
+  "remaining_contracts": [
+    "126 mission earning criteria",
+    "six streaming/category/large-upload bindings",
+    "native achievement metadata cache transition ordering",
+    "native popup, bot visuals and reset/restart game validation",
+    "in-match weapon/preview blueprint consistency"
+  ],
+  "live_process": {
+    "pid": 278975,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261010-c051e14b714f/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261010-c051e14b714f/iw8-dw-server",
+    "sha256": "c051e14b714ffc0ed31eb1ed74669d4c78e2615f907f85d4fc1f8d2aff960f79",
+    "process_sha256": "c051e14b714ffc0ed31eb1ed74669d4c78e2615f907f85d4fc1f8d2aff960f79",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "deployed_map_policy_sha256": "03fbbc68e99bb083302e8acb0ca5c3bf2986e42d2608b26664cc68eb737e2fc4",
+  "client_deployed": true,
+  "full_image_update_published": true,
+  "full_image_release": 16,
+  "public_signed_update_verified": true,
+  "public_full_image_download_verified": true
+}
