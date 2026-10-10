@@ -1,0 +1,52 @@
+REPLAY DW DESTRUCTION MISSION EARNING
+2026-10-10
+
+Issue
+The shared native kill packet reports destroyed vehicles and killstreaks as
+well as player kills. The backend's player-only predicate rejected those
+destruction events, leaving stages 10012 and 10013 without earning rules.
+
+Research
+The retained native challenges.gsc ScriptFile, bytecode and disassembly are
+hash-bound. Original GetByte/GetUnsignedShort operands corroborate all eleven
+target flags. The target is a combination of flags: a streak vehicle can carry
+Killstreak, Ground and Vehicle together. AI subclass flags do not imply a
+player, vehicle or streak. Source labels are corroborated separately from the
+original parser's packed-field placement.
+
+Implementation
+tools/research-replay-target-types.py generates src/replay_kill_target.h from
+that proof. ReplayKillEvent retains the complete seven-UInt64 packet and adds
+a typed target flag accessor. Unknown bits remain intact.
+
+Stage 10012 counts the Vehicle flag; stage 10013 counts the Killstreak flag.
+Those criteria run before the player-only check. Existing player-kill criteria
+still require Player. Every accepted kill packet represents one action.
+The existing public-lobby/session/mode/version/activation and transaction
+checks still apply. These rules use shipped stage IDs, targets, XP, items and
+successor stages rather than introducing a separate mission catalog.
+
+Validation
+The original parser harness is retained unchanged. A companion executes its
+221 existing cases plus ten overlapping/subtype masks, for 231 native parser
+cases. The backend fixture checks wrong targets, combined flags, partial
+accumulation, exact completion, XP/item grants, successors and idempotent retry.
+
+New Windows/Linux results belong to the exact clean-built binary hashes in
+validation/20261010-replay-destruction-readiness.json. Each platform tests 119
+encrypted earning groups and 14 mission-management groups. Unrelated backend
+source is compared with the prior validated release. The previous 304-group
+protocol result remains prior evidence; it is not relabeled as a new full run.
+No game is launched and no new native gameplay callback claim is made.
+
+Remaining work
+Supported earning criteria increase from 95 to 97 of 232. The remaining 135
+criteria, six streaming/category/large-upload result bindings, delayed cached
+event ownership and broader native callback verification remain open.
+The complete backend goal remains active. The shipping client EXE is unchanged.
+
+Deployed release
+Windows SHA256 867a4bef29f136cc75900196256b2bfc37770780b8756b143b4d9b776299f77f
+Linux SHA256 4fc516bf5f6b47d24a8b39b5604d6f8626919cf0f7747718cc6da1d469f0f211
+Verified droplet PID 257071; zero players at controlled stop.
+Previous release retained for rollback. Installed-map policy is unchanged.

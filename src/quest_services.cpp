@@ -45,16 +45,19 @@ namespace services
             const auto classification = event.classification();
             const auto attachments = event.attachmentCount();
             const auto cause = event.cause();
-            const auto target = event.target();
             const auto marksman = std::find(replay_kill_data::Marksman.begin(),
                                             replay_kill_data::Marksman.end(), weapon) !=
                                   replay_kill_data::Marksman.end();
             const auto sniper = std::find(replay_kill_data::Sniper.begin(),
                                           replay_kill_data::Sniper.end(), weapon) !=
                                 replay_kill_data::Sniper.end();
-            // Shipped cp_mp/challenges.gsc also emits kill for equipment,
-            // vehicles and streaks. findenemytype sets bit 0 only for players.
-            if (!(target & 1))
+            // Destruction is reported through the same native kill packet.
+            // Its flags overlap: a killstreak vehicle satisfies both criteria.
+            if (id == 10012)
+                return event.targets(ReplayKillTarget::Vehicle);
+            if (id == 10013)
+                return event.targets(ReplayKillTarget::Killstreak);
+            if (!event.targets(ReplayKillTarget::Player))
                 return false;
             switch (id)
             {

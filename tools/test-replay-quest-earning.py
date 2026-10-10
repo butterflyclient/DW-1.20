@@ -48,7 +48,8 @@ def main():
                 10046: "magnum_three", 1514: "ghost_first", 1563: "ghost_third",
                 1562: "shrapnel_frag", 1595: "reflex_head", 1598: "sks_five",
                 1624: "reflex_pistol", 10000: "smg_head", 10003: "tracker_smg",
-                10040: "zoom_head", 10131: "ak47_head", 10006: "double_time_smg"}
+                10040: "zoom_head", 10131: "ak47_head", 10006: "double_time_smg",
+                10012: "vehicle_target", 10013: "killstreak_target"}
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
@@ -308,6 +309,12 @@ def main():
             assert update["progress"] == 5 and update["reason"] == "completed"
             checks.append("Separate batches accumulate individual kills from zero to the exact target; partial retries neither skip stages nor re-add progress")
             negative_kill_contexts = {
+                10012: ("pistol", "equipment_target", "killstreak_target", "air_streak_target",
+                        "ground_streak_target", "agent_soldier_target", "agent_juggernaut_target",
+                        "agent_shield_target", "agent_suicide_target", "unknown_target_bit"),
+                10013: ("pistol", "equipment_target", "vehicle_target", "ground_vehicle_target",
+                        "agent_soldier_target", "agent_juggernaut_target", "agent_shield_target",
+                        "agent_suicide_target", "unknown_target_bit"),
                 10006: ("smg", "double_time_assault"),
                 1514: ("pistol", "br_ghost"),
                 1563: ("pistol", "br_ghost"),
@@ -327,6 +334,19 @@ def main():
                     send(host, f"wrong-{identity}-{index}", [event(label)])
                     assert states_path(host).read_bytes() == before, (identity, label)
                 checks.append(f"Stage {identity} rejects wrong perk, class, optic, death cause or attachment context")
+            for identity, labels in ((10012, ("ground_vehicle_target", "streak_vehicle_target")),
+                                     (10013, ("air_streak_target", "ground_streak_target",
+                                              "support_streak_target", "streak_vehicle_target"))):
+                seed(host, identity, False)
+                packet = send(host, f"target-masks-{identity}", [event(label) for label in labels])
+                update = rewards(host, 1)[0]
+                assert update["id_"] == identity and update["progress"] == len(labels)
+                assert update["reason"] == "inProgress"
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert rewards(host, 1, refresh=True)[0]["progress"] == len(labels)
+                assert snapshot(host) == saved
+                checks.append(f"Stage {identity} accumulates native overlapping target subtypes and retries without duplicate destruction credit")
             seed(host, 1514, False)
             send(host, "all-native-ghost-slots", [event("ghost_first"), event("ghost_second"), event("ghost_third")])
             update = rewards(host, 1)[0]

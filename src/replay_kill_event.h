@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include "replay_kill_target.h"
 
 // Complete seven-UInt64 native kill/death parameter packet. Retain every bit;
 // only expose meanings verified by original ProcessParams execution. The
@@ -15,6 +16,11 @@ struct ReplayKillEvent
     uint8_t attachmentCount() const { return static_cast<uint8_t>(parameters[5]); }
     uint16_t optic() const { return static_cast<uint16_t>(parameters[6]); }
     uint16_t cause() const { return static_cast<uint16_t>(parameters[6] >> 16); }
+
+    bool targets(ReplayKillTarget flag) const
+    {
+        return (target() & static_cast<uint16_t>(flag)) != 0;
+    }
 
     bool hasPerk(uint16_t id) const
     {
