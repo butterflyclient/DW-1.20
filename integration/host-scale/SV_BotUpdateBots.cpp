@@ -1,8 +1,33 @@
 #include "sv_host_navigation.h"
+#include "sv_host_bot_equipment.h"
+#include "sv_host_bot_loot.h"
+#include <string.h>
 
 namespace
 {
     using namespace HostScale;
+
+    struct EquipmentStamp
+    {
+        uint32_t inventory[15], currentWeapon, phase, scriptFlags;
+        int32_t movementType;
+        BotWeapon scriptWeapon;
+    };
+
+    EquipmentStamp Equipment(const Entity *entity, const void *client)
+    {
+        const auto *player = reinterpret_cast<const BotEquipmentPlayer *>(entity->client);
+        const auto *bot =
+            reinterpret_cast<const BotEquipmentData *>(static_cast<const uint8_t *>(client) + 1368);
+        EquipmentStamp stamp{};
+        memcpy(stamp.inventory, player->inventory, sizeof(stamp.inventory));
+        stamp.currentWeapon = player->currentWeapon;
+        stamp.phase = player->gameExtraInfo & 0x600;
+        stamp.scriptFlags = bot->scriptFlags;
+        stamp.movementType = player->movementType;
+        stamp.scriptWeapon = bot->scriptWeapon;
+        return stamp;
+    }
 
     struct BotDecision
     {
@@ -12,13 +37,17 @@ namespace
         int32_t health;
         uint16_t target;
         bool valid;
+        EquipmentStamp equipment;
     };
+
     BotDecision s_decisions[200]{};
+
     struct HumanObserver
     {
         Vec3 origin;
         uint16_t targetHandle;
     };
+
     HumanObserver s_observers[200]{};
     unsigned s_observerCount;
 
@@ -40,6 +69,26 @@ namespace
 
     unsigned DecisionInterval(const Entity *entity, uint16_t target, unsigned population)
     {
+        // Close bot-vs-bot combat needs the same prompt melee, aim and weapon
+        // decisions as combat against a human. Distance to spectators alone
+        // must not determine the responsiveness of an acquired opponent.
+        if (target && target <= SVHS_ClientCount && target <= 200)
+        {
+            const void *client = SVHS_Clients[target - 1];
+            const Entity *enemy =
+                client ? Field<Entity *>(const_cast<void *>(client), 280) : nullptr;
+            if (enemy && enemy->health > 0)
+            {
+                const float x = enemy->origin.x - entity->origin.x;
+                const float y = enemy->origin.y - entity->origin.y;
+                const float z = enemy->origin.z - entity->origin.z;
+                const float distance = x * x + y * y + z * z;
+                if (distance < 768.0f * 768.0f)
+                    return 32;
+                if (distance < 2048.0f * 2048.0f)
+                    return 64;
+            }
+        }
         float distanceSquared = 3.402823466e38f;
         for (unsigned i = 0; i < s_observerCount; ++i)
         {
@@ -58,22 +107,35 @@ namespace
         if (!target && distanceSquared < 512.0f * 512.0f)
             return 64;
 
-        unsigned interval = target ? (population > 100 ? 96 : 64)
-                                   : population > 100 ? 192 : population > 64 ? 128 : 96;
+        unsigned interval = target             ? (population > 100 ? 96 : 64)
+                            : population > 100 ? 192
+                            : population > 64  ? 128
+                                               : 96;
         if (s_observerCount && distanceSquared > 4096.0f * 4096.0f)
             interval *= 2;
         return interval;
     }
 
-    bool ReuseDecision(BotDecision &previous, void *client, unsigned slot,
-                       unsigned population, int32_t now)
+    bool ReuseDecision(
+        BotDecision &previous, void *client, unsigned slot, unsigned population, int32_t now)
     {
         const auto *entity = Field<Entity *>(client, 280);
         const uint16_t target = entity->sentient ? entity->sentient->targetHandle : 0;
         if (!previous.valid || previous.client != client || previous.player != entity->client ||
             previous.health != entity->health || entity->health <= 0 || previous.target != target ||
             now <= previous.command.serverTime || now < previous.thoughtTime ||
-            Field<uint32_t>(client, 1368 + 8988)) // Pending script-driven buttons must run immediately.
+            Field<uint32_t>(client,
+                            1368 + 8988)) // Pending script-driven buttons must run immediately.
+            return false;
+        if (target && target <= SVHS_ClientCount && target <= 200)
+        {
+            void *other = SVHS_Clients[target - 1];
+            const Entity *enemy = other ? Field<Entity *>(other, 280) : nullptr;
+            if (!enemy || enemy->health <= 0)
+                return false; // Never reuse a hold/fire decision after its target died.
+        }
+        const EquipmentStamp current = Equipment(entity, client);
+        if (memcmp(&previous.equipment, &current, sizeof(current)) != 0)
             return false;
 
         // Spend decision time where humans can interact with the bots. Commands
@@ -85,7 +147,7 @@ namespace
             return false;
         return (uint32_t(now) / frame + slot) % stride != 0;
     }
-}
+} // namespace
 
 extern "C" void SV_BotUpdateBots()
 {
@@ -117,11 +179,15 @@ extern "C" void SV_BotUpdateBots()
         }
         if (SVHS_IsBotPlaying(client))
         {
+            void *data = static_cast<uint8_t *>(client) + 1368;
+            if (SV_HostBot_PrepareEquipment(data))
+                previous.valid = false;
             if (population > 20 && ReuseDecision(previous, client, slot, population, now))
             {
                 command = previous.command;
                 command.serverTime = command.commandTime = command.inputTime = now;
                 SV_HostNav_RefreshBotMovement(static_cast<uint8_t *>(client) + 1368, &command);
+                SV_HostBot_FaceLoot(data, &command);
                 ++reused;
             }
             else
@@ -133,6 +199,8 @@ extern "C" void SV_BotUpdateBots()
                 SVHS_BotThink(client, &command);
                 if (navigationScope)
                     SV_HostNav_EndBot();
+                SV_HostBot_UpdateLoot(data, &command);
+                SV_HostBot_FaceLoot(data, &command);
                 const auto *entity = Field<Entity *>(client, 280);
                 previous.command = command;
                 previous.client = client;
@@ -140,6 +208,7 @@ extern "C" void SV_BotUpdateBots()
                 previous.thoughtTime = now;
                 previous.health = entity->health;
                 previous.target = entity->sentient ? entity->sentient->targetHandle : 0;
+                previous.equipment = Equipment(entity, client);
                 previous.valid = population > 20;
                 ++thought;
             }

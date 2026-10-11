@@ -1,4 +1,6 @@
 #include "sv_host_navigation.h"
+#include "sv_host_bot_loot.h"
+#include "sv_host_bot_equipment.h"
 #include <intrin.h>
 
 namespace
@@ -15,7 +17,9 @@ namespace
         Nav2DQueryView *navigator;
         uint8_t opaque368[80];
         uint8_t *playerState;
-        uint8_t opaque456[164];
+        uint8_t opaque456[80];
+        Vec3 nativeGoal;
+        uint8_t opaque548[72];
         int32_t traversal;
         uint8_t opaque624[16];
         int32_t noPathFoundTime;
@@ -24,8 +28,10 @@ namespace
         uint8_t opaque8988[19148];
         Vec3 strafeDirection;
     };
+
     static_assert(offsetof(BotNavigationView, navigator) == 360);
     static_assert(offsetof(BotNavigationView, playerState) == 448);
+    static_assert(offsetof(BotNavigationView, nativeGoal) == 536);
     static_assert(offsetof(BotNavigationView, traversal) == 620);
     static_assert(offsetof(BotNavigationView, noPathFoundTime) == 640);
     static_assert(offsetof(BotNavigationView, scriptFlags) == 8984);
@@ -40,6 +46,7 @@ namespace
         uint16_t target;
         bool valid;
     };
+
     MeshGoal s_goals[200]{};
     int32_t s_planTime = -1;
     unsigned s_plans, s_nextPlanSlot;
@@ -53,19 +60,21 @@ namespace
     bool Locked(const BotNavigationView *bot)
     {
         auto *player = bot->playerState;
-        return Field<int32_t>(player, 0) < Field<int32_t>(player, 4) ||
-            (bot->scriptFlags & 4) || (Field<uint8_t>(player, 24) & 1) ||
-            (Field<uint32_t>(player, 364) & 0xe0);
+        return Field<int32_t>(player, 0) < Field<int32_t>(player, 4) || (bot->scriptFlags & 4) ||
+               (Field<uint8_t>(player, 24) & 1) || (Field<uint32_t>(player, 364) & 0xe0);
     }
 
     bool ChooseGoal(const BotNavigationView *bot, MeshGoal &state, Vec3 &goal)
     {
-        // Tactical points are absent in this asset set. Pick a local destination
-        // from real participants, then let the native navigator find a route.
-        // Do not invent tactical points, visibility links or navigation edges.
+        // Combat belongs to the native awareness/target controller. A fallback
+        // route must not hunt an unseen enemy across the entire map or circle
+        // a nearby teammate. Prefer a useful, native usable loot destination.
+        if (SV_HostBot_GetLootGoal(const_cast<BotNavigationView *>(bot), &goal))
+        {
+            state.target = 0;
+            return true;
+        }
         Entity *selected = nullptr;
-        Entity *retained = nullptr;
-        float retainedScore = 3.402823466e38f;
         float best = 3.402823466e38f;
         TeamFlags enemies{};
         SVHS_EnemyTeamFlags(&enemies, bot->sentient->team);
@@ -78,47 +87,56 @@ namespace
             if (!entity || entity == bot->entity || !entity->sentient || entity->health <= 0)
                 continue;
             const unsigned team = entity->sentient->team;
-            const bool hostile = team < 160 && (enemies.words[team >> 5] & (0x80000000u >> (team & 31)));
+            const bool hostile =
+                team < 160 && (enemies.words[team >> 5] & (0x80000000u >> (team & 31)));
             const float distance = DistanceSquared(entity->origin, bot->entity->origin);
-            const float score = distance + (hostile ? 0.0f : 16777216.0f);
-            if (state.target == uint16_t(entity->number + 1))
-            {
-                retained = entity;
-                retainedScore = score;
-            }
-            if (score < best)
+            if (hostile && bot->sentient->targetHandle == uint16_t(entity->number + 1))
             {
                 selected = entity;
-                best = score;
+                break;
+            }
+            if (!hostile && team == bot->sentient->team && team > 0 && team < 153 &&
+                distance > 640.0f * 640.0f && distance < best)
+            {
+                selected = entity;
+                best = distance;
             }
         }
-        // Keep a live destination unless an alternative is substantially closer.
-        // Small movements by two adjacent opponents must not reverse the route.
-        if (retained && retainedScore <= best * 1.5625f)
-            selected = retained;
+        if (state.failures)
+            selected = nullptr; // Get clear of the obstacle before resuming the target route.
         state.target = selected ? uint16_t(selected->number + 1) : 0;
         // Disperse patrol destinations and failed-route retries. These are
         // requests, not straight-line movement: only a successful native path
         // is followed. No-path leaves the bot stopped until its next retry.
-        constexpr Vec3 directions[8] = {
-            {1, 0, 0}, {0.7071f, 0.7071f, 0}, {0, 1, 0}, {-0.7071f, 0.7071f, 0},
-            {-1, 0, 0}, {-0.7071f, -0.7071f, 0}, {0, -1, 0}, {0.7071f, -0.7071f, 0}
-        };
+        constexpr Vec3 directions[8] = {{1, 0, 0},
+                                        {0.7071f, 0.7071f, 0},
+                                        {0, 1, 0},
+                                        {-0.7071f, 0.7071f, 0},
+                                        {-1, 0, 0},
+                                        {-0.7071f, -0.7071f, 0},
+                                        {0, -1, 0},
+                                        {0.7071f, -0.7071f, 0}};
         const auto &direction = directions[(unsigned(bot->entity->number) + state.sequence) & 7];
         goal = selected ? selected->origin : bot->entity->origin;
         float x = goal.x - bot->entity->origin.x;
         float y = goal.y - bot->entity->origin.y;
-        const float extent = __builtin_fabsf(x) > __builtin_fabsf(y) ? __builtin_fabsf(x) : __builtin_fabsf(y);
+        const float extent =
+            __builtin_fabsf(x) > __builtin_fabsf(y) ? __builtin_fabsf(x) : __builtin_fabsf(y);
         if (extent > 2048.0f)
         {
             const float fraction = 2048.0f / extent;
-            goal = {bot->entity->origin.x + x * fraction, bot->entity->origin.y + y * fraction,
+            goal = {bot->entity->origin.x + x * fraction,
+                    bot->entity->origin.y + y * fraction,
                     bot->entity->origin.z + (goal.z - bot->entity->origin.z) * fraction};
         }
-        const float spread = selected ? 64.0f : 768.0f;
+        // Keep room between squad members. A stuck bot tries a shorter lateral
+        // escape route rather than repeatedly requesting the same obstruction.
+        const bool enemy = selected && bot->sentient->targetHandle == state.target;
+        const float spread = selected ? (enemy ? 64.0f : 256.0f) : state.failures ? 256.0f : 768.0f;
         goal.x += direction.x * spread;
         goal.y += direction.y * spread;
-        return __builtin_isfinite(goal.x) && __builtin_isfinite(goal.y) && __builtin_isfinite(goal.z);
+        return __builtin_isfinite(goal.x) && __builtin_isfinite(goal.y) &&
+               __builtin_isfinite(goal.z);
     }
 
     bool FollowMesh(BotNavigationView *bot, UserCmd *command, bool allowPlan)
@@ -126,12 +144,12 @@ namespace
         auto *nav = bot->navigator;
         auto *entity = bot->entity;
         const unsigned slot = entity ? uint16_t(entity->number) : 200;
-        if (slot >= 200 || !bot->sentient || !(bot->scriptFlags & 0x1000000) ||
-            !nav ||
+        if (slot >= 200 || !bot->sentient || !(bot->scriptFlags & 0x1000000) || !nav ||
             nav->vtable[45] != reinterpret_cast<uintptr_t>(&SVHS_Nav2DClosest) ||
-            !nav->currentArea.reference || !*nav->currentArea.reference || !nav->currentArea.space ||
-            !bot->playerState || entity->health <= 0 || bot->traversal ||
-            Field<uint16_t>(bot->playerState, 626) == 2047 || Locked(bot))
+            !nav->currentArea.reference || !*nav->currentArea.reference ||
+            !nav->currentArea.space || !bot->playerState || entity->health <= 0 || bot->traversal ||
+            SV_HostBot_InGulag(bot) || Field<uint16_t>(bot->playerState, 626) == 2047 ||
+            Locked(bot))
         {
             if (slot < 200)
                 s_goals[slot].valid = false;
@@ -140,7 +158,8 @@ namespace
 
         auto &state = s_goals[slot];
         const int32_t now = SVHS_LevelTime;
-        if (state.owner != bot || state.navigator != nav || state.player != bot->playerState || now < state.lastTime)
+        if (state.owner != bot || state.navigator != nav || state.player != bot->playerState ||
+            now < state.lastTime)
             state = {bot, nav, bot->playerState, {}, entity->origin, 0, now, now, 0, 0, 0, false};
         state.lastTime = now;
         if (DistanceSquared(entity->origin, state.lastOrigin) > 24.0f * 24.0f)
@@ -159,23 +178,37 @@ namespace
         // A tactical reference is a nearby point, not proof of a usable route.
         // Preserve an existing native route; repair the no-route case even when
         // a streamed tactical graph supplies a point for this bot.
+        if (state.valid && path && DistanceSquared(bot->nativeGoal, state.goal) > 1.0f)
+            state.valid = false; // A native combat/script route replaced our request.
         const bool owned = state.valid && state.owner == bot && state.navigator == nav;
         if (path && !owned)
             return false;
-        const bool reached = state.valid && DistanceSquared(entity->origin, state.goal) < 96.0f * 96.0f;
+        const bool reached =
+            state.valid && DistanceSquared(entity->origin, state.goal) < 96.0f * 96.0f;
         const bool stuck = now - state.progressTime >= 1500;
-        if (allowPlan && now >= state.nextPlan && (!path || reached || stuck || !state.valid) &&
-            s_plans < 2 && slot >= s_nextPlanSlot)
+        bool targetGone = false;
+        if (state.target && state.target <= SVHS_ClientCount && state.target <= 200)
+        {
+            void *client = SVHS_Clients[state.target - 1];
+            const Entity *target = client ? Field<Entity *>(client, 280) : nullptr;
+            targetGone = !target || target->health <= 0;
+            if (targetGone)
+                state.nextPlan = now;
+        }
+        if (allowPlan && now >= state.nextPlan &&
+            (!path || reached || stuck || !state.valid || targetGone) && s_plans < 2 &&
+            slot >= s_nextPlanSlot)
         {
             Vec3 goal{};
             ++s_plans;
             s_nextPlanSlot = slot + 1;
             state.nextPlan = now + 1000 + int32_t((slot * 97) % 500);
             state.progressTime = now;
-            if (stuck || state.failures >= 2 || (reached && !state.target))
+            if (stuck || state.failures || (reached && !state.target))
             {
                 ++state.sequence;
-                state.failures = 0;
+                if (stuck)
+                    ++state.failures;
             }
             if (ChooseGoal(bot, state, goal))
             {
@@ -240,25 +273,30 @@ namespace
         }
         return true;
     }
-}
+} // namespace
 
 extern "C" unsigned Bot_UpdateMove_OffPathGrid(void *data, HostScale::UserCmd *command)
 {
     using namespace HostScale;
     auto *bot = static_cast<BotNavigationView *>(data);
-    if (Enabled() && FollowMesh(bot, command, true))
-        return 1;
     const bool canFire = SVHS_BotCanFire(data);
-    const bool failedLongEnough = bot->noPathFoundTime && SVHS_LevelTime - bot->noPathFoundTime > 750;
-    const bool airborneWithoutPath = !SVHS_NavHasPath(bot->navigator) &&
-                                    Field<uint16_t>(bot->playerState, 626) == 2047;
+    // Do not consume this movement stage before the native combat/melee
+    // controller. This applies equally to bot and human opponents.
+    if (!canFire && Enabled() && FollowMesh(bot, command, true))
+        return 1;
+    const bool failedLongEnough =
+        bot->noPathFoundTime && SVHS_LevelTime - bot->noPathFoundTime > 750;
+    const bool airborneWithoutPath =
+        !SVHS_NavHasPath(bot->navigator) && Field<uint16_t>(bot->playerState, 626) == 2047;
     if (canFire || Locked(bot) || (!failedLongEnough && !airborneWithoutPath))
         return 0;
     Vec3 forward{}, right{};
     SVHS_BotYawVectors(Field<float>(bot->playerState, 464), &forward, &right);
     const auto &direction = bot->strafeDirection;
-    Field<int8_t>(command, 156) = int8_t(int(((forward.y * direction.y + forward.x * direction.x) + forward.z * direction.z) * 127.0f));
-    Field<int8_t>(command, 157) = int8_t(int(((right.y * direction.y + right.x * direction.x) + right.z * direction.z) * 127.0f));
+    Field<int8_t>(command, 156) = int8_t(int(
+        ((forward.y * direction.y + forward.x * direction.x) + forward.z * direction.z) * 127.0f));
+    Field<int8_t>(command, 157) = int8_t(
+        int(((right.y * direction.y + right.x * direction.x) + right.z * direction.z) * 127.0f));
     return 1;
 }
 
@@ -270,14 +308,15 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
     const unsigned slot = entity ? uint16_t(entity->number) : 200;
     if (!Enabled() || slot >= 200)
         return;
+    if (SVHS_BotCanFire(bot) || SV_HostBot_InGulag(bot))
+        return;
     const auto &state = s_goals[slot];
     auto *nav = bot->navigator;
     const bool owned = state.valid && state.owner == bot && state.player == bot->playerState &&
                        state.navigator == nav;
     const bool nativePath = !owned && nav && bot->sentient && bot->playerState &&
-        entity->health > 0 && !bot->traversal && !Locked(bot) &&
-        Field<uint16_t>(bot->playerState, 626) != 2047 &&
-        SVHS_NavHasPath(nav) && !SVHS_BotCanFire(bot);
+                            entity->health > 0 && !bot->traversal && !Locked(bot) &&
+                            Field<uint16_t>(bot->playerState, 626) != 2047 && SVHS_NavHasPath(nav);
     // Refresh fallback-owned and native routes without choosing another goal.
     // Combat firing, airborne and locked/scripted movement retain their commands.
     if (owned || nativePath)

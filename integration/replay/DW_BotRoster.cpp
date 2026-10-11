@@ -681,6 +681,11 @@ extern "C" unsigned func_14118ADD0(const void *party)
     return count;
 }
 
+extern "C" bool DW_BotPolicy_IsBattleRoyale()
+{
+    return DW_LocalBackend_IsEnabled() && s_squadSize && s_squadSize->current.integer > 0;
+}
+
 extern "C" void DW_BotPolicy_Prepare(const void *party)
 {
     Assignments assignments{};

@@ -291,23 +291,18 @@ def prepare():
         )
     # The native overlay verifier follows the authored overlay's current rows.
     # Freeze it with the job and guard its owner just like the integration code.
-    validator = ROOT / "tools/verify_debug_states.py"
-    validation_target = source / "tools/verify_debug_states.py"
-    validator_hash = digest(validator)
-    shutil.copyfile(validator, validation_target)
-    if (
-        digest(validator) != validator_hash
-        or digest(validation_target) != validator_hash
-    ):
-        raise ValueError("Overlay validator changed while freezing")
-    source_inputs.append(
-        dict(
-            source="tools/verify_debug_states.py",
-            source_sha256=validator_hash,
-            compiled_source="tools/verify_debug_states.py",
-            compiled_sha256=digest(validation_target),
+    for validator_name in ("verify_debug_states.py", "verify_spatial.py"):
+        validator = ROOT / "tools" / validator_name
+        validation_target = source / "tools" / validator_name
+        validator_hash = digest(validator)
+        shutil.copyfile(validator, validation_target)
+        if digest(validator) != validator_hash or digest(validation_target) != validator_hash:
+            raise ValueError("Validator changed while freezing: " + validator_name)
+        source_inputs.append(
+            dict(source="tools/" + validator_name, source_sha256=validator_hash,
+                 compiled_source="tools/" + validator_name,
+                 compiled_sha256=digest(validation_target))
         )
-    )
     ui = load_module("dw_client_playlist", ROOT / "tools/prepare-playlist-ui.py")
     ui.prepare(
         source,
@@ -366,6 +361,11 @@ def prepare():
     updater = (source / "src/DW_ExecutableUpdate.cpp").read_text()
     if "unsigned s_state = 0, s_reported = 0;" not in updater:
         raise ValueError("Production updater must remain enabled")
+    # Helper modules have no original-function association, but are still
+    # explicit, frozen source owners. Account for them alongside replacements.
+    for item in source_inputs:
+        if Path(item["compiled_source"]).suffix in (".cpp", ".c"):
+            cpp[item["compiled_source"]] = item["compiled_sha256"]
     receipt = dict(
         schema=1,
         target=config["target"],
@@ -449,8 +449,12 @@ def verify(directory, report_path):
     report = read(report_path)
     build_path = Path(report_path).parent
     source = Path(report["source_root"])
-    expected = read(directory / "source-receipt.json")["cpp_sources"]
-    require_current_sources(read(directory / "source-receipt.json"))
+    receipt = read(directory / "source-receipt.json")
+    expected = dict(receipt["cpp_sources"])
+    for item in receipt["source_inputs"]:
+        if Path(item["compiled_source"]).suffix in (".cpp", ".c"):
+            expected[item["compiled_source"]] = item["compiled_sha256"]
+    require_current_sources(receipt)
     actual = {unit["source"]: unit["source_sha256"] for unit in report["cpp"]}
     if (
         actual != expected
@@ -463,6 +467,7 @@ def verify(directory, report_path):
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
         ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
+        ("test-bot-behavior.py", ["--snapshot", str(source)], "bot-behavior.json"),
         ("test-lobby-controls.py", [], "controls.json"),
         (
             "test-native-bot-roster.py",

@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "passed": true,
+  "production_job": "data\\dw-client\\jobs\\1791755298909874800",
+  "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "executable_sha256": "5d2265334045519f0126212e007290f8f3a0448258e6af2e1b5e9c089587264e",
+  "fresh_cpp_units": 114,
+  "required_gates": 10,
+  "bot_think_baseline_cases": 34,
+  "bot_mesh_continuation_cases": 1,
+  "native_combat_policy_cases": 21,
+  "host_instruction_cases": 348,
+  "navigation_instruction_cases": 195,
+  "updater_publication": {
+    "release": 25,
+    "sha256": "5d2265334045519f0126212e007290f8f3a0448258e6af2e1b5e9c089587264e",
+    "verification": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1791755298909874800\\publication\\public-verification.json",
+    "verification_sha256": "f2b623ee5755b62c577b09725768477797a5a88afec56a27c12713193c73a367",
+    "publication": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1791755298909874800\\publication"
+  },
+  "native_engine_unresolved_symbols": 0,
+  "game_runs_performed": false,
+  "readonly_prior_game_capture": true,
+  "live_server_binary_changed": false,
+  "player_ini_and_profiles_preserved": true,
+  "owner_gameplay_checks": [
+    "BR spawn: visible starter pistol",
+    "Gulag jail: fists and rocks; duel: visible assigned weapon",
+    "Hostile bot combat: automatic fire, native ADS and prompt next movement",
+    "Nearby crate opening and useful pickup via native use rules",
+    "Obstacle escape and squad spacing with 150 bots"
+  ]
+}

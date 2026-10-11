@@ -100,16 +100,18 @@ class Runner:
                    "SV_HostNav_Begin", "SV_HostNav_End", "SV_HostNav_SpatialWork",
                    "SV_HostNav_GraphWork", "SV_HostNav_HasWork",
                    "DW_LocalBackend_GetAuthAddress", "SV_HostNav_RecordClosest",
-                   "SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement")
+                   "SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
+                   "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot")
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
                 if (name.startswith("?Record") or name.startswith("?Clock")) and name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
             hooks[self.base + self.report["symbols"]["Com_Optimized_IsEnabled"]] = "optimized-policy"
-            for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
+            for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
+                         "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot"):
                 hooks[self.base + self.report["symbols"][name]] = name
-            for name in ("memcpy", "memset", "__chkstk", "__security_check_cookie"):
+            for name in ("memcpy", "memcmp", "memset", "__chkstk", "__security_check_cookie"):
                 if name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
             if routine in ("SV_BotApplyCommands", "SV_BotUpdateBots"):
@@ -119,7 +121,7 @@ class Runner:
             section_addresses = {i + 1: 0x180000000 + i * 0x10000 for i in range(len(obj["sections"]))}
             externals = dict(symbols)
             externals.update(self.entries)
-            for name in (*helpers, "memcpy", "memset", "__chkstk", "_fltused", "SV_UserMoveWorkersMP_TryQueueClientThinkCmd"):
+            for name in (*helpers, "memcpy", "memcmp", "memset", "__chkstk", "_fltused", "SV_UserMoveWorkersMP_TryQueueClientThinkCmd"):
                 address = 0x180D00000 + len(externals) * 32
                 externals[name] = address
                 hooks[address] = "queue-bot" if name == "SV_UserMoveWorkersMP_TryQueueClientThinkCmd" else name
@@ -246,6 +248,8 @@ class Runner:
                 put(ent, bytes(1440)); put(ent, i, "<h"); put(ent + 336, player, "<Q")
                 put(ent + 440, 100, "<i"); put(ent + 344, sentients + i * 184, "<Q")
                 put(ent + 304, struct.pack('<fff', float(case.get('bot_distance', 0)), 0., 0.))
+                if i == case.get('target', 0) - 1 and 'enemy_distance' in case:
+                    put(ent + 304, struct.pack('<fff', -float(case['enemy_distance']), 0., 0.))
                 put(sentients + i * 184, bytes(184))
                 put(sentients + i * 184 + 72, case.get("target", 0), "<H")
                 put(client + 1368 + 8988, 0, "<I")
@@ -322,6 +326,8 @@ class Runner:
                 returned(len(events) * 100); return
             if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
                 returned(kind == "SV_HostNav_BeginBot"); return
+            if kind in ("SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot"):
+                returned(); return
             if kind == "SVHS_TransientFileLoaded":
                 events.append(("file-loaded", a)); returned(case.get("loaded", True)); return
             if kind in ("SVHS_WorldTileReady", "SVHS_StaticTileReady"):
@@ -350,6 +356,9 @@ class Runner:
                 events.append(("release-ping", a)); returned(); return
             if kind == "memcpy":
                 put(a, bytes(vm.mem_read(b, c))); returned(a); return
+            if kind == "memcmp":
+                left, right = bytes(vm.mem_read(a, c)), bytes(vm.mem_read(b, c))
+                returned((left > right) - (left < right)); return
             if kind == "memset":
                 put(a, bytes([b & 255]) * c); returned(a); return
             if kind == "SVHS_SupportsFeature":
@@ -441,6 +450,14 @@ class Runner:
                     if frame == case.get("script_at"):
                         for i in range(count):
                             put(clients + i * 321192 + 1368 + 8988, 8, '<I')
+                    if frame == case.get("equipment_at"):
+                        for i in range(count):
+                            put(players + i * 0x8000 + 1784, 17, '<I')
+                    if frame == case.get("gulag_at"):
+                        for i in range(count):
+                            put(players + i * 0x8000 + 22336, 0x200, '<I')
+                    if frame == case.get("target_died_at"):
+                        put(entities + 1440 + 440, 0, '<i')
                 vm.reg_write(UC_X86_REG_RSP, stack)
                 put(stack, stop, '<Q')
                 vm.emu_start(entry, stop, count=8000000)
@@ -541,9 +558,11 @@ def main():
                               (150, {"target":2}), (150, {"mixed":True}),
                               (150, {"frame_ms":50}), (42, {"damage_at":5}),
                               (42, {"target_at":5}), (42, {"script_at":5}),
+                              (42, {"equipment_at":5}), (42, {"gulag_at":5}),
+                              (42, {"target_died_at":5, "target":2}),
                               (42, {"rewind_at":5}), (42, {"loaded":False}),
                               (81, {'human_slot':0, 'bot_distance':800, 'target':2}),
-                              (150, {'human_slot':0, 'bot_distance':8000, 'target':2}),
+                              (150, {'human_slot':0, 'bot_distance':8000, 'enemy_distance':8000, 'target':2}),
                               (150, {'human_slot':0, 'bot_distance':100, 'target':2}),
                               (150, {'human_slot':0, 'bot_distance':8000, 'target':1})):
         case = dict(population=population, count=population, frames=12, **extra)
@@ -563,7 +582,8 @@ def main():
                 assert on['observed'] == original['observed'] and thinks == original_thinks, case
             elif not extra:
                 assert thinks < original_thinks / 2, (case, thinks, original_thinks)
-            for trigger in ('damage_at', 'target_at', 'script_at', 'rewind_at'):
+            for trigger in ('damage_at', 'target_at', 'script_at', 'rewind_at',
+                            'equipment_at', 'gulag_at', 'target_died_at'):
                 if trigger in case:
                     instant = 10000 + case[trigger] * 16 - (1000 if trigger == 'rewind_at' else 0)
                     assert sum(e[0] == 'decision' and e[2] == instant for e in on['events']) == population, (case, trigger)

@@ -79,7 +79,8 @@ class Runner:
                   "memset":"memset", "GetCurrentThreadId":"thread-id", "__security_check_cookie":"cookie",
                   "QueryPerformanceCounter":"qpc", "QueryPerformanceFrequency":"qpf",
                   "Sys_IsMainThread":"main-thread", "Cmd_AddCommandInternal":"register-command",
-                  "SV_HostNav_PrintStatus":"print"}
+                  "SV_HostNav_PrintStatus":"print", "SV_HostBot_GetLootGoal":"loot-goal",
+                  "SV_HostBot_InGulag":"gulag"}
         if edited and self.report:
             for name, alias in common.items():
                 if name in self.report["symbols"]:
@@ -264,17 +265,28 @@ class Machine:
         elif kind=="SVHS_NavFarthestClosest":
             self.uc.reg_write(UC_X86_REG_XMM0,struct.unpack('<I',struct.pack('<f',self.farthest))[0]);self.ret()
         elif kind == 'SVHS_BotCanFire':self.ret(getattr(self, 'can_fire', False))
+        elif kind == 'loot-goal':
+            goal = getattr(self, 'loot_goal', None)
+            if goal is not None:self.put(b, struct.pack('<3f', *goal))
+            self.ret(goal is not None)
+        elif kind == 'gulag':self.ret(getattr(self, 'gulag', False))
         elif kind == 'SVHS_NavHasPath':self.ret(getattr(self, 'path_exists', False))
         elif kind == 'SVHS_BotYawVectors':
             self.put(b,struct.pack('<3f',1.,0.,0.));self.put(c,struct.pack('<3f',0.,-1.,0.));self.ret()
         elif kind == 'SVHS_BotPathToGoal':
             self.events.append(('path-request',struct.unpack('<3f',self.uc.mem_read(b,12))))
+            self.put(a + 536, bytes(self.uc.mem_read(b, 12)))
             self.path_exists=getattr(self, 'route_success', True);self.ret(self.path_exists)
         elif kind == 'SVHS_BotMovePathing':
             self.events.append(('follow-path',));self.put(b+156,struct.pack('<bb',90,35));self.ret(1)
         elif kind == 'SVHS_BotSteerPath':
             self.events.append(('steer-path',c));self.put(b+156,struct.pack('<bb',40,110));self.ret()
-        elif kind == 'SVHS_EnemyTeamFlags':self.put(a,bytes([255])*20);self.ret()
+        elif kind == 'SVHS_EnemyTeamFlags':
+            flags = bytearray([255] * 20)
+            if b:
+                word = struct.unpack_from('<I', flags, (b >> 5) * 4)[0]
+                struct.pack_into('<I', flags, (b >> 5) * 4, word & ~(0x80000000 >> (b & 31)))
+            self.put(a, bytes(flags));self.ret()
         elif kind == 'SVHS_TacSetReference':
             self.tac_selected=b;self.put(a,bytes(4));self.events.append(('set-tactical',b));self.ret()
         elif kind == 'SVHS_TacGetReference':self.ret(getattr(self,'tac_selected',0))
@@ -452,7 +464,7 @@ def nearest_collector(vm,case):
     return dict(events=vm.events,maximum=bytes(vm.uc.mem_read(collector+8,4)).hex(),count=vm.get(collector+24,'<i'))
 
 
-def mesh_bot(vm, mode_case, targets=()):
+def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=()):
     bot, entity, sentient, player = 0x5b000000, 0x5b010000, 0x5b020000, 0x5b030000
     nav, vtable, command, area = 0x5b040000, 0x5b050000, 0x5b060000, 0x5b070000
     vm.put(bot, bytes(28152));vm.put(entity, bytes(1440));vm.put(sentient, bytes(184))
@@ -465,6 +477,7 @@ def mesh_bot(vm, mode_case, targets=()):
                      (nav+1364,area),(nav+1372,0x5b080000)):
         vm.put(at,value,'<Q')
     vm.put(entity+440,100,'<i');vm.put(bot+8984,0x1000000,'<I')
+    vm.put(sentient+16, 2, '<I')
     vm.put(player+626,2046,'<H');vm.put(vm.symbols['SVHS_LevelTime'],1000,'<i')
     vm.put(vm.symbols['SVHS_ClientCount'],0,'<I')
     if targets:
@@ -478,7 +491,9 @@ def mesh_bot(vm, mode_case, targets=()):
             vm.put(client + 8, 5, '<B'); vm.put(client + 280, target_entity, '<Q')
             vm.put(target_entity, slot, '<H'); vm.put(target_entity + 344, target_sentient, '<Q')
             vm.put(target_entity + 440, 100, '<i')
+            vm.put(target_sentient + 16, teams[slot - 1] if teams else 1, '<I')
             vm.put(target_entity + 304, struct.pack('<3f', *xyz))
+        vm.put(sentient + 72, 2 if target_handle is None else target_handle, '<H')
     vm.put(bot+640,1,'<i');vm.put(bot+28136,struct.pack('<3f',0.5,0.25,0.))
     if mode_case in ('tactical', 'tactical-no-path'):
         vm.put(sentient+150,1,'<B')
@@ -576,6 +591,44 @@ def main():
         vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
         assert [event[1] for event in vm.events if event[0] == 'path-request'] == [first_goal, first_goal]
         total += 1
+        # Fire-ready combat must yield to native movement, including a route
+        # previously owned by the fallback. The target may be another bot.
+        vm = runner.machine(True, mode)
+        vm.can_fire = True
+        combat = mesh_bot(vm, 'normal', targets=((100., 0., 0.),))
+        assert combat['result'] == 0
+        assert not any(e[0] in ('path-request', 'follow-path') for e in combat['events'])
+        # Unseen hostile players are not omniscient patrol destinations; nearby
+        # squadmates should not become an endpoint that causes circling.
+        for teams in ((1,), (2,)):
+            vm = runner.machine(True, mode)
+            route = mesh_bot(vm, 'normal', targets=((100., 0., 0.),), target_handle=0, teams=teams)
+            goal = next(e[1] for e in route['events'] if e[0] == 'path-request')
+            assert goal == (768., 0., 0.), (teams, goal)
+        # Loot is an explicit local native-use goal; a failed route tries a
+        # different short escape, and a dead target does not retain its route.
+        vm = runner.machine(True, mode)
+        vm.loot_goal = (200., 100., 0.)
+        route = mesh_bot(vm, 'normal')
+        assert next(e[1] for e in route['events'] if e[0] == 'path-request') == vm.loot_goal
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'normal', targets=((700., 0., 0.),))
+        first = next(e[1] for e in vm.events if e[0] == 'path-request')
+        vm.put(0x5e011000 + 440, 0, '<i')
+        vm.put(vm.symbols['SVHS_LevelTime'], 1016, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        vm.put(vm.symbols['SVHS_LevelTime'], 1032, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert [e[1] for e in vm.events if e[0] == 'path-request'][-1] != first
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'normal')
+        vm.put(vm.symbols['SVHS_LevelTime'], 2600, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        vm.put(vm.symbols['SVHS_LevelTime'], 2616, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        escape = [e[1] for e in vm.events if e[0] == 'path-request'][-1]
+        assert abs(escape[0]) <= 256 and abs(escape[1]) <= 256
+        total += 6
     for graphs in (0,1):
         for point in (0,0x5c020000):
             results=[]

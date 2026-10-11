@@ -110,6 +110,7 @@ def main():
             row = {name: int.from_bytes(read(base + rva, size), "little")
                    for name, (rva, size) in fields.items()}
             clients = struct.unpack("<200Q", read(base + mapped("SVHS_Clients"), 1600))
+            sentient_base = int.from_bytes(read(base + mapped('SVHS_Sentients'), 8), 'little')
             occupied = bots = humans = pending = 0
             positions = []
             for slot, pointer in enumerate(clients[:min(row["capacity"], 200)]):
@@ -126,6 +127,14 @@ def main():
                             sentient = int.from_bytes(read(entity + 344, 8), 'little')
                             nav = read(navigator + 1364, 16) if navigator else bytes(16)
                             area_ref, space = struct.unpack('<QQ', nav)
+                            target = int.from_bytes(read(sentient + 72, 2), 'little') if sentient else 0
+                            target_client = clients[target - 1] if 0 < target <= len(clients) else 0
+                            target_entity = int.from_bytes(read(target_client + 280, 8), 'little') if target_client else 0
+                            target_sentient = int.from_bytes(read(target_entity + 344, 8), 'little') if target_entity else 0
+                            information = int.from_bytes(read(pointer + 1368 + 16, 8), 'little')
+                            sentient_index = (target_sentient - sentient_base) // 184
+                            sight = read(information + sentient_index * 64, 16).hex() if information and 0 <= sentient_index < 272 else None
+                            command = int.from_bytes(read(pointer + 1368 + 456, 8), 'little')
                             positions.append(dict(slot=slot, origin=struct.unpack('<3f', read(entity + 304, 12)),
                                 avoidance=read(pointer + 1368 + 408, 1)[0],
                                 goal=struct.unpack('<3f', read(pointer + 1368 + 536, 12)),
@@ -134,6 +143,12 @@ def main():
                                 navigator=hex(navigator), area_reference=hex(area_ref), space=hex(space),
                                 area=hex(int.from_bytes(read(area_ref, 8), 'little')) if area_ref else None,
                                 tactical_reference=read(sentient + 148, 6).hex() if sentient else None,
+                                team=int.from_bytes(read(sentient + 16, 4), 'little') if sentient else None,
+                                target=target - 1 if target else None,
+                                target_team=int.from_bytes(read(target_sentient + 16, 4), 'little') if target_sentient else None,
+                                target_information=sight,
+                                command_weapon=int.from_bytes(read(command + 36, 2), 'little') if command else None,
+                                command_buttons=hex(int.from_bytes(read(command, 8), 'little')) if command else None,
                                 script_flags=hex(int.from_bytes(read(pointer + 1368 + 8984, 4), 'little'))))
                 else:
                     humans += 1

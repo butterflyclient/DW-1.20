@@ -369,6 +369,11 @@ void SVHS_GlassAddInt(void *, unsigned);
 void SVHS_GlassNotify(void *, uint32_t, unsigned);
 }
 '''
+    equipment_spec = importlib.util.spec_from_file_location(
+        "host_bot_equipment_preparation", ROOT / "tools/prepare-host-bot-equipment.py")
+    equipment_module = importlib.util.module_from_spec(equipment_spec)
+    equipment_spec.loader.exec_module(equipment_module)
+    equipment_proof = equipment_module.configure(pe, by_id, funcs, snapshot)
     (snapshot / "src/SV_HostScaleBindings.h").write_text(header, encoding="utf-8")
     sys.path.insert(0, str(snapshot / "tools"))
     spec = importlib.util.spec_from_file_location("private_host_scale_catalog", snapshot / "tools/source_catalog.py")
@@ -435,6 +440,12 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
                   usercmd_bytes=264, queue_bytes=1600, queue_capacity=6, client_bytes=321192,
                   entity_bytes=1440, sentient_bytes=184, sentient_info_bytes=64,
                   team_bit_count=160, sight_capacity=272, client_capacity=200,
-                  game_run_performed=False)
+                  equipment_bindings=equipment_proof, game_run_performed=False)
     (snapshot / "generated/host-scale-integration.json").write_text(json.dumps(result, indent=2) + "\n")
+    for filename, module_name in (("prepare-bot-think-integration.py", "native_bot_think"),
+                                  ("prepare-br-bot-loot-integration.py", "native_bot_loot")):
+        child_spec = importlib.util.spec_from_file_location(module_name, ROOT / "tools" / filename)
+        child_module = importlib.util.module_from_spec(child_spec)
+        child_spec.loader.exec_module(child_module)
+        child_module.prepare(snapshot, replace_owned=replace_owned)
     return result
