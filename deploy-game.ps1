@@ -1,9 +1,4 @@
-param([string]$Python = 'C:\Users\achar\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe')
+param([string]$Python = 'C:\Users\achar\AppData\Local\Programs\Python\Python314\python.exe')
 $ErrorActionPreference = 'Stop'
-$previous = $env:PYTHONPATH
-try {
-    $config = Get-Content -LiteralPath 'E:\replay-compiler\replay-project.local.json' -Raw | ConvertFrom-Json
-    $env:PYTHONPATH = $config.python_dependency_root
-    & $Python -B (Join-Path $PSScriptRoot 'tools\deploy-game.py')
-    if ($LASTEXITCODE) { throw 'DW executable deployment verification failed.' }
-} finally { $env:PYTHONPATH = $previous }
+& $Python -B (Join-Path $PSScriptRoot 'tools\deploy-dw-client.py')
+if ($LASTEXITCODE) { throw 'DW executable deployment verification failed.' }

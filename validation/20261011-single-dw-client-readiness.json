@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "passed": true,
+  "created_utc": "2026-10-11T17:23:02.333397+00:00",
+  "sole_target": "game_dx12_ship_replay_dw.exe",
+  "installed": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "executable_sha256": "de25aaaf555bf31b959b8c7f06cba2012345ddd034ef042721bebd23874734ca",
+  "bytes": 99795968,
+  "fresh_cpp_units": 110,
+  "unresolved_symbols": 0,
+  "authored_source_owners": 60,
+  "latest_bot_optimizations_included": true,
+  "source_drift": false,
+  "public_release": 21,
+  "public_updater_hash_matches_installed": true,
+  "tested_older_updater_hashes": 20,
+  "checkbox_outside_scrolling_playlist_above_entries": true,
+  "placement_uses_exact_embedded_lua": true,
+  "shared_mp_br_preference": true,
+  "missing_playlist_title": "PLAYLIST/BRSOLOSTIM_NAME2 -> BR Stimulus Solos",
+  "optimization_default": 1,
+  "optimization_profiles": [
+    0,
+    1,
+    2
+  ],
+  "owner_ini_sha256": "6147496a527726fe0ecd21015909346b9f8524fbf0e335a316f41c10d4d2ce80",
+  "owner_ini_preserved": true,
+  "old_variant_artifacts_archived": true,
+  "game_folder_dw_targets": [
+    "game_dx12_ship_replay_dw.exe"
+  ],
+  "server": {
+    "pid": 312440,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-921e1be3cee7/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-921e1be3cee7/iw8-dw-server",
+    "sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0",
+    "process_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "first_host_auto_fill_fix_deployed": true,
+  "exact_image_gates": 8,
+  "host_instruction_cases": 339,
+  "navigation_instruction_cases": 163,
+  "evidence": [
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/host.json",
+      "sha256": "8538b84f0e0ed119c33a4b434e260ab7bdd0e2a4bb3b15dba5cc888fef2cac91"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/navigation.json",
+      "sha256": "c72f6a5c63af6af9e493c0d44ddede0bf34d61a3645cd74217bfda3a78dfbac4"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/controls.json",
+      "sha256": "4e5ddea004ffdfd76bd9865670d68e1d9e3867dc73a55a3d4d1c86056d51d4a6"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/roster.json",
+      "sha256": "da7262cc824e9e29ad4ec5830862c2173c54552ce0f17e86fb65f2da57c4de42"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/playlist.json",
+      "sha256": "456b8fd84b3d4c480d65c6187363302d0624f697ab7eed6ca0a40f94db2dddfb"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/native-clones.json",
+      "sha256": "a3dfe1c2c12c1eebdcffe2a50a447f72eaef964134fa82f54c7f107bb6a5d191"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/updater.json",
+      "sha256": "4ff16352658b6231282574763153b283b5e5033e6d9fb55833fe35ea640695e5"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/unlock.json",
+      "sha256": "3fe41d6fa43febffd293da50897fa6276a18c593273b6b265eb14b0e9d09c496"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/readiness.json",
+      "sha256": "140378c09c288fa8da51ba356d28a202de058a5355fb0dc1455f60a23bb096b0"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/source-receipt.json",
+      "sha256": "3758453c57ed6a8385f45d5dd0bfdcb22dc1d02023c32f336cefc20b00c78553"
+    },
+    {
+      "path": "data/dw-client/jobs/1791735194417348400/publication/public-verification.json",
+      "sha256": "6b613033d05b224e56736c61ea5b879a54171faac3e5bf25138fa121b565116a"
+    },
+    {
+      "path": "data/dw-client/deployment.json",
+      "sha256": "854a899a7e422fd8b4d65ed6a203bf003795548d3fda99fe244d082b80da8c96"
+    },
+    {
+      "path": "data/current-remote-deployment.json",
+      "sha256": "425377619ab5a65456918a019f0598620bf05ab25dda02a24c95e7da31c7ec75"
+    },
+    {
+      "path": "validation/20261011-single-dw-client-workflow.json",
+      "sha256": "cfa9efb670fc3c95c2dc828d09353f0d94d75714ee4445295c31462c24b2fbd0"
+    },
+    {
+      "path": "validation/20261011-playlist-placement.json",
+      "sha256": "7a00bbc6d79e24862a9b8b46956c8e9b3a55ffa6d72fbb0259610b328a16c100"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/release-readiness.json",
+      "sha256": "3b9e59b270d83d38862f22bde4e68e0fbd6a309ab11a50fe6547f2a624eec9ad"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/deployment-result.json",
+      "sha256": "db856c77d249deebe00c8b3ee0b4bbddf3b8756079ac04cc7e0b25af1669bdd9"
+    }
+  ],
+  "game_runs_performed": false,
+  "game_processes_stopped": false,
+  "native_retry_after_this_server_update_verified": false,
+  "live_fps_or_150_player_gain_measured": false
+}

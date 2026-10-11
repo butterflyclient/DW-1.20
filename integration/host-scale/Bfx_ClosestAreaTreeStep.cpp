@@ -27,6 +27,7 @@ extern "C" unsigned Bfx_ClosestAreaTreeStep(HostScale::NavTreeWalk *walk, int co
     if (count <= 0 || walk->top <= walk->stack)
         return 0;
     const bool tighten = Enabled() && Field<float>(walk->collector, 8) > 2048.0f;
+    auto *budget = SV_HostNav_GetClosestBudget();
     Vec3 bounds[256];
     if (tighten)
         __builtin_memset(bounds, 0, sizeof(bounds));
@@ -35,6 +36,13 @@ extern "C" unsigned Bfx_ClosestAreaTreeStep(HostScale::NavTreeWalk *walk, int co
     {
         if (remaining <= 0)
             break;
+        if (!ClosestWork(budget, Field<int32_t>(walk->collector, 24) != 0))
+        {
+            // This native traversal is synchronous. Empty its pending stack so
+            // an outer driver cannot repeatedly resume an exhausted query.
+            walk->top = walk->stack;
+            break;
+        }
         const NavTreeEntry item = *--walk->top;
         --remaining;
         const ptrdiff_t depth = walk->top - walk->stack;
@@ -100,6 +108,8 @@ extern "C" unsigned Bfx_ClosestAreaTreeStep(HostScale::NavTreeWalk *walk, int co
                 auto *child = children + 28;
                 for (unsigned i = 0; i < total; ++i)
                 {
+                    if (budget && budget->exhausted)
+                        break;
                     SVHS_NavCollectClosest(walk->collector, child, &walk->point);
                     child += 96 + 32 * (Field<uint32_t>(child, 56) & 127);
                 }

@@ -18,7 +18,8 @@ from unicorn.x86_const import *
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ("Scr_GetClosestReachablePointOnNavmesh", "Bfx_ClosestReachableTreeStep",
            "Bfx_ClosestReachableSearchStep", "Bfx_IncrementalSearchToIsland", "SV_HostScaleNavigation",
-           "Bfx_GetClosestArea", "Bfx_ClosestAreaTreeStep", "Bfx_ClosestAreaCollect")
+           "Bfx_GetClosestArea", "Bfx_ClosestAreaTreeStep", "Bfx_ClosestAreaCollect",
+           "Bot_UpdateMove_OffPathGrid", "Sentient_NearestTacPoint")
 
 
 class Runner:
@@ -198,7 +199,8 @@ class Machine:
         if kind=="thread-id":self.ret(self.thread)
         elif kind=="mode":self.ret(self.mode!=0)
         elif kind=="population":self.ret(self.population)
-        elif kind in ("cookie","print"):self.ret()
+        elif kind == "cookie":self.ret(self.uc.reg_read(UC_X86_REG_RAX))
+        elif kind == "print":self.ret()
         elif kind in ("memcpy","SVHS_NavMemmove"):
             self.put(a,bytes(self.uc.mem_read(b,c)));self.ret(a)
         elif kind=="memset":self.put(a,bytes([b&255])*c);self.ret(a)
@@ -239,9 +241,10 @@ class Machine:
             center=struct.unpack('<fff',self.uc.mem_read(b+32,12))
             distance=float32(math.sqrt(sum((x-y)**2 for x,y in zip(point,center))))
             self.events.append(('candidate',b))
-            if distance<=self.get(a+8,'<f'):
+            if not getattr(self, 'reject_nearest', False) and distance<=self.get(a+8,'<f'):
                 self.closest_selected=b
                 self.put(a+8,distance,'<f')
+                self.put(a+24,1,'<i')
             self.ret()
         elif kind=="SVHS_NavProjectClosest":
             self.events.append(('project',b))
@@ -252,6 +255,27 @@ class Machine:
             self.put(a+8,1,'<i');self.ret()
         elif kind=="SVHS_NavFarthestClosest":
             self.uc.reg_write(UC_X86_REG_XMM0,struct.unpack('<I',struct.pack('<f',self.farthest))[0]);self.ret()
+        elif kind == 'SVHS_BotCanFire':self.ret(getattr(self, 'can_fire', False))
+        elif kind == 'SVHS_NavHasPath':self.ret(getattr(self, 'path_exists', False))
+        elif kind == 'SVHS_BotYawVectors':
+            self.put(b,struct.pack('<3f',1.,0.,0.));self.put(c,struct.pack('<3f',0.,-1.,0.));self.ret()
+        elif kind == 'SVHS_BotPathToGoal':
+            self.events.append(('path-request',struct.unpack('<3f',self.uc.mem_read(b,12))))
+            self.path_exists=getattr(self, 'route_success', True);self.ret(self.path_exists)
+        elif kind == 'SVHS_BotMovePathing':
+            self.events.append(('follow-path',));self.put(b+156,struct.pack('<bb',90,35));self.ret(1)
+        elif kind == 'SVHS_EnemyTeamFlags':self.put(a,bytes([255])*20);self.ret()
+        elif kind == 'SVHS_TacSetReference':
+            self.tac_selected=b;self.put(a,bytes(4));self.events.append(('set-tactical',b));self.ret()
+        elif kind == 'SVHS_TacGetReference':self.ret(getattr(self,'tac_selected',0))
+        elif kind == 'SVHS_NavConstructArea':self.put(a,bytes(16));self.ret()
+        elif kind == 'SVHS_NavClosestVerticalDefault':
+            self.events.append(('vertical-search',));self.put(b,struct.pack('<3f',0.,0.,0.));self.ret(1)
+        elif kind == 'SVHS_TacClosestWithLos':self.ret(getattr(self,'tac_point',0))
+        elif kind == 'SVHS_TacClosest':self.ret(getattr(self,'tac_fallback',0))
+        elif kind == 'SVHS_PathNodePosition':self.put(b,struct.pack('<3f',*self.node_position));self.ret()
+        elif kind == 'SVHS_TacPointForNode':self.ret(getattr(self,'node_tac',0))
+        elif kind == 'navigator-tactical':self.ret(getattr(self,'navigator_tac',0))
         else:raise AssertionError(kind)
 
 
@@ -418,12 +442,83 @@ def nearest_collector(vm,case):
     return dict(events=vm.events,maximum=bytes(vm.uc.mem_read(collector+8,4)).hex(),count=vm.get(collector+24,'<i'))
 
 
+def mesh_bot(vm, mode_case):
+    bot, entity, sentient, player = 0x5b000000, 0x5b010000, 0x5b020000, 0x5b030000
+    nav, vtable, command, area = 0x5b040000, 0x5b050000, 0x5b060000, 0x5b070000
+    vm.put(bot, bytes(28152));vm.put(entity, bytes(1440));vm.put(sentient, bytes(184))
+    vm.put(player, bytes(1024));vm.put(nav, bytes(1400));vm.put(vtable, bytes(512))
+    vm.put(command, bytes(264));vm.put(area, 0x5b071000, '<Q')
+    for at,value in ((bot,entity),(bot+8,sentient),(bot+360,nav),(bot+448,player),
+                     (entity+336,player),(entity+344,sentient),(nav,vtable),
+                     (vtable+45*8,vm.symbols['SVHS_Nav2DClosest']),
+                     (nav+1364,area),(nav+1372,0x5b080000)):
+        vm.put(at,value,'<Q')
+    vm.put(entity+440,100,'<i');vm.put(bot+8984,0x1000000,'<I')
+    vm.put(player+626,2046,'<H');vm.put(vm.symbols['SVHS_LevelTime'],1000,'<i')
+    vm.put(vm.symbols['SVHS_ClientCount'],0,'<I')
+    vm.put(bot+640,1,'<i');vm.put(bot+28136,struct.pack('<3f',0.5,0.25,0.))
+    if mode_case=='tactical':vm.put(sentient+150,1,'<B')
+    if mode_case=='locked':vm.put(player+364,0x20,'<I')
+    if mode_case=='airborne':vm.put(player+626,2047,'<H')
+    if mode_case=='no-area':vm.put(nav+1364,0,'<Q')
+    if mode_case=='failed':vm.route_success=False
+    result=vm.call('Bot_UpdateMove_OffPathGrid',bot,command)
+    return dict(result=result,movement=bytes(vm.uc.mem_read(command+156,2)).hex(),events=vm.events)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot",type=Path,required=True)
     parser.add_argument("--build",type=Path)
     parser.add_argument("--output",type=Path,required=True)
     args=parser.parse_args();runner=Runner(args.snapshot,args.build);total=0
+    for case in ('normal','tactical','locked','airborne','no-area'):
+        native=mesh_bot(runner.machine(False),case)
+        off=mesh_bot(runner.machine(True,0),case)
+        assert off==native,('off-grid baseline',case,off,native)
+        if case!='normal':assert mesh_bot(runner.machine(True,1),case)==native
+        total+=1
+    for mode in (1,2):
+        success=mesh_bot(runner.machine(True,mode),'normal')
+        assert success['movement']=='5a23' and success['events'][-1]==('follow-path',)
+        assert success['events'][0][0]=='path-request'
+        failed=mesh_bot(runner.machine(True,mode),'failed')
+        assert failed['movement']=='0000' and all(e[0]!='follow-path' for e in failed['events'])
+        total+=2
+    for graphs in (0,1):
+        for point in (0,0x5c020000):
+            results=[]
+            for edited,mode in ((False,0),(True,0),(True,1)):
+                vm=runner.machine(edited,mode);sentient,entity=0x5c000000,0x5c010000
+                vm.put(sentient,bytes(184));vm.put(entity,bytes(1440));vm.put(sentient,entity,'<Q')
+                vm.put(vm.symbols['SVHS_TacGraphCount'],graphs,'<i');vm.tac_point=point
+                result=vm.call('Sentient_NearestTacPoint',sentient)
+                results.append((result,vm.events,bytes(vm.uc.mem_read(sentient+152,2))))
+            assert results[0]==results[1],('tactical baseline',graphs,point,results)
+            if graphs:assert results[2]==results[0]
+            else:assert results[2]==(0,[('set-tactical',0)],bytes([0,1]))
+            total+=1
+    for path in ('cached','near-node','far-node','navigator'):
+        results=[]
+        for edited,mode in ((False,0),(True,0),(True,1)):
+            vm=runner.machine(edited,mode)
+            sentient,entity,ai,nav,table=0x5c000000,0x5c010000,0x5c030000,0x5c040000,0x5c050000
+            for at,size in ((sentient,184),(entity,1440),(ai,400),(nav,1400),(table,512)):
+                vm.put(at,bytes(size))
+            vm.put(sentient,entity,'<Q');vm.put(vm.symbols['SVHS_TacGraphCount'],1,'<i')
+            vm.tac_selected=0x5c020000;vm.node_tac=0x5c020100;vm.navigator_tac=0x5c020200
+            if path=='cached':vm.put(sentient+152,1,'<B')
+            elif path.endswith('node'):
+                vm.put(sentient+112,0x5c070000,'<Q')
+                vm.node_position=(10.,0.,0.) if path=='near-node' else (100.,0.,0.)
+            else:
+                vm.put(sentient+8,ai,'<Q');vm.put(ai+360,nav,'<Q');vm.put(nav,table,'<Q')
+                vm.put(table+384,0x5c080000,'<Q');vm.hooks[0x5c080000]='navigator-tactical'
+            result=vm.call('Sentient_NearestTacPoint',sentient)
+            results.append((result,vm.events,bytes(vm.uc.mem_read(sentient+152,2))))
+        assert results[0]==results[1]==results[2],('populated tactical graph',path,results)
+        total+=1
+    print('PASS mesh-only routing, failed-path stop and empty tactical-graph fast return',total,flush=True)
     for count in (1,2,7,65):
         for blocked in (False,True):
             for tracked in (False,True,2):
@@ -515,6 +610,48 @@ def main():
         vm.put(walk,bytes(4136));vm.put(walk+24,walk+40,'<Q')
         assert vm.call('Bfx_ClosestAreaTreeStep',walk,count)==0
         total+=1
+    for reject in (False, True):
+        vm = runner.machine(True, 1)
+        budget = 0x5a000000
+        vm.put(budget, bytes(8))
+        assert vm.call('SV_HostNav_SetClosestBudget', budget) == 0
+        assert vm.call('SV_HostNav_GetClosestBudget') == 0
+        assert vm.call('SV_HostNav_BeginBot') == 1
+        assert vm.call('SV_HostNav_BeginBot') == 0
+        assert vm.call('SV_HostNav_SetClosestBudget', budget) == 0
+        vm.reject_nearest = reject
+        bounded = nearest_tree(vm, 3, count=16384, point=(150., -220., -80000.), axes=(0, 1, 0))
+        assert vm.get(budget, '<I') == (4096 if reject else 512)
+        assert vm.get(budget + 4, '<B') == 1
+        assert bool(bounded['selected']) == (not reject)
+        assert len(bounded['events']) < (4096 if reject else 512)
+        nested = budget + 16
+        vm.put(nested, bytes(8))
+        assert vm.call('SV_HostNav_SetClosestBudget', nested) == budget
+        assert vm.call('SV_HostNav_SetClosestBudget', budget) == nested
+        assert vm.call('SV_HostNav_SuspendClosest', 1) == 0
+        assert vm.call('SV_HostNav_GetClosestBudget') == 0
+        assert vm.call('SV_HostNav_SetClosestBudget', nested) == 0
+        assert vm.call('SV_HostNav_SuspendClosest', 0) == 1
+        assert vm.call('SV_HostNav_GetClosestBudget') == budget
+        vm.thread += 1
+        assert vm.call('SV_HostNav_GetClosestBudget') == 0
+        vm.call('SV_HostNav_EndBot')
+        vm.thread -= 1
+        assert vm.call('SV_HostNav_GetClosestBudget') == budget
+        vm.call('SV_HostNav_EndBot')
+        assert vm.call('SV_HostNav_GetClosestBudget') == 0
+        total += 1
+    # A rejected dynamic candidate still consumes work, even outside the KD tree.
+    vm = runner.machine(True, 1)
+    budget = 0x5a000000
+    vm.put(budget, struct.pack('<IB3x', 4096, 0))
+    vm.call('SV_HostNav_BeginBot')
+    vm.call('SV_HostNav_SetClosestBudget', budget)
+    exhausted = nearest_collector(vm, dict(point=(0., 0., 0.)))
+    assert not exhausted['events'] and vm.get(budget+4, '<B') == 1
+    vm.call('SV_HostNav_EndBot')
+    total += 1
     for obstacle_mode in (0,1):
         for obstacle_flags in (0,1,7):
             for area_flags in (0,1,2):

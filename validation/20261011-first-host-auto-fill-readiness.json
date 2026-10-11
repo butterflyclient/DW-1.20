@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "passed": true,
+  "created_utc": "2026-10-11T17:23:02.333397+00:00",
+  "fix": "Establish native host readiness and arm fill in the same host update; preserve timing, authority and lobby-state gates",
+  "issue": "First authenticated host publication rejected a zero-bot incomplete automatic-fill arm",
+  "linux_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0",
+  "windows_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467",
+  "source_sha256": "f19752da00504dd0222b65332a29b4c9387c025ab25630cf9588f894553dcf02",
+  "compiled_translation_units_per_platform": 46,
+  "retained_objects": 0,
+  "validation_counts": {
+    "windows-auto-fill-wire": 4,
+    "windows-protocol": 311,
+    "windows-daily": 5,
+    "windows-publisher": 7,
+    "linux-auto-fill-wire": 4,
+    "linux-protocol": 311,
+    "linux-daily": 5,
+    "linux-publisher": 7
+  },
+  "old_backend_negative_control_error": 106,
+  "deployed_live_process": {
+    "pid": 312440,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-921e1be3cee7/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-921e1be3cee7/iw8-dw-server",
+    "sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0",
+    "process_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "client_sha256": "de25aaaf555bf31b959b8c7f06cba2012345ddd034ef042721bebd23874734ca",
+  "server_only_fix": true,
+  "game_tests_performed": false,
+  "native_retry_verified": false,
+  "retained_guards": [
+    "Authenticated host ownership",
+    "Zero-bot incomplete first arm only",
+    "No initial migration arm",
+    "30-second wait plus 15-second fill",
+    "No early match start",
+    "No expired/disbanded/private/tournament lobby"
+  ],
+  "evidence": [
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-auto-fill-wire.json",
+      "sha256": "859b1a8e98e130b691bcd74babfc93f59e8b5b93d386747b8af6f5b276a86f73",
+      "server_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-protocol.json",
+      "sha256": "224b0b57350d77cc65f50a25b21ed20df52e07b848e1d6d382c4f5f055d5d61e",
+      "server_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-daily.json",
+      "sha256": "8e34dac071652bcf030c695935066ff266b3cfee7a8b65a9e30b77713b8a5d79",
+      "server_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-publisher.json",
+      "sha256": "cbac78371ac5534a0f72b19a905a42b1a08c5b5e05eae572be3d2c13cff1f3e6",
+      "server_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-validation-finished.json",
+      "sha256": "dfc1d5e45dce9b56a533396d9eccf7ae86efaf1333af71de83f714c21f0e306b",
+      "server_sha256": "253290357f5e9336e0b3ba7fc9e51f57028e0357358786abdc48865b11887467"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-auto-fill-wire.json",
+      "sha256": "dadedec60d577901bf45bc06dd03ce837d9bc4bce2828fbf6213b3b692e55b42",
+      "server_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-protocol.json",
+      "sha256": "f9abff8c9adc22096974414b51b25b9f4ed03330f639f89d469e2a8876bd92a7",
+      "server_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-daily.json",
+      "sha256": "c413f435898fb06f067960c7c85e2f5a89a4cc2d991f0eb1024cfe86b5552860",
+      "server_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-publisher.json",
+      "sha256": "420242b191563f8de4fb60d86556ed08e22d531576eedc1ec648308b24d9c640",
+      "server_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-validation-finished.json",
+      "sha256": "c965aa1257954bee18ad0c4d8f2e7980d685870699becf76437c877f81f718b1",
+      "server_sha256": "921e1be3cee798d1fe660a42f0fb2d4c16475d4aa5c09eae0732184e7937f7e0"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/source.json",
+      "sha256": "471a0f42250780d07319a8954310fb96cf100b1e5621e652c3f2a239725d79f4"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/source.tar",
+      "sha256": "b99397df39e40fb6fe129d501769d771ac751dcb6f094de26dfec1fc97a3d042"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/fixtures.json",
+      "sha256": "3fbfa882ed1ba92956a764cc3c29ede8ff46dceb6f4a47a3179a934048e6e29a"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/fixtures.tar",
+      "sha256": "5fbb8253e55122732aad7bf2d8d44a1aef9b7d473c12394ecd01a9403ef0cd63"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/windows-build.json",
+      "sha256": "0f86234bda5141a08c8d427dd47d7c5fce9791cf1fa097985da1a800f0c39546"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/linux-build.json",
+      "sha256": "63ec6808ef28e59d3476f4380bfb5e0bb8480c73cc4b4ab2f8d53bfca06fdaf9"
+    },
+    {
+      "path": "data/first-host-auto-fill-20261011/deployment-result.json",
+      "sha256": "db856c77d249deebe00c8b3ee0b4bbddf3b8756079ac04cc7e0b25af1669bdd9"
+    }
+  ]
+}

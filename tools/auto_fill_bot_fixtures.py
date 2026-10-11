@@ -49,8 +49,6 @@ def exercise(host, peer, directory, title, user, query, helpers, checks):
             assert peer.receive() == (kind, packet)
         return strings(packet[23:])
 
-    assert update(docs[0]) == boolean(True)
-    docs = received()
     request_token = 0
 
     def auto(count, complete=False, enabled=True):
@@ -65,8 +63,17 @@ def exercise(host, peer, directory, title, user, query, helpers, checks):
         )
         return h
 
+    # Replay can attach its zero-bot arm to the first native host document,
+    # before host_ready is established. It cannot add bots or declare the
+    # timed fill complete during this initial publication.
+    invalid = auto(1)
+    update(invalid, error=106)
+    invalid = auto(0, complete=True)
+    update(invalid, error=106)
     assert update(auto(0)) == boolean(True)
     docs = received()
+    assert json.loads(path.read_bytes())["host_ready"] is True
+    checks.append("First native host publication accepts only a zero-bot incomplete auto-fill arm; early additions/completion remain rejected")
     rules = docs[1]["ruleset_payload"]["dvar_overrides"]
     target = rules["replay_dw_autoFillBotTarget"]
     assert (

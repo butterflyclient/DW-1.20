@@ -1,4 +1,4 @@
-#include "sv_host_scale.h"
+#include "sv_host_navigation.h"
 
 namespace
 {
@@ -125,7 +125,13 @@ extern "C" void SV_BotUpdateBots()
             }
             else
             {
+                // Only high-population bot decisions own an approximate-query
+                // scope. Human commands, worker movement, scripts outside this
+                // call, and other threads retain their native search behavior.
+                const bool navigationScope = population > 20 && SV_HostNav_BeginBot();
                 SVHS_BotThink(client, &command);
+                if (navigationScope)
+                    SV_HostNav_EndBot();
                 const auto *entity = Field<Entity *>(client, 280);
                 previous.command = command;
                 previous.client = client;

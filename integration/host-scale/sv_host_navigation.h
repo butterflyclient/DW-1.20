@@ -3,6 +3,30 @@
 
 namespace HostScale
 {
+    // Stack-owned by one nearest-area query. No area/resource pointer survives
+    // the query. Budgets include both KD nodes and dynamic-area candidates.
+    struct NavClosestBudget
+    {
+        uint32_t work;
+        bool exhausted;
+    };
+
+    inline bool ClosestWork(NavClosestBudget *budget, bool hasCandidate)
+    {
+        if (!budget)
+            return true;
+        // Preserve a larger discovery allowance when filters reject everything.
+        // Once a valid area exists, stop spending a whole frame proving it is
+        // the absolute nearest area on a large map.
+        const unsigned limit = hasCandidate ? 512 : 4096;
+        if (budget->work >= limit)
+        {
+            budget->exhausted = true;
+            return false;
+        }
+        ++budget->work;
+        return true;
+    }
     // Target-build BFX search views. Handles are borrowed only within a native
     // query; cached results contain coordinates, never retained graph pointers.
     struct NavAreaHandle { void **reference; void *space; };
@@ -118,6 +142,12 @@ namespace HostScale
 
 extern "C"
 {
+    bool SV_HostNav_BeginBot();
+    void SV_HostNav_EndBot();
+    HostScale::NavClosestBudget *SV_HostNav_SetClosestBudget(HostScale::NavClosestBudget *);
+    HostScale::NavClosestBudget *SV_HostNav_GetClosestBudget();
+    bool SV_HostNav_SuspendClosest(bool suspended);
+    void SV_HostNav_RecordClosestBudget(const HostScale::NavClosestBudget *);
     // Zero: no scope; one: admit a query; two: defer this bot's query.
     unsigned SV_HostNav_Begin(unsigned occupiedOrdinal, unsigned population);
     void SV_HostNav_End(unsigned result); // 0=native result, 1=fallback, 2=cached result

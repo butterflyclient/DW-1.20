@@ -9,12 +9,67 @@ namespace
     int32_t s_time = -1;
     uint32_t s_queries, s_deferred, s_cached, s_fallbacks, s_nodes, s_edges;
     uint32_t s_closestQueries, s_closestFallbacks;
+    uint32_t s_botOwner, s_closestLimited, s_closestWork;
+    HostScale::NavClosestBudget *s_closestBudget;
+    bool s_closestSuspended;
+
+    bool OwnsBotScope()
+    {
+        const uint32_t owner = __atomic_load_n(&s_botOwner, __ATOMIC_ACQUIRE);
+        return owner && owner == GetCurrentThreadId();
+    }
 
     bool OwnsScope()
     {
         const uint32_t owner = __atomic_load_n(&s_owner, __ATOMIC_ACQUIRE);
         return owner && owner == GetCurrentThreadId();
     }
+}
+
+extern "C" bool SV_HostNav_BeginBot()
+{
+    uint32_t expected = 0;
+    return __atomic_compare_exchange_n(&s_botOwner, &expected, GetCurrentThreadId(), false,
+                                       __ATOMIC_ACQ_REL, __ATOMIC_RELAXED);
+}
+
+extern "C" void SV_HostNav_EndBot()
+{
+    if (!OwnsBotScope())
+        return;
+    s_closestBudget = nullptr;
+    s_closestSuspended = false;
+    __atomic_store_n(&s_botOwner, 0u, __ATOMIC_RELEASE);
+}
+
+extern "C" HostScale::NavClosestBudget *SV_HostNav_SetClosestBudget(HostScale::NavClosestBudget *budget)
+{
+    if (!OwnsBotScope() || s_closestSuspended)
+        return nullptr;
+    auto *previous = s_closestBudget;
+    s_closestBudget = budget;
+    return previous;
+}
+
+extern "C" HostScale::NavClosestBudget *SV_HostNav_GetClosestBudget()
+{
+    return OwnsBotScope() && !s_closestSuspended ? s_closestBudget : nullptr;
+}
+
+extern "C" bool SV_HostNav_SuspendClosest(bool suspended)
+{
+    if (!OwnsBotScope())
+        return false;
+    const bool previous = s_closestSuspended;
+    s_closestSuspended = suspended;
+    return previous;
+}
+
+extern "C" void SV_HostNav_RecordClosestBudget(const HostScale::NavClosestBudget *budget)
+{
+    __atomic_fetch_add(&s_closestWork, budget->work, __ATOMIC_RELAXED);
+    if (budget->exhausted)
+        __atomic_fetch_add(&s_closestLimited, 1u, __ATOMIC_RELAXED);
 }
 
 extern "C" unsigned SV_HostNav_Begin(unsigned ordinal, unsigned population)
@@ -93,6 +148,9 @@ extern "C" void SV_HostNav_PrintStatus()
     Com_Printf(15, "Closest-area searches: %u nearby probes, %u unrestricted fallbacks\n",
         __atomic_load_n(&s_closestQueries, __ATOMIC_RELAXED),
         __atomic_load_n(&s_closestFallbacks, __ATOMIC_RELAXED));
+    Com_Printf(15, "Bot closest-area budget: %u bounded searches, %u visited nodes/candidates\n",
+        __atomic_load_n(&s_closestLimited, __ATOMIC_RELAXED),
+        __atomic_load_n(&s_closestWork, __ATOMIC_RELAXED));
 }
 
 extern "C" void SV_HostNav_RecordClosest(bool fallback)

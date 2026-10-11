@@ -23,6 +23,8 @@ extern "C" void Bfx_ClosestAreaCollect(HostScale::NavClosestCollector *collector
 {
     using namespace HostScale;
     const bool optimized = Enabled();
+    if (!ClosestWork(SV_HostNav_GetClosestBudget(), collector->areas.count != 0))
+        return;
     if (optimized && collector->spec && !Usable(collector, area))
         return;
     const float x = point->x - area->center.x;

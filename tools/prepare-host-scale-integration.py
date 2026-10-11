@@ -26,6 +26,8 @@ REPLACEMENTS = (
     ("fn_52282ba9de7c27ad", "Bfx_GetClosestArea", "8bacbce48b3608d6cf3cf84e06507fc7ef2a1e626f6ed4ddfdfb4570f2e5bb78"),
     ("fn_8c399c4d7d3e1836", "Bfx_ClosestAreaTreeStep", "0fead1cff23e729a1e7b5f1b07992ab541b538be4f36fcd1bc2fbf430d5a7d67"),
     ("fn_4bdeea2a50a7d8d0", "Bfx_ClosestAreaCollect", "b9c0f3c1437372073ed51b2776f181dd9fd141d6d02c379d6bbe49d63ac80bbd"),
+    ("fn_6d3e9047613805c4", "Bot_UpdateMove_OffPathGrid", "5aff2a15b5d8055f1ceab91a6b75fd44ffca1695a9fb9be9f8060325dde37c7a"),
+    ("fn_e25d88059e9ad6af", "Sentient_NearestTacPoint", "4916e26e5374b2e6ed5f791c81c424de9e1459c8507eb296e0b9de948254b9a6"),
 )
 
 
@@ -207,11 +209,31 @@ def prepare(snapshot, replace_owned=False):
     closest_tree_calls = direct_calls(decoded["Bfx_ClosestAreaTreeStep"])
     assert len(closest_tree_calls) == 2 and closest_tree_calls[0] == closest_tree_calls[1]
     funcs["SVHS_NavCollectClosest"] = closest_tree_calls[0]
-    assert funcs["SVHS_NavCollectClosest"] == base + by_id[REPLACEMENTS[-1][0]]["rva"]
+    assert funcs["SVHS_NavCollectClosest"] == base + by_id["fn_4bdeea2a50a7d8d0"]["rva"]
     closest_collector_calls = direct_calls(decoded["Bfx_ClosestAreaCollect"])
     assert len(closest_collector_calls) == 3
     funcs.update(zip(("SVHS_NavProjectClosest", "SVHS_NavInsertClosest", "SVHS_NavFarthestClosest"),
                      closest_collector_calls))
+    off_grid_calls = direct_calls(decoded["Bot_UpdateMove_OffPathGrid"])
+    assert len(off_grid_calls) == 4
+    funcs.update(zip(("SVHS_BotCanFire", "SVHS_NavHasPath", "SVHS_BotYawVectors"), off_grid_calls[:3]))
+    tac_calls = direct_calls(decoded["Sentient_NearestTacPoint"])
+    assert len(tac_calls) == 10 and tac_calls[-1] == off_grid_calls[-1]
+    assert tac_calls[5] == funcs["SVHS_NavDestroyArea"]
+    funcs.update(zip(("SVHS_PathNodePosition", "SVHS_TacPointForNode", "SVHS_NavConstructArea",
+                      "SVHS_NavClosestVerticalDefault", "SVHS_TacClosestWithLos", "SVHS_NavDestroyArea",
+                      "SVHS_TacClosest", "SVHS_TacSetReference", "SVHS_TacGetReference"), tac_calls[:-1]))
+    tac_leaf = pe.get_data(funcs["SVHS_TacClosest"] - base, 32)
+    assert hashlib.sha256(tac_leaf).hexdigest() == "bc879b4e8b2cac812d7c6588622c67150c1401e5c5f8f4396b32fa7a8921c551"
+    tac_lookup = list(decoder.disasm(tac_leaf, funcs["SVHS_TacClosest"]))
+    globals_["SVHS_TacGraphCount"] = rip(tac_lookup, "cmp", "dword ptr [rip")
+    for identity, name, expected in (
+        ("fn_3f50a363d8067a21", "SVHS_BotPathToGoal", "b40927630208b1f77fdf9b4b464d7b04601df9f6b4465f5c41e7430632718159"),
+        ("fn_705c7024190158b3", "SVHS_BotMovePathing", "ad584145f14723429419e6c72871c93173b06901e91cc93bd8c1070e34305464"),
+    ):
+        body, rows = instructions(identity)
+        assert hashlib.sha256(body).hexdigest() == expected, name
+        funcs[name] = base + by_id[identity]["rva"]
     header = '''#pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -284,6 +306,20 @@ void SVHS_NavCollectClosest(void *, void *, const void *);
 void SVHS_NavProjectClosest(void *, const void *, const void *, const void *);
 void SVHS_NavInsertClosest(void *, const void *, float);
 float SVHS_NavFarthestClosest(void *);
+bool SVHS_BotCanFire(void *);
+bool SVHS_NavHasPath(void *);
+void SVHS_BotYawVectors(float, void *, void *);
+unsigned SVHS_BotPathToGoal(void *, const void *, float);
+unsigned SVHS_BotMovePathing(void *, void *);
+extern int32_t SVHS_TacGraphCount;
+void SVHS_PathNodePosition(const void *, void *);
+void *SVHS_TacPointForNode(const void *);
+void SVHS_NavConstructArea(void *);
+bool SVHS_NavClosestVerticalDefault(const void *, void *, void *);
+void *SVHS_TacClosestWithLos(const void *, const void *, const void *);
+void *SVHS_TacClosest(const void *);
+void SVHS_TacSetReference(void *, const void *);
+void *SVHS_TacGetReference(const void *);
 }
 '''
     (snapshot / "src/SV_HostScaleBindings.h").write_text(header, encoding="utf-8")

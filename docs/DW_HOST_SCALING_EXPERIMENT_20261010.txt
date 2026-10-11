@@ -1,5 +1,10 @@
 Replay high-population host experiment
 
+Current production workflow: build-game.ps1, then deploy-game.ps1 in E:\DW\IW8.
+Only game_dx12_ship_replay_dw.exe is supported. Bot optimizations are included
+in this one target. Revision notes and old filenames below are historical
+evidence; do not use their former private build commands. See DW_CLIENT_BUILD.txt.
+
 Scope
 Thirteen host/navigation routines are replaced by freshly compiled C++ in the private DW
 EXE. Their identities, extents, relocation targets and unwind placement come
@@ -369,9 +374,8 @@ No runtime FPS or 150-player stability gain is claimed before owner testing.
 Source/readiness receipts: data/startup-toast-unlock-update-r4-final-20261011.
 Public and deployment proof: validation/20261011-bot-r4-production-readiness.json.
 
-For a future production build, use --optimized --host-scale without
---pin-experimental-updater. The latter flag is only for private comparisons and
-requires --host-scale. The publisher rejects a disabled/pinned updater.
+For future production builds, use build-game.ps1 with no feature/revision
+switches. Bot optimizations and the active updater are always included.
 
 Combined production release 20 (2026-10-11)
 The main DW EXE now includes both verified R5 nearest-area geometry bodies and
@@ -388,3 +392,57 @@ helper's signed prepare/download and current-version paths pass. The existing
 main INI was preserved. No new game run or live bot-population benchmark was
 performed, so no measured R5 FPS gain is claimed by these fixtures.
 Production evidence: validation/20261011-playlist-auto-fill-readiness.json.
+
+Main-source Verdansk navigation pass (2026-10-11)
+
+Authoring remains in integration/host-scale and integration/replay on main.
+Use build-game.ps1; data/dw-client contains generated compiler inputs/output,
+not another editable source revision. The two new native replacements are
+Bot_UpdateMove_OffPathGrid.cpp and Sentient_NearestTacPoint.cpp.
+
+Read-only observations of the existing 25245ee0... build:
+- 149 bots plus one human advanced 256 ms of simulation in 4.005 wall seconds.
+  Bot decisions averaged 241.006 ms/frame; movement averaged 0.453 ms/frame.
+  1,722 of 1,741 nearest-area requests required their unrestricted fallback.
+- The busy server thread used 10.906 CPU seconds in a 10.953-second capture;
+  311 of its 350 samples were in the nearest-area walker/collector.
+- A later owner-authorized ten-bot lobby showed valid 2D navigation areas and
+  the existing no-pathnode flag, but no tactical-point references. A separate
+  read of the loaded tactical-graph count returned zero. Native code then
+  enters its off-grid movement branch, which uses a strafe direction instead
+  of generating/following a navigation path.
+
+Changes under com_optimized 1 (also inherited by profile 2):
+- Empty tactical graphs return no point immediately, before nearest-area and
+  line-of-sight queries. The count is rechecked; populated graphs retain the
+  native lookup/cache/handle path. Profile 0 retains the original work.
+- Valid mesh-only bots receive local participant/patrol destinations through
+  native Bot_GetPathToGoalInternal, then native Bot_UpdateMove_Pathing. Route
+  requests are limited to two per frame, rotate past earlier slots, and retry
+  on failure/stalls. Failed routes stop rather than drive straight at a goal.
+  Existing native path handles, collision and movement consumers remain in use.
+- High-population bot fallback nearest-area queries stop after 512 combined
+  node/candidate visits once a valid candidate exists, or 4,096 if none exists.
+  This is approximate goal lookup; actual route creation suspends this limit.
+  Scope is server-thread/bot-owned, with no graph pointers retained in a cache.
+- MP/BR bot-fill toggles are siblings above the playlist lists, not extra list
+  rows; native playlist positions and their footer clearance are preserved.
+
+The missing tactical graph is not fabricated. Mesh navigation supplies route
+following, not a complete reconstruction of BR cover, loot and circle tactics.
+No new EXE game run or post-change 150-player throughput is established by the
+component or linked-instruction fixtures. Owner playtest remains necessary.
+See data/dw-client/latest-job.json and its readiness receipt for the final
+artifact, hashes and the exact checks that passed. Do not run the EXE from the
+compiler output directory: close the old game, deploy-game.ps1, then launch it
+from E:\IW8\Builds\1.20-replay with its existing INI.
+
+Verified artifact for this pass:
+E:\DW\IW8\data\dw-client\game_dx12_ship_replay_dw.exe
+SHA256 de25aaaf555bf31b959b8c7f06cba2012345ddd034ef042721bebd23874734ca
+110 compiled C++ units; zero unresolved symbols; 710 Windows unwind cases;
+339 host and 163 navigation instruction cases, plus the existing native lobby,
+roster, UI installer, updater and progression gates. All 150 current names
+from integration/replay/DW_BotNames.h are present in the linked image.
+Readiness: data/dw-client/host-navigation-readiness.json.
+The running game EXE and live backend executable were not replaced/restarted.

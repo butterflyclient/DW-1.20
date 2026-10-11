@@ -1,0 +1,672 @@
+"""One DW client source selection, compiler pipeline and deployment target."""
+
+from datetime import datetime, timezone
+from contextlib import contextmanager
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+if os.name == "nt":
+    import msvcrt
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read(path):
+    return json.loads(Path(path).read_bytes())
+
+
+def digest(path):
+    with Path(path).open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def save(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".pending")
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(value, stream, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+
+
+def inside(path):
+    path = Path(path).resolve()
+    if not path.is_relative_to(ROOT):
+        raise ValueError("DW compilation must remain under " + str(ROOT))
+    return path
+
+
+def settings():
+    config = read(ROOT / "dw-client.json")
+    if config["schema"] != 1 or config["target"] != "game_dx12_ship_replay_dw.exe":
+        raise ValueError("Only the production DW executable is supported")
+    return (
+        config,
+        inside(ROOT / config["build_state"]),
+        inside(ROOT / config["compiler_base"]),
+    )
+
+
+@contextmanager
+def pipeline_lock():
+    """Serialize compilation/publication of the sole local client artifact."""
+    _, state, _ = settings()
+    state.mkdir(parents=True, exist_ok=True)
+    with (state / "pipeline.lock").open("a+b") as stream:
+        stream.seek(0, os.SEEK_END)
+        if not stream.tell():
+            stream.write(b"\0")
+            stream.flush()
+        stream.seek(0)
+        try:
+            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as error:
+            raise RuntimeError(
+                "The production DW build/deployment is already running"
+            ) from error
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+def load_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def frame_source(path):
+    """Integrate host scheduling once, without a separately edited frame copy."""
+    text = Path(path).read_text(encoding="utf-8")
+    marker = "    Com_Optimized_Frame();"
+    if text.count(marker) != 1:
+        raise ValueError("Native end-frame integration changed")
+    if "    SV_HostScale_Frame();" not in text:
+        text = 'extern "C" void SV_HostScale_Frame();\n' + text.replace(
+            marker, marker + "\n    SV_HostScale_Frame();"
+        )
+    if text.count("    SV_HostScale_Frame();") != 1:
+        raise ValueError("Host frame must run exactly once")
+    return text.encode("utf-8")
+
+
+def source_bytes(path, destination):
+    if destination == "src/ScrPlace_EndFrame.cpp":
+        return frame_source(path)
+    return Path(path).read_bytes()
+
+
+def sync_cpp_revisions(source):
+    """Bind recovered and new C++ units to the bytes this job will compile."""
+    source = inside(source)
+    units_path = source / "source-workstation/units.json"
+    units = read(units_path)
+    for unit in units["units"]:
+        if unit.get("kind") == "cpp":
+            path = inside(source / unit["source"])
+            if not path.is_relative_to(source / "src"):
+                raise ValueError("C++ unit escapes the compiled source directory")
+            unit["sha256"] = unit["revision"] = digest(path)
+    save(units_path, units)
+    users_path = source / "source-workstation/user-functions.json"
+    if users_path.exists():
+        users = read(users_path)
+        for user in users["functions"].values():
+            path = inside(source / user["path"])
+            if not path.is_relative_to(source / "src"):
+                raise ValueError("User function escapes the compiled source directory")
+            user["sha256"] = user["revision"] = digest(path)
+        save(users_path, users)
+    return units
+
+
+def initialize():
+    """Seed compiler infrastructure once from the verified production project.
+
+    Authored sources stay exclusively in integration/. The reusable compiler
+    base contains recovered game/compiler inputs and derived bindings. It does
+    not retain a competing editable copy of an integration source.
+    """
+    config, state, base = settings()
+    manifest_path = state / "source-manifest.json"
+    if manifest_path.exists():
+        return read(manifest_path)
+    if base.exists():
+        raise ValueError(
+            "Incomplete compiler initialization; preserve and inspect " + str(base)
+        )
+    deployed = read(ROOT / "data/current-remote-deployment.json")
+    readiness = read(ROOT / deployed["readiness"]["path"])
+    if not readiness["passed"] or readiness["sha256"] != deployed["sha256"]:
+        raise ValueError("Current production readiness does not bind the source")
+    source = inside(deployed["compiler_source_root"])
+    report_path = inside(Path(deployed["build_directory"]) / "build-report.json")
+    report = read(report_path)
+    if report["sha256"] != deployed["sha256"] or report["unresolved_symbols"]:
+        raise ValueError("Current production compile does not verify")
+    for unit in report["cpp"]:
+        if digest(source / unit["source"]) != unit["source_sha256"]:
+            raise ValueError("Verified compiled source changed: " + unit["source"])
+    overlays = {}
+    for directory in config["authored_source_roots"]:
+        for path in sorted(inside(ROOT / directory).iterdir()):
+            if path.suffix not in (".cpp", ".h", ".lua"):
+                continue
+            destination = "src/" + path.name
+            if path.name == "DW_LocalBackend_Frame.cpp":
+                # Resolve the saved user unit by its actual exported symbol.
+                matches = [
+                    unit["source"]
+                    for unit in read(source / "source-units.json")["units"]
+                    if unit["symbol"] == "DW_LocalBackend_Frame"
+                ]
+                users = read(source / "source-workstation/user-functions.json")
+                matches.extend(
+                    user["path"]
+                    for user in users["functions"].values()
+                    if user["name"] == "DW_LocalBackend_Frame"
+                )
+                if not matches:
+                    raise ValueError("Backend frame has no recovered/user source owner")
+                destination = next(iter(set(matches)))
+                if len(set(matches)) > 1:
+                    raise ValueError("Ambiguous backend frame ownership")
+            compiled = source / destination
+            if not compiled.exists():
+                continue
+            if source_bytes(path, destination).decode("utf-8").replace(
+                "\r\n", "\n"
+            ) != compiled.read_text(encoding="utf-8"):
+                raise ValueError(
+                    "Authored source differs from approved source; review " + str(path)
+                )
+            if destination in overlays:
+                raise ValueError("Two authored owners for " + destination)
+            overlays[destination] = path.relative_to(ROOT).as_posix()
+    generated = {"src/DW_PlaylistUI_Source.h", "src/DW_LobbyControls_Native.cpp"}
+    shutil.copytree(
+        source,
+        base,
+        ignore=shutil.ignore_patterns("__pycache__", "*.lock", "*.obj", "*.log"),
+    )
+    # Paths are bounded above. Remove only the duplicate authored/generated
+    # copies from this newly created base; original evidence remains untouched.
+    for name in set(overlays) | generated:
+        path = inside(base / name)
+        if path.exists():
+            path.unlink()
+    inventory = [
+        {"path": path.relative_to(base).as_posix(), "sha256": digest(path)}
+        for path in sorted(base.rglob("*"))
+        if path.is_file()
+    ]
+    manifest = dict(
+        schema=1,
+        initialized_utc=datetime.now(timezone.utc).isoformat(),
+        target=config["target"],
+        compiler_base=str(base),
+        bootstrap_executable_sha256=deployed["sha256"],
+        bootstrap_build_report=str(report_path),
+        bootstrap_original_source_root=str(source),
+        compiled_cpp_sources=sorted(unit["source"] for unit in report["cpp"]),
+        bootstrap_readiness=deployed["readiness"],
+        overlays=overlays,
+        generated_sources=sorted(generated),
+        files=inventory,
+        native_import_bindings=read(source.parent / "source-receipt.json")["bindings"],
+        one_authored_owner_per_source=True,
+        separate_revision_targets=False,
+    )
+    save(manifest_path, manifest)
+    print(
+        "Initialized the single DW compiler base; authored source owners:",
+        len(overlays),
+        flush=True,
+    )
+    return manifest
+
+
+def prepare():
+    config, state, base = settings()
+    manifest = initialize()
+    for item in manifest["files"]:
+        if digest(base / item["path"]) != item["sha256"]:
+            raise ValueError("Compiler base changed unexpectedly: " + item["path"])
+    directory = inside(state / "jobs" / str(time.time_ns()))
+    source = directory / "source"
+    shutil.copytree(base, source)
+    source_inputs = []
+    overlays = dict(manifest["overlays"])
+    for root in config["authored_source_roots"]:
+        # Host replacements acquire their native bindings below. Other authored
+        # modules keep the approved owner map; unrelated research prototypes
+        # may share a filename but require a different generated binding set.
+        if root != "integration/host-scale":
+            continue
+        for path in sorted(inside(ROOT / root).iterdir()):
+            name = path.relative_to(ROOT).as_posix()
+            if path.suffix not in (".cpp", ".h", ".lua") or name in overlays.values():
+                continue
+            destination = "src/" + path.name
+            if destination in overlays:
+                raise ValueError("Two authored owners for " + destination)
+            overlays[destination] = name
+    for destination, name in overlays.items():
+        authored = inside(ROOT / name)
+        raw_hash = digest(authored)
+        content = source_bytes(authored, destination)
+        (source / destination).write_bytes(content)
+        if digest(authored) != raw_hash:
+            raise ValueError("Source changed while freezing: " + name)
+        source_inputs.append(
+            dict(
+                source=name,
+                source_sha256=raw_hash,
+                compiled_source=destination,
+                compiled_sha256=hashlib.sha256(content).hexdigest(),
+            )
+        )
+    ui = load_module("dw_client_playlist", ROOT / "tools/prepare-playlist-ui.py")
+    ui.prepare(
+        source,
+        directory / "playlist-ui-preparation.json",
+        source / "src/DW_PlaylistUI.lua",
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(ROOT / "tools/prepare-lobby-native-clones.py"),
+            "--snapshot",
+            str(source),
+            "--output",
+            str(directory / "lobby-native-clones.json"),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    host = load_module(
+        "dw_client_host", ROOT / "tools/prepare-host-scale-integration.py"
+    )
+    host.prepare(source, replace_owned=True)
+    units = sync_cpp_revisions(source)
+    recovery_path = source / "generated/manifest.json"
+    recovery = read(recovery_path)
+    approved_root = Path(manifest["bootstrap_original_source_root"])
+    for item in recovery["preparation_inputs"]:
+        relative = Path(item["path"]).relative_to(approved_root)
+        new_path = source / relative
+        if digest(new_path) != item["sha256"]:
+            raise ValueError("Recovered input provenance changed: " + str(relative))
+        item["path"] = str(new_path)
+    save(recovery_path, recovery)
+    local_path = source / "replay-project.local.json"
+    local = read(local_path)
+    local.update(
+        cache=str(directory / "cache"),
+        build_root=str(directory / "builds"),
+        publication_root=str(directory / "output"),
+    )
+    save(local_path, local)
+    cpp = {
+        unit["source"]: digest(source / unit["source"])
+        for unit in units["units"]
+        if unit.get("kind") == "cpp"
+    }
+    # User units are compiled too; derive them from the base report rather than
+    # selecting a separate target or manufacturing a second set of bindings.
+    for name in manifest["compiled_cpp_sources"]:
+        cpp[name] = digest(source / name)
+    host_proof = read(source / "generated/host-scale-integration.json")
+    present = {item["symbol"] for item in host_proof["replacements"]}
+    if not set(config["required_host_routines"]).issubset(present):
+        raise ValueError("The production target is missing current bot optimizations")
+    updater = (source / "src/DW_ExecutableUpdate.cpp").read_text()
+    if "unsigned s_state = 0, s_reported = 0;" not in updater:
+        raise ValueError("Production updater must remain enabled")
+    receipt = dict(
+        schema=1,
+        target=config["target"],
+        snapshot=str(source),
+        source_inputs=source_inputs,
+        cpp_sources=cpp,
+        bindings=manifest["native_import_bindings"],
+        baseline_executable_sha256=read(ROOT / "data/current-remote-deployment.json")[
+            "sha256"
+        ],
+        full_host_optimizations_required=True,
+        optimized_compiler_required=True,
+        active_updater_required=True,
+        source_options=[],
+        game_runs_performed=False,
+        files=[
+            dict(path=path.relative_to(source).as_posix(), sha256=digest(path))
+            for path in sorted(source.rglob("*"))
+            if path.is_file()
+        ],
+    )
+    save(directory / "source-receipt.json", receipt)
+    save(
+        state / "latest-job.json",
+        dict(directory=str(directory), prepared=True, deployed=False),
+    )
+    print("Prepared one production DW target:", directory, flush=True)
+    return directory
+
+
+def build(directory):
+    directory = inside(directory)
+    receipt = read(directory / "source-receipt.json")
+    source = inside(receipt["snapshot"])
+    for item in receipt["files"]:
+        if digest(source / item["path"]) != item["sha256"]:
+            raise ValueError("Frozen compiler input changed: " + item["path"])
+    local = read(source / "replay-project.local.json")
+    for key in ("REPLAY_WORKSTATION_BUILD_ROOT", "REPLAY_WORKSTATION_OUTPUT_ROOT"):
+        os.environ.pop(key, None)
+    os.environ.update(
+        REPLAY_GAME_ROOT=local["game"],
+        REPLAY_SQLITE=local["sqlite"],
+        REPLAY_WORKSTATION_CACHE=local["cache"],
+    )
+    sys.path[:0] = [str(source), str(source / "tools")]
+    from workstation.project import Project
+    from workstation.config import load_paths
+
+    paths = load_paths(source)
+    project = Project(
+        source,
+        paths["cache"],
+        paths["game"],
+        paths["sqlite"],
+        paths["acts"],
+        recover_jobs=False,
+    )
+    job = project.start_build("engine")
+    phase = None
+    while True:
+        current = project.job(job["id"])
+        if current.get("phase") != phase:
+            phase = current.get("phase")
+            print(current["status"], phase, flush=True)
+        save(directory / "workstation-job.json", current)
+        if current["status"] not in ("queued", "running"):
+            if current["status"] != "succeeded":
+                raise RuntimeError(current.get("error", "DW compilation failed"))
+            break
+        time.sleep(1)
+    report_path = (
+        directory / "builds" / ("build-workstation-" + job["id"]) / "build-report.json"
+    )
+    verify(directory, report_path)
+
+
+def verify(directory, report_path):
+    """Bind every gate to the freshly compiled image, never a revision alias."""
+    config, state, _ = settings()
+    report = read(report_path)
+    build_path = Path(report_path).parent
+    source = Path(report["source_root"])
+    expected = read(directory / "source-receipt.json")["cpp_sources"]
+    actual = {unit["source"]: unit["source_sha256"] for unit in report["cpp"]}
+    if (
+        actual != expected
+        or report["unresolved_symbols"]
+        or digest(report["executable"]) != report["sha256"]
+    ):
+        raise ValueError("Fresh compilation/source/image gate failed")
+    tools = ROOT / "tools"
+    checks = (
+        ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
+        ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
+        ("test-lobby-controls.py", [], "controls.json"),
+        (
+            "test-native-bot-roster.py",
+            ["--header-source", str(source / "src/DW_BotBindings.h")],
+            "roster.json",
+        ),
+        (
+            "test-playlist-ui-native.py",
+            ["--lua-source", str(source / "src/DW_PlaylistUI.lua")],
+            "playlist.json",
+        ),
+        (
+            "test-lobby-native-clones.py",
+            ["--preparation", str(directory / "lobby-native-clones.json")],
+            "native-clones.json",
+        ),
+        ("test-executable-update-integration.py", [], "updater.json"),
+        ("test-compiled-unlock-progression.py", [], "unlock.json"),
+    )
+    proofs = []
+    for checker, extra, name in checks:
+        output = directory / name
+        subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(tools / checker),
+                "--build",
+                str(build_path),
+                "--output",
+                str(output),
+                *extra,
+            ],
+            cwd=ROOT,
+            check=True,
+        )
+        proof = read(output)
+        if not proof["passed"]:
+            raise ValueError("DW client gate failed: " + checker)
+        proofs.append(
+            dict(
+                path=str(output),
+                sha256=digest(output),
+                checker=checker,
+                checker_sha256=digest(tools / checker),
+            )
+        )
+    compiled = Path(report["executable"])
+    from dw_publication import publish
+
+    publication = publish(
+        compiled,
+        report_path,
+        source,
+        directory / "updater.json",
+        directory / "publication",
+    )
+    artifact = state / config["target"]
+    pending = artifact.with_suffix(".exe.pending")
+    shutil.copyfile(compiled, pending)
+    if digest(pending) != report["sha256"]:
+        raise ValueError("Final client artifact copy failed")
+    os.replace(pending, artifact)
+    ready = dict(
+        passed=True,
+        target=config["target"],
+        executable=str(artifact),
+        sha256=report["sha256"],
+        fresh_cpp_units=len(actual),
+        unresolved_symbols=0,
+        source_root=str(source),
+        build_report=str(report_path),
+        proofs=proofs,
+        source_receipt=str(directory / "source-receipt.json"),
+        source_receipt_sha256=digest(directory / "source-receipt.json"),
+        latest_bot_optimizations_included=True,
+        production_updater_active=True,
+        game_runs_performed=False,
+        deployed=False,
+        publication=publication,
+    )
+    save(directory / "readiness.json", ready)
+    save(
+        state / "latest-job.json",
+        dict(
+            directory=str(directory),
+            prepared=True,
+            passed=True,
+            readiness=str(directory / "readiness.json"),
+        ),
+    )
+    print("PASS one production DW target, all exact-image gates:", artifact, flush=True)
+
+
+def running_games():
+    output = subprocess.check_output(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'game_dx12_ship_replay_dw.exe'\" | ForEach-Object { $_.ProcessId }",
+        ],
+        text=True,
+    )
+    return [int(value) for value in output.split()]
+
+
+def deploy():
+    config, state, _ = settings()
+    latest = read(state / "latest-job.json")
+    ready_path = inside(latest["readiness"])
+    ready = read(ready_path)
+    if not ready["passed"] or not ready["latest_bot_optimizations_included"]:
+        raise ValueError("The single DW target has not passed its build gates")
+    for proof in ready["proofs"]:
+        if digest(inside(proof["path"])) != proof["sha256"]:
+            raise ValueError("Exact-image build proof changed")
+    source = read(ready["source_receipt"])
+    if digest(ready["source_receipt"]) != ready["source_receipt_sha256"]:
+        raise ValueError("Source receipt changed")
+    for item in source["source_inputs"]:
+        if digest(ROOT / item["source"]) != item["source_sha256"]:
+            raise ValueError(
+                "Authored source changed since the build: " + item["source"]
+            )
+    image = inside(ready["executable"])
+    if digest(image) != ready["sha256"]:
+        raise ValueError("Verified production image changed")
+    from dw_publication import require_current
+
+    publication = ready.get("publication")
+    if not publication or publication["sha256"] != ready["sha256"]:
+        raise ValueError("Ready build is missing its verified public publication")
+    public_proof = inside(publication["verification"])
+    if digest(public_proof) != publication["verification_sha256"]:
+        raise ValueError("Public updater verification receipt changed")
+    verified_publication = read(public_proof)
+    if (
+        not verified_publication["passed"]
+        or verified_publication["executable_sha256"] != ready["sha256"]
+    ):
+        raise ValueError("Public updater proof does not bind the ready image")
+    public_catalog = require_current(ready)
+    from remote_backend import verify as verify_backend
+
+    backend = verify_backend()
+    game = Path(
+        read(Path(ready["source_root"]) / "replay-project.local.json")["game"]
+    ).resolve(strict=True)
+    target = game / config["target"]
+    ini = target.with_suffix(".ini")
+    ini_hash = digest(ini)
+    before = digest(target)
+    if before != ready["sha256"]:
+        if running_games():
+            raise RuntimeError("DW game is running; close it before deployment")
+        if before != source["baseline_executable_sha256"]:
+            raise ValueError(
+                "Owner EXE changed since the build; preserve it and review"
+            )
+        pending = game / (config["target"] + ".pending")
+        with pending.open("xb") as stream:
+            stream.write(image.read_bytes())
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            if (
+                digest(pending) != ready["sha256"]
+                or running_games()
+                or digest(target) != before
+            ):
+                raise ValueError(
+                    "Deployment changed concurrently; current game preserved"
+                )
+            os.replace(pending, target)
+        finally:
+            if pending.exists():
+                pending.unlink()
+    if digest(ini) != ini_hash or digest(target) != ready["sha256"]:
+        raise ValueError("Deployed EXE/INI verification failed")
+    deployed = dict(
+        deployed=True,
+        executable=str(target),
+        sha256=ready["sha256"],
+        owner_ini_preserved=True,
+        ini_sha256=ini_hash,
+        game_runs_performed=False,
+        game_processes_stopped=False,
+        readiness=str(ready_path),
+        readiness_sha256=digest(ready_path),
+        public_updater=public_catalog,
+    )
+    save(state / "deployment.json", deployed)
+    current_path = ROOT / "data/current-remote-deployment.json"
+    current = read(current_path)
+    evidence = [
+        dict(
+            path=inside(proof["path"]).relative_to(ROOT).as_posix(),
+            sha256=proof["sha256"],
+        )
+        for proof in ready["proofs"]
+    ]
+    for path in (
+        ready_path,
+        Path(ready["source_receipt"]),
+        public_proof,
+        state / "deployment.json",
+    ):
+        evidence.append(
+            dict(path=inside(path).relative_to(ROOT).as_posix(), sha256=digest(path))
+        )
+    current.update(
+        created_utc=datetime.now(timezone.utc).isoformat(),
+        job_id=read(
+            Path(ready["build_report"]).parent.parent.parent / "workstation-job.json"
+        )["id"],
+        workstation_artifact=str(image),
+        build_directory=str(Path(ready["build_report"]).parent),
+        compiler_source_root=ready["source_root"],
+        source_snapshot_receipt=ready["source_receipt"],
+        executable=str(target),
+        sha256=ready["sha256"],
+        stage="Single production DW source pipeline; exact-image verified; no game run",
+        native_runtime_verified=False,
+        game_runs_performed=False,
+        owner_ini_preserved=True,
+        readiness=dict(
+            path=ready_path.relative_to(ROOT).as_posix(), sha256=digest(ready_path)
+        ),
+        sole_client_build_target=True,
+        latest_bot_optimizations_included=True,
+        public_release=public_catalog["release"],
+        public_client_publication=publication,
+        server=backend,
+        evidence=evidence,
+    )
+    save(current_path, current)
+    print(json.dumps(deployed, indent=2), flush=True)

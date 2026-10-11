@@ -77,8 +77,8 @@ local function connectNavigation(panel)
     first.navigation.up = toggle
 end
 
-local function addToVerticalList(panel, options)
-    if panel.ReplayDWFillLobbyBots then
+local function addAboveVerticalList(menu, panel, options)
+    if not panel or panel.ReplayDWFillLobbyBots then
         return
     end
     local first = firstPlaylistButton(panel)
@@ -86,9 +86,13 @@ local function addToVerticalList(panel, options)
     if not toggle then
         return
     end
-    toggle:SetAnchorsAndPosition(0, 1, 0, 1, 0, 430 * scale, 0, 25 * scale)
-    panel:addElement(toggle)
-    toggle:addElementBefore(first)
+    -- Keep this outside the vertical layout: inserting a row in the list
+    -- pushes the last Warzone entries behind the stock footer.
+    local rect = panel:GetCurrentAnchorsAndPositions()
+    toggle:SetAnchorsAndPosition(0, 1, 0, 1,
+        rect.left, rect.left + 430 * scale,
+        rect.top - 28 * scale, rect.top - 3 * scale)
+    menu:addElement(toggle)
     panel.ReplayDWFillLobbyBots = toggle
     if panel.GetFirstButtonWidget then
         panel.ReplayDWOriginalFirst = panel.GetFirstButtonWidget
@@ -131,12 +135,10 @@ end
 MenuBuilder.BuildRegisteredType = function(kind, options)
     local widget = originalBuild(kind, options)
     local name = string.lower(kind)
-    if name == "mpplaymenubuttons" or name == "brplaymenubuttons" then
-        addToVerticalList(widget, options)
-    elseif name == "mpplaymenu" then
-        connectNavigation(widget.MPPlayMenuButtons)
+    if name == "mpplaymenu" then
+        addAboveVerticalList(widget, widget.MPPlayMenuButtons, options)
     elseif name == "brplaymenu" then
-        connectNavigation(widget.BRPlayMenuButtons)
+        addAboveVerticalList(widget, widget.BRPlayMenuButtons, options)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)
     end

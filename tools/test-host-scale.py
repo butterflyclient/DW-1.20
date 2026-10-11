@@ -18,8 +18,6 @@ from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAP
 from unicorn.x86_const import *
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(Path(r"E:\replay-compiler\tools")))
-from coff import read as read_coff
 
 
 class Runner:
@@ -28,7 +26,7 @@ class Runner:
         self.proof = json.loads((snapshot / "generated/host-scale-integration.json").read_bytes())
         self.original = pefile.PE(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe", fast_load=True)
         self.base = self.original.OPTIONAL_HEADER.ImageBase
-        self.native = json.loads((Path(r"E:\replay-compiler") / "generated/native-symbols.json").read_bytes())
+        self.native = json.loads((snapshot / "generated/native-symbols.json").read_bytes())
         self.imports = {r["name"]: self.base + r["original_rva"] for r in self.proof["bindings"]}
         self.entries = {r["symbol"]: self.base + r["original_rva"] for r in self.proof["replacements"]}
         self.objects = {}
@@ -42,6 +40,8 @@ class Runner:
             self.ranges = self.report["rva_map"]["ranges"]
             self.starts = [r["begin"] for r in self.ranges]
         else:
+            sys.path.insert(0, str(snapshot / "tools"))
+            from coff import read as read_coff
             destination = snapshot / "host-scale-test-objects"
             destination.mkdir(exist_ok=True)
             for symbol in self.entries:
@@ -99,13 +99,16 @@ class Runner:
                    "?RecordBotFrame@HostScale@@YAXII_K0@Z",
                    "SV_HostNav_Begin", "SV_HostNav_End", "SV_HostNav_SpatialWork",
                    "SV_HostNav_GraphWork", "SV_HostNav_HasWork",
-                   "DW_LocalBackend_GetAuthAddress", "SV_HostNav_RecordClosest")
+                   "DW_LocalBackend_GetAuthAddress", "SV_HostNav_RecordClosest",
+                   "SV_HostNav_BeginBot", "SV_HostNav_EndBot")
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
                 if (name.startswith("?Record") or name.startswith("?Clock")) and name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
             hooks[self.base + self.report["symbols"]["Com_Optimized_IsEnabled"]] = "optimized-policy"
+            for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot"):
+                hooks[self.base + self.report["symbols"][name]] = name
             for name in ("memcpy", "memset", "__chkstk", "__security_check_cookie"):
                 if name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
@@ -317,6 +320,8 @@ class Runner:
                 returned(); return
             if kind.startswith("?Clock"):
                 returned(len(events) * 100); return
+            if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot"):
+                returned(kind == "SV_HostNav_BeginBot"); return
             if kind == "SVHS_TransientFileLoaded":
                 events.append(("file-loaded", a)); returned(case.get("loaded", True)); return
             if kind in ("SVHS_WorldTileReady", "SVHS_StaticTileReady"):

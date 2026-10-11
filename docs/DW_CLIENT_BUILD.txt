@@ -1,0 +1,78 @@
+Replay DW: one production client source and target
+
+Build from E:\DW\IW8:
+    .\build-game.ps1
+Then install the verified result:
+    .\deploy-game.ps1
+
+The normal build now publishes the complete verified EXE to the primary droplet
+before promoting the ready artifact. It checks signed update replies for retained
+older releases and the current hash, and exercises the actual embedded updater
+helper on isolated copies. A publication/verification failure fails the build
+handoff; it does not promote a new locally ready executable. No game is launched.
+Deployment also checks that the live droplet advertises this exact ready hash
+and size. It refuses a stale job instead of silently rolling the public release
+back. Never distribute an unpublished client: the updater would replace it with
+the advertised release even if the unpublished executable is newer.
+
+To repair publication of the latest verified job without another compilation:
+    python -B tools/publish-dw-client.py
+Run this from E:\DW\IW8 with the configured Python environment. The command
+checks frozen proof/source/image hashes, uploads through pinned SSH, allocates a
+monotonic release, and verifies the signed public update endpoint. Repeating it
+for the current hash keeps the same release number. Publication commits the
+catalog last under a remote lock and does not restart the backend or game.
+Receipts are retained in the job's publication directory and readiness.json.
+Use the canonical build/deploy commands in future sessions; do not independently
+copy an EXE into the game folder and leave its public updater catalog behind.
+
+The only DW executable to launch or distribute is:
+    E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Keep its existing game_dx12_ship_replay_dw.ini beside it.
+
+Edit current DW client code in integration/replay and bot/host code in
+integration/host-scale. These are feature directories in the same client,
+not separate branches or build targets. Each authored input has one owner.
+The default build always includes the current verified bot optimizations,
+playlist controls, DW services, progression/unlock controls and active updater.
+Use com_optimized 0/1/2 for runtime comparisons; 1 remains the default.
+
+dw-client.json describes this single target. There are no host-scale revision,
+experimental updater-pin, shared-workstation or alternate test-client choices.
+Older entry points either forward to the same build/deploy path or reject the
+retired operation before changing source/build state.
+
+data/dw-client/compiler-base holds one local compiler/recovered-game foundation.
+It is initialized from verified production inputs and does not hold duplicate
+editable integration sources. Normal builds do not read historical revision
+projects or the shared Replay Workstation's changing source selections.
+This private foundation contains game-derived material and is not committed.
+
+Each compilation freezes its inputs under data/dw-client/jobs and rebuilds the
+CPP, recovered assembly, symbol references, relocations and unwind metadata.
+Job directories and old receipts are immutable evidence, not supported source
+revisions or launch targets. Never edit a completed job to make another variant.
+The sole ready artifact is data/dw-client/game_dx12_ship_replay_dw.exe.
+
+Build and deployment are serialized. Deployment refuses changed source/proof
+bytes, a replaced owner EXE or a running game, and preserves the INI/profiles.
+The optional -PrepareOnly switch freezes the same target without compiling it.
+It does not select a different source or executable.
+
+Obsolete audit/hostscale/pair EXEs and INIs are moved out of the root game folder
+to data/dw-client/retired-artifacts with hashes and a recovery manifest. Main
+Replay files, the main DW INI, player profiles and the retained frontend build
+are not part of that cleanup. Historical documents describe their old evidence;
+the commands and target in this document are authoritative going forward.
+
+Playlist controls and matchmaking
+The one "Fill lobby with bots" preference appears above the native MP/BR
+playlist lists. It is a sibling of the scrolling list, preserving all original
+playlist positions and footer clearance. Mouse and controller focus both pass
+between the checkbox and the first playlist item.
+
+Native matchmaking can include the zero-bot, incomplete fill arm in its first
+authenticated host publication. The server establishes host readiness and
+accepts that arm in the same update. Actual additions/completion still require
+the ready host, the 30-second wait and 15-second fill schedule. Private lobbies,
+tournaments, expired/disbanded lobbies and premature start remain excluded.

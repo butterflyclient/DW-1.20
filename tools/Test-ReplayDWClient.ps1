@@ -6,14 +6,18 @@ $ErrorActionPreference = 'Stop'
 $gameRoot = (Resolve-Path -LiteralPath $GameDirectory).Path
 $image = Join-Path $gameRoot 'game_dx12_ship_replay_dw.exe'
 $iniPath = Join-Path $gameRoot 'game_dx12_ship_replay_dw.ini'
-$expectedHash = 'b326981a9718cedbc05228d40bef8b2adcd6be89307b2cde7d8e878a3ca67885'
+$deploymentPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'data\current-remote-deployment.json'
+$expectedHash = if (Test-Path -LiteralPath $deploymentPath) {
+    (Get-Content -LiteralPath $deploymentPath -Raw | ConvertFrom-Json).sha256
+} else { $null }
 
 Write-Output 'Replay DW client diagnostics (read-only; no identity keys are read)'
 Write-Output "Game folder: $gameRoot"
 if (Test-Path -LiteralPath $image) {
     $imageHash = (Get-FileHash -LiteralPath $image -Algorithm SHA256).Hash.ToLowerInvariant()
     Write-Output "EXE SHA256: $imageHash"
-    Write-Output "Current automatic-profile test build: $($imageHash -eq $expectedHash)"
+    if ($expectedHash) { Write-Output "Matches current production DW deployment: $($imageHash -eq $expectedHash)" }
+    else { Write-Output 'No local deployment receipt; compare the EXE hash with the published client release.' }
 } else {
     Write-Output 'ERROR: game_dx12_ship_replay_dw.exe is missing.'
 }

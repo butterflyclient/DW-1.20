@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "target": "game_dx12_ship_replay_dw.exe",
+  "compiler_base": "data/dw-client/compiler-base",
+  "build_state": "data/dw-client",
+  "authored_source_roots": [
+    "integration/replay",
+    "integration/host-scale"
+  ],
+  "required_host_routines": [
+    "AICommon_UpdateSight",
+    "SV_BotApplyCommands",
+    "SV_BotUpdateBots",
+    "SV_UserMoveWorkersMP_TryQueueClientThinkCmd",
+    "Scr_GetClosestReachablePointOnNavmesh",
+    "Bfx_ClosestReachableTreeStep",
+    "Bfx_ClosestReachableSearchStep",
+    "Bfx_IncrementalSearchToIsland",
+    "Bfx_GetClosestArea",
+    "Bfx_ClosestAreaTreeStep",
+    "Bfx_ClosestAreaCollect",
+    "Bot_UpdateMove_OffPathGrid",
+    "Sentient_NearestTacPoint"
+  ],
+  "runtime_optimization_dvar": "com_optimized",
+  "default_optimization_profile": 1
+}

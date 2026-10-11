@@ -55,6 +55,14 @@ Compatibility depends on the exact game executable, its configuration, and the a
 
 ## Development
 
+The Replay client has one production target: `game_dx12_ship_replay_dw.exe`.
+Build it with `./build-game.ps1`, then install the verified result with
+`./deploy-game.ps1`. The current bot and host optimizations are always included;
+`com_optimized` selects their behavior at runtime and defaults to `1`.
+Client code lives in `integration/replay/` and `integration/host-scale/` as one
+source set. See [the client build guide](docs/DW_CLIENT_BUILD.txt) for source
+ownership, compilation evidence and the retirement of older revision targets.
+
 The server is C++20 and built with CMake. Source lives under [`src/`](src/); Replay-specific integration is under [`integration/replay/`](integration/replay/). Start with [`CMakeLists.txt`](CMakeLists.txt), the feature guides in [`docs/`](docs/), and the existing contract tools under [`tools/`](tools/). On Windows, `format-backend.ps1 -Check` checks the C++ formatting without changing files.
 
 Please keep runtime data, credentials, private keys, player identities, game files, and generated build outputs out of commits. Before submitting a change, build the affected target and run the focused checks documented with that feature. Clearly distinguish fixture results from tests using the actual game client.

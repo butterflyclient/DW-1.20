@@ -184,14 +184,19 @@ namespace services
             return token;
         }
 
-        bool lobbyWaitingForStart(const Json &state)
+        bool lobbyCanWaitForStart(const Json &state)
         {
             const auto phase = state.at("host_doc").at("game_state").value("state", std::string{});
-            return state.value("host_ready", false) && !state.value("disbanded", false) &&
+            return !state.value("disbanded", false) &&
                    state.at("expires").get<uint64_t>() > now() &&
                    (phase.empty() || phase == "intermission") &&
                    !state.at("backend_doc").contains("tournament") &&
                    !state.at("backend_doc").contains("private_lobby");
+        }
+
+        bool lobbyWaitingForStart(const Json &state)
+        {
+            return state.value("host_ready", false) && lobbyCanWaitForStart(state);
         }
 
         bool operatorCanStart(const Json &state)
@@ -1568,8 +1573,17 @@ namespace services
                                   host["dw_auto_fill_request"].get<uint64_t>() <= INT32_MAX &&
                                   host["dw_auto_fill_request"].get<uint64_t>() > lobby.value("auto_fill_request", uint64_t{0}) &&
                                   host.contains("dw_bot_count") && host["dw_bot_count"].is_number_unsigned() &&
-                                  lobbyWaitingForStart(lobby) &&
                                   (submittedPhase.empty() || submittedPhase == "intermission"));
+                    // Replay may arm automatic fill in its first authenticated
+                    // host document, which itself establishes host_ready below.
+                    // Only an empty, incomplete arm/clear may cross that first
+                    // publication; bot additions and completion still require
+                    // the established host and the ordinary timed-fill gates.
+                    const bool firstHostArm = !migration && !lobby.value("host_ready", false) &&
+                                              host["dw_bot_count"].get<uint64_t>() == 0 &&
+                                              !host["dw_auto_fill_complete"].get<bool>();
+                    wire::require(lobbyCanWaitForStart(lobby) &&
+                                  (lobby.value("host_ready", false) || firstHostArm));
                     const bool enabled = host["dw_auto_fill_bots"].get<bool>();
                     const bool wasEnabled = lobby.value("auto_fill_bots", false);
                     if (enabled)

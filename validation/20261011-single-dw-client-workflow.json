@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "checks": [
+    "One production filename and no source/revision feature selection",
+    "Every compiled CPP source matches its current single authored owner or unchanged compiler foundation",
+    "Authored sources have one owner; compiler base contains no duplicate editable copies",
+    "Source identities remain unique and revisions match frozen CPP hashes",
+    "Latest bot geometry/navigation are mandatory; com_optimized defaults to 1 and updater remains active",
+    "Edits to both recovered and new C++ functions refresh their compile-time revision hashes",
+    "Legacy revision/source-selection and alternate test-target commands fail before changing build state",
+    "Concurrent build/deployment is rejected by the actual Windows file lock"
+  ],
+  "cpp_sources": 110,
+  "authored_source_owners": 60,
+  "game_runs_performed": false,
+  "owner_game_modified": false
+}

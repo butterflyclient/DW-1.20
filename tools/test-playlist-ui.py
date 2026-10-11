@@ -143,6 +143,16 @@ def main():
             menu:addElement(menu.PlaylistList);return menu
         end)
         MenuBuilder.registerType("BRPlaylistMenu",MenuBuilder.m_types.playlistmenu)
+        for _,pair in ipairs({{"MPPlayMenu","MPPlayMenuButtons"},{"BRPlayMenu","BRPlayMenuButtons"}}) do
+            local menuName,panelName=pair[1],pair[2]
+            MenuBuilder.registerType(menuName,function()
+                local menu=MakeNode()
+                local panel=MenuBuilder.BuildRegisteredType(panelName,{controllerIndex=0})
+                panel:SetAnchorsAndPosition(0,1,0,1,130,560,217,807)
+                menu[panelName]=panel;menu:addElement(panel)
+                return menu
+            end)
+        end
         LockTable(_G)
         LockTable(Engine)
         LockTable(Dvar)
@@ -151,20 +161,24 @@ def main():
     assert vm.execute(source.read_text()) == 1
     checks = vm.execute(r'''
         local options={controllerIndex=0}
-        local mp=MenuBuilder.BuildRegisteredType("MPPlayMenuButtons",options)
-        local br=MenuBuilder.BuildRegisteredType("BRPlayMenuButtons",options)
+        local mpMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        local brMenu=MenuBuilder.BuildRegisteredType("BRPlayMenu",options)
+        local mp,br=mpMenu.MPPlayMenuButtons,brMenu.BRPlayMenuButtons
         local grid=MenuBuilder.BuildRegisteredType("PlaylistMenu",options)
         local brGrid=MenuBuilder.BuildRegisteredType("BRPlaylistMenu",options)
         local results={}
         for _,panel in ipairs({mp,br}) do
             local checkbox=panel.ReplayDWFillLobbyBots
-            assert(checkbox and panel.children[1]==checkbox)
+            assert(checkbox and checkbox.parent==panel.parent)
+            for _,child in ipairs(panel.children) do assert(child~=checkbox) end
+            assert(checkbox.rect.top==189 and checkbox.rect.bottom==214)
+            assert(panel.rect.top==217 and panel.rect.bottom==807)
             assert(checkbox.Text.text=="Fill lobby with bots" and checkbox.mouse==true)
             assert(checkbox.Checkbox:GetValue()==false)
             assert(checkbox.rect.bottom-checkbox.rect.top==25)
             assert(checkbox.navigation.down.navigation.up==checkbox)
         end
-        results[#results+1]="Original MP/BR list builders contain one native checkbox before all playlists, with mouse and controller navigation"
+        results[#results+1]="Original MP/BR lists retain their rectangle and rows; one sibling checkbox sits above with mouse and controller navigation"
         for _,menu in ipairs({grid,brGrid}) do
             local checkbox=menu.ReplayDWFillLobbyBots
             assert(checkbox and checkbox.rect.top==189 and checkbox.rect.bottom==214)
@@ -196,15 +210,20 @@ def main():
         results[#results+1]="Native policy rejection and console changes refresh all checkboxes through the actual periodic C++ probe"
         local first=br.BRPlayButton
         local added=MakeNode();br:addElement(added);added:addElementBefore(first)
-        assert(br.children[1]==br.ReplayDWFillLobbyBots)
-        results[#results+1]="Later playlist insertion stays below the global toggle"
+        assert(br.children[1]==added and br.ReplayDWFillLobbyBots.parent==brMenu)
+        results[#results+1]="Later playlist insertion remains in the unchanged list; toggle never consumes a row"
         local upper=MakeNode()
         upper.navigation={down=mp.QuickPlayButtonContainer}
         mp.QuickPlayButtonContainer.navigation.up=upper
-        MenuBuilder.registerType("MPPlayMenu",function()
-            local menu=MakeNode();menu.MPPlayMenuButtons=mp;return menu
-        end)
-        MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        -- Construct a new parent whose stock post-load connects an upper item.
+        MenuBuilder.m_types.mpplaymenu=function()
+            local menu=MakeNode()
+            local panel=MenuBuilder.BuildRegisteredType("MPPlayMenuButtons",options)
+            panel.QuickPlayButtonContainer.navigation={up=upper}
+            upper.navigation.down=panel.QuickPlayButtonContainer
+            menu.MPPlayMenuButtons=panel;menu:addElement(panel);return menu
+        end
+        mp=MenuBuilder.BuildRegisteredType("MPPlayMenu",options).MPPlayMenuButtons
         assert(upper.navigation.down==mp.ReplayDWFillLobbyBots)
         assert(mp.ReplayDWFillLobbyBots.navigation.up==upper)
         assert(mp.ReplayDWFillLobbyBots.navigation.down==mp.QuickPlayButtonContainer)

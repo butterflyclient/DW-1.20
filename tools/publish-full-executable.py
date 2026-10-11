@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import time
+import textwrap
 
 import remote_backend
 
@@ -118,6 +119,12 @@ print(json.dumps(dict(published=True,format=new['format'],release=new['release']
             "INCOMING", repr(incoming)
         ).replace(
             "CATALOG_SHA", repr(hashlib.sha256(catalog_bytes).hexdigest())
+        )
+        script = (
+            "import fcntl,pathlib\n"
+            "with (pathlib.Path('/var/lib/replay-dw/updates')/'publication.lock').open('a') as lock:\n"
+            "    fcntl.flock(lock,fcntl.LOCK_EX)\n"
+            + textwrap.indent(script, "    ")
         )
         _, out, error = client.exec_command(
             "python3 - <<'PY'\n" + script + "\nPY", timeout=60

@@ -43,11 +43,15 @@ extern "C" void *Bfx_GetClosestArea(void *planner, const void *position,
     bool fallback = false;
     if (optimized && results.count == 0)
     {
-        // No valid nearby area exists. Release this query's array and perform
-        // the original unrestricted search, preserving remote-goal behavior.
+        // Only a bot-owned scope receives a bounded fallback. Nested searches
+        // restore the outer stack-owned budget; no graph pointer is cached.
         Release(results);
         results = {nullptr, 0, 0, uint8_t(SVHS_NavAllocationTag)};
+        NavClosestBudget budget{};
+        auto *previous = SV_HostNav_SetClosestBudget(&budget);
         SVHS_NavGetClosestAreas(layer, position, specification, SVHS_NavUnlimitedRadius, 1, &results);
+        SV_HostNav_SetClosestBudget(previous);
+        SV_HostNav_RecordClosestBudget(&budget);
         fallback = true;
     }
     void *closest = results.count ? results.items[0] : nullptr;

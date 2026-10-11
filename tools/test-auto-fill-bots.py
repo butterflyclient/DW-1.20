@@ -23,6 +23,7 @@ def main():
     args = parser.parse_args()
     source = (ROOT / "src/matchmaking_services.cpp").read_text()
     signatures = [
+        "        bool lobbyCanWaitForStart(",
         "        bool lobbyWaitingForStart(",
         "        bool operatorCanStart(",
         "        uint64_t autoFillTarget(",
@@ -59,6 +60,12 @@ uint64_t requestToken=0;
 Json request(uint64_t count,bool complete=false,bool enabled=true){return Json{{"dw_auto_fill_request",++requestToken},{"game_state",{{"state","intermission"}}},{"dw_auto_fill_bots",enabled},{"dw_auto_fill_complete",complete},{"dw_bot_count",count}};}
 bool reject(Json &l,Json h){auto copy=l;try{apply(copy,h);return false;}catch(const std::exception&){return true;}}
 int exercise(){
+ auto first=base();first["host_ready"]=false;
+ CHECK(!lobbyWaitingForStart(first));
+ CHECK(reject(first,request(1)) && reject(first,request(0,true)));
+ apply(first,request(0));CHECK(first["auto_fill_bots"]==true && first["operator_bot_count"]==0 && !operatorCanStart(first));
+ auto blocked=base();blocked["host_ready"]=false;blocked["backend_doc"]["private_lobby"]=Json::object();CHECK(reject(blocked,request(0)));
+ blocked=base();blocked["host_ready"]=false;blocked["backend_doc"]["tournament"]=Json::object();CHECK(reject(blocked,request(0)));
  auto l=base();apply(l,request(0));CHECK(l["auto_fill_target"]==11 && !operatorCanStart(l));auto armed=l["auto_fill_started_ms"];auto duplicate=request(0);duplicate["dw_auto_fill_request"]=l["auto_fill_request"];CHECK(reject(l,duplicate));
  auto pending=request(0);pending["game_state"]["state"]="countdown";CHECK(reject(l,pending));
  auto published=nativeBackendDocument(l)["ruleset_payload"]["dvar_overrides"];CHECK(published["replay_dw_autoFillBotsActive"]==1 && published["replay_dw_autoFillBotsComplete"]==0 && published["replay_dw_autoFillBotTarget"]==11 && published["replay_dw_autoFillRevision"]==1);
