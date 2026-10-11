@@ -86,8 +86,11 @@ def exercise(root, data, offset, checks):
         saved_state = data / "achievement-user-state/5800" / context / f"{user}.json"
         assert json.loads(saved_state.read_bytes())["battlepass3_owned"] == 1
         stored = json.loads(saved_state.read_bytes())
-        stored.update(br_tutorial_rewarded=True, player_xp_end_time=1234567890,
-                      weapon_xp_end_time=1234567891)
+        stored.update(
+            br_tutorial_rewarded={str(index): True for index in range(4)},
+            player_xp_end_time=1234567890,
+            weapon_xp_end_time=1234567891,
+        )
         saved_state.write_text(json.dumps(stored))
     user_state_paths = [data / "achievement-user-state/5800" / c / f"{user}.json"
                         for c in ("5800", "iw8")]

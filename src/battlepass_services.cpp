@@ -239,6 +239,136 @@ namespace services
             }
             state["claimed"] = std::move(claimed);
         }
+
+        const Json &rewardFlags(const Json &state)
+        {
+            static const Json empty = Json::object();
+            if (!state.contains("br_tutorial_rewarded"))
+                return empty;
+            const auto &flags = state.at("br_tutorial_rewarded");
+            // Replay ParseUserState consumes four boolean fields named 0..3,
+            // matching training, first match, practice and Blood Money training.
+            wire::require(flags.is_object() && flags.size() <= 4);
+            for (const auto &entry : flags.items())
+                wire::require((entry.key() == "0" || entry.key() == "1" || entry.key() == "2" ||
+                               entry.key() == "3") &&
+                              entry.value().is_boolean());
+            return flags;
+        }
+
+        bool firstMatchClaim(const Json &event)
+        {
+            return event.at("name") == "br_tutorial_complete" &&
+                   event.at("values").contains("Param0") &&
+                   number(event.at("values"), "Param0") == 1;
+        }
+
+        void firstMatchReward(const std::filesystem::path &root,
+                              const platform::LobbyIdentity &id,
+                              const std::string &context,
+                              const Json &config,
+                              std::vector<achievement_store::Write> &writes,
+                              std::vector<Delivery> &deliveries,
+                              bool refresh)
+        {
+            uint64_t token = 0;
+            for (const auto &definition : config.at("activations"))
+                if (number(definition, "season", 6) == 0 && number(definition, "skips", 100) == 1)
+                {
+                    wire::require(token == 0);
+                    token = number(definition, "item", INT32_MAX);
+                }
+            wire::require(token > 0);
+
+            // Inventory belongs to the account across achievement contexts.
+            // Keep its one-time reward owner in the canonical native namespace
+            // too, so a second claim in iw8 cannot grant another consumable.
+            const auto userWrite = std::find_if(writes.begin(),
+                                                writes.end(),
+                                                [&](const auto &write)
+                                                {
+                                                    return write.owner == id.userId &&
+                                                           write.context == "5800" &&
+                                                           write.kind == Destination::userState;
+                                                });
+            const auto userIndex = static_cast<size_t>(userWrite - writes.begin());
+            const bool stagedUser = userWrite != writes.end();
+            auto userState = stagedUser ? userWrite->document
+                                        : read(root / "achievement-user-state/5800/5800" /
+                                                   (std::to_string(id.userId) + ".json"),
+                                               Json::object());
+            wire::require(userState.is_object() && userState.dump().size() <= 4096);
+            const bool claimed = rewardFlags(userState).value("1", false);
+            // A full progression reset retains request history while clearing
+            // rewards. Replaying an old accepted request cannot undo that reset.
+            // A fresh native claim after another first match earns the reward.
+            if (refresh && !claimed)
+                return;
+
+            const auto inventoryWrite = std::find_if(
+                writes.begin(),
+                writes.end(),
+                [&](const auto &write)
+                {
+                    return write.owner == id.userId && write.kind == Destination::inventory;
+                });
+            const auto inventoryIndex = static_cast<size_t>(inventoryWrite - writes.begin());
+            const bool stagedInventory = inventoryWrite != writes.end();
+            auto inventory = stagedInventory ? inventoryWrite->document
+                                             : prepareRankInventory(root, id, {}, false).document;
+            auto &owned = item(inventory, token);
+            const auto quantity = number(owned, "2", INT32_MAX);
+            if (!claimed)
+            {
+                wire::require(quantity < INT32_MAX);
+                owned["2"] = quantity + 1;
+                if (!userState.contains("br_tutorial_rewarded"))
+                    userState["br_tutorial_rewarded"] = Json::object();
+                userState["br_tutorial_rewarded"]["1"] = true;
+                wire::require(userState.dump().size() <= 4096);
+                validateRankInventory(inventory);
+                if (stagedUser)
+                    writes[userIndex].document = userState;
+                else
+                    writes.push_back({id.userId,
+                                      id.platformAccountId,
+                                      "5800",
+                                      {},
+                                      std::move(userState),
+                                      Destination::userState});
+                if (stagedInventory)
+                    writes[inventoryIndex].document = inventory;
+                else
+                    writes.push_back({id.userId,
+                                      id.platformAccountId,
+                                      "5800",
+                                      {},
+                                      inventory,
+                                      Destination::inventory});
+            }
+
+            // The stock popup polls the actual tier-skip inventory. Notify its
+            // native consumer with the absolute current quantity, including on
+            // retry, without activating/consuming the token or moving season XP.
+            const auto stateWrite = std::find_if(writes.begin(),
+                                                 writes.end(),
+                                                 [&](const auto &write)
+                                                 {
+                                                     return write.owner == id.userId &&
+                                                            write.context == context &&
+                                                            write.kind == Destination::states;
+                                                 });
+            auto data = stateWrite != writes.end() ? stateWrite->document
+                                                   : states(statePath(root, id, context));
+            const auto season = number(config, "current_season", 6);
+            auto &state = progress(data, season);
+            const auto total = xp(state);
+            const auto tier = rank(config.at("seasons").at(std::to_string(season)), total);
+            state["multiProgress"] =
+                Json::array({{{"name", "xp"}, {"current", total}, {"target", uint64_t{0}}},
+                             {{"name", "rank"}, {"current", tier}, {"target", uint64_t{100}}}});
+            deliveries.push_back(update(id, context, state, inventory, {token}, false));
+        }
     } // namespace
 
     void projectBattlepassUserState(const std::filesystem::path &root,
@@ -248,6 +378,18 @@ namespace services
     {
         if (id.titleId != 5800 || (context != "5800" && context != "iw8"))
             return;
+        const auto canonical = context == "5800" ? state
+                                                 : read(root / "achievement-user-state/5800/5800" /
+                                                            (std::to_string(id.userId) + ".json"),
+                                                        Json::object());
+        const auto &flags = rewardFlags(canonical);
+        if (flags.contains("1"))
+        {
+            if (!state.contains("br_tutorial_rewarded"))
+                state["br_tutorial_rewarded"] = Json::object();
+            (void)rewardFlags(state);
+            state["br_tutorial_rewarded"]["1"] = flags.at("1");
+        }
         const auto data = states(statePath(root, id, context));
         // Same-Replay 0x14105E1C0 resets each of the seven ownership flags and
         // reads Int32 battlepassN_owned. JSON booleans are not its wire contract.
@@ -341,26 +483,36 @@ namespace services
     {
         if (id.titleId != 5800)
             return;
-        if (std::none_of(events.begin(),
-                         events.end(),
-                         [](const Json &event)
-                         {
-                             const auto &name = event.at("name").get_ref<const std::string &>();
-                             const auto &values = event.at("values");
-                             return name == "skip_tier" ||
-                                    name.starts_with("activate_battlepass") ||
-                                    (name == "mp_addxp" && values.contains("Param4") &&
-                                     number(values, "Param4") > 0);
-                         }))
+        const bool hasFirstMatchClaim = std::any_of(events.begin(), events.end(), firstMatchClaim);
+        const bool hasBattlepassEvent =
+            !std::none_of(events.begin(),
+                          events.end(),
+                          [](const Json &event)
+                          {
+                              const auto &name = event.at("name").get_ref<const std::string &>();
+                              const auto &values = event.at("values");
+                              return name == "skip_tier" ||
+                                     name.starts_with("activate_battlepass") ||
+                                     (name == "mp_addxp" && values.contains("Param4") &&
+                                      number(values, "Param4") > 0);
+                          });
+        if (!hasFirstMatchClaim && !hasBattlepassEvent)
             return;
         const auto config = rules(root);
         if (config.is_null())
             return;
-        const auto stateWrite = std::find_if(writes.begin(), writes.end(), [&](const auto &write)
-        {
-            return write.owner == id.userId && write.context == context &&
-                   write.kind == Destination::states;
-        });
+        if (hasFirstMatchClaim)
+            firstMatchReward(root, id, context, config, writes, deliveries, refresh);
+        if (!hasBattlepassEvent)
+            return;
+        const auto stateWrite = std::find_if(writes.begin(),
+                                             writes.end(),
+                                             [&](const auto &write)
+                                             {
+                                                 return write.owner == id.userId &&
+                                                        write.context == context &&
+                                                        write.kind == Destination::states;
+                                             });
         const auto stateIndex = static_cast<size_t>(stateWrite - writes.begin());
         const bool stagedStates = stateWrite != writes.end();
         auto data = stagedStates ? stateWrite->document : states(statePath(root, id, context));
@@ -482,7 +634,8 @@ namespace services
         if (stagedStates)
             writes[stateIndex].document = data;
         else
-            writes.push_back({id.userId, id.platformAccountId, context, {}, data, Destination::states});
+            writes.push_back(
+                {id.userId, id.platformAccountId, context, {}, data, Destination::states});
         for (auto season : changedSeasons)
             deliveries.push_back(update(id,
                                         context,

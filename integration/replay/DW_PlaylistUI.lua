@@ -13,6 +13,7 @@ end
 local originalBuild = MenuBuilder.BuildRegisteredType
 local originalLocalize = Engine.CBBHFCGDIC
 local state = { widgets = setmetatable({}, { __mode = "k" }) }
+state.presentation = setmetatable({}, { __mode = "k" })
 local preference = "replay_dw_autoFillBots"
 local scale = _1080p or 1
 
@@ -123,6 +124,67 @@ local function addAboveGrid(menu, options)
     list.PlaylistButtons.navigation.up = toggle
 end
 
+local function playlistTitle(text)
+    if text == "PLAYLIST/BRSOLOSTIM_NAME2" or
+        text == "@PLAYLIST/BRSOLOSTIM_NAME2" then
+        return "BR STIMULUS SOLOS"
+    end
+    return text
+end
+
+local function repairPlaylistTitle(widget)
+    local name = widget and widget.Name
+    if not name or name.ReplayDWTitleFixed then
+        return
+    end
+    -- These stock buttons read their already localized data model directly;
+    -- their subscription callbacks do not call Engine.Localize again.
+    local originalSetText = name.setText
+    name.setText = function(element, text, ...)
+        return originalSetText(element, playlistTitle(text), ...)
+    end
+    name.ReplayDWTitleFixed = true
+    local current = name:getText()
+    if playlistTitle(current) ~= current then
+        name:setText(current, 0)
+    end
+end
+
+local function installPresentationGates()
+    local onboarding = rawget(_G, "Onboarding")
+    if not onboarding then
+        return
+    end
+    local function gate(name, preference)
+        local stage = onboarding[name]
+        local original = stage and stage.WasCompleted
+        if type(original) ~= "function" or state.presentation[stage] == original then
+            return
+        end
+        local wrapped = function(...)
+            if Dvar.IBEGCHEFE(preference) ~= true then
+                return true
+            end
+            return original(...)
+        end
+        stage.WasCompleted = wrapped
+        state.presentation[stage] = wrapped
+    end
+    -- Gate automatic presentation only. Keep the original saved flags and
+    -- MarkCompleted methods intact, including explicit training/trailer actions.
+    gate("SeasonVideo", "lui_dwIntroVideos")
+    gate("MagmaVideo", "lui_dwIntroVideos")
+    gate("WARZONE_INTRODUCTION", "lui_dwTutorialPrompts")
+    gate("WARZONE_TUTORIAL_GAMEPLAY_INITIATED", "lui_dwTutorialPrompts")
+    gate("Plunder", "lui_dwTutorialPrompts")
+end
+
+state.Refresh = function()
+    refreshCheckboxes()
+    installPresentationGates()
+end
+installPresentationGates()
+
 Engine.CBBHFCGDIC = function(key, ...)
     local text = originalLocalize(key, ...)
     if key == "PLAYLIST/BRSOLOSTIM_NAME2" and
@@ -141,6 +203,8 @@ MenuBuilder.BuildRegisteredType = function(kind, options)
         addAboveVerticalList(widget, widget.BRPlayMenuButtons, options)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)
+    elseif name == "playlistpromotedbutton" or name == "playlistfeaturedbutton" then
+        repairPlaylistTitle(widget)
     end
     return widget
 end

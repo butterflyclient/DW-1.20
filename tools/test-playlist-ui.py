@@ -83,8 +83,20 @@ def main():
         }
         NativeTranslations = {}
         Preference = false
+        IntroPreferences = {}
+        OnboardingNativeReads = 0
+        OnboardingNativeWrites = 0
+        Engine.ECCJEIDDC = function(controller,flag)
+            assert(controller==0 and type(flag)=="number")
+            OnboardingNativeReads=OnboardingNativeReads+1
+            return false
+        end
+        Engine.CIHICIEBIA = function() OnboardingNativeWrites=OnboardingNativeWrites+1 end
         Dvar = {
-            IBEGCHEFE=function(name) return name=="replay_dw_autoFillBots" and Preference end,
+            IBEGCHEFE=function(name)
+                if name=="replay_dw_autoFillBots" then return Preference end
+                return IntroPreferences[name]==true
+            end,
             DHEGHJJJHI=function(name,value)
                 assert(name=="replay_dw_autoFillBots" and type(value)=="boolean")
                 Preference=value
@@ -135,6 +147,33 @@ def main():
     original("frontend/mp/mpplaymenubuttons.lua.561.lua", "MPPlayButtonsModule")
     original("frontend/mp/brplaymenubuttons.lua.395.lua", "BRPlayButtonsModule")
     original("frontend/playlistlist.lua.742.lua", "PlaylistListModule")
+    original("utils/onboarding.lua.2213.lua", "OnboardingModule")
+    for relative, kind in (
+        ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton"),
+        ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton"),
+    ):
+        path = ORIGINAL / relative
+        raw = path.read_text(encoding="utf-8-sig")
+        inputs[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+        begin = raw.index("\tlocal function var_21_9()")
+        end = raw.index("\n\tvar_21_8:SubscribeToModelThroughElement", begin)
+        vm.execute(
+            '''MenuBuilder.registerType(..., function()
+                local widget=MakeNode()
+                widget.modelName="PLAYLIST/BRSOLOSTIM_NAME2"
+                local var_21_0=widget
+                local var_21_1=0
+                local var_21_8=MakeNode()
+                widget.Name=var_21_8
+                function widget:GetDataSource()
+                    return {name={GetValue=function() return widget.modelName end}}
+                end
+            ''' + raw[begin:end] + '''
+                widget.RefreshModel=var_21_9
+                var_21_9()
+                return widget
+            end)''', kind
+        )
     vm.execute(r'''
         MenuBuilder.registerType("PlaylistMenu", function()
             local menu=MakeNode()
@@ -233,6 +272,47 @@ def main():
         assert(Engine.CBBHFCGDIC("PLAYLIST/BRSOLOSTIM_NAME2")=="Localized native title")
         assert(Engine.CBBHFCGDIC("UNRELATED_KEY")=="UNRELATED_KEY")
         results[#results+1]="Only the confirmed missing playlist title gets a fallback; native translations and unrelated keys remain authoritative"
+        for _,kind in ipairs({"PlaylistPromotedButton","PlaylistFeaturedButton"}) do
+            local widget=MenuBuilder.BuildRegisteredType(kind,options)
+            assert(widget.Name:getText()=="BR STIMULUS SOLOS")
+            widget.modelName="@PLAYLIST/BRSOLOSTIM_NAME2"
+            widget.RefreshModel()
+            assert(widget.Name:getText()=="BR STIMULUS SOLOS")
+            widget.modelName="Localized native title"
+            widget.RefreshModel()
+            assert(widget.Name:getText()=="LOCALIZED NATIVE TITLE")
+            widget.modelName="PLAYLIST/UNRELATED_KEY"
+            widget.RefreshModel()
+            assert(widget.Name:getText()=="PLAYLIST/UNRELATED_KEY")
+            widget.modelName=nil
+            widget.RefreshModel()
+            assert(widget.Name:getText()=="PLAYLIST/UNRELATED_KEY")
+        end
+        results[#results+1]="Original promoted/featured model callbacks repair the missing title at construction and on later updates without calling Localize or rewriting unrelated/localized names"
+        assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==true)
+        assert(Onboarding.MagmaVideo.WasCompleted(nil,0)==true)
+        assert(Onboarding.WARZONE_INTRODUCTION.WasCompleted(nil,0)==true)
+        assert(Onboarding.WARZONE_TUTORIAL_GAMEPLAY_INITIATED.WasCompleted(nil,0)==true)
+        assert(Onboarding.Plunder.WasCompleted(nil,0)==true)
+        assert(OnboardingNativeReads==0 and OnboardingNativeWrites==0)
+        IntroPreferences.lui_dwIntroVideos=true
+        IntroPreferences.lui_dwTutorialPrompts=true
+        assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==false)
+        assert(Onboarding.MagmaVideo.WasCompleted(nil,0)==false)
+        assert(Onboarding.WARZONE_INTRODUCTION.WasCompleted(nil,0)==false)
+        assert(Onboarding.WARZONE_TUTORIAL_GAMEPLAY_INITIATED.WasCompleted(nil,0)==false)
+        assert(Onboarding.Plunder.WasCompleted(nil,0)==false)
+        assert(OnboardingNativeReads==5 and OnboardingNativeWrites==0)
+        IntroPreferences.lui_dwIntroVideos=false
+        IntroPreferences.lui_dwTutorialPrompts=false
+        local stage=Onboarding.MagmaVideo
+        local current=stage.WasCompleted
+        MenuBuilder.m_types.replaydwplaylistfillstate().Refresh()
+        assert(stage.WasCompleted==current)
+        stage.WasCompleted=function() return false end
+        MenuBuilder.m_types.replaydwplaylistfillstate().Refresh()
+        assert(stage.WasCompleted(nil,0)==true)
+        results[#results+1]="Automatic season/mode videos and BR tutorial prompts default off; enabling their dvars delegates to original onboarding checks without changing saved flags, and reloaded stages are repaired idempotently"
         return results
     ''')
     old_builder = vm.globals().MenuBuilder.BuildRegisteredType

@@ -307,7 +307,8 @@ def main():
             returned(pointer)
         elif name == "Dvar_RegisterBool":
             key = string(values[0])
-            assert key in ("replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete")
+            assert key in ("replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete",
+                           "lui_dwIntroVideos", "lui_dwTutorialPrompts")
             assert values[1:3] == [0, 0] and key not in registered
             pointer = arena + 0x2000 + len(registered) * 0x100
             write(pointer + 29, 0, "<B")
@@ -459,6 +460,11 @@ def main():
     write(lobby_identity, 1, "<Q")
     write(base + symbols["gl_14C27E4B0"] + 80128, 1, "<B")
     run("DW_LobbyControls_Frame")
+    for key in ("lui_dwIntroVideos", "lui_dwTutorialPrompts"):
+        assert key in registered
+        assert read(registered[key] + 29, "<B") == 0
+        assert read(registered[key] + 40, "<B") == 0
+    checks.append("Intro videos and automatic Warzone tutorial prompts register as native booleans disabled by default")
     assert read(arena + 0x3000 + 40) == 2
     write(dvars["gl_14D386840"] + 40, 152)
     write(registered["replay_dw_botCount"] + 40, 7)

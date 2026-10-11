@@ -10,6 +10,9 @@ before promoting the ready artifact. It checks signed update replies for retaine
 older releases and the current hash, and exercises the actual embedded updater
 helper on isolated copies. A publication/verification failure fails the build
 handoff; it does not promote a new locally ready executable. No game is launched.
+Authored source hashes are rechecked immediately before publication as well as
+at deployment. A concurrent edit requires a fresh build and cannot silently
+publish the earlier frozen source over the current source's intended result.
 Deployment also checks that the live droplet advertises this exact ready hash
 and size. It refuses a stale job instead of silently rolling the public release
 back. Never distribute an unpublished client: the updater would replace it with
@@ -76,3 +79,33 @@ authenticated host publication. The server establishes host readiness and
 accepts that arm in the same update. Actual additions/completion still require
 the ready host, the 30-second wait and 15-second fill schedule. Private lobbies,
 tournaments, expired/disbanded lobbies and premature start remain excluded.
+
+Default presentation controls
+Automatic seasonal/mode introduction videos and Warzone onboarding prompts
+are disabled by default through two native boolean dvars:
+    lui_dwIntroVideos 0
+    lui_dwTutorialPrompts 0
+Set either to 1 to restore its original automatic onboarding checks. These
+controls gate presentation, preserve saved completion flags and do not replace
+explicit tutorial/trailer actions. They are independent of com_optimized.
+The stock season, Magma and Warzone onboarding Lua stages use these gates;
+the existing frontend probe repairs reloaded stages without stacking wrappers.
+
+Playlist titles and first-match Battle Pass reward
+Promoted/featured playlist buttons consume their name model without calling
+Localize. Repair their confirmed missing PLAYLIST/BRSOLOSTIM_NAME2 value at
+construction and later model updates; leave localized/other names intact.
+The displayed fallback is BR STIMULUS SOLOS.
+
+The native first-match claim emits br_tutorial_complete with Param0=1. The
+backend grants the published single-tier consumable, sets native keyed boolean
+br_tutorial_rewarded["1"], and publishes both through the recoverable achievement
+transaction. Canonical ownership prevents duplicate rewards across contexts,
+retries and reconnects. Existing token quantities and earned season XP remain
+intact. Full progression reset clears the reward; replaying an old accepted
+request after reset cannot award it again, while a fresh claim can.
+
+Focused validation executes the original onboarding/button Lua, linked native
+dvar registration, encrypted reward requests, transaction recovery, real server
+restart and normal token activation/consumption. These checks do not establish
+rendered game UI behavior; owner playtesting remains a separate gate.

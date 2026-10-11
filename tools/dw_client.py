@@ -27,6 +27,16 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def require_current_sources(receipt):
+    """Reject a frozen job superseded by edits to its authored source owners."""
+    for item in receipt["source_inputs"]:
+        path = inside(ROOT / item["source"])
+        if digest(path) != item["source_sha256"]:
+            raise ValueError(
+                "Authored source changed since the build: " + item["source"]
+            )
+
+
 def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -421,6 +431,7 @@ def verify(directory, report_path):
     build_path = Path(report_path).parent
     source = Path(report["source_root"])
     expected = read(directory / "source-receipt.json")["cpp_sources"]
+    require_current_sources(read(directory / "source-receipt.json"))
     actual = {unit["source"]: unit["source_sha256"] for unit in report["cpp"]}
     if (
         actual != expected
@@ -480,6 +491,9 @@ def verify(directory, report_path):
             )
         )
     compiled = Path(report["executable"])
+    # A second editor can change source while compilation/linked checks run.
+    # Catch that before publishing, not only at local deployment afterward.
+    require_current_sources(read(directory / "source-receipt.json"))
     from dw_publication import publish
 
     publication = publish(
@@ -489,6 +503,7 @@ def verify(directory, report_path):
         directory / "updater.json",
         directory / "publication",
     )
+    require_current_sources(read(directory / "source-receipt.json"))
     artifact = state / config["target"]
     pending = artifact.with_suffix(".exe.pending")
     shutil.copyfile(compiled, pending)
@@ -552,11 +567,7 @@ def deploy():
     source = read(ready["source_receipt"])
     if digest(ready["source_receipt"]) != ready["source_receipt_sha256"]:
         raise ValueError("Source receipt changed")
-    for item in source["source_inputs"]:
-        if digest(ROOT / item["source"]) != item["source_sha256"]:
-            raise ValueError(
-                "Authored source changed since the build: " + item["source"]
-            )
+    require_current_sources(source)
     image = inside(ready["executable"])
     if digest(image) != ready["sha256"]:
         raise ValueError("Verified production image changed")

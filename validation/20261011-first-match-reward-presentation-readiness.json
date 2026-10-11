@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "created_utc": "2026-10-11T19:04:12.990123+00:00",
+  "passed": true,
+  "issues": [
+    "Native first-match reward was acknowledged without claimed flag or tier-skip inventory",
+    "Promoted/featured playlist title callbacks displayed the unlocalized BRSOLOSTIM_NAME2 model",
+    "Automatic seasonal/mode intro videos and Warzone tutorial prompts should default off"
+  ],
+  "backend": {
+    "freshly_compiled_windows_and_linux": true,
+    "translation_units": 46,
+    "windows_sha256": "b813c97fc17894bfdc82f81fd7b5bfdcf62cca1bf0cfb3a4b5ed4d48555438f0",
+    "linux_sha256": "8c6f5f586c01b6f62bf053a0c8bc9315cb9533bdbf61963c4222440f76ac39c5",
+    "live_pid": 315939,
+    "live_executable": "/opt/replay-dw/releases/20261011-8c6f5f586c01/iw8-dw-server",
+    "verified_live_process": true,
+    "native_reward_test_groups_per_platform": 5,
+    "old_backend_negative_control_reproduced": true,
+    "reward": {
+      "event": "br_tutorial_complete",
+      "parameter": 1,
+      "token": 430002,
+      "flag": "br_tutorial_rewarded[\"1\"]",
+      "recoverable_flag_and_inventory_transaction": true,
+      "retries_and_cross_context_claims_do_not_duplicate": true,
+      "full_reset_preserves_old_receipt_replay_safety": true
+    }
+  },
+  "client": {
+    "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+    "sha256": "739d6fc8c2b11903388fe4f77bd6ae8ce013fd8747e15edfab7d519299387662",
+    "fresh_cpp_units": 110,
+    "unresolved_symbols": 0,
+    "exact_image_gates": 8,
+    "current_source_inputs_verified": true,
+    "installed_hash_verified": true,
+    "owner_ini_preserved": true,
+    "latest_bot_optimizations_included": true,
+    "embedded_lua_sha256": "91d79baf8663c6b2ca8d2eeb2baf3bfc75a13e64490544297a7f60cb9fa2f3ef",
+    "title": "BR STIMULUS SOLOS",
+    "dvar_defaults": {
+      "lui_dwIntroVideos": 0,
+      "lui_dwTutorialPrompts": 0
+    },
+    "onboarding_completion_flags_modified": false,
+    "public_update_release": 23,
+    "retained_older_hashes_checked": 22,
+    "actual_embedded_updater_helper_staging_verified": true
+  },
+  "evidence": [
+    {
+      "path": "data\\reward-claim-20261011\\windows-build.json",
+      "sha256": "8830020d0523e099506022a6f149f0f76f454c32bfe9bd6e58f516361720d1ef"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\linux-build.json",
+      "sha256": "9cf982ef596568b9fcf27f5d6958c90338d7011a437d13feacd67fa2231731b5"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\windows-first-match.json",
+      "sha256": "4eca1da791fdc4f2def59dc0766cb69bea9681b1fa1a3ee6d161e88d8f874c8e"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\linux-first-match.json",
+      "sha256": "048531a5580f4c95f4b5634672a4cf7be4cc0dc654fec0e00efb38e4652f7cd1"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\native-claim-state.json",
+      "sha256": "199abb22e87203be3dc87d6640bbc9180dc0074a0de50baed0e26cf17619ef48"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\native-reward-fields.json",
+      "sha256": "b413690feb9dde0057c0a2f89192ebd995c16e0dbc2677501606e7a997c95e3b"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\negative-control.json",
+      "sha256": "38862335aa58f41bc70208c206818a06800855cd6895db32a50086bb85331a7b"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\deployment-result.json",
+      "sha256": "4ac781b0ea212d741c0f31accbde24aa07b12f140ebb4a7733b67ea2de5b22a5"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\playlist-title-intro-controls.json",
+      "sha256": "07b1c9b424bcd0b45054d385ef27831b064700a6330449795a7ad297658719a7"
+    },
+    {
+      "path": "data\\reward-claim-20261011\\client-workflow.json",
+      "sha256": "241e468ff754a232c473e66c3d0488b4355108ce6f3ccdd64822eea011a08aed"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791743982749854800\\readiness.json",
+      "sha256": "b9f6d8f24082b0019d2c7295a471d6706698ab516401ed1e9c5bf2dff218cc63"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791743982749854800\\publication\\public-verification.json",
+      "sha256": "af20bc5702c54c9b4f662030302bd95a455c615e8b0af53f18ede3271341cad0"
+    },
+    {
+      "path": "data\\dw-client\\deployment.json",
+      "sha256": "2ad0c354512859d94bfc89ee45701dbe6e03a36de0512febb57b8d965f4b0f1e"
+    }
+  ],
+  "game_runs_performed": false,
+  "rendered_game_ui_verified": false,
+  "primary_player_modified": false,
+  "owner_game_test_steps": [
+    "Restart the root-folder DW EXE or install its advertised update",
+    "Confirm BR tutorial and seasonal/mode intro prompts are skipped by default",
+    "Confirm the promoted playlist reads BR STIMULUS SOLOS",
+    "Retry Collect Reward after reconnect; verify one tier-skip token and no duplicate on retry",
+    "If desired, set either presentation dvar to 1 to restore its automatic onboarding checks"
+  ]
+}

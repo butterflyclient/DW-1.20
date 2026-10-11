@@ -120,6 +120,33 @@ with tempfile.TemporaryDirectory(
 checks.append(
     "Edits to both recovered and new C++ functions refresh their compile-time revision hashes"
 )
+dw_client.require_current_sources(receipt)
+with tempfile.TemporaryDirectory(
+    prefix="source-drift-check-", dir=root / "data"
+) as temporary:
+    drift_source = Path(temporary) / "Current.cpp"
+    drift_source.write_text('extern "C" int Current() { return 1; }\n')
+    frozen = {
+        "source_inputs": [
+            {
+                "source": str(drift_source.relative_to(root)),
+                "source_sha256": dw_client.digest(drift_source),
+            }
+        ]
+    }
+    dw_client.require_current_sources(frozen)
+    drift_source.write_text('extern "C" int Current() { return 2; }\n')
+    try:
+        dw_client.require_current_sources(frozen)
+    except ValueError as error:
+        assert "Authored source changed" in str(error)
+    else:
+        raise AssertionError(
+            "Changed authored source passed the publication/deployment guard"
+        )
+checks.append(
+    "Publication/deployment source guard accepts matching owners and rejects an edit after freezing"
+)
 for arguments in (
     ["tools/build-dw-client.py", "--host-scale"],
     ["tools/build-frozen-workstation.py", "--pin-experimental-updater"],

@@ -416,6 +416,10 @@ extern "C" void DW_LobbyControls_Frame()
             "replay_dw_botCount", 0, 0, 199, 0, "DW operator number of native bots to add");
         s_autoFill = Dvar_RegisterBool("replay_dw_autoFillBots", false, 0,
                                       "Fill eligible lobby slots with native bots before starting");
+        Dvar_RegisterBool("lui_dwIntroVideos", false, 0,
+                          "Automatically show seasonal and mode introduction videos");
+        Dvar_RegisterBool("lui_dwTutorialPrompts", false, 0,
+                          "Automatically prompt for Warzone introduction and training");
         s_autoActive = Dvar_RegisterBool("replay_dw_autoFillBotsActive", false, 0,
                                         "Authoritative DW automatic bot fill state");
         s_autoComplete = Dvar_RegisterBool("replay_dw_autoFillBotsComplete", false, 0,
