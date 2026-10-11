@@ -12,6 +12,80 @@ from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAP
 import unicorn.x86_const as reg
 
 
+def check_initial_update(pe, base, symbols, updater_state):
+    """Execute the first frame with image-initialized state and mocked OS threads."""
+    cases = []
+    for enabled, thread_succeeds in ((False, True), (True, True), (True, False)):
+        vm = Uc(UC_ARCH_X86, UC_MODE_64)
+        arena = 0x100000000
+        vm.mem_map(arena, 0x10000)
+        mapped, calls = set(), []
+
+        def page(address):
+            start = address & ~4095
+            if start in mapped:
+                return
+            assert base <= start < base + pe.OPTIONAL_HEADER.SizeOfImage
+            vm.mem_map(start, 4096)
+            data = pe.get_data(start - base, 4096)
+            if data:
+                vm.mem_write(start, data)
+            mapped.add(start)
+
+        def missing(vm, access, address, size, value, context):
+            page(address)
+            page(address + size - 1)
+            return True
+
+        vm.hook_add(UC_HOOK_MEM_UNMAPPED, missing)
+        page(updater_state)
+        initial = struct.unpack("<I", vm.mem_read(updater_state, 4))[0]
+        assert initial == 0, ("Compiled updater must start unstarted", initial)
+        for name, address in (("__imp_CreateThread", arena + 0x1000), ("__imp_CloseHandle", arena + 0x1100)):
+            page(symbols[name])
+            vm.mem_write(symbols[name], struct.pack("<Q", address))
+
+        def returned(value):
+            stack = vm.reg_read(reg.UC_X86_REG_RSP)
+            target = struct.unpack("<Q", vm.mem_read(stack, 8))[0]
+            vm.reg_write(reg.UC_X86_REG_RAX, value)
+            vm.reg_write(reg.UC_X86_REG_RSP, stack + 8)
+            vm.reg_write(reg.UC_X86_REG_RIP, target)
+
+        def boundary(vm, address, size, context):
+            if address == symbols["DW_LocalBackend_IsEnabled"]:
+                returned(int(enabled))
+            elif address == arena + 0x1000:
+                callback = vm.reg_read(reg.UC_X86_REG_R8)
+                assert base <= callback < base + pe.OPTIONAL_HEADER.SizeOfImage
+                assert vm.reg_read(reg.UC_X86_REG_RCX) == vm.reg_read(reg.UC_X86_REG_RDX) == vm.reg_read(reg.UC_X86_REG_R9) == 0
+                stack = vm.reg_read(reg.UC_X86_REG_RSP)
+                assert bytes(vm.mem_read(stack + 40, 16)) == bytes(16)
+                calls.append("thread")
+                returned(0x1234 if thread_succeeds else 0)
+            elif address == arena + 0x1100:
+                assert vm.reg_read(reg.UC_X86_REG_RCX) == 0x1234
+                calls.append("close")
+                returned(1)
+            elif address == symbols["DW_LocalPlatform_RecordStage"]:
+                returned(0)
+
+        vm.hook_add(UC_HOOK_CODE, boundary)
+        for _ in range(2):
+            stack, stop = arena + 0xEF88, arena + 0xF000
+            vm.mem_write(stack, struct.pack("<Q", stop))
+            vm.reg_write(reg.UC_X86_REG_RSP, stack)
+            vm.emu_start(symbols["DW_ExecutableUpdate_Frame"], stop, count=10000)
+            assert vm.reg_read(reg.UC_X86_REG_RIP) == stop
+        expected = ["thread", "close"] if enabled and thread_succeeds else ["thread"] if enabled else []
+        assert calls == expected, (enabled, thread_succeeds, calls)
+        state = struct.unpack("<I", vm.mem_read(updater_state, 4))[0]
+        assert state == (1 if enabled and thread_succeeds else 40 if enabled else 0)
+        cases.append({"enabled": enabled, "thread_creation_succeeds": thread_succeeds,
+                      "compiled_initial_state": initial, "frames": 2, "worker_starts": calls.count("thread"), "final_state": state})
+    return cases
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", type=Path, required=True)
@@ -36,6 +110,7 @@ def main():
             candidates.append(insn.address + insn.size + operand.mem.disp)
     assert len(candidates) == 1
     updater_state = candidates[0]
+    initial_checks = check_initial_update(pe, base, symbols, updater_state)
     assert not any(
         row["symbol"] == "func_1410527B0" for row in report["replacements"]
     ), "Do not close the native prerequisite fence"
@@ -154,10 +229,12 @@ def main():
                 "passed": True,
                 "game_sha256": report["sha256"],
                 "checks": checks,
+                "initial_update_checks": initial_checks,
                 "native_game_verified": False,
                 "modeled_boundaries": [
                     "DW filename selection",
                     "native platform request transport",
+                    "OS thread creation and handle close; updater worker not executed",
                 ],
             },
             indent=2,
@@ -165,7 +242,7 @@ def main():
         + "\n"
     )
     print(
-        "PASS: 100 linked patch-state cases, prerequisite fence and actual platform restart routing"
+        "PASS: compiled initial updater scheduling, 100 linked patch-state cases, prerequisite fence and actual platform restart routing"
     )
 
 

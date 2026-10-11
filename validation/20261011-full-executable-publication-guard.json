@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "scope": "Publisher receipt admission; synthetic cases, no game or network",
+  "source_sha256": "ffb8d5c5a158c53f2644752007491091dcd0257f5a9718264d671f717f13babd",
+  "checks": [
+    "Valid compiled startup/fence/restart receipt accepted",
+    "wrong_image rejected",
+    "inherited_disabled_state30 rejected",
+    "duplicate_workers rejected",
+    "missing_startup_cases rejected",
+    "broken_restart_route rejected",
+    "Missing compiled updater receipt rejected"
+  ]
+}

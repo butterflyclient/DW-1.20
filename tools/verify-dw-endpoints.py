@@ -126,15 +126,24 @@ def verify(pe, report):
             return bytes(machine.mem_read(address, 128)).split(b"\0", 1)[0].decode()
 
         assert bool(run("DW_LocalBackend_IsEnabled")) == enabled
+        # Match the original buildAuthReq order. The constructor begins with an
+        # empty address; the old port-first check masked the first-request bug.
+        auth_address = string(run("func_14212B100"))
+        assert auth_address == (host if enabled else "native.auth.invalid")
+        machine.mem_write(config + 36, bytes(1024))
+        first_address = string(run("func_14212B100"))
+        assert first_address == (host if enabled else "")
         auth_port = run("func_14212B110") & 0xFFFF
+        assert string(run("func_14212B100")) == first_address
+        assert bytes(machine.mem_read(config + 36, 1024)) == bytes(1024)
+        machine.mem_write(config + 36, bytes(native[36:1060]))
         lobby_address = string(run("func_14212B210"))
         lobby_port = run("func_14212B220") & 0xFFFF
-        auth_address = string(config + 36)
         assert auth_port == (8443 if enabled else 443)
         assert lobby_port == (3075 if enabled else 3074)
-        assert auth_address == (host if enabled else "native.auth.invalid")
         assert lobby_address == (host if enabled else "native.lobby.invalid")
         assert bytes(machine.mem_read(config, 36)) == bytes(native[:36])
+        assert bytes(machine.mem_read(config + 36, 1024)) == bytes(native[36:1060])
         assert bytes(machine.mem_read(config + 1060, len(native) - 1060)) == bytes(
             native[1060:]
         )
@@ -250,6 +259,8 @@ def verify(pe, report):
             "events": [],
             "sdk_writes": [],
             "local_storage": 0,
+            "begin_failures": 0,
+            "end_failures": 0,
         }
         environment_thunk = arena + 0xF740
         library_thunk, procedure_thunk, free_library_thunk = (
@@ -328,6 +339,10 @@ def verify(pe, report):
                     return
                 if address == symbols["LUI_BeginEvent"]:
                     assert args[0] == 0 and string(args[1]) == "bnet_online_status_set"
+                    if presence["begin_failures"]:
+                        presence["begin_failures"] -= 1
+                        return_native(uc, 0)
+                        return
                     return_native(uc, 1)
                     return
                 if address == symbols["func_1419CE4F0"]:
@@ -336,6 +351,10 @@ def verify(pe, report):
                     return_native(uc)
                     return
                 if address == symbols["func_1419BDA00"]:
+                    if presence["end_failures"]:
+                        presence["end_failures"] -= 1
+                        return_native(uc, 0)
+                        return
                     return_native(uc, 1)
                     return
             if restart["active"] and address in (
@@ -919,15 +938,27 @@ def verify(pe, report):
         local_user, local_platform = 0x110000100000001, 1
         machine.mem_write(local + 144, struct.pack("<Q", local_user))
         machine.mem_write(local + 184, struct.pack("<Q", local_platform))
-        for status in (2, 1, 3, 4, 2):
+        presence["begin_failures"] = 1
+        assert invoke("func_140C88C10", 2, 0, 0) & 255 == 0
+        assert presence["events"] == []
+        assert presence["social"] == [(0, 2)]
+        presence["social"].clear()
+        selections = (2, 2, 1, 1, 3, 3, 4, 4, 2, 2)
+        for status in selections:
             assert invoke("func_140C88C10", status, 0, 0) & 255 == 1
             for _ in range(3):
                 assert invoke("func_140C88A30", local_user, 0, 0) == status
                 assert invoke("func_140C88B20", local_platform, 0, 0) == status
-        assert presence["social"] == [(0, n) for n in (2, 1, 3, 4, 2)]
-        assert presence["events"] == [2, 1, 3, 4, 2]
+        assert presence["social"] == [(0, n) for n in selections]
+        assert presence["events"] == ([2, 1, 3, 4, 2] if enabled else list(selections))
         assert invoke("func_140C88C10", 99, 0, 0) & 255 == 0
-        assert len(presence["social"]) == 5
+        assert len(presence["social"]) == 10
+        previous_events = len(presence["events"])
+        presence["end_failures"] = 1
+        assert invoke("func_140C88C10", 1, 0, 0) & 255 == 0
+        assert invoke("func_140C88C10", 1, 0, 0) & 255 == 1
+        assert len(presence["events"]) == previous_events + 2
+        cases[-1]["compiled_presence_repeat_and_failed_announcement_retry"] = True
         if enabled:
             assert not presence["sdk_writes"]
             # Exercise the compiled eligibility check, including when optimized
@@ -952,3 +983,140 @@ def verify(pe, report):
             presence["local_storage"] > 0
         )
     return cases
+
+
+def verify_auth_address_component(output):
+    """Compile production getters and check the original caller's host selection order."""
+    import hashlib
+    import json
+    import os
+    from pathlib import Path
+    import shutil
+    import sqlite3
+    import subprocess
+    import tempfile
+
+    root = Path(__file__).resolve().parents[1]
+    source = root / "integration/replay/DW_LocalBackend_Frame.cpp"
+    database = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe.sqlite")
+    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
+        getter = db.execute(
+            "select assembly from functions where address=?", (str(0x14212B100),)
+        ).fetchone()[0]
+        caller = db.execute(
+            "select assembly from functions where address=?", (str(0x14216B720),)
+        ).fetchone()[0]
+    assert getter.splitlines() == ["lea     rax, [rcx+24h]", "retn"]
+    assert caller.index("call    sub_14212B100") < caller.index("call    bdLoginConfig__getAuthPort")
+    contents = source.read_text()
+    layout = contents[contents.index("#pragma pack(push, 1)"):contents.index("namespace\n{")]
+    begin = contents.index('extern "C" const char *DW_LocalBackend_GetAuthAddress(')
+    end = contents.index('extern "C" void DW_LocalBackend_Status_f()', begin)
+    getters = contents[begin:end]
+    harness = r'''
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <cstdio>
+#include <string>
+bool enabled = false;
+const char *host = "127.0.0.1";
+extern "C" bool DW_LocalBackend_IsEnabled() { return enabled; }
+extern "C" const char *DW_LocalConfig_Host() { return host; }
+@@LAYOUT@@
+@@GETTERS@@
+// Original getter's lea rax,[rcx+24h]; ret, bound above to Replay's oracle.
+const char *OriginalAddress(const void *config) {
+    return static_cast<const char *>(config) + 36;
+}
+uint16_t LatePort(void *nativeConfig) {
+    auto *config = static_cast<DWReplayLoginConfigPrefix *>(nativeConfig);
+    if (!enabled) return config->authPort;
+    std::memcpy(config->authAddress, host, std::strlen(host) + 1);
+    return 8443;
+}
+// Model only the original caller's address/port order and cached hostname.
+// All task serialization, token processing, HTTP and signatures are excluded.
+std::string SelectFirstHost(DWReplayLoginConfigPrefix &config, bool old) {
+    const char *address = old ? OriginalAddress(&config) : DW_LocalBackend_GetAuthAddress(&config);
+    bool configured = *address != 0;
+    std::string selected = configured ? address : "prod-auth3.demonware.net";
+    uint16_t port = old ? LatePort(&config) : DW_LocalBackend_GetAuthPort(&config);
+    if (configured) selected = old ? OriginalAddress(&config) : DW_LocalBackend_GetAuthAddress(&config);
+    return selected + ":" + std::to_string(port);
+}
+int main() {
+    unsigned checks = 0;
+    for (const char *endpoint : {"127.0.0.1", "162.243.115.160"}) {
+        host = endpoint;
+        for (bool local : {false, true}) {
+            enabled = local;
+            for (bool populated : {false, true}) {
+                DWReplayLoginConfigPrefix config{};
+                std::memset(config.platformAndTitle, 0x5A, sizeof(config.platformAndTitle));
+                if (populated) std::memcpy(config.authAddress, "native.auth.invalid", sizeof("native.auth.invalid"));
+                config.authPort = 443;
+                std::memcpy(config.lobbyAddress, "native.lobby.invalid", sizeof("native.lobby.invalid"));
+                config.lobbyPort = 3074;
+                const auto original = config;
+                const auto first = SelectFirstHost(config, false);
+                const auto expected = std::string(local ? endpoint : populated ? "native.auth.invalid" : "prod-auth3.demonware.net") + (local ? ":8443" : ":443");
+                if (first != expected || std::memcmp(&config, &original, sizeof(config))) return 1;
+                if (SelectFirstHost(config, false) != first) return 2;
+                if (local && !populated) {
+                    auto old = original;
+                    if (SelectFirstHost(old, true) != "prod-auth3.demonware.net:8443") return 3;
+                    if (SelectFirstHost(old, true) != std::string(endpoint) + ":8443") return 4;
+                }
+                ++checks;
+            }
+        }
+    }
+    std::printf("PASS: %u address-before-port cases; original-host first-request negative control reproduced\n", checks);
+}
+'''.replace("@@LAYOUT@@", layout).replace("@@GETTERS@@", getters)
+    variables = Path(r"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat")
+    listing = subprocess.check_output(
+        f'cmd /d /s /c "call "{variables}" >nul && set"', text=True
+    )
+    environment = dict(os.environ)
+    for line in listing.splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.upper() in ("PATH", "INCLUDE", "LIB", "LIBPATH"):
+            environment[key.upper()] = value
+    compiler = shutil.which("cl.exe", path=environment["PATH"])
+    assert compiler
+    (root / "build").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="auth-address-", dir=root / "build") as temporary:
+        folder = Path(temporary)
+        cpp, image = folder / "getters.cpp", folder / "getters.exe"
+        cpp.write_text(harness)
+        subprocess.run(
+            [compiler, "/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", str(cpp),
+             "/Fe:" + str(image), "/Fo:" + str(folder / "getters.obj")],
+            cwd=folder, env=environment, check=True,
+        )
+        result = subprocess.run([str(image)], capture_output=True, text=True, check=True)
+    proof = dict(
+        passed=True, native_game_verified=False, checks=8,
+        modeled_boundary="original auth builder host selection; configured INI host supplied at getter boundary",
+        production_source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+        oracle_database=str(database), original_getter_va="0x14212B100",
+        original_caller_va="0x14216B720", original_getter_instructions=getter,
+        original_caller_instructions_sha256=hashlib.sha256(caller.encode()).hexdigest(),
+        original_host_negative_control=True, result=result.stdout.strip(),
+    )
+    output = Path(output).resolve()
+    assert output.is_relative_to(root)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(proof, indent=2) + "\n")
+    print(result.stdout.strip())
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Focused compiled authentication getter regression; no game launch")
+    parser.add_argument("--auth-address-component", action="store_true", required=True)
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args()
+    verify_auth_address_component(args.output)

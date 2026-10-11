@@ -41,6 +41,7 @@ static_assert(offsetof(DWReplayLoginConfigPrefix, authAddress) == 36);
 static_assert(offsetof(DWReplayLoginConfigPrefix, authPort) == 1060);
 static_assert(offsetof(DWReplayLoginConfigPrefix, lobbyAddress) == 1062);
 static_assert(offsetof(DWReplayLoginConfigPrefix, lobbyPort) == 2086);
+static_assert(sizeof(DWReplayLoginConfigPrefix) == 2088);
 
 namespace
 {
@@ -212,19 +213,22 @@ extern "C" bool DW_LocalBackend_IsEnabled()
     return mode == 2;
 }
 
-extern "C" uint16_t DW_LocalBackend_GetAuthPort(void *nativeConfig)
+extern "C" const char *DW_LocalBackend_GetAuthAddress(const void *nativeConfig)
 {
-    auto *config = static_cast<DWReplayLoginConfigPrefix *>(nativeConfig);
-    if (!DW_LocalBackend_IsEnabled())
-        return config->authPort;
-    // buildAuthReq calls this before formatting its HTTPS URL from authAddress.
-    const auto *localAddress = DW_LocalConfig_Host();
-    unsigned length = 0;
-    while (localAddress[length])
-        ++length;
-    for (unsigned i = 0; i <= length; ++i)
-        config->authAddress[i] = localAddress[i];
-    return 8443;
+    // Original buildAuthReq tests this getter before it asks for the port. An
+    // empty native address selects a generated production hostname for that
+    // entire request, so the local host must be selected at this first read.
+    // DW_LocalConfig_Host owns the bounded, validated, NUL-terminated INI host.
+    return DW_LocalBackend_IsEnabled()
+               ? DW_LocalConfig_Host()
+               : static_cast<const DWReplayLoginConfigPrefix *>(nativeConfig)->authAddress;
+}
+
+extern "C" uint16_t DW_LocalBackend_GetAuthPort(const void *nativeConfig)
+{
+    return DW_LocalBackend_IsEnabled()
+               ? 8443
+               : static_cast<const DWReplayLoginConfigPrefix *>(nativeConfig)->authPort;
 }
 
 extern "C" const char *DW_LocalBackend_GetLSGAddress(const void *nativeConfig)

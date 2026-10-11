@@ -7,7 +7,9 @@ The backend must be running. Test Shipment; other map package completeness varie
 
 INI controls, read at full game startup:
   unlock_all=0  Normal native unlock controls.
-  unlock_all=1  Enable the available native unlock overrides.
+  unlock_all=1  Enable native unlock overrides and project maximum player rank
+                and all original weapon XP/levels in the rebuilt DW UI getters.
+                Earned local/server progression is preserved underneath.
   rank=0        Use saved progression and allow earned XP to continue.
   rank=1..55    Select that career rank's native XP threshold once when changed.
                 Keeping the same setting does not reset earned XP each launch.
@@ -37,17 +39,18 @@ One gameplay run:
    the native XP notification. No server-side player provisioning is needed.
 8. Compare com_optimized 0, 1 and 2 in the console. Zero disables the experimental
    profiles. One preserves the 3D scene's appearance; two is the aggressive profile.
-   Return to 0 after comparison. The fresh build registers 0 by default.
+   Return to 1 after comparison. The fresh build registers 1 by default.
 
 Persistence/config check after the match:
 9. Fully stop and relaunch the game. Each player should retain their own earned
    XP, rank, name and settings. Keep player-identity.bin and player-progression.bin.
-10. On one test profile only, set rank=5 and unlock_all=1, restart, and inspect
-    rank and available unlocks. Set rank=0 and unlock_all=0 and restart again.
-    Rank 5's XP should remain stored while normal unlock restrictions return.
+10. With rank=0, record earned player/weapon progression. Set unlock_all=1,
+    restart, and inspect rank155 and original maximum weapon levels. Then set
+    unlock_all=0 and restart; earned progression must return. An explicit rank
+    change is a separate starting-rank override and should not be mixed into
+    this reversible-unlock test.
 
-Current evidence:
-- Fresh C++ game compilation, symbol/relocation/unwind validation and deployment pass.
+Earlier game evidence (not a new run of the 20261011 client):
 - All 27 native startup fences pass on the current backend.
 - Native invitation receipt/display passes; invitation acceptance needs playtest.
 - Independent-party native matching, shared ready roster, map preload and actual
@@ -56,6 +59,15 @@ Current evidence:
 - Backend earned-XP/retry and text-channel fixtures pass. This automated game run
   ended in inactivity forfeits before a scored XP event; earned native match XP,
   text display, audible voice and distinct scoreboard ping are not claimed passed.
+
+20261011 client evidence:
+- Fresh C++ compilation, symbol/relocation/unwind and exact-image getter checks pass.
+- Corrected unlock projection passes the original Lua consumers for both local
+  clients, maximum displayed rank155, all 51 weapons and disabled restoration.
+- Release 18's full EXE is published on the primary server. Signed checks for
+  13 older hashes and the actual embedded helper's download/verification pass.
+  Its current-version path stages no replacement. No game run or apply/relaunch
+  was performed for this release; the checks above still need owner playtesting.
 
 Use controlled restarts. The current dw_leave command remains unsuitable for tests.
 The direct xstartlobby command faulted in this build; normal Quick Play menu entry

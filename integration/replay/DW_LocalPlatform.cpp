@@ -95,6 +95,8 @@ namespace
     DWLocalPlatformReply s_reply{};
     bool s_registered = false;
     unsigned s_onlineStatus = 2;    // Same-Replay: 1 Away, 2 Online, 3 Busy, 4 Offline.
+    unsigned s_announcedOnlineStatus = 0; // No successful menu announcement yet.
+    unsigned s_announcingOnlineStatus = 0;
     bool s_identityApplied = false; // engine thread only; native auth state alone is insufficient
     bool s_refreshIdentityHeld = false; // DW refresh must not sign out the local platform user
     cmd_function_s s_statusCommand{};
@@ -1281,7 +1283,8 @@ extern "C" uint8_t func_140C88C10(unsigned status)
 {
     if (status < 1 || status > 4)
         return 0;
-    if (DW_LocalBackend_IsEnabled())
+    const bool localProvider = DW_LocalBackend_IsEnabled();
+    if (localProvider)
     {
         s_onlineStatus = status;
         Log("DW_LOCAL_PRESENCE native online-status selection retained by local provider");
@@ -1299,10 +1302,27 @@ extern "C" uint8_t func_140C88C10(unsigned status)
     // Preserve both native effects of the setter: schedule Social's normal
     // update and notify the menu. Its next presence update reads the same state.
     func_141B95F20(0, status);
+    if (localProvider &&
+        (s_announcedOnlineStatus == status || s_announcingOnlineStatus == status))
+        return 1;
+    const unsigned previousAnnouncement = s_announcingOnlineStatus;
+    if (localProvider)
+        s_announcingOnlineStatus = status;
     if (!LUI_BeginEvent(0, "bnet_online_status_set", gl_151868880))
+    {
+        if (localProvider)
+            s_announcingOnlineStatus = previousAnnouncement;
         return 0;
+    }
     func_1419CE4F0("onlineStatus", status, gl_151868880);
-    return static_cast<uint8_t>(func_1419BDA00(gl_151868880));
+    const auto completed = static_cast<uint8_t>(func_1419BDA00(gl_151868880));
+    if (localProvider)
+    {
+        s_announcingOnlineStatus = previousAnnouncement;
+        if (completed && s_onlineStatus == status)
+            s_announcedOnlineStatus = status;
+    }
+    return completed;
 }
 
 // bdLoginTaskFetchFirstPartyToken::pump. Preserve the real native task,

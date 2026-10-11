@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "native_game_verified": false,
+  "checks": 8,
+  "modeled_boundary": "original auth builder host selection; configured INI host supplied at getter boundary",
+  "production_source_sha256": "1a4447c21c29a1b7170f183c615f1ac46919fe3099d7403af12295d4405c3d51",
+  "oracle_database": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay.exe.sqlite",
+  "original_getter_va": "0x14212B100",
+  "original_caller_va": "0x14216B720",
+  "original_getter_instructions": "lea     rax, [rcx+24h]\nretn",
+  "original_caller_instructions_sha256": "ced2493444e22cdfed09c9cd122ccf517b19b06a9cee8adeaa1b6682f956abfd",
+  "original_host_negative_control": true,
+  "result": "PASS: 8 address-before-port cases; original-host first-request negative control reproduced"
+}

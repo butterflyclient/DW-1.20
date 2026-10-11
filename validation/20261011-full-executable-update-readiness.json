@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "passed": true,
+  "release": 18,
+  "host": "162.243.115.160",
+  "client_sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
+  "bytes": 99742720,
+  "format": "full-executable-v1",
+  "catalog_committed_last": true,
+  "compiled_initial_state": 0,
+  "first_enabled_frame_workers": 1,
+  "second_frame_additional_workers": 0,
+  "direct_latest_update_for_older_full_update_clients": true,
+  "older_hashes_verified": 13,
+  "exact_embedded_helper_download_verified": true,
+  "latest_version_no_update_loop_verified": true,
+  "legacy_delta_only_or_disabled_updater_clients_require_manual_bootstrap": true,
+  "game_runs_performed": false,
+  "apply_or_relaunch_invoked": false,
+  "native_restart_popup_verified": false,
+  "evidence": [
+    {
+      "path": "data/startup-toast-unlock-update-final-20261011/client-readiness.json",
+      "sha256": "626fcbae3e5b8341a9a2df232b042cbe320e002c5b63f791054fe69444ebb8c5"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-final-20261011/linked-executable-update.json",
+      "sha256": "2a33ce17479d628bf47e0c47b1248a8e6b793eb0c8cb4d606f2383f8a37a1919"
+    },
+    {
+      "path": "data/full-executable-publication-release18-20261011/droplet-publication.json",
+      "sha256": "eeffde95b9be1dfd4c574245cfad0cf7dbd7315aa014d7e8e67637e84d5493b3"
+    },
+    {
+      "path": "data/full-executable-publication-release18-20261011/public-verification.json",
+      "sha256": "8175246aea62e6fe6782aada98055e1dbb745ebd067e2be01d2930babb4c2151"
+    },
+    {
+      "path": "validation/20261011-full-executable-publication-guard.json",
+      "sha256": "b0c69c41c79f9e9a3cba050fd746f85367c2d37d2b9b44d75eb04583a788418e"
+    }
+  ]
+}

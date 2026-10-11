@@ -1,0 +1,209 @@
+REPLAY DW ADDITIONAL AUDIT AND REVERSIBLE UNLOCK PROGRESSION
+
+Work and compilation live in E:\DW\IW8. The destination repository is
+https://github.com/butterflyclient/DW-1.20 on main. No game process is launched,
+stopped or interacted with during this audit. Source, compiled component,
+encrypted protocol, deployed process and native game proof are separate gates.
+
+Confirmed audit fixes
+
+1. Achievement completion now publishes a flushed, checksummed empty applied
+   intent after all checkpoints finish. A filesystem unlink is no longer the
+   sole evidence that the transaction finished. Reads recover unfinished work.
+   The old-release rollback helper validates and archives the applied marker
+   while the service is stopped; it refuses unsafe prepared user_state work.
+
+2. Full progression reset includes both achievement user-state namespaces in
+   the same intent as XP, states, inventory and leaderboards. This clears stale
+   tutorial, boost and Battle Pass ownership keys. Account reads recover first,
+   before loading user-state. Derived Battle Pass ownership is rebuilt from
+   current authoritative activation states rather than stale ownership flags.
+
+3. Public and presence joins reserve requested bot slots together with existing
+   humans and guests. Capacity stays at the native playlist value. Rejected
+   over-capacity joins do not change lobby documents or the requested bot count.
+
+4. REST status and ObjectStore timestamp/extra-data fields are checked before
+   narrowing conversions. Wrapped or unrepresentable values cannot appear as
+   valid success codes or publication metadata. Dispatch refreshes the signed
+   platform lease after obtaining the store lock, preventing a queued revoked
+   session from mutating state.
+
+5. Unchanged effective presence still saves its fresh timestamp, but it does not
+   advance the notification revision or send another status push. The DW game
+   setter announces a status only after a successful LUI event, retries a failed
+   event, and continues native social presence scheduling on every call.
+
+6. Original Replay buildAuthReq calls the auth-address getter before the port
+   getter. Previously, local address initialization in the port override came
+   too late for the first hostname choice. The rebuilt address getter now returns
+   the validated INI host before that choice. The literal 15000ms auth timeout
+   explains the prior first-request delay. Native-provider address/port reads
+   remain native. A new game startup timing measurement has not been performed.
+
+Daily challenges
+
+The primary store contained no native daily-kind rows. Original Lua treats an
+empty cache as no available challenges. Assignment now uses the first three
+original 13-column definitions for each mode every UTC day. This is an explicit
+local assignment policy, not a claim to reproduce retail random scheduling.
+
+MP kinds/IDs: 12 / 1797, 1798, 1799. These are 20 player kills, five headshots,
+and three melee kills. Original seven-parameter kill packets, public allocation
+ownership, mode/version, Player target and activation/expiration/captured-match
+bounds must all agree. Each completion awards 2000 XP exactly once and sends
+the native event-67 completion. Invalid, private, stale and duplicate events
+do not award. Daily state rolls over without resetting unrelated progression.
+
+BR kinds/IDs: 27 / 5000, 5001, 5002. Co-op kinds/IDs: 30 / 9055, 9056, 9057.
+These assignments remain pending: six earning predicates do not yet have bound
+original producer/ownership contracts. They are not fabricated as completed.
+
+Original native state deserialization reads progress/target fields 3/4, and
+original daily Lua compares cached earned progress with CSV column 4. Each new
+assignment has zero progress and a positive original target, so this completion
+path selects an unchecked widget. The unlock-all overrides have no reference in
+that path. This source proof does not establish the cause of the owner's prior
+checked-checkbox display; rendered game behavior remains untested this turn.
+
+Original state requests and the achievement earning client derive their context
+from authenticated title 5800. That namespace alone owns daily assignments,
+progress and rewards. iw8 queries mirror the canonical rows without persisting
+a second daily set. iw8 event batches cannot duplicate daily XP. Accepted old
+completion retries after a full reset cannot restore the old daily award.
+
+Reversible unlock_all projection, including rank
+
+DW_Unlocks.cpp replaces five exact OnlineProgression Lua registration roots and
+the native Gunsmith weapon-info helper. Dependencies and data aliases use the
+verified Replay function catalog. It is compiled from source into a fresh game
+image through a private compiler snapshot; no compiled image bytes are edited.
+
+With DW enabled and unlock_all=1, original progression consumers see maximum
+player XP/rank, maximum seasonal progression, and maximum XP/rank for all 51
+original weapon definitions. The existing native/backend weapon catalog maps
+680 loot aliases to those base definitions. Original Lua computes
+internal rank 154 / displayed rank 155. Two shipped cap-zero weapons retain
+their original level-one cap. No fabricated progression cap is introduced. The original getter ABI is
+preserved for both native local clients and all eight controller slots.
+Gunsmith blocks are 2056 bytes, following a 64-byte header, and the lifetime
+value uses its original 16-byte controller stride.
+
+Only returned Lua values are projected. Native earned progression arrays,
+local profile storage, backend earning journals and INI rank are not overwritten
+by enabling unlock_all. Setting unlock_all=0 and restarting restores current real progression,
+including XP legitimately earned while it was enabled. Use rank=0 if the test
+should use saved earned rank; an explicit rank setting remains its separate
+existing once-per-change starting-rank policy. Full reset still sets both
+unlock_all and rank to zero through the existing confirmed reset path.
+
+Repeatable import:
+  python tools/workstation-client.py --unlock-progression-root <private snapshot>
+The snapshot must be under E:\DW\IW8 and carry the verified original image
+catalog and compiler source. This local mode does not write to the external
+workstation's HTTP source editor. Six roots and thirteen dependencies are bound
+through the existing source_catalog interface.
+
+Verification receipts and final artifact locations are recorded below.
+The superseded ddf592 candidate was withheld after the semantic checker found
+its second-client and lifetime-stride defects. Generic relocation/unwind checks
+alone had passed that draft; it was not deployed by this audit.
+
+BACKEND RELEASE VERIFIED
+
+Source commit: ae8182a (pushed to butterflyclient/DW-1.20 main).
+Fresh Windows image: ed616122b33fb964e49722cd31ed766af993ccd608c1355fa83af3b88a220c46.
+Fresh Linux image: 3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c.
+Both builds contain 46 freshly compiled translation units and no retained
+objects. Each exact image passed 655 encrypted protocol/earning/recovery checks.
+The droplet now runs /opt/replay-dw/releases/20261011-3aff0f962e3d/iw8-dw-server,
+with its process path and /proc image hash verified after separate stop/start.
+Player data, keys, publications and map policy were preserved. Previous release
+20261010-9d10c8c5fa1a is retained with a guarded marker rollback procedure.
+
+Backend readiness: validation/20261011-additional-audit-combined-readiness.json.
+Exact suite receipts/source manifests: data/additional-audit-combined-20261011.
+The six native route exclusions and 51 mission earning exclusions remain in
+their existing scope documents; six new BR/co-op daily earning criteria are
+explicitly pending above. No claim is made that every possible DW API is
+implemented or that these unbound contracts are inherently impossible.
+
+CLIENT RELEASE VERIFIED AND DEPLOYED
+
+Fresh job: 61adafbd4c0048ce (full engine profile, succeeded).
+Client SHA256: d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2.
+Deployed EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe.
+The owner INI stayed byte-for-byte unchanged. No game process was started or
+stopped. Immediately before replacement, the primary EXE matched the latest
+verified audit image and no process used that filename. The immutable original
+owner R3 artifact remains in its build directory for restoration.
+
+The build retains all 103 approved C++ units and 71 recovered assembly units.
+It carries the corrected unlock source and reviewed auth-port wrapper, then
+restores the production updater's initial state to zero. The other 102 C++
+sources match the preceding verified audit candidate. Owner console, frontend,
+optimization, host-scale and approved navigation work are preserved. An owner
+navigation fixture subsequently referenced Bfx_GetClosestArea, absent from this
+approved source baseline; its drift is recorded. The frozen approved 49-case
+navigation fixture passes; the newer root is not claimed present in this image.
+
+Final exact-image gates: 650 Windows unwind cases, full reconstruction/image/
+relocation/source-object-header provenance, four endpoint/presence cases,
+136 normal controller cases plus 136 original-instruction oracle cases,
+306 weapon cases, original Lua rank155/XP/max-level/restoration, ten lobby
+control groups, 49 navigation cases and 339 host-scale cases. Native calls and
+Lua boundaries are modeled by the instruction checkers; these are not game runs.
+
+Client readiness: validation/20261011-reversible-unlock-client-readiness.json.
+Frozen build and checker receipts: data/startup-toast-unlock-update-final-20261011.
+Current local pair receipt: data/current-remote-deployment.json.
+
+FULL EXECUTABLE AUTO UPDATE PUBLICATION
+
+The inherited private test updater started at state 30, so it could not start
+the first check. The production initializer is now state zero. Exact compiled
+frame execution verifies one worker on the first enabled frame, no duplicate
+worker on the second, no worker when disabled, and failure state 40 if thread
+creation fails. The previous disabled image fails this negative-control check.
+Existing compiled prerequisite, update-state and restart-routing cases pass.
+
+Release 18 publishes the complete d8993395 EXE on the droplet. The full-image
+blob is verified and flushed before the catalog is atomically committed last.
+Server route /updates/v2/check signs a nonce-bound plan; /updates/v2/image/<sha>
+serves the full image. Modern full-update clients can jump directly from any
+older executable hash to the latest release without intermediate patches.
+The latest hash returns current status and does not create another update loop.
+
+The upload tool now requires a passing receipt tied to the precise EXE hash,
+including compiled first-frame scheduling and restart routing. It rejects an
+inherited disabled updater rather than publishing it for other clients.
+Local publication: data/full-executable-publication-release18-20261011.
+Public readiness: validation/20261011-full-executable-update-readiness.json.
+
+Signed public replies and the actual helper embedded in the published EXE are
+checked without a game run. Its --prepare mode downloads and verifies the new
+image into a temporary fixture while leaving the old fixture EXE unchanged.
+Applying the image and the rendered restart popup remain owner game tests.
+Very old delta-only clients and private test images whose updater was disabled
+need one manual copy of the new EXE to enter this full-update workflow. No new
+delta patch is generated. The game INI and local player identity are preserved.
+
+OWNER PLAYTEST
+
+1. Run the deployed game from E:\IW8\Builds\1.20-replay. With rank=0 and
+   unlock_all=0, record player level and one or two weapon XP/level values.
+2. Exit, set unlock_all=1 in the same EXE INI, then launch again. Expect displayed
+   player rank155 and each original weapon at its own original maximum level.
+   The two cap-zero weapons correctly retain level1.
+3. Earn some XP if desired. Exit, set unlock_all=0, then launch again. The actual
+   saved progression must return, including the new legitimate XP. Do not use
+   the full-reset command when testing reversible projection.
+4. Compare cold online connection time and verify unchanged online status does
+   not repeatedly show a toast. Check three pending MP dailies and advance one
+   through public gameplay. BR/co-op daily criteria remain pending exclusions.
+5. On a working older full-update client, connect and accept the restart notice.
+   After restarting, confirm release 18's EXE hash and no repeated update notice.
+   Keep the same INI, local identity and profile throughout this check.
+
+No new game/UI confirmation or startup timing measurement was performed in
+this turn. Test those game-facing behaviors before distributing this client.
