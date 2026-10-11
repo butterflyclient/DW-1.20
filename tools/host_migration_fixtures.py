@@ -210,7 +210,11 @@ def exercise(
         "host_address": address,
     }
     assert current[1]["dtls"] == docs[1]["dtls"]
-    assert current[1]["ruleset_payload"] == docs[1]["ruleset_payload"]
+    # Revision is an explicit transient acknowledgement publication; every
+    # other native playlist/netcode/map rule must remain exactly unchanged.
+    expected_rules = json.loads(json.dumps(docs[1]["ruleset_payload"]))
+    expected_rules["dvar_overrides"]["replay_dw_autoFillRevision"] = current[1]["update_id"] % 2147483647
+    assert current[1]["ruleset_payload"] == expected_rules
     assert stored["match_selection"] == original["match_selection"]
     assert current[1]["listen_server"]["lobby_host_order"] == [user]
     assert (

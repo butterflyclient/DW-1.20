@@ -287,9 +287,24 @@ namespace matchmaking_store
                     require(state[key].is_boolean());
             if (state.contains("operator_bot_count"))
                 require(state["operator_bot_count"].is_number_unsigned() &&
-                        state["operator_bot_count"].get<uint64_t>() > 0 &&
+                        (state["operator_bot_count"].get<uint64_t>() > 0 || state.value("auto_fill_bots", false)) &&
                         state["operator_bot_count"].get<uint64_t>() < 200 &&
                         state.value("operator_bots_requested", false));
+            for (const auto *key : {"auto_fill_bots", "auto_fill_complete"})
+                if (state.contains(key))
+                    require(state[key].is_boolean());
+            if (state.contains("auto_fill_request"))
+                require(state["auto_fill_request"].is_number_unsigned() &&
+                        state["auto_fill_request"].get<uint64_t>() > 0 &&
+                        state["auto_fill_request"].get<uint64_t>() <= INT32_MAX);
+            if (state.value("auto_fill_bots", false))
+                require(state.contains("auto_fill_complete") &&
+                        state.at("auto_fill_started_ms").is_number_unsigned() &&
+                        state.at("auto_fill_target").is_number_unsigned() &&
+                        state["auto_fill_target"].get<uint64_t>() < 200 &&
+                        state.value("operator_bots_requested", false) &&
+                        state.at("operator_bot_count").get<uint64_t>() <= state["auto_fill_target"].get<uint64_t>() &&
+                        (!state["auto_fill_complete"].get<bool>() || state["operator_bot_count"] == state["auto_fill_target"]));
             if (state.contains("squad_fill"))
             {
                 const auto &fill = state["squad_fill"];

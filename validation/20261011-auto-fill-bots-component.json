@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "component_result": "PASS: server ramp/completion, human admission, guest slots, BR noFill, retry, disable and migration policies",
+  "translation_units_compiled": true,
+  "source_hashes": {
+    "E:\\DW\\IW8\\src\\matchmaking_services.cpp": "5c2d04c145a2eac3f04ce4544def99eaecfef5732a519a658c28175f8250d078",
+    "E:\\DW\\IW8\\src\\matchmaking_store.cpp": "29a1342b212d4cb4c802f4311543be90130b7ddc620ce92d719d6e4635b8036d",
+    "E:\\DW\\IW8\\tools\\test-auto-fill-bots.py": "6d5edffd3a2295bea642bd34ce523158b898ab89cc24fd81cc7415b4d95f3b9d"
+  },
+  "game_tested": false,
+  "full_backend_build": false
+}

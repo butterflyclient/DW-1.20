@@ -184,7 +184,7 @@ namespace services
             return token;
         }
 
-        bool operatorCanStart(const Json &state)
+        bool lobbyWaitingForStart(const Json &state)
         {
             const auto phase = state.at("host_doc").at("game_state").value("state", std::string{});
             return state.value("host_ready", false) && !state.value("disbanded", false) &&
@@ -194,6 +194,63 @@ namespace services
                    !state.at("backend_doc").contains("private_lobby");
         }
 
+        bool operatorCanStart(const Json &state)
+        {
+            return lobbyWaitingForStart(state) &&
+                   (!state.value("auto_fill_bots", false) ||
+                    state.value("auto_fill_complete", false));
+        }
+
+        uint64_t autoFillNowMilliseconds()
+        {
+            return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        }
+
+        uint64_t autoFillTarget(const Json &state)
+        {
+            const auto capacity = state.at("maximum_members").get<uint64_t>();
+            const auto &backend = state.at("backend_doc");
+            const auto slots = backend.value("player_id_to_slots", Json::object());
+            const auto humans = occupiedSlots(state.at("members"), slots);
+            wire::require(humans <= capacity);
+            uint64_t reserved = 0;
+            const auto squadSize = state.value("match_selection", Json::object()).value("squad_size", 0u);
+            if (squadSize)
+            {
+                const auto fill = state.value("squad_fill", Json::object());
+                for (const auto &squad : backend.at("team_balance").at("squads").items())
+                    if (!fill.value(squad.key(), false))
+                    {
+                        const auto group = std::stoul(squad.key());
+                        wire::require(group < 200 && group * squadSize < capacity);
+                        const auto groupSlots = std::min<uint64_t>(squadSize, capacity - group * squadSize);
+                        const auto occupied = occupiedSlots(squad.value(), slots);
+                        wire::require(occupied <= groupSlots);
+                        reserved += groupSlots - occupied;
+                    }
+            }
+            wire::require(reserved <= capacity - humans);
+            return capacity - humans - reserved;
+        }
+
+        void refreshAutoFill(Json &state, bool restart = false)
+        {
+            if (!state.value("auto_fill_bots", false))
+                return;
+            const auto target = autoFillTarget(state);
+            if (restart)
+            {
+                state.erase("auto_fill_request");
+                state["auto_fill_started_ms"] = autoFillNowMilliseconds();
+                state["operator_bot_count"] = uint64_t{0};
+            }
+            if (restart || target != state.value("auto_fill_target", uint64_t{0}))
+                state["auto_fill_complete"] = false;
+            state["auto_fill_target"] = target;
+            state["operator_bot_count"] = std::min(state.value("operator_bot_count", uint64_t{0}), target);
+        }
+
         Json nativeBackendDocument(const Json &lobby)
         {
             auto backendDocument = lobby.at("backend_doc");
@@ -201,6 +258,16 @@ namespace services
                 lobby.value("match_selection", Json::object()).value("squad_size", 0u);
             auto &botRules = backendDocument["ruleset_payload"]["dvar_overrides"];
             botRules["replay_dw_squadSize"] = squadSize;
+            // Every member receives the same committed fill acknowledgement.
+            botRules["replay_dw_autoFillBotsActive"] = lobby.value("auto_fill_bots", false) ? 1 : 0;
+            botRules["replay_dw_autoFillBotsComplete"] = lobby.value("auto_fill_complete", false) ? 1 : 0;
+            botRules["replay_dw_autoFillBotTarget"] = lobby.value("auto_fill_target", uint64_t{0});
+            botRules["replay_dw_autoFillAck"] = lobby.value("auto_fill_request", uint64_t{0});
+            botRules["replay_dw_autoFillRevision"] = lobby.at("update_id").get<uint64_t>() % uint64_t{INT32_MAX};
+            // Publish zero explicitly on disable/reset even for historical
+            // documents without the modern playlist's default count override.
+            // Manual requests retain their actual authoritative stored count.
+            botRules["replay_dw_botCount"] = lobby.value("operator_bot_count", uint64_t{0});
             std::string reserved(50, '0');
             if (squadSize)
             {
@@ -439,7 +506,39 @@ namespace services
             // its slots while admitting real primaries and their guest slots.
             const auto bots = lobby.value("operator_bots_requested", false)
                                   ? lobby.value("operator_bot_count", uint64_t{0}) : uint64_t{0};
-            return occupied <= capacity && bots <= capacity - occupied;
+            if (occupied > capacity)
+                return false;
+            if (lobby.value("auto_fill_bots", false))
+            {
+                const auto squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+                if (squadSize)
+                {
+                    const auto &squads = lobby.at("backend_doc").at("team_balance").at("squads");
+                    const auto fill = lobby.value("squad_fill", Json::object());
+                    Json additions = Json::array();
+                    for (const auto &user : query.at("members"))
+                        if (!member(lobby, user.get<uint64_t>()))
+                            additions.push_back(user);
+                    const auto needed = occupiedSlots(additions, slots);
+                    if (!needed)
+                        return true;
+                    if (!query.value("team_balance", Json::object()).value("lock_squad", false))
+                        for (const auto &squad : squads.items())
+                            if (fill.value(squad.key(), false) &&
+                                occupiedSlots(squad.value(), slots) + needed <= squadSize)
+                                return true;
+                    // NoFill reserves teammates' places, including against a
+                    // joining party that would otherwise spill beyond teamCount.
+                    const auto groups = (capacity + squadSize - 1) / squadSize;
+                    for (uint64_t group = 0; group < groups; ++group)
+                        if (!squads.contains(std::to_string(group)) &&
+                            needed <= std::min<uint64_t>(squadSize, capacity - group * squadSize))
+                            return true;
+                    return false;
+                }
+                return true;
+            }
+            return bots <= capacity - occupied;
         }
 
         bool platformAllowed(const Json &query)
@@ -871,6 +970,7 @@ namespace services
                 }
                 backend["player_id_to_mm_id"][key] = mmId;
             }
+            refreshAutoFill(lobby);
             wire::require(lobby["host_doc"].dump().size() < 16384 && backend.dump().size() < 16384);
             const auto lobbyId = lobby.at("id").get<uint64_t>();
             const bool hostReady = lobby.value("host_ready", true);
@@ -1452,13 +1552,73 @@ namespace services
                     eraseUsers(order, {id.userId});
                     order.insert(order.begin(), id.userId);
                 }
+                const auto submittedPhase = host.value("game_state", Json::object()).value("state", std::string{});
+                if (lobby.value("auto_fill_bots", false) && !lobby.value("auto_fill_complete", false))
+                    wire::require(submittedPhase.empty() || submittedPhase == "intermission");
                 auto writes = reconcileMembers(root, id, lobby, host);
+                refreshAutoFill(lobby, migration && lobbyWaitingForStart(lobby));
+                if (lobby.value("auto_fill_bots", false) && !lobby.value("auto_fill_complete", false))
+                    wire::require(submittedPhase.empty() || submittedPhase == "intermission");
+                if (host.contains("dw_auto_fill_bots"))
+                {
+                    wire::require(host["dw_auto_fill_bots"].is_boolean() &&
+                                  host.contains("dw_auto_fill_complete") && host["dw_auto_fill_complete"].is_boolean() &&
+                                  host.contains("dw_auto_fill_request") && host["dw_auto_fill_request"].is_number_unsigned() &&
+                                  host["dw_auto_fill_request"].get<uint64_t>() > 0 &&
+                                  host["dw_auto_fill_request"].get<uint64_t>() <= INT32_MAX &&
+                                  host["dw_auto_fill_request"].get<uint64_t>() > lobby.value("auto_fill_request", uint64_t{0}) &&
+                                  host.contains("dw_bot_count") && host["dw_bot_count"].is_number_unsigned() &&
+                                  lobbyWaitingForStart(lobby) &&
+                                  (submittedPhase.empty() || submittedPhase == "intermission"));
+                    const bool enabled = host["dw_auto_fill_bots"].get<bool>();
+                    const bool wasEnabled = lobby.value("auto_fill_bots", false);
+                    if (enabled)
+                    {
+                        wire::require(wasEnabled ||
+                                      (!lobby.value("operator_bots_requested", false) &&
+                                       !lobby.value("operator_start_requested", false)));
+                        lobby["auto_fill_bots"] = true;
+                        refreshAutoFill(lobby, !wasEnabled);
+                        const auto timestamp = autoFillNowMilliseconds();
+                        const auto started = lobby.at("auto_fill_started_ms").get<uint64_t>();
+                        const auto elapsed = timestamp >= started ? timestamp - started : 0;
+                        const auto target = lobby.at("auto_fill_target").get<uint64_t>();
+                        const auto ceiling = target * std::min<uint64_t>(elapsed > 30000 ? elapsed - 30000 : 0, 15000) / 15000;
+                        const auto count = host["dw_bot_count"].get<uint64_t>();
+                        wire::require(count <= 199);
+                        const auto accepted = std::min(count, ceiling);
+                        if (host["dw_auto_fill_complete"].get<bool>())
+                            wire::require(elapsed >= 45000 && count == target &&
+                                          lobby.value("operator_bot_count", uint64_t{0}) == target);
+                        lobby["operator_bot_count"] = accepted;
+                        lobby["operator_bots_requested"] = true;
+                        lobby["auto_fill_complete"] = host["dw_auto_fill_complete"].get<bool>();
+                    }
+                    else
+                    {
+                        wire::require(!host["dw_auto_fill_complete"].get<bool>() && host["dw_bot_count"].get<uint64_t>() == 0);
+                        if (wasEnabled)
+                        {
+                            lobby.erase("operator_bot_count");
+                            lobby.erase("operator_bots_requested");
+                        }
+                        for (const auto *key : {"auto_fill_bots", "auto_fill_complete", "auto_fill_started_ms", "auto_fill_target"})
+                            lobby.erase(key);
+                    }
+                    lobby["auto_fill_request"] = host["dw_auto_fill_request"];
+                    host.erase("dw_auto_fill_request");
+                    host.erase("dw_auto_fill_bots");
+                    host.erase("dw_auto_fill_complete");
+                    host.erase("dw_bot_count");
+                }
+                else
+                    wire::require(!host.contains("dw_auto_fill_complete") && !host.contains("dw_auto_fill_request"));
                 if (host.contains("dw_bot_count"))
                 {
                     // This extension travels in Replay's authenticated 145/15
                     // host update. Apply the same authoritative native rules as
                     // the operator panel without exposing its credentials.
-                    wire::require(!migration && host["dw_bot_count"].is_number_unsigned());
+                    wire::require(!migration && !lobby.value("auto_fill_bots", false) && host["dw_bot_count"].is_number_unsigned());
                     const auto count = host["dw_bot_count"].get<uint64_t>();
                     const auto phase = host.value("game_state", Json::object())
                                            .value("state", std::string{});
@@ -1499,7 +1659,8 @@ namespace services
                     (newPhase.empty() || newPhase == "intermission"))
                 {
                     auto &overrides = lobby["backend_doc"]["ruleset_payload"]["dvar_overrides"];
-                    for (const auto &saved : lobby.at("operator_start_overrides").items())
+                    const auto savedOverrides = lobby.value("operator_start_overrides", Json::object());
+                    for (const auto &saved : savedOverrides.items())
                         if (saved.value().is_null())
                             overrides.erase(saved.key());
                         else
@@ -1516,6 +1677,9 @@ namespace services
                         lobby.erase("operator_bots_capacity");
                     }
                     lobby.erase("operator_start_overrides");
+                    lobby.erase("auto_fill_request");
+                    for (const auto *key : {"auto_fill_bots", "auto_fill_complete", "auto_fill_started_ms", "auto_fill_target"})
+                        lobby.erase(key);
                 }
                 lobby["update_id"] = revision + 1;
                 host["update_id"] = revision + 1;
@@ -1587,6 +1751,8 @@ namespace services
                 return {409, "The host has left this lobby."};
             if (!hostSessionActive(state, player.title) || !operatorCanStart(state))
                 return {409, "This lobby is no longer waiting for a public match."};
+            if (fillBots && state.value("auto_fill_bots", false))
+                return {409, "Automatic bot fill owns this round's bot count."};
             const auto *requested = fillBots ? "operator_bots_requested" : "operator_start_requested";
             if (state.value(requested, false))
             {

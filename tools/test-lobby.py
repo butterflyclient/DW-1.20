@@ -3463,6 +3463,9 @@ try:
     import host_bot_control_fixtures
     host_bot_control_fixtures.exercise(client, peer_client, directory, title, user,
                                      match_query, (u32, u64, text, boolean), checks)
+    import auto_fill_bot_fixtures
+    auto_fill_bot_fixtures.exercise(client, peer_client, directory, title, user,
+                                  match_query, (u32, u64, text, boolean), checks)
     if args.host_controls_only:
         proof = dict(passed=True, native_game_verified=False, checks=checks,
                      server_sha256=hashlib.sha256(exe.read_bytes()).hexdigest())

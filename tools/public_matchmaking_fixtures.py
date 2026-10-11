@@ -141,7 +141,11 @@ def exercise(
     )
     assert joined[0]["listen_server"] == initial[0]["listen_server"]
     assert joined[1]["dtls"] == initial[1]["dtls"]
-    assert joined[1]["ruleset_payload"] == initial[1]["ruleset_payload"]
+    # Revision is an explicit transient acknowledgement publication; every
+    # other native playlist/netcode/map rule must remain exactly unchanged.
+    expected_rules = json.loads(json.dumps(initial[1]["ruleset_payload"]))
+    expected_rules["dvar_overrides"]["replay_dw_autoFillRevision"] = joined[1]["update_id"] % 2147483647
+    assert joined[1]["ruleset_payload"] == expected_rules
     assert joined[1]["team_balance"]["teams"] == {"0": [user], "1": [peer_user]}
     assert joined[1]["player_id_to_mm_id"][str(peer_user)] == mm
     index = json.loads((root / "current-lobbies.json").read_bytes())["lobbies"]

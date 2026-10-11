@@ -125,7 +125,11 @@ def exercise(
     joined_host, joined_backend = joined_docs
     assert joined_host["listen_server"] == host_doc["listen_server"]
     assert joined_backend["dtls"] == backend["dtls"]
-    assert joined_backend["ruleset_payload"] == backend["ruleset_payload"]
+    # Revision is an explicit transient acknowledgement publication; every
+    # other native playlist/netcode/map rule must remain exactly unchanged.
+    expected_rules = json.loads(json.dumps(backend["ruleset_payload"]))
+    expected_rules["dvar_overrides"]["replay_dw_autoFillRevision"] = joined_backend["update_id"] % 2147483647
+    assert joined_backend["ruleset_payload"] == expected_rules
     assert joined_backend["player_id_to_mm_id"] == {
         str(host_user): original_mm,
         str(peer_user): joined_mm,

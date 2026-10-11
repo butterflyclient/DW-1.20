@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "deployed": true,
+  "game_runs_performed": false,
+  "source_archive_sha256": "cc567b9637ad3258360cef91e4eaffdaf471f7ff66aad0b69f6dc182e9de62b4",
+  "windows_sha256": "b778190a4b88331fdf888b93290b80c5762cc8f941636d4597ebab5c973171d9",
+  "linux_sha256": "b8da13b51a286f5613de1bf1164ed1fea1d3f080ed243a6f12ce6770f70b4ce7",
+  "source_sha256": {
+    "src/matchmaking_services.cpp": "5c2d04c145a2eac3f04ce4544def99eaecfef5732a519a658c28175f8250d078",
+    "src/matchmaking_store.cpp": "29a1342b212d4cb4c802f4311543be90130b7ddc620ce92d719d6e4635b8036d"
+  },
+  "compiled_units_each": 46,
+  "retained_objects": 0,
+  "unchanged_support_inputs": 176,
+  "protocol_groups_each": 310,
+  "focused_auto_fill_groups_each": 3,
+  "daily_groups_each": 5,
+  "publisher_groups_each": 7,
+  "release_readiness": "E:\\DW\\IW8\\data\\auto-fill-backend-final-20261011-1791700056228361400\\release-readiness.json",
+  "release_readiness_sha256": "d458c05786ee747246c1107817e971e4ae7581e09a16372d399b98478de0cf9b",
+  "running_server": {
+    "pid": 300286,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-b8da13b51a28/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-b8da13b51a28/iw8-dw-server",
+    "sha256": "b8da13b51a286f5613de1bf1164ed1fea1d3f080ed243a6f12ce6770f70b4ce7",
+    "process_sha256": "b8da13b51a286f5613de1bf1164ed1fea1d3f080ed243a6f12ce6770f70b4ce7"
+  },
+  "guarded_stop_switch_start": true
+}

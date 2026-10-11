@@ -98,7 +98,10 @@ def exercise(directory, title, player_info, match_query, new_client, helpers, ch
         # controls must not mutate the durable assignment document.
         expected_backend = copy.deepcopy(state["backend_doc"])
         expected_backend["ruleset_payload"]["dvar_overrides"].update(
-            replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+            replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50,
+            replay_dw_autoFillBotsActive=0, replay_dw_autoFillBotsComplete=0,
+            replay_dw_autoFillBotTarget=0, replay_dw_autoFillAck=0,
+            replay_dw_autoFillRevision=state["update_id"] % 2147483647
         )
         assert backend == expected_backend
         assert backend["tournament"] == {

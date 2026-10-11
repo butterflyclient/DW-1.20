@@ -135,7 +135,10 @@ def exercise(client, directory, title, user, query, helpers, checks):
     assert not snapshots[lobby_name]["match_selection"].get("squad_size", 0)
     expected_backend = copy.deepcopy(snapshots[lobby_name]["backend_doc"])
     expected_backend["ruleset_payload"]["dvar_overrides"].update(
-        replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+        replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50,
+        replay_dw_autoFillBotsActive=0, replay_dw_autoFillBotsComplete=0,
+        replay_dw_autoFillBotTarget=0, replay_dw_autoFillAck=0,
+        replay_dw_autoFillRevision=snapshots[lobby_name]["update_id"] % 2147483647
     )
     assert result == [snapshots[lobby_name]["host_doc"], expected_backend]
     for name, snapshot in snapshots.items():

@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "semantics_unchanged": true,
+  "validated_inputs_retained": "E:\\DW\\IW8\\data\\auto-fill-backend-final-20261011-1791700056228361400",
+  "files": [
+    {
+      "path": "tools\\auto_fill_bot_fixtures.py",
+      "validated_sha256": "0e2c5262ebf0be8ecdb89901db25f3399859759fd1f6905a95d28de739c94b3e",
+      "formatted_sha256": "266dd1db46053b6cdd7b0386372ca66b81d4e8127a916c37593a547fc844dd9a",
+      "identical_ast_sha256": "2242f93d4f49ddaca1b2190598bed3f6a7eb283f754bffd3d10fca29dfdd0ec4"
+    },
+    {
+      "path": "tools\\test-auto-fill-bots.py",
+      "validated_sha256": "6d5edffd3a2295bea642bd34ce523158b898ab89cc24fd81cc7415b4d95f3b9d",
+      "formatted_sha256": "6baf2c24911aba6fb4bb47484b9a264003c01871052aa19058481f3f653703d8",
+      "identical_ast_sha256": "bb1796c0d1a4640ddec758cc2da24f180fb5a5c64718cea81e4a578fa8c78da8"
+    },
+    {
+      "path": "tools\\test-auto-fill-wire.py",
+      "validated_sha256": "b11b024d2d290cf02991297ba9f0ed517eef33546b28882d2baae90c39c4e780",
+      "formatted_sha256": "dd51d0ba5771915d684b488e90826ace031e6082c42f62c22c0bbb83a92af854",
+      "identical_ast_sha256": "f7fd3ea3ebef0b5ec2b1cff056817ce88d04df2dc2defaea0bc12caa96e689d3"
+    }
+  ]
+}

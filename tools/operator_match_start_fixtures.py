@@ -83,7 +83,10 @@ def before_match(base, data, clients, activity, lobby_path, strings, checks):
                 expected_backend = copy.deepcopy(state["backend_doc"])
                 assert not state["match_selection"].get("squad_size", 0)
                 expected_backend["ruleset_payload"]["dvar_overrides"].update(
-                    replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50
+                    replay_dw_squadSize=0, replay_dw_reservedSquads="0" * 50,
+                    replay_dw_autoFillBotsActive=0, replay_dw_autoFillBotsComplete=0,
+                    replay_dw_autoFillBotTarget=0, replay_dw_autoFillAck=0,
+                    replay_dw_autoFillRevision=state["update_id"] % 2147483647
                 )
                 assert host == state["host_doc"] and backend == expected_backend
                 break
