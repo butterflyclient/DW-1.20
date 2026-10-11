@@ -1,0 +1,699 @@
+{
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "1b7fcc1973a190ce28362fab12325ebd350b0eb08476ed1a80f240ca110845ee",
+  "reader_dependency": {
+    "path": "E:\\replay-compiler\\tools\\workstation_asset_codecs.py",
+    "sha256": "2176f004de4cc3acb8b15fbb61f22e45ffc64c386475244e2c801ea14b42cc73"
+  },
+  "modifier_script_sha256": "fafa6157e03c0f3900963014753a9294b923c8b13e518a5292aeb55ede2be4cc",
+  "modifier_assembly_sha256": "370ff39cb6a6b60bd3174a585fc3143e0d2f84724fcf4f0fa0a81630630cbbe4",
+  "normalization_changed_only_reference_operands": true,
+  "instruction_count": 5665,
+  "named_flags": [
+    {
+      "name": "oneshotkill",
+      "word": 0,
+      "bit": 1,
+      "value": 1
+    },
+    {
+      "name": "cooking",
+      "word": 0,
+      "bit": 2,
+      "value": 2
+    },
+    {
+      "name": "backstab",
+      "word": 0,
+      "bit": 4,
+      "value": 4
+    },
+    {
+      "name": "ads",
+      "word": 0,
+      "bit": 8,
+      "value": 8
+    },
+    {
+      "name": "hipfire",
+      "word": 0,
+      "bit": 16,
+      "value": 16
+    },
+    {
+      "name": "mounted",
+      "word": 0,
+      "bit": 32,
+      "value": 32
+    },
+    {
+      "name": "last_bullet_kill",
+      "word": 0,
+      "bit": 64,
+      "value": 64
+    },
+    {
+      "name": "victim_sprinting",
+      "word": 0,
+      "bit": 128,
+      "value": 128
+    },
+    {
+      "name": "sliding",
+      "word": 0,
+      "bit": 256,
+      "value": 256
+    },
+    {
+      "name": "prone_kill",
+      "word": 0,
+      "bit": 512,
+      "value": 512
+    },
+    {
+      "name": "crouch_kill",
+      "word": 0,
+      "bit": 1024,
+      "value": 1024
+    },
+    {
+      "name": "quickscope",
+      "word": 0,
+      "bit": 2048,
+      "value": 2048
+    },
+    {
+      "name": "low_health_kill",
+      "word": 0,
+      "bit": 4096,
+      "value": 4096
+    },
+    {
+      "name": "weapon_change_kill",
+      "word": 0,
+      "bit": 8192,
+      "value": 8192
+    },
+    {
+      "name": "weapon_pickup_kill",
+      "word": 0,
+      "bit": 16384,
+      "value": 16384
+    },
+    {
+      "name": "reload_kill",
+      "word": 0,
+      "bit": 65536,
+      "value": 65536
+    },
+    {
+      "name": "secondary_weapon",
+      "word": 0,
+      "bit": 131072,
+      "value": 131072
+    },
+    {
+      "name": "last_stand",
+      "word": 1,
+      "bit": 1024,
+      "value": 4398046511104
+    },
+    {
+      "name": "victim_last_stand",
+      "word": 1,
+      "bit": 2048,
+      "value": 8796093022208
+    },
+    {
+      "name": "in_vehicle",
+      "word": 1,
+      "bit": 4096,
+      "value": 17592186044416
+    },
+    {
+      "name": "victim_in_vehicle",
+      "word": 1,
+      "bit": 8192,
+      "value": 35184372088832
+    },
+    {
+      "name": "recon_drone_explosive",
+      "word": 1,
+      "bit": 32768,
+      "value": 140737488355328
+    },
+    {
+      "name": "vehicle_explosive",
+      "word": 1,
+      "bit": 65536,
+      "value": 281474976710656
+    },
+    {
+      "name": "longshot",
+      "word": 0,
+      "bit": 262144,
+      "value": 262144
+    },
+    {
+      "name": "pointblank",
+      "word": 0,
+      "bit": 524288,
+      "value": 524288
+    },
+    {
+      "name": "headshot",
+      "word": 0,
+      "bit": 1048576,
+      "value": 1048576
+    },
+    {
+      "name": "avenger",
+      "word": 0,
+      "bit": 2097152,
+      "value": 2097152
+    },
+    {
+      "name": "posthumous",
+      "word": 0,
+      "bit": 8388608,
+      "value": 8388608
+    },
+    {
+      "name": "revenge",
+      "word": 0,
+      "bit": 16777216,
+      "value": 16777216
+    },
+    {
+      "name": "firstblood",
+      "word": 0,
+      "bit": 33554432,
+      "value": 33554432
+    },
+    {
+      "name": "buzzkill",
+      "word": 0,
+      "bit": 67108864,
+      "value": 67108864
+    },
+    {
+      "name": "comeback",
+      "word": 0,
+      "bit": 134217728,
+      "value": 134217728
+    },
+    {
+      "name": "backfire",
+      "word": 0,
+      "bit": 32768,
+      "value": 32768
+    },
+    {
+      "name": "quadfeed",
+      "word": 0,
+      "bit": 536870912,
+      "value": 536870912
+    },
+    {
+      "name": "assault",
+      "word": 0,
+      "bit": 1073741824,
+      "value": 1073741824
+    },
+    {
+      "name": "defender",
+      "word": 0,
+      "bit": 4194304,
+      "value": 4194304
+    },
+    {
+      "name": "insmoke",
+      "word": 1,
+      "bit": 512,
+      "value": 2199023255552
+    },
+    {
+      "name": "enemyHasUAV",
+      "word": 1,
+      "bit": 1,
+      "value": 4294967296
+    },
+    {
+      "name": "killEnemyTeam",
+      "word": 1,
+      "bit": 2,
+      "value": 8589934592
+    },
+    {
+      "name": "killedNemesis",
+      "word": 1,
+      "bit": 16,
+      "value": 68719476736
+    },
+    {
+      "name": "kingslayer",
+      "word": 1,
+      "bit": 4,
+      "value": 17179869184
+    },
+    {
+      "name": "grenadestuck",
+      "word": 1,
+      "bit": 8,
+      "value": 34359738368
+    },
+    {
+      "name": "impaired",
+      "word": 1,
+      "bit": 64,
+      "value": 274877906944
+    },
+    {
+      "name": "gunbutt",
+      "word": 1,
+      "bit": 128,
+      "value": 549755813888
+    },
+    {
+      "name": "tripledefenderkill",
+      "word": 1,
+      "bit": 32,
+      "value": 137438953472
+    },
+    {
+      "name": "execution",
+      "word": 1,
+      "bit": 256,
+      "value": 1099511627776
+    }
+  ],
+  "original_assignments": [
+    {
+      "name": "oneshotkill",
+      "word": 0,
+      "bit": 1,
+      "original_offset": 1649,
+      "original_bytes_hex": "1601"
+    },
+    {
+      "name": "cooking",
+      "word": 0,
+      "bit": 2,
+      "original_offset": 2004,
+      "original_bytes_hex": "1602"
+    },
+    {
+      "name": "backstab",
+      "word": 0,
+      "bit": 4,
+      "original_offset": 2757,
+      "original_bytes_hex": "1604"
+    },
+    {
+      "name": "ads",
+      "word": 0,
+      "bit": 8,
+      "original_offset": 3471,
+      "original_bytes_hex": "1608"
+    },
+    {
+      "name": "hipfire",
+      "word": 0,
+      "bit": 16,
+      "original_offset": 3533,
+      "original_bytes_hex": "1610"
+    },
+    {
+      "name": "mounted",
+      "word": 0,
+      "bit": 32,
+      "original_offset": 3642,
+      "original_bytes_hex": "1620"
+    },
+    {
+      "name": "last_bullet_kill",
+      "word": 0,
+      "bit": 64,
+      "original_offset": 3714,
+      "original_bytes_hex": "1640"
+    },
+    {
+      "name": "victim_sprinting",
+      "word": 0,
+      "bit": 128,
+      "original_offset": 3764,
+      "original_bytes_hex": "1680"
+    },
+    {
+      "name": "ads",
+      "word": 0,
+      "bit": 8,
+      "original_offset": 3979,
+      "original_bytes_hex": "1608"
+    },
+    {
+      "name": "hipfire",
+      "word": 0,
+      "bit": 16,
+      "original_offset": 4024,
+      "original_bytes_hex": "1610"
+    },
+    {
+      "name": "sliding",
+      "word": 0,
+      "bit": 256,
+      "original_offset": 4235,
+      "original_bytes_hex": "660001"
+    },
+    {
+      "name": "prone_kill",
+      "word": 0,
+      "bit": 512,
+      "original_offset": 4288,
+      "original_bytes_hex": "660002"
+    },
+    {
+      "name": "crouch_kill",
+      "word": 0,
+      "bit": 1024,
+      "original_offset": 4334,
+      "original_bytes_hex": "660004"
+    },
+    {
+      "name": "quickscope",
+      "word": 0,
+      "bit": 2048,
+      "original_offset": 5551,
+      "original_bytes_hex": "660008"
+    },
+    {
+      "name": "low_health_kill",
+      "word": 0,
+      "bit": 4096,
+      "original_offset": 5603,
+      "original_bytes_hex": "660010"
+    },
+    {
+      "name": "weapon_change_kill",
+      "word": 0,
+      "bit": 8192,
+      "original_offset": 5668,
+      "original_bytes_hex": "660020"
+    },
+    {
+      "name": "weapon_pickup_kill",
+      "word": 0,
+      "bit": 16384,
+      "original_offset": 5744,
+      "original_bytes_hex": "660040"
+    },
+    {
+      "name": "reload_kill",
+      "word": 0,
+      "bit": 65536,
+      "original_offset": 5809,
+      "original_bytes_hex": "4900000100"
+    },
+    {
+      "name": "secondary_weapon",
+      "word": 0,
+      "bit": 131072,
+      "original_offset": 5920,
+      "original_bytes_hex": "4900000200"
+    },
+    {
+      "name": "last_stand",
+      "word": 1,
+      "bit": 1024,
+      "original_offset": 5972,
+      "original_bytes_hex": "660004"
+    },
+    {
+      "name": "victim_last_stand",
+      "word": 1,
+      "bit": 2048,
+      "original_offset": 6030,
+      "original_bytes_hex": "660008"
+    },
+    {
+      "name": "in_vehicle",
+      "word": 1,
+      "bit": 4096,
+      "original_offset": 6145,
+      "original_bytes_hex": "660010"
+    },
+    {
+      "name": "victim_in_vehicle",
+      "word": 1,
+      "bit": 8192,
+      "original_offset": 6196,
+      "original_bytes_hex": "660020"
+    },
+    {
+      "name": "recon_drone_explosive",
+      "word": 1,
+      "bit": 32768,
+      "original_offset": 6326,
+      "original_bytes_hex": "660080"
+    },
+    {
+      "name": "vehicle_explosive",
+      "word": 1,
+      "bit": 65536,
+      "original_offset": 6387,
+      "original_bytes_hex": "4900000100"
+    },
+    {
+      "name": "longshot",
+      "word": 0,
+      "bit": 262144,
+      "original_offset": 9102,
+      "original_bytes_hex": "4900000400"
+    },
+    {
+      "name": "pointblank",
+      "word": 0,
+      "bit": 524288,
+      "original_offset": 9237,
+      "original_bytes_hex": "4900000800"
+    },
+    {
+      "name": "headshot",
+      "word": 0,
+      "bit": 1048576,
+      "original_offset": 9338,
+      "original_bytes_hex": "4900001000"
+    },
+    {
+      "name": "avenger",
+      "word": 0,
+      "bit": 2097152,
+      "original_offset": 9427,
+      "original_bytes_hex": "4900002000"
+    },
+    {
+      "name": "posthumous",
+      "word": 0,
+      "bit": 8388608,
+      "original_offset": 9674,
+      "original_bytes_hex": "4900008000"
+    },
+    {
+      "name": "revenge",
+      "word": 0,
+      "bit": 16777216,
+      "original_offset": 9763,
+      "original_bytes_hex": "4900000001"
+    },
+    {
+      "name": "firstblood",
+      "word": 0,
+      "bit": 33554432,
+      "original_offset": 10297,
+      "original_bytes_hex": "4900000002"
+    },
+    {
+      "name": "buzzkill",
+      "word": 0,
+      "bit": 67108864,
+      "original_offset": 10413,
+      "original_bytes_hex": "4900000004"
+    },
+    {
+      "name": "comeback",
+      "word": 0,
+      "bit": 134217728,
+      "original_offset": 10501,
+      "original_bytes_hex": "4900000008"
+    },
+    {
+      "name": "backfire",
+      "word": 0,
+      "bit": 32768,
+      "original_offset": 10818,
+      "original_bytes_hex": "660080"
+    },
+    {
+      "name": "quadfeed",
+      "word": 0,
+      "bit": 536870912,
+      "original_offset": 10888,
+      "original_bytes_hex": "4900000020"
+    },
+    {
+      "name": "assault",
+      "word": 0,
+      "bit": 1073741824,
+      "original_offset": 10976,
+      "original_bytes_hex": "4900000040"
+    },
+    {
+      "name": "defender",
+      "word": 0,
+      "bit": 4194304,
+      "original_offset": 11023,
+      "original_bytes_hex": "4900004000"
+    },
+    {
+      "name": "insmoke",
+      "word": 1,
+      "bit": 512,
+      "original_offset": 11070,
+      "original_bytes_hex": "660002"
+    },
+    {
+      "name": "enemyHasUAV",
+      "word": 1,
+      "bit": 1,
+      "original_offset": 11115,
+      "original_bytes_hex": "1601"
+    },
+    {
+      "name": "killEnemyTeam",
+      "word": 1,
+      "bit": 2,
+      "original_offset": 11159,
+      "original_bytes_hex": "1602"
+    },
+    {
+      "name": "killedNemesis",
+      "word": 1,
+      "bit": 16,
+      "original_offset": 11216,
+      "original_bytes_hex": "1610"
+    },
+    {
+      "name": "kingslayer",
+      "word": 1,
+      "bit": 4,
+      "original_offset": 11260,
+      "original_bytes_hex": "1604"
+    },
+    {
+      "name": "grenadestuck",
+      "word": 1,
+      "bit": 8,
+      "original_offset": 11341,
+      "original_bytes_hex": "1608"
+    },
+    {
+      "name": "impaired",
+      "word": 1,
+      "bit": 64,
+      "original_offset": 11385,
+      "original_bytes_hex": "1640"
+    },
+    {
+      "name": "gunbutt",
+      "word": 1,
+      "bit": 128,
+      "original_offset": 11429,
+      "original_bytes_hex": "1680"
+    },
+    {
+      "name": "tripledefenderkill",
+      "word": 1,
+      "bit": 32,
+      "original_offset": 11497,
+      "original_bytes_hex": "1620"
+    },
+    {
+      "name": "execution",
+      "word": 1,
+      "bit": 256,
+      "original_offset": 11541,
+      "original_bytes_hex": "660001"
+    }
+  ],
+  "lua_inputs": [
+    {
+      "asset": "ui/utils/brlootutils.lua",
+      "bytecode_sha256": "9dce4e9f41ed3d430796e1e893ecb3dab38fbd96c39099497ed669761f62cdbb",
+      "layout_proof": "data/remaining-kill-modifiers-20261010/br-loot-lua-native-layout.json",
+      "layout_sha256": "e6874ed808eea918136b9b3f34bfa8fe7da52ec2201e9daa9d7feca40f1b662b"
+    },
+    {
+      "asset": "ui/utils/mp/perkutils.lua",
+      "bytecode_sha256": "ad613dfd9c81964a4ffce9fb35e3602baa16873fcfcfbda164d8749649965d03",
+      "layout_proof": "data/remaining-kill-modifiers-20261010/perk-lua-native-layout.json",
+      "layout_sha256": "87ceb855cadad5f79f040588aee7b80ea7e191c9dd801fe81c076d8f1d58cfe9"
+    }
+  ],
+  "lua_definitions": {
+    "rarity": {
+      "LEGENDARY": 4,
+      "COMMON": 0,
+      "RARE": 2,
+      "EPIC": 3,
+      "SPECIAL_MISSION": 7,
+      "UNCOMMON": 1,
+      "PLAYER": 5,
+      "MISSION": 6
+    },
+    "perk": {
+      "perkOverkill": "specialty_twoprimaries",
+      "perkIncludesOverkill": "perkpackage_munitions",
+      "perkMunitions": "specialty_munitions",
+      "perkMunitions2": "specialty_munitions_2"
+    }
+  },
+  "table_inputs": {
+    "mp/perktable.csv": {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\perktable.csv.575.csv",
+      "sha256": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+    },
+    "mp/reticlecategorytable.csv": {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\reticlecategorytable.csv.604.csv",
+      "sha256": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f"
+    },
+    "loot/weapon_ids.csv": {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\loot\\weapon_ids.csv.235.csv",
+      "sha256": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019"
+    }
+  },
+  "mapped_overkill_ids": [
+    2,
+    26,
+    44
+  ],
+  "unrepresented_overkill_reference": "perkpackage_munitions",
+  "constants": {
+    "Oden": 17,
+    "Fal": 21,
+    "M13": 19,
+    "Thermal": 5,
+    "ThermalHybrid": 7
+  },
+  "fields": {
+    "Param1": "mask in low32, mask2 in high32",
+    "Param6": "rarity in bits32..47, circle index in bits48..63"
+  },
+  "new_parser_cases": 103,
+  "parser_proof_sha256": "4d95f65466f134f13055ac0d53a00df9a81a6d53287762f12cc3775951ca6ebc",
+  "generated_path": "src/replay_kill_context.h",
+  "generated_sha256": "1a69ca2d6b00591e6be1568bafd232233c1fc9cb7cf633de8ae40626e698a4b8",
+  "native_game_callback_verified": false,
+  "game_runs_performed": false,
+  "scope": "Original producer operands and LuaFile definitions, plus original parser execution. Criteria are reconstructed from shipped descriptions; retail cloud predicate code is unavailable."
+}

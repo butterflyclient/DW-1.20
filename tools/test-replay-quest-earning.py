@@ -54,7 +54,13 @@ def main():
                 1570: "tdm_headshot", 1589: "tdm_pistol", 1592: "hq_pistol",
                 10004: "arena_smg", 10047: "dom_m19",
                 1512: "capture_dom", 1588: "capture_dom", 1517: "capture_hq",
-                1590: "defuse_sd"}
+                1590: "defuse_sd",
+                1573: "modifier_pointblank", 1576: "modifier_secondary_weapon",
+                1577: "modifier_longshot", 1586: "modifier_quadfeed",
+                1565: "secondary_specialty_munitions_2",
+                10001: "secondary_smg_specialty_munitions_2",
+                10038: "ads_reflex", 10039: "longshot_thermal",
+                10130: "oden_longshot", 10134: "fal_ads", 10135: "m13_kingslayer"}
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
@@ -648,6 +654,51 @@ def main():
                 assert snapshot(host) == saved
                 assert not any(t["type"] == "ACTIVATE_ACHIEVEMENT" for row in retry for t in row.get("triggers", []))
                 checks.append(f"Stage {identity}: original {label} parser result completes exact target, grants shipped XP/item, activates successor and refreshes retry once")
+            modifier_negatives = {
+                1573: ("modifier_none", "modifier_longshot"),
+                1576: ("modifier_none", "modifier_secondary_wrong_word"),
+                1577: ("modifier_none", "modifier_pointblank"),
+                1586: ("modifier_none", "modifier_firstblood"),
+                1565: ("modifier_secondary_weapon", "secondary_specialty_ghost", "secondary_perkpackage_munitions"),
+                10001: ("modifier_secondary_weapon", "secondary_specialty_munitions_2",
+                        "secondary_smg_specialty_ghost", "secondary_smg_perkpackage_munitions"),
+                10038: ("modifier_ads", "ads_acog", "modifier_none"),
+                10039: ("modifier_longshot", "longshot_reflex", "ads_thermal"),
+                10130: ("oden_longshot_no_flag", "modifier_longshot"),
+                10134: ("fal_ads_no_flag", "modifier_ads"),
+                10135: ("m13_kingslayer_no_flag", "modifier_kingslayer", "modifier_king_wrong_word"),
+            }
+            for identity, labels in modifier_negatives.items():
+                seed(host, identity, False)
+                before = snapshot(host)
+                for index, label in enumerate(labels):
+                    send(host, f"mn{identity}-{index}", [event(label)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                # A present bit in the wrong mask word or a missing packet field
+                # must not substitute for the exact producer flag.
+                send(host, f"mi{identity}", [event(fixtures[identity], omit=("Param1",))])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                checks.append(f"Stage {identity}: exact native modifier/weapon/perk/optic qualifiers exclude wrong-word and incomplete packets")
+            for identity in (1565, 10001):
+                prefix = "secondary_smg_" if identity == 10001 else "secondary_"
+                for index, ref in enumerate(("specialty_twoprimaries", "specialty_munitions", "specialty_munitions_2")):
+                    seed(host, identity, False)
+                    send(host, f"oa{identity}-{index}", [event(prefix + ref)])
+                    update = rewards(host, 1)[0]
+                    assert update["id_"] == identity and update["progress"] == 1
+                seed(host, identity, False)
+                before = snapshot(host)
+                source = cases[prefix + "specialty_munitions_2"]["values"][4]
+                send(host, f"os{identity}", [event(prefix + "specialty_munitions_2", extra={"Param4": source << 48})])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+            checks.append("Both Overkill-secondary stages recognize all three native UI aliases; an unresolved package or super-ID field cannot become a perk")
+            seed(host, 10039, False)
+            send(host, "thermal-hybrid", [event("longshot_hybrid3")])
+            assert rewards(host, 1)[0]["progress"] == 1
+            checks.append("Thermal longshots recognize both thermal and thermal-hybrid native optic groups")
             for identity, label in ((1509, "marksman"), (1600, "marksman_head_five"),
                                     (1596, "lmg"), (10046, "pistol"), (1500, "pistol")):
                 seed(host, identity)
@@ -992,6 +1043,43 @@ def main():
             assert update["id_"] == 50052 and update["reason"] == "completed"
             assert snapshot(host) == before
             checks.append("Signed listen-host REST purchase reporting credits only the authorized remote buyer and grants its exact reward")
+            br_kill_stages = {50027: "br_rarity_3", 50028: "br_rarity_4", 50038: "br_rarity_0",
+                              50083: "br_rarity_0", 50041: "br_circle_0", 50073: "br_victim_downed"}
+            for identity, label in br_kill_stages.items():
+                if identity == 50041:
+                    negatives = [f"br_circle_{value}" for value in (1, 2, 256, 65535)]
+                elif identity == 50073:
+                    negatives = ["br_attacker_downed", "br_equipment_downed", "modifier_victim_down_wrong_word"]
+                else:
+                    rarity = {50027: 3, 50028: 4, 50038: 0, 50083: 0}[identity]
+                    negatives = [f"br_rarity_{value}" for value in (0, 1, 2, 3, 4, 5, 6, 7, 65535) if value != rarity]
+                    negatives.append("br_rarity_equipment_" + str(rarity))
+                seed(host, identity, False)
+                before = snapshot(host)
+                for index, negative in enumerate(negatives):
+                    send(host, f"bkn{identity}-{index}", [event(negative, mode=8)])
+                    after = snapshot(host)
+                    assert after[0] == before[0] and after[2] == before[2]
+                # BR family alone does not turn a packed MP kill into BR.
+                wrong_type = cases["modifier_none"]["values"][2]
+                send(host, f"bkt{identity}", [event(label, mode=8, extra={"Param2": wrong_type})])
+                send(host, f"bkm{identity}", [event(label, mode=2)])
+                send(host, f"bki{identity}", [event(label, mode=8, omit=("Param6",))])
+                after = snapshot(host)
+                assert after[0] == before[0] and after[2] == before[2]
+                send(host, f"bkp{identity}", [event(label, mode=24)])
+                update = rewards(host, 2 if quests[identity]["target"] == 1 else 1)
+                assert next(row for row in update if row["kind"] == 15)["progress"] == 1
+                seed(host, identity)
+                packet = send(host, f"bkf{identity}", [event(label, mode=8)])
+                update = next(row for row in rewards(host, 2) if row["kind"] == 15)
+                assert update["id_"] == identity and update["progress"] == quests[identity]["target"]
+                assert update["reason"] == "completed"
+                saved = snapshot(host)
+                assert host.task(125, 1, packet) == b""
+                assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
+                assert snapshot(host) == saved
+                checks.append(f"Stage {identity}: exact original BR rarity/circle/victim flags credit one player kill, exclude unknown and wrong fields, and preserve completion/retry rewards")
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -1092,10 +1180,10 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 64, checks=checks,
+                                         supported_stage_count=len(fixtures) + 70, checks=checks,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 64} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 70} stages; {args.output}")
 
 
 if __name__ == "__main__":

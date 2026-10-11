@@ -91,6 +91,13 @@ namespace services
             case 1562:
                 return (classification & 0xC00) == 0xC00 &&
                        event.hasPerk(replay_kill_data::Shrapnel);
+            case 1565:
+            case 10001:
+                return event.hasModifier(ReplayKillModifier::SecondaryWeapon) &&
+                       (id != 10001 || classification == 5) &&
+                       std::any_of(replay_kill_context::OverkillPerks.begin(),
+                                   replay_kill_context::OverkillPerks.end(),
+                                   [&event](uint16_t perk) { return event.hasPerk(perk); });
             case 1553:
                 return weapon == 50000;
             case 1555:
@@ -108,6 +115,14 @@ namespace services
                 return (classification & 0x400) != 0;
             case 1570:
                 return mode == ReplayChallengeGameType::war && cause == 9;
+            case 1573:
+                return event.hasModifier(ReplayKillModifier::Pointblank);
+            case 1576:
+                return event.hasModifier(ReplayKillModifier::SecondaryWeapon);
+            case 1577:
+                return event.hasModifier(ReplayKillModifier::Longshot);
+            case 1586:
+                return event.hasModifier(ReplayKillModifier::Quadfeed);
             case 1589:
                 return mode == ReplayChallengeGameType::war;
             case 1592:
@@ -142,12 +157,28 @@ namespace services
             case 10040:
                 return cause == 9 && event.optic() == replay_kill_data::VariableZoom &&
                        (classification & 1) != 0;
+            case 10038:
+                return event.hasModifier(ReplayKillModifier::Ads) &&
+                       event.optic() == replay_kill_data::Reflex;
+            case 10039:
+                return event.hasModifier(ReplayKillModifier::Longshot) &&
+                       (event.optic() == replay_kill_context::Thermal ||
+                        event.optic() == replay_kill_context::ThermalHybrid);
             case 10044:
                 return weapon == 1;
             case 10046:
                 return weapon == 5 && attachments == 3;
             case 10131:
                 return weapon == replay_kill_data::Ak47 && cause == 9;
+            case 10130:
+                return weapon == replay_kill_context::Oden &&
+                       event.hasModifier(ReplayKillModifier::Longshot);
+            case 10134:
+                return weapon == replay_kill_context::Fal &&
+                       event.hasModifier(ReplayKillModifier::Ads);
+            case 10135:
+                return weapon == replay_kill_context::M13 &&
+                       event.hasModifier(ReplayKillModifier::Kingslayer);
             default:
                 return false;
             }
@@ -206,6 +237,28 @@ namespace services
         {
             const auto &values = event.at("values");
             const auto &name = event.at("name").get_ref<const std::string &>();
+            if (name == "kill" && completeParameters(values, 7))
+            {
+                ReplayKillEvent kill{};
+                for (unsigned index = 0; index < kill.parameters.size(); ++index)
+                    kill.parameters[index] = number(values, ("Param" + std::to_string(index)).c_str());
+                if (!kill.targets(ReplayKillTarget::Player) ||
+                    kill.gameType() != ReplayChallengeGameType::br)
+                    return 0;
+                switch (id)
+                {
+                case 50027: return kill.rarity() == ReplayLootRarity::Epic;
+                case 50028: return kill.rarity() == ReplayLootRarity::Legendary;
+                case 50038:
+                case 50083: return kill.rarity() == ReplayLootRarity::Common;
+                // circletimer(0) owns the first delay/closing cycle. The
+                // producer's 65535 default (including pre-circle -1) does not
+                // establish an active first circle and earns no early kill.
+                case 50041: return kill.circleIndex() == 0;
+                case 50073: return kill.hasModifier(ReplayKillModifier::VictimLastStand);
+                default: return 0;
+                }
+            }
             if (name == "buy_item" && completeParameters(values, 3))
             {
                 const ReplayBuyItemEvent purchase{{number(values, "Param0"),

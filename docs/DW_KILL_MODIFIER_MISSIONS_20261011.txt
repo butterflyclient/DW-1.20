@@ -1,0 +1,93 @@
+REPLAY DW KILL MODIFIERS AND BR MISSION EARNING
+2026-10-11 UTC
+
+Issue
+Seventeen shipped mission stages had no earning rule for secondary weapons,
+Overkill, point-blank/longshot kills, quad feeds, optic/weapon combinations,
+BR weapon rarity, the first active circle, or kills of downed enemies.
+
+Research
+The original Replay modifier producer contains 48 writes to 46 named bits.
+Every write was correlated with an unmodified ScriptFile instruction and
+operand. Both 32-bit mask words occupy the full UInt64 Param1. Reading only
+the lower word would lose Kingslayer and victim-last-stand conditions.
+
+Original ProcessParams execution verifies the complete seven-UInt64 kill
+packet. Param6 contains optic, damage cause, weapon rarity, and circle index
+as four 16-bit fields. The extended original-instruction proof has 379 cases,
+including 103 new modifier, rarity, circle, perk, weapon, and optic cases.
+
+The native code_post_gfx LuaFile layout was verified before executing its
+BRLOOT and PERK definitions. LuaFile is a 24-byte type-62 root. Epic rarity
+is 3, Legendary is 4, and Common is 0. Native Overkill aliases map to perk
+IDs 2, 26, and 44. The package spelling has no unique numeric perk-table
+entry and is not inferred from the parser's unknown/null zero value.
+
+The original BR circle script initializes the current circle to -1, then
+sets index 0 for the first delay/closing cycle. The packed value 65535 can
+mean pre-circle or unavailable context; it does not establish an active
+first circle. Retail cloud predicates are unavailable. Mission conditions
+are reconstructed from the shipped descriptions and verified event fields.
+
+Fix
+src/replay_kill_context.h preserves all 46 named modifier bits and all eight
+native rarity definitions, plus the unknown sentinel. ReplayKillEvent keeps
+every parameter bit and exposes only researched fields.
+
+MP stages added:
+  1565, 10001: Secondary weapon with Overkill; 10001 additionally requires SMG.
+  1573: Point blank.
+  1576: Secondary weapon.
+  1577: Longshot.
+  1586: Quad feed.
+  10038: ADS with a Reflex optic.
+  10039: Longshot with Thermal or ThermalHybrid optics.
+  10130: Oden longshot.
+  10134: FAL while ADS.
+  10135: M13 Kingslayer.
+
+BR stages added:
+  50027: Epic weapon rarity.
+  50028: Legendary weapon rarity.
+  50038, 50083: Common weapon rarity.
+  50041: First active circle, index 0.
+  50073: Victim in last stand, rather than the attacker in last stand.
+
+Rules use the existing public allocation, player ownership, mode, activation,
+reward, successor, and retry validation. BR kill rules require a complete
+player-target packet and the exact native BR mode. Unknown rarity/circle
+values, incomplete fields, wrong target types, or misplaced bits earn nothing.
+
+Validation
+Fresh Windows and Linux builds compile all 46 backend translation units from
+the same frozen C++ inputs. Each platform passed 187 encrypted earning
+groups covering 127 stages and 14 management groups before deployment.
+New checks include exact positive packets, incorrect mask words, perk/weapon/
+optic mismatches, actor/victim confusion, unknown values, missing fields,
+partial accumulation, rewards, and duplicate retries.
+
+These are backend and original-instruction checks. No game was launched and
+no new native gameplay callback is claimed. The shipping client remains
+release 17; this change does not require a game executable recompile.
+
+Evidence
+  validation/20261011-replay-kill-modifier-layout.json
+  validation/20261011-replay-quest-modifier-readiness.json
+  data/remaining-kill-modifiers-20261010/
+
+Deployment
+The validated Linux image is staged before the live service is stopped.
+Stop and start are separate steps, with process/image hash checks, health
+verification, an unchanged installed-map policy, and the previous release
+retained for rollback. The owner explicitly authorized server updates with
+connected players. The readiness receipt records the actual activation.
+
+Remaining scope
+127 of 232 mission stages have earning rules; 105 remain. A vehicle-assist
+packet has no vehicle-state field. The insmoke modifier describes the
+attacker, so it cannot prove that an enemy is near smoke. Broad attachment
+groups do not identify every named optic/barrel variant. Those conditions
+remain open rather than receiving approximated credit.
+
+Six streaming/category/large-upload response bindings and broader native
+callback validation also remain open. This is not a complete-backend claim.

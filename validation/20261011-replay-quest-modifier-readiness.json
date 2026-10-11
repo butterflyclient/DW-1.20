@@ -1,0 +1,125 @@
+{
+  "passed": true,
+  "windows_server_sha256": "a89bf688f22108d85a616103a9d61b5518e20fac3078051a5c1784d5e9e123e8",
+  "linux_server_sha256": "b29b665e61158bd669263e803e4137c39a420e381f71f977d8304d1c3619c61d",
+  "compiled_translation_units": 46,
+  "retained_objects": 0,
+  "exact_dual_platform_compiled_sources": true,
+  "supported_earning_stages": 127,
+  "remaining_earning_stages": 105,
+  "shipped_mission_descriptions": 232,
+  "original_parser_cases": 379,
+  "added_earning_stages": [
+    1565,
+    1573,
+    1576,
+    1577,
+    1586,
+    10001,
+    10038,
+    10039,
+    10130,
+    10134,
+    10135,
+    50027,
+    50028,
+    50038,
+    50041,
+    50073,
+    50083
+  ],
+  "encrypted_earning_checks_per_platform": 187,
+  "management_checks_per_platform": 14,
+  "native_game_callback_verified": false,
+  "game_runs_performed": false,
+  "full_backend_completed": false,
+  "server_deployed": true,
+  "shipping_client_sha256": "bd792a7c871c683baf34409f1024fe5688e18d77f3ed3a34f8f1b109530bedfb",
+  "client_recompile_required": false,
+  "previous_client_deployment": {
+    "path": "data/service-bindings-20261010/reset-deployment.json",
+    "sha256": "21ea9fd9e7356d157fb1c12d62bb0935ab74ff7d237af92d6b3a22b6e3dec2d7"
+  },
+  "unbound_contexts": [
+    "vehicle assist packets carry no vehicle-state field",
+    "insmoke identifies the attacker, not an enemy near smoke",
+    "Overkill package reference has no unambiguous numeric perk ID"
+  ],
+  "evidence": [
+    {
+      "path": "data/backend-snapshot-1791677943649388400/build-receipt.json",
+      "sha256": "3160446e70aeb7c66e0ba600767d43d7c7f1cc30b82a435c112ec46bad1ba12e"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/windows-object-proof.json",
+      "sha256": "54c8c57e776899bd198c85a4f1e4af82902678c293a202f6d3e5577929ca55d1"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/linux-build-receipt.json",
+      "sha256": "fd2bfc88d36104a2db3d624966062735c99e5a8391278ec3e8b529385836c366"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/windows-earning.json",
+      "sha256": "23539bcf5c69f4aabee3c4708670bd808ecfe7c09ec38f34118dfc9e8d8bba17"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/windows-management.json",
+      "sha256": "2830c7be05d6100fd73c4ccf25fb7c4f23bad2c0909a0c4854159fe1dd88e37b"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/linux-earning.json",
+      "sha256": "9889feddf840917864d88d5138fa69c615f209cf8959a9ad5db998ebd9a89b19"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/linux-management.json",
+      "sha256": "9eb7adccd1da9995eaaf3a8c72b50afd0192debcd9855aff1b341db2f43112f3"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/br-loot-lua-native-layout.json",
+      "sha256": "e6874ed808eea918136b9b3f34bfa8fe7da52ec2201e9daa9d7feca40f1b662b"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/perk-lua-native-layout.json",
+      "sha256": "87ceb855cadad5f79f040588aee7b80ea7e191c9dd801fe81c076d8f1d58cfe9"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/challenge-parser-verified.json",
+      "sha256": "4d95f65466f134f13055ac0d53a00df9a81a6d53287762f12cc3775951ca6ebc"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/circle-lifecycle-proof.json",
+      "sha256": "315da0800fc8eebb99c3318a5002a9ad4d744b4974aadf0fbd9f111d2fbc93dd"
+    },
+    {
+      "path": "validation/20261011-replay-kill-modifier-layout.json",
+      "sha256": "437bf8b7ef54d6d5b312e04061f5f86e658547ba36cdd1e304a93da77c03dc60"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/staged-release.json",
+      "sha256": "0d8baa7f90cb5cda7cf439534fe7e6cf00b8e953cb30166ff73f88e0d10c6d87"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/controlled-stop.json",
+      "sha256": "52ac90dfbe960076c3f3f3aba65ea765100da93d0d6aa8167a441f0230cf0090"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/deployment.json",
+      "sha256": "bd34020a0538734cce45118338fe4c33fa29d344d3c4df9c69a1a099ce2acfbd"
+    }
+  ],
+  "scope": "Original modifier operands, native Lua rarity/Overkill definitions and full kill parser fields; encrypted mission earning/rewards/retry/ownership and management fixtures. No new game run or native gameplay callback proof.",
+  "live_process": {
+    "pid": 283404,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261010-b29b665e6115/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261010-b29b665e6115/iw8-dw-server",
+    "sha256": "b29b665e61158bd669263e803e4137c39a420e381f71f977d8304d1c3619c61d",
+    "process_sha256": "b29b665e61158bd669263e803e4137c39a420e381f71f977d8304d1c3619c61d",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "deployed_map_policy_sha256": "03fbbc68e99bb083302e8acb0ca5c3bf2986e42d2608b26664cc68eb737e2fc4",
+  "owner_authorized_connected_restart": true
+}
