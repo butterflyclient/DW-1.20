@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "passed": true,
-  "release": 18,
+  "release": 19,
   "host": "162.243.115.160",
-  "client_sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
-  "bytes": 99742720,
+  "client_sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
+  "bytes": 99750400,
   "format": "full-executable-v1",
   "catalog_committed_last": true,
   "compiled_initial_state": 0,
@@ -20,20 +20,20 @@
   "native_restart_popup_verified": false,
   "evidence": [
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/client-readiness.json",
-      "sha256": "626fcbae3e5b8341a9a2df232b042cbe320e002c5b63f791054fe69444ebb8c5"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/client-readiness.json",
+      "sha256": "42bc5d08d3293b905245fde3d9c6f3205f7eea289c8633ff243c20c5d194c40f"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-executable-update.json",
-      "sha256": "2a33ce17479d628bf47e0c47b1248a8e6b793eb0c8cb4d606f2383f8a37a1919"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-executable-update.json",
+      "sha256": "4a9e1377f5a8ff5c27c736c97878b1a66c3e7fd4dcdd48159b0601acbbc10338"
     },
     {
-      "path": "data/full-executable-publication-release18-20261011/droplet-publication.json",
-      "sha256": "eeffde95b9be1dfd4c574245cfad0cf7dbd7315aa014d7e8e67637e84d5493b3"
+      "path": "data/full-executable-publication-release19-20261011/droplet-publication.json",
+      "sha256": "b166475b868476f28cd8f91845dada8a9c49063aa6edb22cdde79e2a9234787a"
     },
     {
-      "path": "data/full-executable-publication-release18-20261011/public-verification.json",
-      "sha256": "8175246aea62e6fe6782aada98055e1dbb745ebd067e2be01d2930babb4c2151"
+      "path": "data/full-executable-publication-release19-20261011/public-verification.json",
+      "sha256": "18633d527b336bf2445e5d5200b3012253bf903908b075271db4e308ae750f24"
     },
     {
       "path": "validation/20261011-full-executable-publication-guard.json",

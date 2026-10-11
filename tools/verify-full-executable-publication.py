@@ -102,6 +102,11 @@ def main():
         staged = Path(str(base) + ".update") / "next.exe"
         assert sha(staged) == catalog["latest"] and sha(base) == base_hash
         checks.append("Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged")
+        # These isolated bytes are no longer needed after verification. Reclaim
+        # them before the current-version check to bound fixture disk usage.
+        assert staged.resolve().is_relative_to(folder) and base.resolve().parent == folder
+        staged.unlink()
+        base.unlink()
         current = folder / "current-release.exe"
         shutil.copyfile(image, current)
         result = subprocess.run([str(runner), "--prepare", str(current), args.host],

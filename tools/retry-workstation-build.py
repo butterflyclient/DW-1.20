@@ -13,14 +13,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--reason", default="retained verification fixtures added; full pipeline retry"
 )
+parser.add_argument("--receipt-directory", type=Path,
+                    help="Private job receipts produced by build-frozen-workstation")
 args = parser.parse_args()
 
 ROOT = Path(__file__).resolve().parents[1]
-receipt_path = ROOT / "data" / "compiler-snapshot-receipt.json"
+receipts = args.receipt_directory.resolve() if args.receipt_directory else ROOT / "data"
+receipt_path = receipts / "compiler-snapshot-receipt.json"
 receipt = json.loads(receipt_path.read_text())
 snapshot = Path(receipt["snapshot"])
 configuration = json.loads((snapshot / "replay-project.local.json").read_text())
-dispatch = json.loads((ROOT / "data" / "workstation-job.json").read_text())
+dispatch = json.loads((receipts / "workstation-job.json").read_text())
 directory = Path(configuration["cache"]) / "jobs" / dispatch["id"]
 job_path = directory / "job.json"
 job = json.loads(job_path.read_text())
@@ -119,7 +122,7 @@ with (directory / "compiler.log").open("ab", buffering=0) as log:
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
 current = json.loads(job_path.read_text())
-(ROOT / "data" / "workstation-job.json").write_text(
+(receipts / "workstation-job.json").write_text(
     json.dumps(current, indent=2) + "\n"
 )
 print(current["status"], current["phase"], current.get("error", ""), flush=True)

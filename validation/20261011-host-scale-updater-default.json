@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "source_sha256": "32dc3bd5e56f2788b7ae9de625f2c2fe8e0f97da65f2d0e01a12788353c45b5d",
+  "checks": [
+    "--host-scale",
+    "--host-scale --pin-experimental-updater",
+    "Pin without host-scale rejected before any files are created",
+    "Disabled updater initializer is emitted only inside the explicit pin guard"
+  ],
+  "game_runs_performed": false,
+  "build_dispatched": false
+}

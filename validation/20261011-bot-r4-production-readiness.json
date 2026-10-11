@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "passed": true,
+  "side_chat_revision": 4,
+  "side_chat_candidate_sha256": "e7be71d7452c8191d93b5f0b66c961b17314b64f227f03fbfbbc37d9c22ad44a",
+  "approved_previous_production_sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
+  "compiled_client_sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
+  "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "public_release": 19,
+  "fresh_cpp_count": 104,
+  "preserved_side_chat_cpp_count": 102,
+  "all_r4_native_bindings_preserved": true,
+  "latest_r4_sources_match_current_worktree": true,
+  "bot_names_count": 150,
+  "all_bot_names_present_in_image": true,
+  "bot_names_header_sha256": "88bbdb15b301e9613bbc273483e60c0bdc60384c2d4f67b3226f3e247c4f7947",
+  "active_updater_initial_state": 0,
+  "unwind_cases": 659,
+  "host_instruction_cases": 339,
+  "navigation_instruction_cases": 68,
+  "current_unlock_auth_toast_fixes_retained": true,
+  "owner_ini_preserved": true,
+  "backend_binary_unchanged": true,
+  "server_live": {
+    "pid": 291365,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-3aff0f962e3d/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-3aff0f962e3d/iw8-dw-server",
+    "sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+    "process_sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "game_runs_performed": false,
+  "game_processes_stopped": false,
+  "gameplay_interactions_performed": false,
+  "native_game_verified": false,
+  "live_150_player_performance_verified": false,
+  "primary_already_current": true,
+  "observed_primary_process_ids": [
+    7904
+  ],
+  "current_source_evidence": [
+    {
+      "path": "integration/host-scale/AICommon_UpdateSight.cpp",
+      "sha256": "2956bb66e100d231d1feaa772390067e61aafe171355edf6b6d9aeeb0d136524"
+    },
+    {
+      "path": "integration/host-scale/Bfx_ClosestReachableSearchStep.cpp",
+      "sha256": "7e569a9493a8e7de8a30b2a62422761e7b9a1f08038906d3915a1194a12778b8"
+    },
+    {
+      "path": "integration/host-scale/Bfx_ClosestReachableTreeStep.cpp",
+      "sha256": "fee3e5ce55d7dc0e30f2194b5a6c614cc92d6470f6a3a9a0402266006dbcf5fb"
+    },
+    {
+      "path": "integration/host-scale/Bfx_GetClosestArea.cpp",
+      "sha256": "ab0a112dcf3ad75613f74a231890320b818131dfbe1c9dd68f026982a17b2311"
+    },
+    {
+      "path": "integration/host-scale/Bfx_IncrementalSearchToIsland.cpp",
+      "sha256": "75e6bf4a54ab6852634f4289439332e126654283c2ff85effca0393ac9344aeb"
+    },
+    {
+      "path": "integration/host-scale/CL_TransientsCollisionMP_UpdateTransientFlags.cpp",
+      "sha256": "0a59626536a4df59cc7730f89b4c63cd4f551bf6433083c43d5a16675f25054e"
+    },
+    {
+      "path": "integration/host-scale/CL_TransientsCollisionMP_UpdateTransientTileFlags.cpp",
+      "sha256": "6a8e39ae4f4fa59720fd486d043c11d1076614f2c13384f2414c799724a6ac6a"
+    },
+    {
+      "path": "integration/host-scale/DW_GetAuthAddress.cpp",
+      "sha256": "d8167b57f5cddf6bf674fb1964a4546fda613b6ad8239f55442691c73dd70d8b"
+    },
+    {
+      "path": "integration/host-scale/Scr_GetClosestReachablePointOnNavmesh.cpp",
+      "sha256": "3909dda17bee628d5c06babd16f92e6bfb572a45d0f2fed966e3914e4382db96"
+    },
+    {
+      "path": "integration/host-scale/SV_BotApplyCommands.cpp",
+      "sha256": "9dbe3b2152497645c8a3eafeaf17f9d10ae45da9d90afc7636037f1697c5455b"
+    },
+    {
+      "path": "integration/host-scale/SV_BotUpdateBots.cpp",
+      "sha256": "cf9540c533025e2959bb47e924b4605e218d59c511e4228809d04597aaa718e3"
+    },
+    {
+      "path": "integration/host-scale/SV_HostScale.cpp",
+      "sha256": "ddf5bc2c6a5b3dc7d5d6b92053f7eb3b2292861490844c72d996598ec3b84ea8"
+    },
+    {
+      "path": "integration/host-scale/SV_HostScaleNavigation.cpp",
+      "sha256": "849ef690de55728cd9bf9d6c18acfcfccc9b869f567989999de341fc05f31784"
+    },
+    {
+      "path": "integration/host-scale/sv_host_navigation.h",
+      "sha256": "f3e7d18a45bed6761d42deb839cd598004903a6a84a79767b21f8c01adb0a7dc"
+    },
+    {
+      "path": "integration/host-scale/sv_host_scale.h",
+      "sha256": "9a5dbd67c8fbbfa6df8eb83efb9a107626beea61cbadf210f41f4292ecb75cf5"
+    },
+    {
+      "path": "integration/host-scale/SV_UserMoveWorkersMP_TryQueueClientThinkCmd.cpp",
+      "sha256": "d2bd46aea65163f3793f0792f54be47261dfb21f86bb34f7894ea578d09bc8d9"
+    },
+    {
+      "path": "integration/replay/DW_BotNames.h",
+      "sha256": "88bbdb15b301e9613bbc273483e60c0bdc60384c2d4f67b3226f3e247c4f7947"
+    },
+    {
+      "path": "integration/replay/DW_BotRoster.cpp",
+      "sha256": "bf3df323022d0783231f7bfeb64c43613a6a0dd1ee95eb23af3c6e8a19ab9347"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/client-readiness.json",
+      "sha256": "42bc5d08d3293b905245fde3d9c6f3205f7eea289c8633ff243c20c5d194c40f"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/client-deployment.json",
+      "sha256": "3dbcc048aff6ab2780b25de4e114db58d4d7a7022df41f7c6133453d9c056c0d"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/source-receipt.json",
+      "sha256": "45091d071eebf90599b72c2f3d7808ded885e503a4b9ace31e1c262442132754"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-check-inputs.json",
+      "sha256": "e175018dba93b3e245c195598e74067ff5640beeecfa7011431446e3cb139d9d"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-unlock-progression.json",
+      "sha256": "5ac7a58d94cd94b3ae829c9fe2f2bc01518b31eb187fcd55ac605f7f52e7ccc8"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-lobby-controls.json",
+      "sha256": "7bbcb0279850b326e3beb8aefbd70375d5f643c2167830792b02615f693657d5"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-navigation.json",
+      "sha256": "bc2b6b0e2184dc4b3d8840bcc46b48dd8e8c76360fcf42a9b30fab95d8d147f3"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-host-scale.json",
+      "sha256": "4951a5cd645b2bf524e78346a1bc94c5cd4bb2573b0cd35324d4ec99ddcb4f9b"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-executable-update.json",
+      "sha256": "4a9e1377f5a8ff5c27c736c97878b1a66c3e7fd4dcdd48159b0601acbbc10338"
+    },
+    {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/builds/build-workstation-5d9aeb9b9b1b43cc/verification-report.json",
+      "sha256": "6848563a508527850ae24ac50d5f249577125262863a934df189997bbb954afe"
+    },
+    {
+      "path": "validation/20261011-auth-address-component.json",
+      "sha256": "e9a6383c111b673bb6bdd29df5a8ae819d0fec33b38a2cfdeeb6fe8b38b25119"
+    },
+    {
+      "path": "validation/20261011-unlock-progression-target.json",
+      "sha256": "7d135a323599e639e5e375ffcd548511fd93a1de3fce9d4a734d8688eaf926d8"
+    },
+    {
+      "path": "validation/20261011-full-executable-update-readiness.json",
+      "sha256": "7b2d70317e9bc8e6a567a65fdfa6e573551f53a187a38a698dfc2b327b8eed3f"
+    },
+    {
+      "path": "data/host-scale-20261010/r4-ready.json",
+      "sha256": "65e2aad3c77e12fd68a7c7856fbaf92857d4c1f4de8b380a21031325a95a3745"
+    },
+    {
+      "path": "validation/20261011-host-scale-updater-default.json",
+      "sha256": "b9f3c39186caa8385ce56d64881e327989eef1f5f864911703e166a880f03278"
+    },
+    {
+      "path": "data/full-executable-publication-release19-20261011/public-verification.json",
+      "sha256": "18633d527b336bf2445e5d5200b3012253bf903908b075271db4e308ae750f24"
+    }
+  ]
+}

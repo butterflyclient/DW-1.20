@@ -64,10 +64,16 @@ Earlier game evidence (not a new run of the 20261011 client):
 - Fresh C++ compilation, symbol/relocation/unwind and exact-image getter checks pass.
 - Corrected unlock projection passes the original Lua consumers for both local
   clients, maximum displayed rank155, all 51 weapons and disabled restoration.
-- Release 18's full EXE is published on the primary server. Signed checks for
+- Release 19's full EXE is published on the primary server. Signed checks for
   13 older hashes and the actual embedded helper's download/verification pass.
   Its current-version path stages no replacement. No game run or apply/relaunch
   was performed for this release; the checks above still need owner playtesting.
+- The combined client carries side-chat R4 bot decisions and nearest-area search,
+  all 150 current bot names, and the existing individual bot operator/loadout
+  roster. The exact image passes 339 host cases and all 68 R4 navigation cases.
+  Compare the same map/viewpoint at 20, 32, 64 and 80 bots before larger counts;
+  inspect sv_hostScaleStatus while comparing com_optimized 0 and 1. No new live
+  high-population performance result is claimed by these instruction fixtures.
 
 Use controlled restarts. The current dw_leave command remains unsuitable for tests.
 The direct xstartlobby command faulted in this build; normal Quick Play menu entry

@@ -1,0 +1,291 @@
+Replay high-population host experiment
+
+Scope
+Eleven host/navigation routines are replaced by freshly compiled C++ in the private DW
+EXE. Their identities, extents, relocation targets and unwind placement come
+from the normal Replay compiler. No existing executable is edited in place.
+All code and build outputs for this experiment remain under E:\DW\IW8.
+
+Controls
+com_optimized 0: use the original scheduling and visibility behavior.
+com_optimized 1: CPU optimizations, including this experiment; native scene quality.
+com_optimized 2: the same CPU changes plus the existing reduced-detail profile.
+The existing registration default remains 1.
+sv_hostScaleStatus prints cumulative diagnostic counters. It is not a switch.
+Collision ownership fixes apply in every profile: freeing an in-use physics
+shape is a correctness failure, not an optional optimization.
+
+Changes
+1. Bot movement uses the existing native user-movement worker queue above 20
+   connected clients. Commands remain complete 264-byte records; the six-entry,
+   1600-byte per-client queue retains its native publication/wakeup ownership.
+   Every queued bot command is joined before this routine returns. This matters
+   because the caller resets the skeleton cache and updates agents immediately
+   afterward. Human commands, spectator buttons, command times and native
+   acknowledgement behavior remain on their original paths.
+
+2. A full command queue can use the native worker-draining wait instead of
+   repeatedly sleeping for 1 ms. This path applies to human burst input too.
+   Worker eligibility, dependency handling, physics context and completion stay
+   owned by native routines. Small sessions and com_optimized 0 retain the wait.
+
+3. Bot perception is budgeted above 20 connected clients. The native routine
+   evaluates all eligible sentients for threat updates and sorts them by its
+   original age/distance priority. It then limits new background visibility
+   evaluations to 8 at 21-64 clients, 6 at 65-100, and 4 above 100. An acquired
+   target gets its normal check separately. Existing visibility timestamps and
+   the native priority age move deferred candidates forward on later frames.
+   This visibility routine does not change movement or simulation ticks.
+   The deliberate tradeoff is slower perception of secondary/new enemies in
+   dense battles. This is an experimental AI scheduling policy, not a claim of
+   identical bot reactions.
+
+4. The native bot command-production loop is compiled from C++ and staggers
+   full decision updates above 20 occupied slots. Revision 4 adapts the rate to
+   population and human proximity. Background searching bots target 96 ms at
+   21-64 clients, 128 ms at 65-100, and 192 ms above 100. Background fighting
+   bots target 64 ms up to 100 clients and 96 ms above 100. Those background
+   intervals double when the closest living human is more than 4096 units away.
+   A bot targeting a human, or fighting within 256 units of one, uses 32 ms.
+   Searching within 512 units of a human uses 64 ms. Human origins are gathered
+   once per server frame, rather than rescanning client records for each bot.
+   These intervals round up to the native server frame step.
+   A per-slot phase spreads work across frames. Every playing bot still gets a
+   complete movement command with current server/command/input times each tick.
+   Health/target changes, pending script buttons, inactive/spectator transitions,
+   owner changes and time rewinds invalidate cached decisions. Human clients
+   keep native processing. Movement and server tick rates are not reduced.
+   This deliberately trades background decision/aim refresh frequency for CPU
+   headroom; it does not promise identical bot reactions to the unmodified game.
+
+5. Individual and combined collision unload state now means that ANY of the
+   five target-build physics worlds still owns world-collision or static-model
+   bodies. Setup readiness retains the native ALL-world predicate. This keeps
+   fastfile memory resident until both server worlds and all client worlds have
+   completed teardown, without suppressing raycasts or removing collisions.
+
+6. sv_hostScaleStatus also reports full/reused bot decisions and average/peak
+   elapsed time in bot command generation and movement. These measurements do
+   not include the remainder of the server frame (GSC, snapshots, etc.).
+
+7. Revision 3 directly addresses the measured script-navigation hotspot. Only
+   bot GetClosestReachablePointOnNavmesh calls above 20 occupied slots, with
+   com_optimized 1/2 and the verified native 2D navigator, enter a bounded search.
+   The native spatial walker, loose-area walker, and incremental island search
+   are recompiled in C++. Native filter predicates, visitation generations,
+   traversal order, queue allocation/growth/free and area-handle ownership are
+   preserved when no bot budget is active. A thread-owned query scope prevents
+   another worker's navigation from consuming the server's budget.
+
+   Each admitted query receives 512 spatial work units and 2048 graph-edge
+   visits. A server frame permits at most 8192 spatial units and 32768 edges.
+   Occupied-slot groups rotate each native frame, admitting at most 16 slots
+   (15 per frame for a full 150-slot population). A 150-slot rotation completes
+   in ten server frames. These are work limits, not promised millisecond limits.
+   Movement commands and human navigation retain their native rate and path.
+
+   Matching goal points can be reused for less than 250 ms, bound to navigator,
+   current area, space, player storage, requested coordinates and path settings.
+   No native area handle or graph allocation is kept in the cache. A deferred
+   query, or a search finding no reachable area inside its budget, projects the
+   requested position onto the bot's current valid navigation area. This can
+   delay long routes and make dense-population bots less decisive; it never
+   claims that a disconnected region is connected. Mode 0, humans, 3D navigators
+   and populations of 20 or fewer keep the original unbounded behavior.
+   sv_hostScaleStatus includes query/cache/fallback/spatial/graph counters.
+
+8. The private build also carries the latest DW authentication-address getter
+   binding. Its helper was already in current source, but older shared editor
+   metadata bound only the port getter. The strict endpoint fixture caught this
+   mismatch before publication. The getter is now compiled from source and
+   bound privately using the verified native ABI; no runtime binary patch or
+   edit to the other session's saved workstation state is required.
+
+9. Revision 4 replaces the native BFX Planner::GetClosestArea body with an
+   exact-result search optimization. Profiles 1/2 first call its original
+   nearest-area query with a 1024-unit radius. If no valid nearby area is found,
+   the temporary result allocation is released and the original unrestricted
+   query runs. If a valid nearby area exists, every closer area is also within
+   that radius. The native collector retains projection, traversal flags,
+   distance ranking and native area storage; no native pointer is cached.
+   Profile 0 uses the original unrestricted query directly. This path is not
+   subject to the experimental bot reachability work budget in item 7.
+   sv_hostScaleStatus counts nearby queries and unrestricted fallbacks so its
+   effectiveness can be checked on the actual map.
+
+Research
+The original Replay image SHA256 is
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+Original instructions show bot command application is serial, while normal
+client movement already has a worker queue. PreThink copies the same command
+that the serial path copies; the worker calls the corresponding native movement
+body. The native sight loop can continue over its entire sorted list whenever
+a bot has a nearby enemy. This permits quadratic tracing in dense populations.
+Native end-of-frame and human movement workers were already enabled. The
+later-build deferred-snapshot controls do not exist in this Replay image and
+were not fabricated. No applicable BAP mode was identified in the searched
+Replay code and reference source.
+
+The target layout differs from the reference source: Replay's team flags here
+have five 32-bit words (160 bits), its sentients are 184 bytes, per-sentient
+visibility records are 64 bytes, entities are 1440 bytes, and the native sight
+candidate array holds 272 entries. The C++ views and compile-time checks retain
+these target values. Game mode limits and the native 200-client storage capacity
+are not changed by this work.
+
+Owner-run first-candidate failure
+The owner ran candidate SHA256
+ed0548c1347be46415810c5608c4a7e0d58470cba39939a07dc2dda0b9a02051
+with a requested 100 bots. The server stopped with 42 occupied slots at game
+time 26256 ms; rendering continued. Exception RVA 0x1EC94AE maps to original
+0x1E964AE in the Havok raycast shape consumer. Read-only thread contexts and a
+native StackWalk64 unwind identify PhysicsScript_Raycast on the server thread,
+after movement workers had joined. Shape 0x2304689C4F0 was decommitted. Its
+physics reference is world-collision tile 560. That tile's asset/shape pointers
+and setup bits were cleared, but server-world instances 6836 still existed in
+both worlds. Native unload code used the negation of ALL-world readiness,
+allowing partial teardown to release the fastfile too soon. Revision 2 fixes
+that lifecycle predicate for both numbered tiles and the combined fastfile.
+The post-crash CPU profile is not valid evidence of the pre-crash lag hotspot.
+No game instance was restarted or changed by the diagnostic tools.
+
+Owner-run revision-2 lag profile
+The owner tested SHA256
+b767edbe8c171dc1dda51d7810ab6d4c1ae98029139eb92ec7a7b01a57940b37
+with around 50 bots and reported heavy lag. During a read-only 10.938-second
+capture, server thread 25112 consumed 10.921875 CPU seconds. Of its 350 samples,
+171 were in the closest-area spatial walker and most others in its BFX
+reachability/area callbacks. A native StackWalk64 trace led from the server
+GSC thread through Scr_GetClosestReachablePointOnNavmesh, AINavigator2D's
+virtual query, and GetClosestReachableArea into those searches. This work is
+outside SV_BotUpdateBots, so decision staggering cannot bound it. The owner
+confirmed closing this process manually; no new fatal error was reported.
+Evidence is in data/host-scale-20261010/live-r2-lag-profile.json and
+live-r2-navigation-callers.json. Revision 3 targets this observed bottleneck.
+
+Owner-run revision-3 lag profile
+The owner tested SHA256
+de7d5718b49e7542a1519446abe4a2c22bd915ad1624bb9773e7e40a8c6b004e
+with 80 bots plus one human. It was considerably better but remained too slow
+for the desired 150 participants. A 4.009-second counter capture contained
+164 server frames and 2624 ms of simulation advancement: about 40.9 Hz against
+the configured 16 ms / 62.5 Hz cadence. The bot decision stage averaged 10.387 ms
+per frame and movement 0.602 ms. All 12,262 bot movement commands were queued;
+3,487 full decisions and 8,775 reused commands were recorded. A separate
+10.938-second lightweight sample found server thread 21428 used 9.640625 CPU
+seconds. Of 350 context samples, 106 were in the other generic nearest-area
+spatial walker and 26 in its candidate collector. Sample counts are not CPU
+percentages. This evidence supports the decision-rate and exact nearby-query
+changes in revision 4; it does not predict a specific FPS improvement.
+
+These measurements predate a later diagnostic snapshot failure. A VA-clone
+experiment leaked three zero-thread diagnostic clones and temporarily consumed
+additional memory. Their identities were verified, only those three clones
+were terminated, and the real game process was left running. VA cloning is now
+disabled in the stack tool. No measurements taken during that failure are used
+as evidence of game performance. Evidence for the clean profile is in
+live-highcount-host-counters.json and live-highcount-profile.json.
+
+Validation
+tools/test-host-scale.py compares actual original and compiled instructions with
+modeled engine boundaries. It covers original-mode equivalence, 20/21-client
+transition, up to 200 client records / 272 sentients, both optimization profiles,
+inactive and spectator clients, worker-disabled fallback, copying all command
+bytes, queue wraparound/full/rejected cases, and the completion fence.
+The isolated 150-client sight fixture reduces background visibility evaluations
+from 149 to 4 per bot; an acquired target can add one. This is a work-count
+measurement. It is not a measured game FPS gain or proof of 150-human capacity.
+The revision-2 decision tests check command continuity, spectators, native-mode
+equivalence, target/damage/script urgency, time rewind, and 16/50 ms server
+frames. Collision tests replay partially released worlds, tile word boundaries,
+tile 560, the combined file, and level-close with zero registered tiles.
+The owner performed the live tests described above. Revision 4 needs a new
+owner playtest; no new game instance was launched by these checks. Navigation
+checks compare original and compiled graph filtering, allocator variants,
+queue growth and spatial traversal, then verify bounded work, independent
+threads, cache/fallback behavior and fair admission across 150 slots. Passing
+these checks does not demonstrate live 150-player performance. Revision 4 adds
+native/compiled nearest-area result comparisons, invalid-layer handling,
+finite-radius fallback and native array ownership checks, plus human proximity
+and distant bot decision scenarios. The proximity fixtures measure reduced
+decision calls while proving that all bot movement commands still run each tick.
+
+Private build
+python -B tools/build-frozen-workstation.py --optimized --host-scale --pin-experimental-updater \
+  --receipt-directory data/host-scale-20261010/build-r4
+
+--host-scale is only a build selection; runtime behavior uses com_optimized.
+The private build retains the current integration/replay sources, including the
+latest DW_BotNames.h. Shared workstation sources and the public update catalog
+are not changed. The explicit --pin-experimental-updater option uses the existing
+no-update outcome so the public release cannot overwrite a private experiment
+before testing. Without that option, host-scale builds retain active updates.
+Native content updates and Demonware connectivity remain included.
+
+Suggested first comparison
+Launch the candidate from E:\IW8\Builds\1.20-replay with your normal INI.
+Use the same map, player/bot count and viewpoint for each comparison.
+Start at 20, then 32, 64, 100 and 150 total participants.
+At each size compare com_optimized 0 and 1; record host FPS and whether remote
+clients stay smooth. Run sv_hostScaleStatus twice several seconds apart and
+compare counter deltas. Queued movement should grow above 20 clients, and the
+sight deferred counter should grow in dense fights. Full/reused command counts
+show whether decision staggering is active. Compare bot-stage elapsed times
+separately from rendered FPS. Repeat with numbered collision tiles and the full
+collision fastfile. Check normal shooting,
+respawn, spectator behavior and AI reacquisition after losing a target.
+Profile 2 is optional and mixes the CPU changes with existing visual reductions.
+
+Revision 4 ready artifact (2026-10-11)
+Run from the existing game folder:
+E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_hostscale_r4_dw.exe
+Its matching .ini is copied from the current game_dx12_ship_replay_dw.ini.
+The main game_dx12_ship_replay_dw.exe and the DW server were not replaced.
+
+Build directory:
+E:\DW\IW8\data\workstation-builds\build-workstation-f01c8bee5820432f
+Frozen source:
+E:\DW\IW8\data\compiler-snapshot-1791691351163152100
+EXE SHA256:
+e7be71d7452c8191d93b5f0b66c961b17314b64f227f03fbfbbc37d9c22ad44a
+Size: 99,750,400 bytes. Fresh C++ units: 104. Unresolved symbols: 0.
+
+The standard compiler job succeeded. Its checks include relocation auditing,
+source provenance and 659 Windows virtual-unwind cases. Against the exact
+linked EXE, 339 host instruction cases and 68 navigation cases passed. The
+150-client background-decision fixture reduced 1800 original decision calls
+to 288 while delivering all 1800 movement commands. This is work-count evidence,
+not a measured runtime speedup. No revision-4 game test was run by the assistant.
+
+All 150 unique current DW_BotNames.h names are present in the EXE. The exact
+header SHA256 is 88bbdb15b301e9613bbc273483e60c0bdc60384c2d4f67b3226f3e247c4f7947.
+Current private DW sources and the frozen source were compared again at handoff;
+the only intentional differences are host status-command registration and the
+private executable-updater pin. Full readiness evidence:
+E:\DW\IW8\data\host-scale-20261010\r4-ready.json
+
+Compare revision 4 first at the same 80 bots plus one human, then 100 and finally
+the map's full capacity. In a 150-slot match, the host occupies one of those
+slots, leaving 149 for bots/other players. Stable 150-participant operation and
+the behavior of many remote human players remain live validation gates.
+
+Combined production release 19 (2026-10-11)
+The main EXE now includes the verified R4 bot/navigation source, bindings and
+all 150 current names together with the latest DW unlock, auth-address and
+Online-toast fixes. Unlike the private comparison image above, this production
+image has its full-EXE updater enabled and is published on the primary droplet.
+Run E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe with its existing INI.
+EXE SHA256:
+09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29
+Fresh job 5d9aeb9b9b1b43cc compiled all 104 CPP units with zero unresolved symbols.
+Its 659 unwind, 339 host and 68 navigation cases pass alongside the existing
+DW getter/Lua, lobby-control and active-updater gates. No game run was performed.
+The same native movement commands run each server tick; high-population bot
+decisions deliberately use the R4 population/proximity refresh policy above.
+No runtime FPS or 150-player stability gain is claimed before owner testing.
+Source/readiness receipts: data/startup-toast-unlock-update-r4-final-20261011.
+Public and deployment proof: validation/20261011-bot-r4-production-readiness.json.
+
+For a future production build, use --optimized --host-scale without
+--pin-experimental-updater. The latter flag is only for private comparisons and
+requires --host-scale. The publisher rejects a disabled/pinned updater.

@@ -11,6 +11,40 @@ import subprocess
 import sys
 import time
 
+def prepare_host_stack_verifier(text):
+    """Size the emulated stack from the PE's actual unwind allocation."""
+    replacements = {
+        '                stack_buffer = ctypes.create_string_buffer(0x6000)': '''                frame_info = next(e.unwindinfo for e in pe.DIRECTORY_ENTRY_EXCEPTION
+                                  if e.struct.BeginAddress == rva)
+                frame_bytes = 0
+                while frame_info:
+                    for operation in frame_info.UnwindCodes:
+                        if hasattr(operation, "get_alloc_size"):
+                            frame_bytes += operation.get_alloc_size()
+                        elif operation.struct.UnwindOp == 0:
+                            frame_bytes += 8
+                        elif operation.struct.UnwindOp == 10:
+                            frame_bytes += 48 if operation.struct.OpInfo else 40
+                    frame_info = frame_info._chained_entry.unwindinfo if frame_info.UNW_FLAG_CHAININFO else None
+                if frame_bytes > 0x100000:
+                    raise ValueError(f"Unexpectedly large unwind frame for {name}: {frame_bytes}")
+                stack_extent = (max(0x4000, frame_bytes + 0x2000) + 4095) & -4096
+                stack_buffer = ctypes.create_string_buffer(stack_extent + 0x2000)''',
+        '                initial_rsp = stack_at+0x4000-8':
+            '                initial_rsp = stack_at+stack_extent-8',
+        '                machine.mem_map(stack_page, 0x8000)':
+            '                machine.mem_map(stack_page, ((ctypes.addressof(stack_buffer)+len(stack_buffer)+4095) & -4096)-stack_page)',
+        '                    machine.emu_start(view+rva, view+stop, count=100)': '''                    machine.emu_start(view+rva, view+stop, count=8192)
+                    if machine.reg_read(x86.UC_X86_REG_RIP) != view+stop:
+                        raise ValueError(f"Prologue execution did not reach {name}+{stop-rva}")''',
+    }
+    for before, after in replacements.items():
+        if text.count(before) != 1:
+            raise RuntimeError("Windows unwind stack model insertion point changed")
+        text = text.replace(before, after)
+    return text
+
+
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument(
@@ -20,13 +54,21 @@ parser.add_argument(
 )
 parser.add_argument("--optimized", action="store_true",
                     help="Include the existing runtime com_optimized 0/1/2 controls in this private DW build")
+parser.add_argument("--host-scale", action="store_true",
+                    help="Opt into experimental high-population host scheduling and perception")
+parser.add_argument("--pin-experimental-updater", action="store_true",
+                    help="Only for private host-scale comparisons: suppress public EXE replacement; never publish this candidate")
 parser.add_argument("--include-player-data-path", action="store_true",
                     help="Explicitly include the separate Documents/Replay profile relocation; production retains the native path")
 parser.add_argument("--match-events", action="store_true",
                     help="Opt into the separately validated native match-event metadata replacement")
 parser.add_argument("--receipt-directory", type=Path,
                     help="Keep this private build's job and source receipts separate from concurrent workstation builds")
+parser.add_argument("--prepare-only", action="store_true",
+                    help="Freeze and validate inputs without dispatching compilation")
 args = parser.parse_args()
+if args.pin_experimental_updater and not args.host_scale:
+    parser.error("--pin-experimental-updater requires a private --host-scale comparison")
 receipts = args.receipt_directory.resolve() if args.receipt_directory else ROOT / "data"
 receipts.mkdir(parents=True, exist_ok=True)
 ORIGINAL = Path(r"E:\replay-compiler")
@@ -232,6 +274,33 @@ for source in sorted(private_sources.iterdir()):
     copy_file(source, destination)
 # A private replacement of a saved source unit is a new source revision. Update
 # only this frozen job's metadata; the shared workstation stays untouched.
+if args.host_scale:
+    for source in sorted((ROOT / "integration/host-scale").iterdir()):
+        if source.suffix in (".cpp", ".h"):
+            copy_file(source, snapshot / "src" / source.name)
+    frame = snapshot / "src/ScrPlace_EndFrame.cpp"
+    content = frame.read_text()
+    marker = "    Com_Optimized_Frame();"
+    if content.count(marker) != 1:
+        raise RuntimeError("Host-scale frame integration point changed")
+    frame.write_text('extern "C" void SV_HostScale_Frame();\n' +
+                     content.replace(marker, marker + "\n    SV_HostScale_Frame();"))
+    record = next(item for item in records if Path(item["snapshot"]) == frame)
+    record.setdefault("original_sha256", record["sha256"])
+    record["sha256"] = hashlib.sha256(frame.read_bytes()).hexdigest()
+    if args.pin_experimental_updater:
+        # An explicit private comparison can stay on its candidate instead of
+        # updating to the public release. Normal host-scale builds retain the
+        # production updater; the publisher rejects a pinned candidate.
+        updater = snapshot / "src/DW_ExecutableUpdate.cpp"
+        updater_text = updater.read_text()
+        update_marker = "unsigned s_state = 0, s_reported = 0;"
+        if updater_text.count(update_marker) != 1:
+            raise RuntimeError("Experimental updater pin insertion point changed")
+        updater.write_text(updater_text.replace(update_marker, "unsigned s_state = 30, s_reported = 0;"))
+        record = next(item for item in records if Path(item["snapshot"]) == updater)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(updater.read_bytes()).hexdigest()
 units_path = snapshot / "source-workstation/units.json"
 units_document = json.loads(units_path.read_text())
 for unit in units_document["units"]:
@@ -306,6 +375,24 @@ if args.match_events:
                               "content_sha256": match_events["source_sha256"],
                               "source": str(private_sources / "DW_AchievementEvent.cpp"),
                               "derived_native_bindings": "generated/match-event-integration.json"})
+if args.host_scale:
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_host_scale", ROOT / "tools/prepare-host-scale-integration.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    host_scale = module.prepare(snapshot)
+    for changed in (snapshot / "source-units.json", units_path):
+        record = next(item for item in records if Path(item["snapshot"]) == changed)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    for generated in (snapshot / "src/SV_HostScaleBindings.h",
+                      snapshot / "generated/host-scale-integration.json"):
+        copy_file(generated, generated)
+    for replacement in host_scale["replacements"]:
+        private_overrides.append({"id": replacement["identity"],
+                                  "content_sha256": replacement["source_sha256"],
+                                  "source": str(ROOT / "integration/host-scale" / Path(replacement["source"]).name)})
+
 # A normal build generates its own static updater from the selected, frozen
 # client trust/ABI sources. Explicit reviewed integration snapshots may retain
 # their already-built helper header, whose bytes remain compiler dependencies.
@@ -387,6 +474,13 @@ verify_text = verify_text.replace(
     + '\n    if any(item["source"].endswith("DW_TestHomePath.cpp") for item in report["cpp"]):'
     + '\n        checks["dw_private_test_paths"] = verify_dw_test_paths(rebuilt, report)',
 )
+if args.host_scale:
+    verify_text = prepare_host_stack_verifier(verify_text)
+    probe_marker = "                if stop != rva:\n                    machine.emu_start"
+    if verify_text.count(probe_marker) != 1:
+        raise RuntimeError("Windows stack-probe verification insertion point changed")
+    probe_overlay = ROOT / "integration/compiler/stack_probe_validation.py.inc"
+    verify_text = verify_text.replace(probe_marker, probe_overlay.read_text() + "\n" + probe_marker)
 verify_path.write_text(verify_text)
 verify_record = next(item for item in records if Path(item["snapshot"]) == verify_path)
 verify_record["original_sha256"] = verify_record["sha256"]
@@ -421,6 +515,16 @@ debug_text = debug_text.replace(
     '            ret(arena + 0x7080)\n'
     '        elif name == "Sys_IsMainThread":',
 )
+if args.host_scale:
+    debug_text = debug_text.replace(
+        '    query = symbols["__imp_VirtualQuery"]',
+        '    intercepted[symbols["SV_HostScale_Frame"]] = "SV_HostScale_Frame"\n'
+        '    query = symbols["__imp_VirtualQuery"]')
+    debug_text = debug_text.replace(
+        '        elif name == "Sys_IsMainThread":',
+        '        elif name == "SV_HostScale_Frame":\n'
+        '            ret(0)  # Independently verified host-scale registration boundary.\n'
+        '        elif name == "Sys_IsMainThread":')
 if args.optimized:
     first_frame = '    run("ScrPlace_EndFrame")\n    expected_commands ='
     if debug_text.count(first_frame) != 1:
@@ -551,6 +655,9 @@ manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     )
     + "\n"
 )
+if args.prepare_only:
+    print("Frozen compiler inputs:", snapshot, flush=True)
+    raise SystemExit(0)
 os.environ["REPLAY_GAME_ROOT"] = configuration["game"]
 os.environ["REPLAY_SQLITE"] = configuration["sqlite"]
 os.environ["REPLAY_WORKSTATION_CACHE"] = configuration["cache"]

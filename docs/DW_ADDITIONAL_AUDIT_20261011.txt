@@ -130,33 +130,36 @@ implemented or that these unbound contracts are inherently impossible.
 
 CLIENT RELEASE VERIFIED AND DEPLOYED
 
-Fresh job: 61adafbd4c0048ce (full engine profile, succeeded).
-Client SHA256: d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2.
+Fresh job: 5d9aeb9b9b1b43cc (full engine profile, succeeded).
+Client SHA256: 09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29.
 Deployed EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe.
 The owner INI stayed byte-for-byte unchanged. No game process was started or
-stopped. Immediately before replacement, the primary EXE matched the latest
-verified audit image and no process used that filename. The immutable original
-owner R3 artifact remains in its build directory for restoration.
+stopped by this session. At the final deployment check, the primary EXE already
+matched the combined release-19 image and a game instance was running from it.
+That instance was left untouched. Earlier approved production and private R4
+artifacts remain in their build directories for restoration.
 
-The build retains all 103 approved C++ units and 71 recovered assembly units.
-It carries the corrected unlock source and reviewed auth-port wrapper, then
-restores the production updater's initial state to zero. The other 102 C++
-sources match the preceding verified audit candidate. Owner console, frontend,
-optimization, host-scale and approved navigation work are preserved. An owner
-navigation fixture subsequently referenced Bfx_GetClosestArea, absent from this
-approved source baseline; its drift is recorded. The frozen approved 49-case
-navigation fixture passes; the newer root is not claimed present in this image.
+The build retains all 104 latest side-chat R4 C++ units and 71 recovered assembly
+units. It includes the latest population/proximity decision scheduling and the
+Bfx_GetClosestArea native root, with all R4 navigation bindings and headers.
+The production updater and reviewed const auth-port wrapper replace their
+private R4 counterparts; the other 102 C++ source hashes match the verified R4
+baseline. The approved production update helper, corrected unlock source,
+auth-address and Online-toast fixes are retained. All 150 current unique bot
+names are verified in the actual image. Owner console, frontend, optimization,
+collision ownership, bot roster and navigation work are preserved.
 
-Final exact-image gates: 650 Windows unwind cases, full reconstruction/image/
+Final exact-image gates: 659 Windows unwind cases, full reconstruction/image/
 relocation/source-object-header provenance, four endpoint/presence cases,
 136 normal controller cases plus 136 original-instruction oracle cases,
 306 weapon cases, original Lua rank155/XP/max-level/restoration, ten lobby
-control groups, 49 navigation cases and 339 host-scale cases. Native calls and
+control groups, 68 navigation cases and 339 host-scale cases. Native calls and
 Lua boundaries are modeled by the instruction checkers; these are not game runs.
 
 Client readiness: validation/20261011-reversible-unlock-client-readiness.json.
-Frozen build and checker receipts: data/startup-toast-unlock-update-final-20261011.
+Frozen build and checker receipts: data/startup-toast-unlock-update-r4-final-20261011.
 Current local pair receipt: data/current-remote-deployment.json.
+Latest bot integration readiness: validation/20261011-bot-r4-production-readiness.json.
 
 FULL EXECUTABLE AUTO UPDATE PUBLICATION
 
@@ -167,7 +170,7 @@ worker on the second, no worker when disabled, and failure state 40 if thread
 creation fails. The previous disabled image fails this negative-control check.
 Existing compiled prerequisite, update-state and restart-routing cases pass.
 
-Release 18 publishes the complete d8993395 EXE on the droplet. The full-image
+Release 19 publishes the complete 09159e5a EXE on the droplet. The full-image
 blob is verified and flushed before the catalog is atomically committed last.
 Server route /updates/v2/check signs a nonce-bound plan; /updates/v2/image/<sha>
 serves the full image. Modern full-update clients can jump directly from any
@@ -177,7 +180,7 @@ The latest hash returns current status and does not create another update loop.
 The upload tool now requires a passing receipt tied to the precise EXE hash,
 including compiled first-frame scheduling and restart routing. It rejects an
 inherited disabled updater rather than publishing it for other clients.
-Local publication: data/full-executable-publication-release18-20261011.
+Local publication: data/full-executable-publication-release19-20261011.
 Public readiness: validation/20261011-full-executable-update-readiness.json.
 
 Signed public replies and the actual helper embedded in the published EXE are
@@ -202,7 +205,7 @@ OWNER PLAYTEST
    not repeatedly show a toast. Check three pending MP dailies and advance one
    through public gameplay. BR/co-op daily criteria remain pending exclusions.
 5. On a working older full-update client, connect and accept the restart notice.
-   After restarting, confirm release 18's EXE hash and no repeated update notice.
+   After restarting, confirm release 19's EXE hash and no repeated update notice.
    Keep the same INI, local identity and profile throughout this check.
 
 No new game/UI confirmation or startup timing measurement was performed in

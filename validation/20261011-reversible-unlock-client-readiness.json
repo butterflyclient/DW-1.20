@@ -1,32 +1,40 @@
 {
   "schema": 1,
   "passed": true,
-  "compiled_client_sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
+  "compiled_client_sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
   "deployed_client": {
     "schema": 1,
     "deployed": true,
     "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
-    "sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
-    "primary_replaced": true,
-    "owner_primary_before_sha256": "514bc53cd4b98f56cc2021a4006ec6b3f1a9586ff688241999ccf0b1184074f8",
-    "current_primary_sha256": "d899339555617b249903bb40b28d149f4604fdde00b7f3df7c8ebc997622dfd2",
-    "observed_owner_process_ids": [],
-    "original_owner_artifact": "E:\\DW\\IW8\\data\\startup-toast-unlock-r3-final-20261011\\builds\\build-workstation-1bc688b8b7014df1\\game_dx12_ship_replay_recompiled.exe",
-    "original_owner_sha256": "514bc53cd4b98f56cc2021a4006ec6b3f1a9586ff688241999ccf0b1184074f8",
+    "sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
+    "primary_replaced": false,
+    "owner_primary_before_sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
+    "current_primary_sha256": "09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29",
+    "observed_owner_process_ids": [
+      7904
+    ],
+    "original_owner_artifact": "E:\\DW\\IW8\\data\\workstation-builds\\build-workstation-f01c8bee5820432f\\game_dx12_ship_replay_recompiled.exe",
+    "original_owner_sha256": "e7be71d7452c8191d93b5f0b66c961b17314b64f227f03fbfbbc37d9c22ad44a",
     "ini": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.ini",
     "ini_sha256": "6147496a527726fe0ecd21015909346b9f8524fbf0e335a316f41c10d4d2ce80",
     "owner_ini_preserved": true,
-    "readiness": "E:\\DW\\IW8\\data\\startup-toast-unlock-update-final-20261011\\client-readiness.json",
-    "readiness_sha256": "626fcbae3e5b8341a9a2df232b042cbe320e002c5b63f791054fe69444ebb8c5",
+    "readiness": "E:\\DW\\IW8\\data\\startup-toast-unlock-update-r4-final-20261011\\client-readiness.json",
+    "readiness_sha256": "42bc5d08d3293b905245fde3d9c6f3205f7eea289c8633ff243c20c5d194c40f",
     "game_runs_performed": false,
     "game_processes_stopped": false,
-    "public_executable_update_publication_changed": true
+    "public_executable_update_publication_changed": true,
+    "primary_already_current": true,
+    "primary_observation": "Primary already matched fresh release19 at deployment check; active instance left untouched",
+    "secondary_copy_receipt": {
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/secondary-deployment.json",
+      "sha256": "25f3c8db5145b203a776b1aefd2e76854275041b4f96d7f7995ab02fc52029ed"
+    }
   },
-  "fresh_cpp_count": 103,
+  "fresh_cpp_count": 104,
   "preserved_cpp_count": 102,
   "assembly_unit_count": 71,
   "unresolved_symbols": 0,
-  "windows_virtual_unwind_cases": 650,
+  "windows_virtual_unwind_cases": 659,
   "maximum_display_rank": 155,
   "reversible_native_progression": true,
   "canonical_weapons": 51,
@@ -51,48 +59,44 @@
   "public_executable_update_publication_changed": true,
   "evidence": [
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/client-readiness.json",
-      "sha256": "626fcbae3e5b8341a9a2df232b042cbe320e002c5b63f791054fe69444ebb8c5"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/client-readiness.json",
+      "sha256": "42bc5d08d3293b905245fde3d9c6f3205f7eea289c8633ff243c20c5d194c40f"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/client-deployment.json",
-      "sha256": "c171d46fb407ac7ccd52fa6bd49140030eb6a66952985da5b6362a2863cedd84"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/client-deployment.json",
+      "sha256": "3dbcc048aff6ab2780b25de4e114db58d4d7a7022df41f7c6133453d9c056c0d"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/source-receipt.json",
-      "sha256": "1c2272c979639abbf5e38042f9bd97680bbb9a31fe055cc84747550b9f19b69d"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/source-receipt.json",
+      "sha256": "45091d071eebf90599b72c2f3d7808ded885e503a4b9ace31e1c262442132754"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-check-inputs.json",
-      "sha256": "96afbacc6dbdf3b2154b753ba8e4e34b990d23e873dc649683a273c3328e8e37"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-check-inputs.json",
+      "sha256": "e175018dba93b3e245c195598e74067ff5640beeecfa7011431446e3cb139d9d"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-unlock-progression.json",
-      "sha256": "60244c32350330c5444137e47a2921b28262c9204aeb0c44401b956e870dc543"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-unlock-progression.json",
+      "sha256": "5ac7a58d94cd94b3ae829c9fe2f2bc01518b31eb187fcd55ac605f7f52e7ccc8"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-lobby-controls.json",
-      "sha256": "2e21b92e5c332536e0bf069efaa0d5ad8b45afb7a87fa7c244433616954631b0"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-lobby-controls.json",
+      "sha256": "7bbcb0279850b326e3beb8aefbd70375d5f643c2167830792b02615f693657d5"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-navigation.json",
-      "sha256": "38d6427ce115df055e08484b53db0bb0654e9ba8ae41fcc9b1c5c4ed0d18bc97"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-navigation.json",
+      "sha256": "bc2b6b0e2184dc4b3d8840bcc46b48dd8e8c76360fcf42a9b30fab95d8d147f3"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-host-scale.json",
-      "sha256": "665ea84b1ad5cd846c4a4891f01c431f9903c9852e0cdbfe4d36eaf0ea9832ad"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-host-scale.json",
+      "sha256": "4951a5cd645b2bf524e78346a1bc94c5cd4bb2573b0cd35324d4ec99ddcb4f9b"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/linked-executable-update.json",
-      "sha256": "2a33ce17479d628bf47e0c47b1248a8e6b793eb0c8cb4d606f2383f8a37a1919"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/linked-executable-update.json",
+      "sha256": "4a9e1377f5a8ff5c27c736c97878b1a66c3e7fd4dcdd48159b0601acbbc10338"
     },
     {
-      "path": "data/startup-toast-unlock-update-final-20261011/navigation-fixture-drift.json",
-      "sha256": "b7f7c1d0f2c9c8e97ca514bb874abe2c4f7472b74f1f854eb682621f1cd3c2ec"
-    },
-    {
-      "path": "data/startup-toast-unlock-update-final-20261011/builds/build-workstation-61adafbd4c0048ce/verification-report.json",
-      "sha256": "a56545f3d89e60853b93ec274f13ede54924af3b33762dfff7858b360e6440dc"
+      "path": "data/startup-toast-unlock-update-r4-final-20261011/builds/build-workstation-5d9aeb9b9b1b43cc/verification-report.json",
+      "sha256": "6848563a508527850ae24ac50d5f249577125262863a934df189997bbb954afe"
     },
     {
       "path": "validation/20261011-auth-address-component.json",
@@ -104,11 +108,12 @@
     },
     {
       "path": "validation/20261011-full-executable-update-readiness.json",
-      "sha256": "84a54b103371cfc49fc21c66bb9e748a2e36209aaff3bf3cf14cf902bf6c352e"
+      "sha256": "7b2d70317e9bc8e6a567a65fdfa6e573551f53a187a38a698dfc2b327b8eed3f"
     }
   ],
-  "public_release": 18,
+  "public_release": 19,
   "compiled_updater_initial_state": 0,
   "host_scale_cases": 339,
-  "navigation_cases": 49
+  "navigation_cases": 68,
+  "side_chat_bot_revision": 4
 }
