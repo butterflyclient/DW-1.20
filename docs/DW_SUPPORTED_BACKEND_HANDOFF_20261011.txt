@@ -8,7 +8,7 @@ and preserves explicit failures for unsupported operations. It does not claim
 a complete audit of every indirect SDK call or a new live-game callback test.
 
 Changes
-67 mission stages were added in the two integration batches: original kill
+71 mission stages were added in the two integration batches: original kill
 modifiers/rarity/circle context, 29 MP attachment/streak/field stages, 12 BR
 placement/downed stages, nine qualified match completion/win stages, and four
 Ground War stages. There are now 181 earning stages among the 232 canonical
