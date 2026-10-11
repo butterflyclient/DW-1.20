@@ -70,22 +70,27 @@ class Runner:
             symbols = {k: mapped(v) for k,v in symbols.items()}
             entries = {k: self.base+self.report["symbols"][k] for k in entries}
             entries.update({k:self.base+v for k,v in self.report["symbols"].items()
-                            if k.startswith("SV_HostNav_")})
+                            if k.startswith(("SV_HostNav_", "SV_HostScale_", "?RecordBotFrame"))})
         vm.symbols = symbols
         vm.entries = entries
         hooks = {symbols[r["name"]]:r["name"] for r in self.proof["bindings"] if r["kind"] == "function"}
         common = {"?Enabled@HostScale@@YA_NXZ":"mode", "?Population@HostScale@@YAIXZ":"population",
                   "Com_Optimized_IsEnabled":"mode", "Com_Printf":"print", "memcpy":"memcpy",
-                  "memset":"memset", "GetCurrentThreadId":"thread-id", "__security_check_cookie":"cookie"}
+                  "memset":"memset", "GetCurrentThreadId":"thread-id", "__security_check_cookie":"cookie",
+                  "QueryPerformanceCounter":"qpc", "QueryPerformanceFrequency":"qpf",
+                  "Sys_IsMainThread":"main-thread", "Cmd_AddCommandInternal":"register-command",
+                  "SV_HostNav_PrintStatus":"print"}
         if edited and self.report:
             for name, alias in common.items():
                 if name in self.report["symbols"]:
                     hooks[self.base+self.report["symbols"][name]] = alias
             for desc in pe.DIRECTORY_ENTRY_IMPORT:
                 for imp in desc.imports:
-                    if imp.name == b"GetCurrentThreadId":
-                        vm.put(imp.address, 0x180ff1000, "<Q")
-                        hooks[0x180ff1000] = "thread-id"
+                    if imp.name in (b"GetCurrentThreadId", b"QueryPerformanceCounter", b"QueryPerformanceFrequency"):
+                        slot = (b"GetCurrentThreadId", b"QueryPerformanceCounter", b"QueryPerformanceFrequency").index(imp.name)
+                        target = 0x180ff1000 + slot * 32
+                        vm.put(imp.address, target, "<Q")
+                        hooks[target] = common[imp.name.decode()]
         elif edited:
             externals = dict(symbols)
             section_addresses = {}
@@ -102,8 +107,10 @@ class Runner:
                     externals[name] = cursor
                     hooks[cursor] = alias
                     cursor += 32
-            externals["__imp_GetCurrentThreadId"] = cursor
-            vm.put(cursor, externals["GetCurrentThreadId"], "<Q")
+            for name in ("GetCurrentThreadId", "QueryPerformanceCounter", "QueryPerformanceFrequency"):
+                externals["__imp_" + name] = cursor
+                vm.put(cursor, externals[name], "<Q")
+                cursor += 16
             externals["_fltused"] = cursor+16
             for index,obj in enumerate(self.objects):
                 addresses = {i:section_addresses[index,s["section"]]+s["value"] if s["section"] > 0
@@ -125,7 +132,7 @@ class Runner:
                             raise AssertionError(kind)
                     if data:
                         vm.put(start,bytes(data))
-            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith("SV_HostNav_")})
+            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith(("SV_HostNav_", "SV_HostScale_", "?RecordBotFrame"))})
         vm.hooks = hooks
         vm.mode,vm.population = mode,population
         vm.put(symbols["SVHS_LevelTime"],0,"<i")
@@ -219,10 +226,11 @@ class Machine:
         elif kind in ("SVHS_Nav2DClosest","other-navigator"):
             self.put(c,struct.pack("<fff",91.,92.,93.));self.events.append(("native",));self.ret()
         elif kind=="SVHS_NavClosestArea":
+            self.project_request = struct.unpack('<3f', self.uc.mem_read(b, 12))
             self.events.append(("closest",));self.put(a,struct.pack("<QQ",0x51400000,0x51500000) if self.found else bytes(16));self.ret()
         elif kind=="SVHS_NavProjectArea":
             chosen=self.get(a,"<Q")==0x51400000
-            self.put(b,struct.pack("<fff",*(self.request if chosen else (1.,2.,3.))));self.ret()
+            self.put(b,struct.pack("<fff",*(self.project_request if chosen else (1.,2.,3.))));self.ret()
         elif kind=="SVHS_NavDestroyArea":self.events.append(("destroy",self.get(a,"<Q")));self.ret()
         elif kind=="SVHS_NavGetClosestAreas":
             maximum=struct.unpack('<f',struct.pack('<I',self.uc.reg_read(UC_X86_REG_XMM3)&0xffffffff))[0]
@@ -264,6 +272,8 @@ class Machine:
             self.path_exists=getattr(self, 'route_success', True);self.ret(self.path_exists)
         elif kind == 'SVHS_BotMovePathing':
             self.events.append(('follow-path',));self.put(b+156,struct.pack('<bb',90,35));self.ret(1)
+        elif kind == 'SVHS_BotSteerPath':
+            self.events.append(('steer-path',c));self.put(b+156,struct.pack('<bb',40,110));self.ret()
         elif kind == 'SVHS_EnemyTeamFlags':self.put(a,bytes([255])*20);self.ret()
         elif kind == 'SVHS_TacSetReference':
             self.tac_selected=b;self.put(a,bytes(4));self.events.append(('set-tactical',b));self.ret()
@@ -442,12 +452,13 @@ def nearest_collector(vm,case):
     return dict(events=vm.events,maximum=bytes(vm.uc.mem_read(collector+8,4)).hex(),count=vm.get(collector+24,'<i'))
 
 
-def mesh_bot(vm, mode_case):
+def mesh_bot(vm, mode_case, targets=()):
     bot, entity, sentient, player = 0x5b000000, 0x5b010000, 0x5b020000, 0x5b030000
     nav, vtable, command, area = 0x5b040000, 0x5b050000, 0x5b060000, 0x5b070000
     vm.put(bot, bytes(28152));vm.put(entity, bytes(1440));vm.put(sentient, bytes(184))
     vm.put(player, bytes(1024));vm.put(nav, bytes(1400));vm.put(vtable, bytes(512))
     vm.put(command, bytes(264));vm.put(area, 0x5b071000, '<Q')
+    vm.put(0x51400000, 0x51400100, '<Q'); vm.found = mode_case != 'unreachable'
     for at,value in ((bot,entity),(bot+8,sentient),(bot+360,nav),(bot+448,player),
                      (entity+336,player),(entity+344,sentient),(nav,vtable),
                      (vtable+45*8,vm.symbols['SVHS_Nav2DClosest']),
@@ -456,8 +467,22 @@ def mesh_bot(vm, mode_case):
     vm.put(entity+440,100,'<i');vm.put(bot+8984,0x1000000,'<I')
     vm.put(player+626,2046,'<H');vm.put(vm.symbols['SVHS_LevelTime'],1000,'<i')
     vm.put(vm.symbols['SVHS_ClientCount'],0,'<I')
+    if targets:
+        vm.put(vm.symbols['SVHS_Clients'], bytes(1600))
+        vm.put(vm.symbols['SVHS_ClientCount'], len(targets) + 1, '<I')
+        for slot, xyz in enumerate(targets, 1):
+            client = 0x5e000000 + slot * 0x10000
+            target_entity, target_sentient = client + 0x1000, client + 0x2000
+            vm.put(client, bytes(0x3000))
+            vm.put(vm.symbols['SVHS_Clients'] + slot * 8, client, '<Q')
+            vm.put(client + 8, 5, '<B'); vm.put(client + 280, target_entity, '<Q')
+            vm.put(target_entity, slot, '<H'); vm.put(target_entity + 344, target_sentient, '<Q')
+            vm.put(target_entity + 440, 100, '<i')
+            vm.put(target_entity + 304, struct.pack('<3f', *xyz))
     vm.put(bot+640,1,'<i');vm.put(bot+28136,struct.pack('<3f',0.5,0.25,0.))
-    if mode_case=='tactical':vm.put(sentient+150,1,'<B')
+    if mode_case in ('tactical', 'tactical-no-path'):
+        vm.put(sentient+150,1,'<B')
+        vm.path_exists = mode_case == 'tactical'
     if mode_case=='locked':vm.put(player+364,0x20,'<I')
     if mode_case=='airborne':vm.put(player+626,2047,'<H')
     if mode_case=='no-area':vm.put(nav+1364,0,'<Q')
@@ -481,10 +506,76 @@ def main():
     for mode in (1,2):
         success=mesh_bot(runner.machine(True,mode),'normal')
         assert success['movement']=='5a23' and success['events'][-1]==('follow-path',)
-        assert success['events'][0][0]=='path-request'
+        assert any(e[0]=='path-request' for e in success['events'])
+        tactical = mesh_bot(runner.machine(True, mode), 'tactical-no-path')
+        assert tactical['movement'] == '5a23'
+        assert any(event[0] == 'path-request' for event in tactical['events'])
+        total += 1
         failed=mesh_bot(runner.machine(True,mode),'failed')
         assert failed['movement']=='0000' and all(e[0]!='follow-path' for e in failed['events'])
+        unreachable = mesh_bot(runner.machine(True, mode), 'unreachable')
+        assert unreachable['movement'] == '0000'
+        assert all(e[0] not in ('path-request', 'follow-path') for e in unreachable['events'])
+        total += 1
         total+=2
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'normal')
+        # A cached decision must steer again without replanning or rescanning
+        # every friendly client, with the same TLS contract as native BotThink.
+        teb, slots, tls = 0x5d000000, 0x5d001000, 0x5d002000
+        vm.put(teb, bytes(128)); vm.put(slots, bytes(128)); vm.put(tls, bytes(128))
+        vm.put(teb + 0x58, slots, '<Q'); vm.put(slots, tls, '<Q')
+        vm.uc.reg_write(UC_X86_REG_GS_BASE, teb)
+        vm.put(vm.symbols['SVHS_BotTlsIndex'], 0, '<I')
+        vm.put(vm.symbols['SVHS_GameStatics'], 0x5d003000, '<Q')
+        vm.put(tls + 16, 0x5d004000, '<Q')
+        before = len(vm.events)
+        vm.put(vm.symbols['SVHS_LevelTime'], 1016, '<i')
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == [('steer-path', 127)]
+        assert bytes(vm.uc.mem_read(0x5b060000 + 156, 2)) == bytes([40, 110])
+        assert vm.get(tls + 16, '<Q') == 0x5d004000
+        vm.path_exists = False
+        before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == []
+        assert vm.get(0x5b060000 + 156, '<H') == 0
+        total += 2
+        # Native routes also need fresh corner steering between full decisions.
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'tactical')
+        vm.put(teb, bytes(128)); vm.put(slots, bytes(128)); vm.put(tls, bytes(128))
+        vm.put(teb + 0x58, slots, '<Q'); vm.put(slots, tls, '<Q')
+        vm.uc.reg_write(UC_X86_REG_GS_BASE, teb)
+        vm.put(vm.symbols['SVHS_BotTlsIndex'], 0, '<I')
+        vm.put(vm.symbols['SVHS_GameStatics'], 0x5d003000, '<Q')
+        vm.put(tls + 16, 0x5d004000, '<Q')
+        before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == [('steer-path', 127)]
+        assert vm.get(tls + 16, '<Q') == 0x5d004000
+        vm.can_fire = True
+        before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == []
+        vm.can_fire = False
+        vm.put(0x5b030000 + 364, 0x20, '<I')
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == []
+        total += 3
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'normal', targets=((700., 0., 0.), (750., 0., 0.)))
+        first_goal = next(event[1] for event in vm.events if event[0] == 'path-request')
+        # The second opponent becomes marginally closer while the bot makes
+        # progress. Losing the route must not rotate the offset or flip targets.
+        vm.put(0x5e021000 + 304, struct.pack('<3f', 690., 0., 0.))
+        vm.put(0x5b010000 + 304, struct.pack('<3f', 100., 0., 0.))
+        vm.put(vm.symbols['SVHS_LevelTime'], 2400, '<i'); vm.path_exists = False
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        vm.put(vm.symbols['SVHS_LevelTime'], 2416, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert [event[1] for event in vm.events if event[0] == 'path-request'] == [first_goal, first_goal]
+        total += 1
     for graphs in (0,1):
         for point in (0,0x5c020000):
             results=[]
@@ -518,6 +609,27 @@ def main():
             results.append((result,vm.events,bytes(vm.uc.mem_read(sentient+152,2))))
         assert results[0]==results[1]==results[2],('populated tactical graph',path,results)
         total+=1
+    vm = runner.machine(True, 1)
+    sentient, entity = 0x5c000000, 0x5c010000
+    vm.put(sentient, bytes(184)); vm.put(entity, bytes(1440)); vm.put(sentient, entity, '<Q')
+    vm.put(vm.symbols['SVHS_TacGraphCount'], 1, '<i')
+    assert vm.call('SV_HostNav_BeginBot') == 1
+    assert vm.call('Sentient_NearestTacPoint', sentient) == 0
+    before = len(vm.events)
+    vm.put(vm.symbols['SVHS_LevelTime'], 200, '<i')
+    assert vm.call('Sentient_NearestTacPoint', sentient) == 0 and len(vm.events) == before
+    vm.put(vm.symbols['SVHS_LevelTime'], 250, '<i')
+    vm.call('Sentient_NearestTacPoint', sentient)
+    assert len(vm.events) > before
+    before = len(vm.events)
+    vm.put(entity + 304, 65., '<f')
+    vm.call('Sentient_NearestTacPoint', sentient)
+    assert len(vm.events) > before
+    vm.call('SV_HostNav_EndBot')
+    before = len(vm.events)
+    vm.call('Sentient_NearestTacPoint', sentient)
+    assert len(vm.events) > before  # No negative cache outside the owning bot thread.
+    total += 4
     print('PASS mesh-only routing, failed-path stop and empty tactical-graph fast return',total,flush=True)
     for count in (1,2,7,65):
         for blocked in (False,True):
@@ -551,20 +663,22 @@ def main():
     vm.put(vm.symbols["SVHS_LevelTime"],16,"<i")
     vm.call("Scr_GetClosestReachablePointOnNavmesh",0x58000000,0)
     assert struct.unpack("<fff",vm.output)==vm.request and vm.events.count(("closest",))==1
+    previous_request=vm.request
     vm.request=(50.,60.,70.)
     vm.call("Scr_GetClosestReachablePointOnNavmesh",0x58000000,0)
-    assert struct.unpack("<fff",vm.output)==(1.,2.,3.)
+    assert struct.unpack("<fff",vm.output)==previous_request
+    vm.request=(500.,600.,700.)
     vm.put(vm.symbols["SVHS_LevelTime"],160,"<i");vm.found=False
     vm.call("Scr_GetClosestReachablePointOnNavmesh",0x58000000,0)
     assert struct.unpack("<fff",vm.output)==(1.,2.,3.);total+=4
-    # All 150 occupied ordinals receive a turn, with no more than 15 per frame.
+    # All 150 occupied ordinals receive a turn, with at most four per frame.
     vm=runner.machine(True,1,150);seen=[]
-    for frame in range(10):
+    for frame in range(38):
         vm.put(vm.symbols["SVHS_LevelTime"],frame*16,"<i");admitted=[]
         for ordinal in range(150):
             if vm.call("SV_HostNav_Begin",ordinal,150)==1:admitted.append(ordinal)
             vm.call("SV_HostNav_End",0)
-        assert len(admitted)==15;seen+=admitted
+        assert 0 < len(admitted)<=4;seen+=admitted
     assert sorted(seen)==list(range(150));total+=1
     for distances in ([],[0.],[1023.5],[1024.],[1024.5],[100000.],[900.,12.,1025.],[1024.,1024.,1025.]):
         for tracked in (False,True):

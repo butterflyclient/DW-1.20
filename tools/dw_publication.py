@@ -53,6 +53,13 @@ def publish(image, report, source, updater, output):
     image, report, source, updater, output = map(
         Path, (image, report, source, updater, output)
     )
+    receipt = json.loads((source.parent / "source-receipt.json").read_bytes())
+    for item in receipt["source_inputs"]:
+        if sha(ROOT / item["source"]) != item["source_sha256"]:
+            raise ValueError(
+                "Authored source changed during this build; refusing stale publication: "
+                + item["source"]
+            )
     target = sha(image)
     remote = inventory()
     catalog = remote["catalog"]

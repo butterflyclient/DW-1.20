@@ -109,3 +109,20 @@ Focused validation executes the original onboarding/button Lua, linked native
 dvar registration, encrypted reward requests, transaction recovery, real server
 restart and normal token activation/consumption. These checks do not establish
 rendered game UI behavior; owner playtesting remains a separate gate.
+
+BR streaming safety and simulation rate
+G_Glass_PieceStateChanged is rebuilt from C++ with target-native bindings derived
+at preparation time. Missing FX-transient geometry uses the native destroyed
+piece/no-impact-position encoding. Damage state, collapse timing, navigation
+obstacle removal and glass_destroyed notifications retain their native behavior.
+The linked host-safety gate compares resident behavior and reproduces the
+original null-system failure in a disposable instruction fixture.
+
+com_debugStates now includes Simulation FPS. This measures completed local
+server ticks over one second of wall time, independently of rendering. A stopped
+simulation reports zero even while the renderer runs. Without a local server,
+the row shows N/A. Its usual 20-render-frame snapshot refresh remains intact.
+The debug overlay's sole authored source is integration/replay/Com_DebugStates.cpp.
+
+Warzone promoted playlist buttons use GamemodeName rather than the MP Name
+field; both consumers now repair the confirmed BRSOLOSTIM_NAME2 model value.

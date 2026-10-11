@@ -121,6 +121,7 @@ extern "C" void SV_BotUpdateBots()
             {
                 command = previous.command;
                 command.serverTime = command.commandTime = command.inputTime = now;
+                SV_HostNav_RefreshBotMovement(static_cast<uint8_t *>(client) + 1368, &command);
                 ++reused;
             }
             else

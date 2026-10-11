@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "passed": true,
+  "created_utc": "2026-10-11T20:34:23.891673+00:00",
+  "client": {
+    "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+    "sha256": "d672f24c53de37df7aea7d6425e41c25bdeb35230c9e101ea4855251df6f94ef",
+    "fresh_cpp_units": 111,
+    "unresolved_symbols": 0,
+    "exact_image_gates": 9,
+    "windows_unwind_cases": 719,
+    "installed_hash_verified": true,
+    "owner_ini_preserved": true,
+    "public_update_release": 24,
+    "older_update_hashes_verified": 23,
+    "latest_bot_optimizations_included": true
+  },
+  "confirmed_failure": {
+    "pid": 13140,
+    "executable_sha256": "739d6fc8c2b11903388fe4f77bd6ae8ce013fd8747e15edfab7d519299387662",
+    "linked_fault_rva": "0x1532752",
+    "original_fault_address": "0x14150d752",
+    "function": "Glass_GetInitialPieceCenter",
+    "null_system_pointer": true,
+    "global_glass_piece": 3657,
+    "local_glass_piece": 22,
+    "server_simulation_stopped": true,
+    "live_failure_capture": true
+  },
+  "fixes": [
+    "Recompile full glass state-change consumer; absent transient geometry uses native no-impact encoding while state, obstacle removal and script events remain authoritative",
+    "Tactical reference alone does not block mesh-route creation; preserve existing native routes and refresh corner steering between full decisions with native TLS",
+    "Repair BRPromotedButton.GamemodeName and MP Name scrolling-field callbacks for BRSOLOSTIM_NAME2",
+    "Show local simulation FPS from completed server ticks over wall time in com_debugStates",
+    "Freeze and hash-guard the owned overlay validator with each production job"
+  ],
+  "prior_navigation_capture": {
+    "bots": 151,
+    "fallback_goal_owners": 90,
+    "valid_fallback_routes": 51,
+    "bots_with_native_path": 118,
+    "tactical_reference_without_path": 10
+  },
+  "checks": {
+    "host_cases": 339,
+    "navigation_cases": 183,
+    "glass_cases": 36,
+    "numeric_and_unavailable_simulation_rows_verified": true
+  },
+  "evidence": [
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\readiness.json",
+      "sha256": "47b7ca9b7caf91b795c987ea701f47a6c8830c98b80e8e6040fb2cfd05b27459"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\host.json",
+      "sha256": "a3798d830c1dc58603d931fc412e3537fdca884157cf69e2cf40f67f59044d2d"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\navigation.json",
+      "sha256": "7fa6bcba5adbacb0f234d3917d11ad9538955f432069807d19c94e4dd3d3dd44"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\host-safety.json",
+      "sha256": "cd3056908513fd792388f3cbf1a0e27b029be42f4e2d5ac8d37dadaf45b6ea87"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\playlist.json",
+      "sha256": "350758bc84473b56e29b4863408aff704eb59ab793524fe9f50c37db8eb4165e"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\builds\\build-workstation-cba8d8b1c8ff44e9\\verification-report.json",
+      "sha256": "ec95cf861f82fd074ffa6fc7c417a3d8d0d74825389ada00704ca4437532fd0a"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1791749661184267900\\publication\\public-verification.json",
+      "sha256": "87192cbf7d886a16102ac4d625d898e24c1498e71fd3e30e07e4d9794eafefbd"
+    },
+    {
+      "path": "data\\br-bot-navigation-20261011\\crash-address.json",
+      "sha256": "34c07cc912423f14946545b534115a81512f55dee092bfc8215371755001f999"
+    },
+    {
+      "path": "data\\br-bot-navigation-20261011\\resolved-stack.json",
+      "sha256": "5c58188cff7a21babef6c1d22cf7ce498f76e7a334786f5dd51e173baf3adc49"
+    },
+    {
+      "path": "data\\br-bot-navigation-20261011\\mesh-routes-live.json",
+      "sha256": "b7cc0095ee56e3c4c0e0d3e0934bc1baab122c8beab220c964d2956e6ef0fd5f"
+    },
+    {
+      "path": "data\\br-bot-navigation-20261011\\fault-counters.json",
+      "sha256": "45853060b9289bf24b366ea691dfbea2e94cc35d357f1c4fcb0ee09572494ca2"
+    },
+    {
+      "path": "data\\br-bot-navigation-20261011\\playlist-ui.json",
+      "sha256": "e1bb6b0342b8f4b275d5e5b8bbf200f47e33bbd2d547de7cf46f90fadbd6e345"
+    },
+    {
+      "path": "data\\dw-client\\deployment.json",
+      "sha256": "750fabb2b05b527a9677a82854f44e4819542878e97073729a4a1e4fc6956546"
+    }
+  ],
+  "new_executable_game_run_performed": false,
+  "remaining_owner_playtest": [
+    "Launch the root-folder DW executable and confirm BR STIMULUS SOLOS",
+    "Enable com_debugStates 1 and compare Simulation FPS with renderer FPS",
+    "Repeat the 152-player BR pregame/countdown/deployment with 151 bots",
+    "Observe bots turning along routes and around buildings/obstacles; exercise glass damage"
+  ]
+}

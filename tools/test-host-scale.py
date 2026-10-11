@@ -100,14 +100,14 @@ class Runner:
                    "SV_HostNav_Begin", "SV_HostNav_End", "SV_HostNav_SpatialWork",
                    "SV_HostNav_GraphWork", "SV_HostNav_HasWork",
                    "DW_LocalBackend_GetAuthAddress", "SV_HostNav_RecordClosest",
-                   "SV_HostNav_BeginBot", "SV_HostNav_EndBot")
+                   "SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement")
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
                 if (name.startswith("?Record") or name.startswith("?Clock")) and name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
             hooks[self.base + self.report["symbols"]["Com_Optimized_IsEnabled"]] = "optimized-policy"
-            for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot"):
+            for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
                 hooks[self.base + self.report["symbols"][name]] = name
             for name in ("memcpy", "memset", "__chkstk", "__security_check_cookie"):
                 if name in self.report["symbols"]:
@@ -320,7 +320,7 @@ class Runner:
                 returned(); return
             if kind.startswith("?Clock"):
                 returned(len(events) * 100); return
-            if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot"):
+            if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
                 returned(kind == "SV_HostNav_BeginBot"); return
             if kind == "SVHS_TransientFileLoaded":
                 events.append(("file-loaded", a)); returned(case.get("loaded", True)); return

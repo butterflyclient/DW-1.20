@@ -148,15 +148,16 @@ def main():
     original("frontend/mp/brplaymenubuttons.lua.395.lua", "BRPlayButtonsModule")
     original("frontend/playlistlist.lua.742.lua", "PlaylistListModule")
     original("utils/onboarding.lua.2213.lua", "OnboardingModule")
-    for relative, kind in (
-        ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton"),
-        ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton"),
+    for relative, kind, field, scope in (
+        ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton", "Name", "21"),
+        ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton", "Name", "21"),
+        ("frontend/mp/brpromotedbutton.lua.401.lua", "BRPromotedButton", "GamemodeName", "15"),
     ):
         path = ORIGINAL / relative
         raw = path.read_text(encoding="utf-8-sig")
         inputs[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
-        begin = raw.index("\tlocal function var_21_9()")
-        end = raw.index("\n\tvar_21_8:SubscribeToModelThroughElement", begin)
+        begin = raw.index("\tlocal function var_" + scope + "_9()")
+        end = raw.index("\n\tvar_" + scope + "_8:SubscribeToModelThroughElement", begin)
         vm.execute(
             '''MenuBuilder.registerType(..., function()
                 local widget=MakeNode()
@@ -168,11 +169,11 @@ def main():
                 function widget:GetDataSource()
                     return {name={GetValue=function() return widget.modelName end}}
                 end
-            ''' + raw[begin:end] + '''
+            '''.replace("var_21", "var_" + scope).replace("widget.Name", "widget." + field) + raw[begin:end] + '''
                 widget.RefreshModel=var_21_9
                 var_21_9()
                 return widget
-            end)''', kind
+            end)'''.replace("var_21", "var_" + scope), kind
         )
     vm.execute(r'''
         MenuBuilder.registerType("PlaylistMenu", function()
@@ -272,21 +273,22 @@ def main():
         assert(Engine.CBBHFCGDIC("PLAYLIST/BRSOLOSTIM_NAME2")=="Localized native title")
         assert(Engine.CBBHFCGDIC("UNRELATED_KEY")=="UNRELATED_KEY")
         results[#results+1]="Only the confirmed missing playlist title gets a fallback; native translations and unrelated keys remain authoritative"
-        for _,kind in ipairs({"PlaylistPromotedButton","PlaylistFeaturedButton"}) do
+        for _,kind in ipairs({"PlaylistPromotedButton","PlaylistFeaturedButton","BRPromotedButton"}) do
             local widget=MenuBuilder.BuildRegisteredType(kind,options)
-            assert(widget.Name:getText()=="BR STIMULUS SOLOS")
+            local label=widget.Name or widget.GamemodeName
+            assert(label:getText()=="BR STIMULUS SOLOS")
             widget.modelName="@PLAYLIST/BRSOLOSTIM_NAME2"
             widget.RefreshModel()
-            assert(widget.Name:getText()=="BR STIMULUS SOLOS")
+            assert(label:getText()=="BR STIMULUS SOLOS")
             widget.modelName="Localized native title"
             widget.RefreshModel()
-            assert(widget.Name:getText()=="LOCALIZED NATIVE TITLE")
+            assert(label:getText()=="LOCALIZED NATIVE TITLE")
             widget.modelName="PLAYLIST/UNRELATED_KEY"
             widget.RefreshModel()
-            assert(widget.Name:getText()=="PLAYLIST/UNRELATED_KEY")
+            assert(label:getText()=="PLAYLIST/UNRELATED_KEY")
             widget.modelName=nil
             widget.RefreshModel()
-            assert(widget.Name:getText()=="PLAYLIST/UNRELATED_KEY")
+            assert(label:getText()=="PLAYLIST/UNRELATED_KEY")
         end
         results[#results+1]="Original promoted/featured model callbacks repair the missing title at construction and on later updates without calling Localize or rewriting unrelated/localized names"
         assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==true)

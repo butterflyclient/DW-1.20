@@ -26,6 +26,12 @@ namespace
         return area.reference && *area.reference && area.space;
     }
 
+    bool NearbyRequest(const Vec3 &a, const Vec3 &b)
+    {
+        const float x = a.x - b.x, y = a.y - b.y, z = a.z - b.z;
+        return x * x + y * y + z * z <= 128.0f * 128.0f;
+    }
+
     void Native(void *navigator, const Vec3 &requested, Vec3 &result)
     {
         const auto *vtable = Field<const uintptr_t *>(navigator, 0);
@@ -75,9 +81,8 @@ extern "C" void Scr_GetClosestReachablePointOnNavmesh(void *context, uint32_t re
     void *area = *view->currentArea.reference;
     const bool reusable = cached.valid && cached.navigator == navigator && cached.area == area &&
         cached.space == view->currentArea.space && cached.client == entity->client &&
-        cached.configuration == configuration && now >= cached.time && now - cached.time < 250 &&
-        cached.requested.x == requested.x && cached.requested.y == requested.y &&
-        cached.requested.z == requested.z;
+        cached.configuration == configuration && now >= cached.time && now - cached.time < 750 &&
+        NearbyRequest(cached.requested, requested);
     unsigned outcome = 0;
     if (reusable)
     {

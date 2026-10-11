@@ -28,6 +28,7 @@ REPLACEMENTS = (
     ("fn_4bdeea2a50a7d8d0", "Bfx_ClosestAreaCollect", "b9c0f3c1437372073ed51b2776f181dd9fd141d6d02c379d6bbe49d63ac80bbd"),
     ("fn_6d3e9047613805c4", "Bot_UpdateMove_OffPathGrid", "5aff2a15b5d8055f1ceab91a6b75fd44ffca1695a9fb9be9f8060325dde37c7a"),
     ("fn_e25d88059e9ad6af", "Sentient_NearestTacPoint", "4916e26e5374b2e6ed5f791c81c424de9e1459c8507eb296e0b9de948254b9a6"),
+    ("fn_80990981f58ec6f4", "G_Glass_PieceStateChanged", "395b4f1a084f34fadd59d5948602b574fa7cbcc84ff18860834a0fc6e45aedf9"),
 )
 
 
@@ -234,6 +235,37 @@ def prepare(snapshot, replace_owned=False):
         body, rows = instructions(identity)
         assert hashlib.sha256(body).hexdigest() == expected, name
         funcs[name] = base + by_id[identity]["rva"]
+        if name == "SVHS_BotMovePathing":
+            # Last real call is the native route-steering/avoidance leaf. Its
+            # containing body is hash checked above; derive the target each build.
+            calls = direct_calls(rows)
+            assert calls[-1] == off_grid_calls[-1]
+            funcs["SVHS_BotSteerPath"] = calls[-2]
+    think_prefix = pe.get_data(funcs["SVHS_BotThink"] - base, 750)
+    assert hashlib.sha256(think_prefix).hexdigest() == "d0123e3e923dc409bf1548398f5aeaef4916aab3d72cbeb5a7ea452da8743322"
+    tls_tail = pe.get_data(funcs["SVHS_BotThink"] - base + len(think_prefix), 32)
+    assert hashlib.sha256(tls_tail).hexdigest() == "45342c2b9d701b78adec2d70a400ce287d9a99e4c4c504576744b83ab307e24d"
+    think_rows = list(decoder.disasm(think_prefix + tls_tail, funcs["SVHS_BotThink"]))
+    tls_setup = one([i for i, row in enumerate(think_rows) if "gs:[0x58]" in row.op_str])
+    globals_["SVHS_BotTlsIndex"] = rip([think_rows[tls_setup + 2]], "mov", "r12d,")
+    globals_["SVHS_GameStatics"] = rip([think_rows[tls_setup + 5]], "mov", "rax,")
+    glass = decoded["G_Glass_PieceStateChanged"]
+    glass_calls = direct_calls(glass)
+    assert len(glass_calls) == 15 and glass_calls[-1] == off_grid_calls[-1]
+    funcs.update(zip(("SVHS_GlassDirectionByte", "SVHS_GlassSystem", "SVHS_GlassCenter",
+                      "SVHS_GlassAxis", "SVHS_GlassPackImpact"), glass_calls[:5]))
+    assert glass_calls[4] == glass_calls[5] and glass_calls[6] == glass_calls[7]
+    funcs["SVHS_GlassRemoveObstacle"] = glass_calls[6]
+    assert glass_calls[8] == glass_calls[9] == glass_calls[10]
+    funcs["SVHS_GlassRandom"] = glass_calls[8]
+    funcs.update(zip(("SVHS_GlassScriptContext", "SVHS_GlassAddInt", "SVHS_GlassNotify"), glass_calls[11:14]))
+    rax_loads = [row for row in glass if row.mnemonic == "mov" and
+                 row.op_str.startswith("rax, qword ptr [rip")]
+    globals_["SVHS_GlassData"] = rip(rax_loads[1:2], "mov", "rax,")
+    globals_["SVHS_GlassDestroyDvar"] = rip(rax_loads[3:4], "mov", "rax,")
+    globals_["SVHS_GlassWeakenDvar"] = rip(rax_loads[4:5], "mov", "rax,")
+    assert rip(glass, "mov", "eax, dword ptr [rip") == globals_["SVHS_LevelTime"]
+    globals_["SVHS_GlassDestroyedString"] = rip(glass, "mov", "edx, dword ptr [rip")
     header = '''#pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -309,8 +341,11 @@ float SVHS_NavFarthestClosest(void *);
 bool SVHS_BotCanFire(void *);
 bool SVHS_NavHasPath(void *);
 void SVHS_BotYawVectors(float, void *, void *);
-unsigned SVHS_BotPathToGoal(void *, const void *, float);
+unsigned SVHS_BotPathToGoal(void *, const void *, float, const char *);
 unsigned SVHS_BotMovePathing(void *, void *);
+void SVHS_BotSteerPath(void *, void *, int);
+extern uint32_t SVHS_BotTlsIndex;
+extern void *SVHS_GameStatics;
 extern int32_t SVHS_TacGraphCount;
 void SVHS_PathNodePosition(const void *, void *);
 void *SVHS_TacPointForNode(const void *);
@@ -320,6 +355,18 @@ void *SVHS_TacClosestWithLos(const void *, const void *, const void *);
 void *SVHS_TacClosest(const void *);
 void SVHS_TacSetReference(void *, const void *);
 void *SVHS_TacGetReference(const void *);
+extern void *SVHS_GlassData, *SVHS_GlassWeakenDvar, *SVHS_GlassDestroyDvar;
+extern uint32_t SVHS_GlassDestroyedString;
+float SVHS_GlassRandom();
+uint8_t SVHS_GlassDirectionByte(const void *);
+void *SVHS_GlassSystem(unsigned, unsigned *);
+void SVHS_GlassCenter(const void *, unsigned, void *);
+void SVHS_GlassAxis(const void *, unsigned, void *);
+uint8_t SVHS_GlassPackImpact(float);
+void SVHS_GlassRemoveObstacle(unsigned);
+void *SVHS_GlassScriptContext();
+void SVHS_GlassAddInt(void *, unsigned);
+void SVHS_GlassNotify(void *, uint32_t, unsigned);
 }
 '''
     (snapshot / "src/SV_HostScaleBindings.h").write_text(header, encoding="utf-8")

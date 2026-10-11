@@ -446,3 +446,121 @@ roster, UI installer, updater and progression gates. All 150 current names
 from integration/replay/DW_BotNames.h are present in the linked image.
 Readiness: data/dw-client/host-navigation-readiness.json.
 The running game EXE and live backend executable were not replaced/restarted.
+
+Main-source large-match route stability pass (2026-10-11)
+
+Read-only release-21 observations from the owner's full-collision match:
+- PID 4812, de25aaaf...: 150 occupied slots, 149 bots and one human, profile 1.
+- 4.052 wall seconds advanced 4,048 simulation milliseconds over 253 frames
+  (62.44 Hz). This sample was keeping pace; it does not exclude intermittent
+  stalls or establish a maximum sustainable population on other machines.
+- Bot decisions averaged 0.770 ms/frame and command application 1.026 ms/frame.
+  There were 21,841 closest-area queries and 1,495 unrestricted fallbacks.
+- One tactical graph was present, but 133 of 149 sampled bots had no tactical
+  reference. This differs from the earlier empty-graph asset load.
+- Sampling attributed the busiest thread to server/script work. Snapshot
+  sampling includes overhead and waits; counts are not CPU percentages.
+Evidence: data/host-scale-20261010/live-release21-counters.json,
+live-release21-profile.json and live-release21-routes.json.
+
+Changes remain in integration/host-scale on main; profile 0 retains native code.
+Profiles 1/2 now admit four full script destination discoveries per frame above
+96 occupied slots, with 2,048 spatial-node and 8,192 graph-edge frame budgets.
+Smaller populations retain the prior policy. Same-area, same-configuration
+successful destinations may be reused for 750 ms when requests move <=128 units.
+This avoids replacing a nearby useful destination with a current-area fallback
+just because the discovery slot was deferred. Failed tactical searches receive
+a 250 ms/64-unit negative cache only inside the serialized bot decision scope;
+owner, player, AI, node, graph count, movement and time changes invalidate it.
+
+The mesh fallback retains its target through small distance changes and uses a
+stable target offset. Recovery offsets change after a stall, repeated failure,
+or completion of an untargeted patrol leg. Failed attempts back off. Before
+requesting a path, a bounded native reachable-area query projects the requested
+point onto the actual navigation surface. No usable projection means stop/retry,
+not a straight-line command. At most two route plans run per frame, each with
+its own bounded projection so script discovery cannot consume its allowance.
+
+Cached decisions now refresh steering for routes owned by the mesh fallback.
+The native path-steering/avoidance leaf runs without the all-player friendly
+speed scan or another route plan. Its native GameStatics TLS context is installed
+and the previous context restored. Tactical, scripted, airborne and dead states
+are excluded. No collision data, graphical quality or world rendering is reduced.
+
+175 navigation cases cover native baseline, bounded discovery fairness, target
+hysteresis, unreachable goals, cached-turn steering/TLS, negative-cache expiry,
+and existing geometry/precision/handle checks. 339 host/collision/cadence cases
+pass in preflight. Final linked receipts and publication are attached to the
+current data/dw-client/latest-job.json. These are compile/instruction checks;
+the new pass still needs the owner's same-map 150-slot performance comparison.
+
+Linked build ca86a35ea0524363:
+E:\DW\IW8\data\dw-client\jobs\1791741634101164600\builds\build-workstation-ca86a35ea0524363
+SHA256 a8d303e81b4f025575a2f5acbd79d27119474ee39c04e6c94367f005204323b0
+101,258,752 bytes, 110 C++ units, no unresolved symbols. The exact linked image
+passes 708 Windows unwind, 339 host and 175 navigation instruction cases, plus
+the native lobby/roster, Lua installer, updater and unlock/progression gates.
+All 150 current unique names from DW_BotNames.h occur in this linked EXE.
+Only five C++ units differ from release 21; no previously compiled unit was
+removed. The active updater remains enabled. Publication/deployment receipts
+record the final public release and installed hash; no new game is launched.
+
+Final combined build and deployment (release 23)
+The final build also includes the completed playlist-title and presentation
+control changes that arrived from the owner's other session during compilation.
+Installed: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+Build: E:\DW\IW8\data\dw-client\jobs\1791743982749854800\builds\build-workstation-2ae0116a3a2844ef
+SHA256: 739d6fc8c2b11903388fe4f77bd6ae8ce013fd8747e15edfab7d519299387662
+101,260,800 bytes; 110 C++ units; zero unresolved symbols; 708 Windows unwind,
+339 host, 175 navigation, 12 lobby-control and 10 roster groups passed.
+The signed full-image updater and actual embedded helper verified older-to-new
+staging and current-version status. Droplet release 23 matches the installed
+EXE hash. The owner's INI was preserved; no new game run was performed.
+Current receipt: data/dw-client/host-navigation-readiness.json.
+
+152-player BR failure and navigation follow-up (2026-10-11)
+The owner handed off bot optimization maintenance after a BR pregame with 151
+bots reached its countdown smoothly, then failed while rendering continued.
+Read-only capture of PID 13140 binds the failure to release 23, hash 739d6fc8...
+The exception context and native unwind resolve shifted RVA 0x1532752 to original
+Glass_GetInitialPieceCenter+2. RCX was null; local piece index was 22. The caller
+was G_Glass_PieceStateChanged after bullet damage to global piece 3657. R14 held
+the piece index; RDI was its tripled array index (10971) for the 12-byte record.
+The server's tick and simulation-time counters stopped during the capture.
+This is a native server glass/FX-transient residency failure, not a renderer
+shutdown or evidence that the bot command array exceeded its 200-slot capacity.
+
+The rebuilt state-change function covers native glass data/piece and FX-system
+layouts, preserves state/collapse/impact behavior when geometry is resident,
+and selects the native no-impact-position encoding when the FX system or its
+initial geometry is absent. Navigation obstacle removal and script notification
+still occur, so server glass destruction remains authoritative.
+
+Live route evidence had 90 bots admitted to mesh fallback and 51 valid fallback
+routes at the stopped frame. A tactical point did not guarantee a usable route:
+the prior gate excluded any bot with a valid point, leaving some no-route bots
+in native straight-line recovery.
+The capture identified 10 tactical-reference bots with no path and 118 bots with
+native path points. These are stopped-frame observations, not a new benchmark.
+That exclusion is removed while an existing
+native route retains its goal and planner. Between full decisions, native routes
+also refresh their engine corner steering with the original GameStatics TLS
+context. Combat firing, locked movement and airborne states keep their command
+path. Mesh route requests remain bounded; route failure does not invent edges.
+
+Preflight passed 183 navigation instruction cases, 36 glass cases and simulation
+FPS samples, plus the original BR scrolling-title callback. Final exact-image
+host/navigation/safety, lobby, roster, UI, updater and progression receipts are
+in the current data/dw-client/latest-job.json. New live-game route behavior and
+152-player countdown/deployment stability remain owner playtest gates.
+
+Verified release 24
+Installed root game EXE: game_dx12_ship_replay_dw.exe
+SHA256 d672f24c53de37df7aea7d6425e41c25bdeb35230c9e101ea4855251df6f94ef
+111 freshly compiled C++ units, zero unresolved symbols, 719 Windows unwind
+cases and nine exact-image DW gates passed. The expanded overlay verification
+checks its numeric and N/A simulation-rate rows along with original placement,
+20-frame refresh, stutter submission, controller and guarded-getter behavior.
+The signed full-image updater verified 23 older hashes and actual helper staging.
+Root deployment preserved the owner's INI; no process was stopped and no new
+game run was performed. Validation: validation/20261011-br-bot-navigation-readiness.json.

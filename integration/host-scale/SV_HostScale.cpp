@@ -19,6 +19,9 @@ namespace
     uint64_t s_brainTicks, s_moveTicks, s_peakTicks, s_frequency;
     int32_t s_populationTime = -1;
     void *s_populationBase;
+    uint32_t s_simulationFrames;
+    uint64_t s_simulationTick;
+    float s_simulationFPS;
 
     uint32_t Read(const uint32_t &value)
     {
@@ -127,4 +130,34 @@ extern "C" void SV_HostScale_Frame()
         Cmd_AddCommandInternal("sv_hostScaleStatus", Status, &s_statusCommand);
         s_registered = true;
     }
+}
+
+extern "C" float SV_HostScale_GetSimulationFPS()
+{
+    // Only the main-thread debug overlay calls this sampler. The producer is
+    // the completed server bot/movement tick, independent of render frames.
+    const auto frequency = __atomic_load_n(&s_frequency, __ATOMIC_RELAXED);
+    const auto frames = Read(s_botFrames);
+    if (!SVHS_BotSystemAllocated || !SVHS_LevelClientsAllocated || !frequency)
+    {
+        s_simulationTick = 0;
+        s_simulationFrames = frames;
+        s_simulationFPS = 0;
+        return -1;
+    }
+    const uint64_t now = HostScale::Clock();
+    if (!s_simulationTick || now < s_simulationTick)
+    {
+        s_simulationTick = now;
+        s_simulationFrames = frames;
+        s_simulationFPS = 0;
+    }
+    else if (now - s_simulationTick >= frequency)
+    {
+        s_simulationFPS = float(double(uint32_t(frames - s_simulationFrames)) *
+                                double(frequency) / double(now - s_simulationTick));
+        s_simulationTick = now;
+        s_simulationFrames = frames;
+    }
+    return s_simulationFPS;
 }

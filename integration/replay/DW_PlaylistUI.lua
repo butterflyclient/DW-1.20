@@ -133,7 +133,7 @@ local function playlistTitle(text)
 end
 
 local function repairPlaylistTitle(widget)
-    local name = widget and widget.Name
+    local name = widget and (widget.Name or widget.GamemodeName)
     if not name or name.ReplayDWTitleFixed then
         return
     end
@@ -203,7 +203,8 @@ MenuBuilder.BuildRegisteredType = function(kind, options)
         addAboveVerticalList(widget, widget.BRPlayMenuButtons, options)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)
-    elseif name == "playlistpromotedbutton" or name == "playlistfeaturedbutton" then
+    elseif name == "playlistpromotedbutton" or name == "playlistfeaturedbutton" or
+        name == "brpromotedbutton" then
         repairPlaylistTitle(widget)
     end
     return widget

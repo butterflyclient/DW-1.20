@@ -289,6 +289,25 @@ def prepare():
                 compiled_sha256=hashlib.sha256(content).hexdigest(),
             )
         )
+    # The native overlay verifier follows the authored overlay's current rows.
+    # Freeze it with the job and guard its owner just like the integration code.
+    validator = ROOT / "tools/verify_debug_states.py"
+    validation_target = source / "tools/verify_debug_states.py"
+    validator_hash = digest(validator)
+    shutil.copyfile(validator, validation_target)
+    if (
+        digest(validator) != validator_hash
+        or digest(validation_target) != validator_hash
+    ):
+        raise ValueError("Overlay validator changed while freezing")
+    source_inputs.append(
+        dict(
+            source="tools/verify_debug_states.py",
+            source_sha256=validator_hash,
+            compiled_source="tools/verify_debug_states.py",
+            compiled_sha256=digest(validation_target),
+        )
+    )
     ui = load_module("dw_client_playlist", ROOT / "tools/prepare-playlist-ui.py")
     ui.prepare(
         source,
@@ -443,6 +462,7 @@ def verify(directory, report_path):
     checks = (
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
+        ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
         ("test-lobby-controls.py", [], "controls.json"),
         (
             "test-native-bot-roster.py",

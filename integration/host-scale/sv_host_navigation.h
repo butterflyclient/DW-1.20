@@ -143,13 +143,16 @@ namespace HostScale
 extern "C"
 {
     bool SV_HostNav_BeginBot();
+    bool SV_HostNav_OwnsBotScope();
     void SV_HostNav_EndBot();
+    void SV_HostNav_RefreshBotMovement(void *, HostScale::UserCmd *);
     HostScale::NavClosestBudget *SV_HostNav_SetClosestBudget(HostScale::NavClosestBudget *);
     HostScale::NavClosestBudget *SV_HostNav_GetClosestBudget();
     bool SV_HostNav_SuspendClosest(bool suspended);
     void SV_HostNav_RecordClosestBudget(const HostScale::NavClosestBudget *);
     // Zero: no scope; one: admit a query; two: defer this bot's query.
     unsigned SV_HostNav_Begin(unsigned occupiedOrdinal, unsigned population);
+    bool SV_HostNav_BeginRouteProjection();
     void SV_HostNav_End(unsigned result); // 0=native result, 1=fallback, 2=cached result
     bool SV_HostNav_SpatialWork();
     bool SV_HostNav_GraphWork();

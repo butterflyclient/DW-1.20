@@ -17,6 +17,15 @@ namespace
     static_assert(offsetof(SentientNavigationView, tacticalReference) == 148);
     static_assert(offsetof(SentientNavigationView, tacticalValid) == 152);
     static_assert(sizeof(SentientNavigationView) == 184);
+
+    struct FailedLookup
+    {
+        void *sentient, *player, *node, *ai;
+        HostScale::Vec3 origin;
+        int32_t time, graphs;
+        bool valid;
+    };
+    FailedLookup s_failed[200]{};
 }
 
 extern "C" void *Sentient_NearestTacPoint(void *data)
@@ -35,6 +44,27 @@ extern "C" void *Sentient_NearestTacPoint(void *data)
     }
     if (sentient->tacticalValid)
         return SVHS_TacGetReference(sentient->tacticalReference);
+
+    // Failed point searches have no native cache. Most Verdansk bots observed
+    // outside tactical coverage repeat them indefinitely. Cache absence briefly
+    // within the serialized bot scope; no resource/point handle is retained.
+    FailedLookup *failed = nullptr;
+    if (Enabled() && SV_HostNav_OwnsBotScope() && sentient->entity)
+    {
+        const unsigned slot = uint16_t(sentient->entity->number);
+        if (slot < 200)
+        {
+            failed = &s_failed[slot];
+            const auto &origin = sentient->entity->origin;
+            const float x = origin.x - failed->origin.x, y = origin.y - failed->origin.y,
+                        z = origin.z - failed->origin.z;
+            if (failed->valid && failed->sentient == sentient && failed->player == sentient->entity->client &&
+                failed->node == sentient->nearestNode && failed->ai == sentient->ai &&
+                failed->graphs == SVHS_TacGraphCount && SVHS_LevelTime >= failed->time &&
+                SVHS_LevelTime - failed->time < 250 && x * x + y * y + z * z < 64.0f * 64.0f)
+                return nullptr;
+        }
+    }
 
     void *point = nullptr;
     if (sentient->nearestNode)
@@ -69,5 +99,8 @@ extern "C" void *Sentient_NearestTacPoint(void *data)
         point = SVHS_TacClosest(&sentient->entity->origin);
     SVHS_TacSetReference(sentient->tacticalReference, point);
     sentient->tacticalValid = point != nullptr;
+    if (failed)
+        *failed = {sentient, sentient->entity->client, sentient->nearestNode, sentient->ai,
+                   sentient->entity->origin, SVHS_LevelTime, SVHS_TacGraphCount, point == nullptr};
     return SVHS_TacGetReference(sentient->tacticalReference);
 }
