@@ -1,0 +1,277 @@
+{
+  "passed": true,
+  "sources": {
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\daily_challenges.csv.62.csv": "8c7fe20ea522e8e5becf3e2a9a5cc3751653f68fc4fd8eef55ba8151ce5ebd5c",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\br_daily_challenges.csv.5.csv": "29b46beeca009506d62aede393e9f110432669ed3d3b11be32d84db780afdaad",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\cp_daily_challenges.csv.59.csv": "0d654edfd64fd143283485bbba6514f22151de7c811c5f275dda14d6c4f0ead6",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\luashared\\csvutils.lua.1.lua": "65ac2fbb044acd3ec22cb8ffd71fa51dfb12890e755b1bc65c7e2d571e140191"
+  },
+  "rows": [
+    {
+      "id": 1797,
+      "kind": 12,
+      "name": "ch_daily_killer_short",
+      "description": "CHALLENGE/DAILY_KILLER_DESC",
+      "target": 20,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "PlayerKill",
+      "fields": [
+        "1797",
+        "ch_daily_killer_short",
+        "CHALLENGE/DAILY_KILLER",
+        "CHALLENGE/DAILY_KILLER_DESC",
+        "20",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "12"
+      ]
+    },
+    {
+      "id": 1798,
+      "kind": 12,
+      "name": "ch_daily_headhunter_short",
+      "description": "CHALLENGE/DAILY_HEADHUNTER_DESC",
+      "target": 5,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Headshot",
+      "fields": [
+        "1798",
+        "ch_daily_headhunter_short",
+        "CHALLENGE/DAILY_HEADHUNTER",
+        "CHALLENGE/DAILY_HEADHUNTER_DESC",
+        "5",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "11"
+      ]
+    },
+    {
+      "id": 1799,
+      "kind": 12,
+      "name": "ch_daily_close_and_personal_short",
+      "description": "CHALLENGE/DAILY_CLOSE_AND_PERSONAL_DESC",
+      "target": 3,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Melee",
+      "fields": [
+        "1799",
+        "ch_daily_close_and_personal_short",
+        "CHALLENGE/DAILY_CLOSE_AND_PERSONAL",
+        "CHALLENGE/DAILY_CLOSE_AND_PERSONAL_DESC",
+        "3",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "8"
+      ]
+    },
+    {
+      "id": 5000,
+      "kind": 27,
+      "name": "ch_br_daily_ammo_dealer_short",
+      "description": "CHALLENGE/BR_DAILY_AMMO_DEALER_DESC",
+      "target": 3,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "5000",
+        "ch_br_daily_ammo_dealer_short",
+        "CHALLENGE/BR_DAILY_AMMO_DEALER",
+        "CHALLENGE/BR_DAILY_AMMO_DEALER_DESC",
+        "3",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "15"
+      ]
+    },
+    {
+      "id": 5001,
+      "kind": 27,
+      "name": "ch_br_daily_the_biggest_booms_short",
+      "description": "CHALLENGE/BR_DAILY_THE_BIGGEST_BOOMS_DESC",
+      "target": 2,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "5001",
+        "ch_br_daily_the_biggest_booms_short",
+        "CHALLENGE/BR_DAILY_THE_BIGGEST_BOOMS",
+        "CHALLENGE/BR_DAILY_THE_BIGGEST_BOOMS_DESC",
+        "2",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "6"
+      ]
+    },
+    {
+      "id": 5002,
+      "kind": 27,
+      "name": "ch_br_daily_arms_dealer_short",
+      "description": "CHALLENGE/BR_DAILY_ARMS_DEALER_DESC",
+      "target": 1,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "5002",
+        "ch_br_daily_arms_dealer_short",
+        "CHALLENGE/BR_DAILY_ARMS_DEALER",
+        "CHALLENGE/BR_DAILY_ARMS_DEALER_DESC",
+        "1",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "33"
+      ]
+    },
+    {
+      "id": 9055,
+      "kind": 30,
+      "name": "ch_daily_assault_rifle_kills_short_cp",
+      "description": "CHALLENGE/DAILY_ASSAULT_RIFLE_KILLS_DESC",
+      "target": 40,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "9055",
+        "ch_daily_assault_rifle_kills_short_cp",
+        "CHALLENGE/DAILY_ASSAULT_RIFLE_KILLS",
+        "CHALLENGE/DAILY_ASSAULT_RIFLE_KILLS_DESC",
+        "40",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "2"
+      ]
+    },
+    {
+      "id": 9056,
+      "kind": 30,
+      "name": "ch_daily_assault_rifle_headshots_short_cp",
+      "description": "CHALLENGE/DAILY_ASSAULT_RIFLE_HEADSHOTS_DESC",
+      "target": 10,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "9056",
+        "ch_daily_assault_rifle_headshots_short_cp",
+        "CHALLENGE/DAILY_ASSAULT_RIFLE_HEADSHOTS",
+        "CHALLENGE/DAILY_ASSAULT_RIFLE_HEADSHOTS_DESC",
+        "10",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "3"
+      ]
+    },
+    {
+      "id": 9057,
+      "kind": 30,
+      "name": "ch_daily_smg_kills_short_cp",
+      "description": "CHALLENGE/DAILY_SMG_KILLS_DESC",
+      "target": 40,
+      "xp": 2000,
+      "item": 0,
+      "criterion": "Pending",
+      "fields": [
+        "9057",
+        "ch_daily_smg_kills_short_cp",
+        "CHALLENGE/DAILY_SMG_KILLS",
+        "CHALLENGE/DAILY_SMG_KILLS_DESC",
+        "40",
+        "2000",
+        "",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "1"
+      ]
+    }
+  ],
+  "native_columns": 13,
+  "native_cache_capacity_per_kind": 3,
+  "kinds": [
+    12,
+    27,
+    30
+  ],
+  "local_assignment_policy": "First three original rows per mode; reset at UTC midnight",
+  "exclusions": [
+    {
+      "id": 5000,
+      "name": "ch_br_daily_ammo_dealer_short",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    },
+    {
+      "id": 5001,
+      "name": "ch_br_daily_the_biggest_booms_short",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    },
+    {
+      "id": 5002,
+      "name": "ch_br_daily_arms_dealer_short",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    },
+    {
+      "id": 9055,
+      "name": "ch_daily_assault_rifle_kills_short_cp",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    },
+    {
+      "id": 9056,
+      "name": "ch_daily_assault_rifle_headshots_short_cp",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    },
+    {
+      "id": 9057,
+      "name": "ch_daily_smg_kills_short_cp",
+      "reason": "Original action ownership/predicate not bound; pending with zero earning"
+    }
+  ],
+  "native_game_verified": false
+}

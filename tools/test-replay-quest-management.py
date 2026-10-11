@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, fields, integer, structure, text
 from progression_transaction_fixtures import exercise_mission_window, mission_snapshot
 
@@ -234,7 +235,7 @@ def main():
                 blocker.rmdir()
             row = states(client)[1502]
             assert row[3] == [0] and row[5] == [1] and row[7] == [123]
-            assert not intent.exists()
+            assert_applied(intent)
             before = path.read_bytes()
             select(client, 1502, timestamp=999)
             assert path.read_bytes() == before

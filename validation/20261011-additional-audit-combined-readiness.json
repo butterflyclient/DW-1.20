@@ -1,0 +1,210 @@
+{
+  "daily_assigned_definitions": 9,
+  "daily_bound_earning_predicates": 3,
+  "daily_pending_earning_predicates": 6,
+  "daily_canonical_context": "5800",
+  "daily_alias_context": "iw8",
+  "current_source_match": {
+    "src/achievement_store.cpp": true,
+    "src/achievement_store.h": true,
+    "src/achievement_services.cpp": true,
+    "src/account_services.cpp": true,
+    "src/battlepass_services.cpp": true,
+    "src/matchmaking_services.cpp": true,
+    "src/objectstore_services.cpp": true,
+    "src/rest_services.cpp": true,
+    "src/services.cpp": true,
+    "src/social_services.cpp": true,
+    "src/quest_services.cpp": true,
+    "src/quest_services.h": true,
+    "src/replay_daily_challenges.h": true
+  },
+  "further_changes_in_progress": false,
+  "passed": true,
+  "windows_server_sha256": "ed616122b33fb964e49722cd31ed766af993ccd608c1355fa83af3b88a220c46",
+  "linux_server_sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+  "backend_sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+  "exact_dual_platform_compiled_sources": true,
+  "compiled_translation_units": 46,
+  "retained_objects": 0,
+  "counts": {
+    "windows": {
+      "earning": 241,
+      "management": 15,
+      "exclusions": 14,
+      "daily": 5,
+      "protocol": 306,
+      "publisher": 7,
+      "battlepass": 16,
+      "catchup": 8,
+      "retry": 8,
+      "gunsmith": 8,
+      "team": 27
+    },
+    "linux": {
+      "earning": 241,
+      "management": 15,
+      "exclusions": 14,
+      "daily": 5,
+      "protocol": 306,
+      "publisher": 7,
+      "battlepass": 16,
+      "catchup": 8,
+      "retry": 8,
+      "gunsmith": 8,
+      "team": 27
+    }
+  },
+  "supported_mission_stages": 181,
+  "excluded_mission_stages": 51,
+  "excluded_native_routes": 6,
+  "full_backend_completed": false,
+  "requested_emulation_scope_finalized": true,
+  "additional_audit_completed": true,
+  "server_deployed": true,
+  "native_game_callback_verified": false,
+  "game_runs_performed": false,
+  "evidence": [
+    {
+      "path": "data/backend-snapshot-1791688346585792000/build-receipt.json",
+      "sha256": "7842df5c13e12e68eb607d93ac0345310f6f78f6acf4cd6d4f6573c939102e0e"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-object-proof.json",
+      "sha256": "ef2bd88ee740c009dcbd55e1d6403755beb54ab85211beefaa702c3ecd519c26"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-build-receipt.json",
+      "sha256": "6545fdff5fd781b16caac2b5d3b327e56c0860d10d159af22fd372d9657d9ecd"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-earning.json",
+      "sha256": "995587e65ab7cae64109b3b0d096bd4b4642db6ca9393212ff6c35789d18af9d"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-management.json",
+      "sha256": "eb3db08de2dec28db792e95c9db64f31e833812cf637adbb49e3c86b1efbb19b"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-exclusions.json",
+      "sha256": "67e9223651813cb20045e0cc195aec7ee02f5bd28cc11a9e2157514c1dad125b"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-daily.json",
+      "sha256": "09b4e01f0923a7fa291226345d96c1f337f0522631aa87708fbfb2990ef27fe8"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-protocol.json",
+      "sha256": "6fa84dbc75d546a4fdcb5f4cf443597cfc5f57a4ee2f79b33b19949afcb4fb7b"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-publisher.json",
+      "sha256": "9b31feddd1e836422fa72e91137d2f6d464042b028deebac129ac4e405a122ee"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-battlepass.json",
+      "sha256": "f28dda9c1d3485c992fa30854a7f0086e4ff5811c083618f4260f8b397724bc9"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-catchup.json",
+      "sha256": "7d5c5d3bd4fef2ce2dce012f2b14e0f5d64024ba71366e9f7aea8bfe20f8c87d"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-retry.json",
+      "sha256": "9b63cb65ee59809edb2f8b728415d365824c47ef75affbc3d0bf8bca89159bf0"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-gunsmith.json",
+      "sha256": "79431e729dd1a4ee7590408bae396a4979c29089444558d0a4a078191c011a75"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/windows-team.json",
+      "sha256": "1088e081b3f07943414e224bea3d19d7499c1c9bddbddeaf28132b93294470f6"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-earning.json",
+      "sha256": "83e172cb284b6e71c0ba4bc8bc9884082cc1914372664a8677f406e6867ce249"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-management.json",
+      "sha256": "54d4631aa62cbb4cdbd1261975f91af451ee826254e469def808e38cb15fa2b8"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-exclusions.json",
+      "sha256": "195f8e3056fb98db2db7c9ab264cd71b36e09e67ef7deafe53320831454208a8"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-daily.json",
+      "sha256": "bac1f1318ff77c61a2481642446c21ff52adf4585981648ff64a794545fb0472"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-protocol.json",
+      "sha256": "c869544af20c1874cd4b87354bd7c5293d1548269cd5b471cd944a1c24c5fa21"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-publisher.json",
+      "sha256": "888ac2a13f2cdc93e8af7579af88623078cc2356a5ac2bdc6977e450b397e063"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-battlepass.json",
+      "sha256": "18478073c753b3bffef560802ac30687e08c5fc7778c373f85cb00b921a41a1b"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-catchup.json",
+      "sha256": "3524dd3d4bc04716168c62a796f95942072574bb64ab9833afe902856916df11"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-retry.json",
+      "sha256": "95b4ff04588cbad2a116858d3100adacbe495e6f31d99566eb70adae713fa49b"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-gunsmith.json",
+      "sha256": "30957e81500a6bfcc1b856c1d273a7cfc83ebdde175decd0a3db27eaf44e637d"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/linux-team.json",
+      "sha256": "7b5e8a91c74508de0553dd6375ebf9a10afacf79ac74c3edae76081272fdb799"
+    },
+    {
+      "path": "validation/20261011-dispatch-lease.json",
+      "sha256": "874bce5e23a9dca8587e1e7685eb1091ff0d8d9e05612fd93561da631a0147b7"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/validation-cohort/cohort-inputs.json",
+      "sha256": "d6241fa666d087157291effec61870fb7d37630ab53c6e37a27f0b781d4bb57f"
+    },
+    {
+      "path": "validation/20261011-replay-daily-assets.json",
+      "sha256": "6789949c3e41260c7ede784bb7809c67376626ffbac6df337b831fb550695f83"
+    },
+    {
+      "path": "validation/20261011-replay-daily-component.json",
+      "sha256": "64025b74db3890a55e2150aab3cf34d27039011c274af8f943976afa70c8f30b"
+    },
+    {
+      "path": "validation/20261011-replay-daily-context.json",
+      "sha256": "cda8688ebeddf0464a89d615b6fd11c2aecdcfeb06fdaa2899a2f4d01df278c5"
+    },
+    {
+      "path": "validation/20261011-replay-daily-consumer.json",
+      "sha256": "d3204fbce82b6baeda44567ccf4334754b9869cc96efed9abb16e640d5d4c861"
+    },
+    {
+      "path": "data/additional-audit-combined-20261011/shipping-client-observation.json",
+      "sha256": "5358c5187dfcab47be89b364f3098a8c4c1f7a4948c8ddadf213debbcd1626d7"
+    }
+  ],
+  "live_process": {
+    "pid": 291365,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-3aff0f962e3d/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-3aff0f962e3d/iw8-dw-server",
+    "sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+    "process_sha256": "3aff0f962e3d9d91bf3e3e6f9e0ede30f150b0c20d356da68e5875ca1a4eea9c",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "deployed_map_policy_sha256": "03fbbc68e99bb083302e8acb0ca5c3bf2986e42d2608b26664cc68eb737e2fc4"
+}

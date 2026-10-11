@@ -1,0 +1,131 @@
+{
+  "passed": true,
+  "native_game_verified": false,
+  "full_backend_build_verified": false,
+  "source_sha256": {
+    "E:\\DW\\IW8\\src\\achievement_services.cpp": "13873fd053d2b1c6c950524c09dd4fca0786ab9403bbb2fecc885bed78455ff0",
+    "E:\\DW\\IW8\\src\\quest_services.cpp": "30a431bd8554cc91970871f1c89275d266dfd86ffb810c3704746f75d4d84884",
+    "E:\\DW\\IW8\\src\\quest_services.h": "476c671ad5d4a6061c7e0324f35ba30708a304163e2084e488cb2e92483a8401",
+    "E:\\DW\\IW8\\src\\replay_daily_challenges.h": "04365b18a8b905cb036728d9ea1f03373e81aa183418f8513303354f86be1639",
+    "E:\\DW\\IW8\\validation\\20261009-challenge-event-parser.json": "edca0997771c45bd7d38b2fcdce4f0a43343123a29e1eaf4dad08a6b9c0fd6b1",
+    "E:\\DW\\IW8\\validation\\20261011-replay-mp-mission-events.json": "026996eec630d3d86e8864932407c694d929cd75cdbb378514d95fd6a849125d"
+  },
+  "parser_packets": {
+    "normal": {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,no_attachments,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883619071,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    "headshot": {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_HEAD_SHOT,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        589824
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    "melee": {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_MELEE,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        524288
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    }
+  },
+  "component_result": "PASS: daily native metadata, zero assignment, MP earning/rewards, exclusions, admission, cycle and event67 contracts",
+  "backend_achievement_translation_unit_compiled": true
+}

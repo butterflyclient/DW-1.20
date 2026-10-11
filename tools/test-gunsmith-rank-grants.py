@@ -14,6 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, fields, integer, structure, text
 from progression_delivery_fixtures import decode_reward
 
@@ -161,7 +162,7 @@ def main():
             received = {body["id_"]: body for body in (event(client), event(client))}
             assert received[1000000]["multiProgress"]["xp"]["value"] == 1599
             assert grants(received[2000015]) == {1015124: 1, 2015000: 1}
-            assert not intent.exists()
+            assert_applied(intent)
             owned = weapon_inventory(client)
             assert owned == {1001124: 7, 2001000: 1, 1015124: 1, 2015000: 1}
             checks.append("XP and inventory share a flushed intent; blocked writes fence both reads and idle recovery completes the whole window")

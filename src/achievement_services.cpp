@@ -639,6 +639,8 @@ namespace services
             return delivery;
         }
 
+        void validateEventWrite(const achievement_store::Write &write);
+
         Reply get(const std::filesystem::path &root,
                   const platform::LobbyIdentity &id,
                   wire::Reader &p,
@@ -650,11 +652,43 @@ namespace services
                                           : folder / std::to_string(id.userId) / "states.json";
             auto data = document(path, Json::array());
             wire::require(data.is_array() && data.size() <= 15000);
+            bool dailyChanged = false;
+            bool dailyMirror = false;
+            Json canonicalDailyData;
             if (definitions && id.titleId == 5800 && data.empty())
                 for (const auto &row : replayQuests)
                     data.push_back(questDefinition(row));
             if (!definitions)
             {
+                // The original progression request explicitly includes these
+                // three kinds. Generic state reads do not enroll new schedules.
+                if (id.titleId == 5800 && (
+                    std::any_of(q.kinds.begin(), q.kinds.end(), [](auto kind)
+                        { return kind == 12 || kind == 27 || kind == 30; }) ||
+                    std::any_of(data.begin(), data.end(), [](const Json &row)
+                        { return replayDailyChallenge(integer(row, "id")) != nullptr; })))
+                {
+                    const auto time = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count());
+                    if (q.context == "5800")
+                        dailyChanged = synchronizeReplayDailies(data, time);
+                    else
+                    {
+                        // Original Replay uses its authenticated numeric title
+                        // for both state reads and earning. iw8 is a read alias
+                        // for this schedule, not a second daily reward owner.
+                        const auto canonical = root / "achievements" / "5800" / "5800" /
+                            std::to_string(id.userId) / "states.json";
+                        canonicalDailyData = document(canonical, Json::array());
+                        dailyChanged = synchronizeReplayDailies(canonicalDailyData, time);
+                        dailyMirror = true;
+                        data.erase(std::remove_if(data.begin(), data.end(), [](const Json &row)
+                            { return replayDailyChallenge(integer(row, "id")) != nullptr; }), data.end());
+                        for (const auto &row : canonicalDailyData)
+                            if (replayDailyChallenge(integer(row, "id")))
+                                data.push_back(row);
+                    }
+                }
                 // The first Battle Pass backend left completed activations at
                 // ACTIVE. Present their inactive status without queuing
                 // them again into the native challenge-activation cache.
@@ -741,8 +775,21 @@ namespace services
                         2,
                         end < filtered.size() ? digest + ":" + std::to_string(end) : "");
             wire::require(reply.structure.size() <= 256 * 1024);
-            if (!definitions && !std::filesystem::exists(path))
-                publish(path, data);
+            if (dailyChanged)
+            {
+                const achievement_store::Write write{id.userId, id.platformAccountId,
+                    dailyMirror ? "5800" : q.context, {},
+                    dailyMirror ? canonicalDailyData : data, achievement_store::Destination::states};
+                achievement_store::commit(root, id.titleId, {&write, 1}, validateEventWrite);
+            }
+            else if (!definitions && !std::filesystem::exists(path))
+            {
+                auto persisted = data;
+                if (dailyMirror)
+                    persisted.erase(std::remove_if(persisted.begin(), persisted.end(), [](const Json &row)
+                        { return replayDailyChallenge(integer(row, "id")) != nullptr; }), persisted.end());
+                publish(path, persisted);
+            }
             return reply;
         }
 
@@ -964,6 +1011,20 @@ namespace services
                     wire::require(quest(identity) && seen.insert(identity).second);
                 }
             }
+            if (receipt.contains("daily_updates"))
+            {
+                (void)integer(receipt, "daily_cycle");
+                wire::require(receipt.contains("daily_cycle"));
+                const auto &updates = receipt.at("daily_updates");
+                wire::require(updates.is_array() && updates.size() <= replayDailyChallenges.size());
+                std::set<uint64_t> seen;
+                for (const auto &value : updates)
+                {
+                    wire::require(value.is_number_unsigned());
+                    const auto identity = value.get<uint64_t>();
+                    wire::require(replayDailyChallenge(identity) && seen.insert(identity).second);
+                }
+            }
             if (receipt.contains("users"))
             {
                 const auto &users = receipt.at("users");
@@ -1030,6 +1091,12 @@ namespace services
 
         void validateEventWrite(const achievement_store::Write &write)
         {
+            if (write.kind == achievement_store::Destination::userState)
+            {
+                wire::require(write.receiptKey.empty() && write.document.is_object() &&
+                              write.document.dump().size() <= 4096);
+                return;
+            }
             if (write.kind == achievement_store::Destination::leaderboard)
             {
                 wire::require(write.document.is_object() && write.document.size() <= 1000);
@@ -1174,11 +1241,18 @@ namespace services
             const auto aliases = requestAliases(request);
             bool accepted = false;
             std::set<uint32_t> refreshedQuests;
+            std::set<uint32_t> refreshedDailies;
+            const auto dailyTime = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
             const auto restoreQuests = [&](const Json &receipt)
             {
                 if (receipt.contains("quest_updates"))
                     for (const auto &value : receipt.at("quest_updates"))
                         refreshedQuests.insert(value.get<uint32_t>());
+                if (context == "5800" && receipt.contains("daily_updates") &&
+                    integer(receipt, "daily_cycle") == dailyTime / 86400)
+                    for (const auto &value : receipt.at("daily_updates"))
+                        refreshedDailies.insert(value.get<uint32_t>());
             };
             for (const auto &receipt : data.at("requests"))
                 if (includes(aliases, receipt.at("id").get<std::string>()))
@@ -1237,6 +1311,22 @@ namespace services
                 std::optional<RankInventory> awards;
                 auto selected = rankItems(snapshots, xp);
                 QuestProgress questRefresh;
+                QuestProgress dailyRefresh;
+                if (!refreshedDailies.empty())
+                {
+                    dailyRefresh.states = document(path.parent_path() / "states.json", Json::array());
+                    wire::require(dailyRefresh.states.is_array());
+                    for (const auto &row : dailyRefresh.states)
+                        if (refreshedDailies.contains(static_cast<uint32_t>(integer(row, "id"))) &&
+                            integer(row, "dailyCycle") == dailyTime / 86400)
+                        {
+                            (void)state(row);
+                            const auto identity = static_cast<uint32_t>(integer(row, "id"));
+                            const bool completed = integer(row, "status") == 3;
+                            dailyRefresh.updates[identity] = completed;
+                            earnedXp = earnedXp || completed;
+                        }
+                }
                 if (!refreshedQuests.empty())
                 {
                     questRefresh.states = document(path.parent_path() / "states.json", Json::array());
@@ -1297,6 +1387,13 @@ namespace services
                     result.operation = "achievement-events-idempotent-refresh";
                 }
                 std::vector<achievement_store::Write> refreshWrites;
+                if (!dailyRefresh.updates.empty())
+                {
+                    auto deliveries = replayDailyUpdates(id, context, dailyRefresh, true);
+                    result.deliveries.insert(result.deliveries.end(),
+                        std::make_move_iterator(deliveries.begin()), std::make_move_iterator(deliveries.end()));
+                    result.operation = "achievement-events-idempotent-refresh";
+                }
                 battlepassEvents(root, id, context, events, refreshWrites, result.deliveries, true);
                 return result;
             }
@@ -1346,6 +1443,8 @@ namespace services
                 }
             }
             QuestProgress questProgress;
+            QuestProgress dailyProgress;
+            bool dailyStatesChanged = false;
             if (id.titleId == 5800 && std::any_of(events.begin(), events.end(),
                 [](const Json &event)
                 {
@@ -1353,7 +1452,7 @@ namespace services
                     return replayQuestEventMayEarn(name);
                 }))
             {
-                const auto stored = document(path.parent_path() / "states.json", Json::array());
+                auto stored = document(path.parent_path() / "states.json", Json::array());
                 wire::require(stored.is_array() && stored.size() <= 15000);
                 std::set<uint64_t> identities;
                 for (const auto &row : stored)
@@ -1361,11 +1460,23 @@ namespace services
                     (void)state(row);
                     wire::require(identities.insert(integer(row, "id")).second);
                 }
+                const bool hasDailies = context == "5800" && std::any_of(stored.begin(), stored.end(), [](const Json &row)
+                    { return replayDailyChallenge(integer(row, "id")) != nullptr; });
+                if (hasDailies)
+                    dailyStatesChanged = synchronizeReplayDailies(stored, dailyTime);
                 if (!stored.empty())
                     questProgress = advanceReplayQuests(stored, events,
                         std::span<const ReplayQuestEventContext>(matches.contexts));
                 wire::require(xp <= UINT64_MAX - questProgress.xp);
                 xp += questProgress.xp;
+                if (hasDailies)
+                {
+                    dailyProgress = advanceReplayDailies(questProgress.states, events,
+                        std::span<const ReplayQuestEventContext>(matches.contexts), dailyTime);
+                    questProgress.states = dailyProgress.states;
+                    wire::require(xp <= UINT64_MAX - dailyProgress.xp);
+                    xp += dailyProgress.xp;
+                }
             }
             WeaponXp changedWeapons;
             for (const auto &[weaponId, total] : weapons)
@@ -1377,6 +1488,7 @@ namespace services
             std::optional<RankInventory> awards;
             auto selected = rankItems(changedWeapons, xp);
             selected.insert(selected.end(), questProgress.items.begin(), questProgress.items.end());
+            selected.insert(selected.end(), dailyProgress.items.begin(), dailyProgress.items.end());
             std::sort(selected.begin(), selected.end());
             selected.erase(std::unique(selected.begin(), selected.end()), selected.end());
             if (!selected.empty())
@@ -1406,6 +1518,16 @@ namespace services
                     receipt["quest_updates"].push_back(uint64_t{identity});
                 }
             }
+            if (!dailyProgress.updates.empty())
+            {
+                receipt["daily_cycle"] = dailyTime / 86400;
+                receipt["daily_updates"] = Json::array();
+                for (const auto &[identity, completed] : dailyProgress.updates)
+                {
+                    (void)completed;
+                    receipt["daily_updates"].push_back(uint64_t{identity});
+                }
+            }
             if (!owners.is_null())
                 receipt["users"] = owners;
             data["requests"].push_back(std::move(receipt));
@@ -1421,7 +1543,7 @@ namespace services
                 data["requests"].erase(data["requests"].begin());
             }
             writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
-            if (!questProgress.updates.empty())
+            if (!questProgress.updates.empty() || !dailyProgress.updates.empty() || dailyStatesChanged)
                 writes.push_back({id.userId, id.platformAccountId, context, {}, questProgress.states,
                                   achievement_store::Destination::states});
             if (awards && awards->changed)
@@ -1442,6 +1564,9 @@ namespace services
             result.deliveries.insert(result.deliveries.end(),
                                      std::make_move_iterator(missionDeliveries.begin()),
                                      std::make_move_iterator(missionDeliveries.end()));
+            auto dailyDeliveries = replayDailyUpdates(id, context, dailyProgress);
+            result.deliveries.insert(result.deliveries.end(),
+                std::make_move_iterator(dailyDeliveries.begin()), std::make_move_iterator(dailyDeliveries.end()));
             if (xp != previousXp)
             {
                 result.deliveries.push_back(
@@ -2155,6 +2280,8 @@ namespace services
             writes.push_back({user, platformAccount, context, {}, std::move(journal)});
             writes.push_back({user, platformAccount, context, {}, Json::array(),
                               achievement_store::Destination::states});
+            writes.push_back({user, platformAccount, context, {}, Json::object(),
+                              achievement_store::Destination::userState});
         }
         Json inventory{{"items", Json::array()}, {"balances", Json::array()}};
         for (const auto item : replayInitialItems)
@@ -2164,7 +2291,8 @@ namespace services
         writes.push_back({user, platformAccount, "5800", {}, Json::object(),
                           achievement_store::Destination::leaderboard});
         // One durable roll-forward intent covers both achievement namespaces,
-        // fresh-account ownership/currencies and every leaderboard. Identity,
+        // fresh-account ownership/currencies, user-state rewards/boosts and
+        // every leaderboard. Identity,
         // friends and ordinary settings are separate domains and remain intact.
         achievement_store::commit(root, title, writes, validateEventWrite);
     }

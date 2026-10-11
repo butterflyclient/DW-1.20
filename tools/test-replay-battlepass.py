@@ -11,6 +11,7 @@ import subprocess
 import time
 import urllib.request
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, binary, fields, integer, structure, text
 from progression_delivery_fixtures import decode_event67
 from test_replay_store_helpers import buy
@@ -216,7 +217,7 @@ def main():
             )
             assert received(client)[-1]["reason"] == "inProgress"
             assert battlepass_state()["multiProgress"][0]["current"] == target
-            assert not (data / "achievements/5800/event-transaction.json").exists()
+            assert_applied(data / "achievements/5800/event-transaction.json")
             checks.append(
                 "A real earned-reward write interruption recovers its XP, grants and request receipt once"
             )
@@ -303,7 +304,7 @@ def main():
                 quantity(430003) == 0
                 and get_state(3002000)["multiProgress"][1]["current"] == 24
             )
-            assert not (data / "achievements/5800/event-transaction.json").exists()
+            assert_applied(data / "achievements/5800/event-transaction.json")
             checks.append(
                 "Interrupted publication recovers its receipt, token debit, rewards and tier state once"
             )

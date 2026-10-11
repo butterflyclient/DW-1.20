@@ -102,9 +102,11 @@ namespace achievement_store
             if (row.contains("kind"))
             {
                 wire::require(row.at("kind") == "inventory" || row.at("kind") == "states" ||
-                              row.at("kind") == "leaderboard");
+                              row.at("kind") == "leaderboard" || row.at("kind") == "user_state");
                 kind = row.at("kind") == "inventory" ? Destination::inventory :
-                       row.at("kind") == "states" ? Destination::states : Destination::leaderboard;
+                       row.at("kind") == "states" ? Destination::states :
+                       row.at("kind") == "leaderboard" ? Destination::leaderboard :
+                                                          Destination::userState;
             }
             wire::require(kind == Destination::states ? row.at("after").is_array()
                                                      : row.at("after").is_object());
@@ -139,6 +141,12 @@ namespace achievement_store
             return root / "leaderboard-stats" / std::to_string(title) /
                    (std::to_string(write.owner) + ".json");
         }
+        if (write.kind == Destination::userState)
+        {
+            wire::require(write.receiptKey.empty());
+            return root / "achievement-user-state" / std::to_string(title) / write.context /
+                   (std::to_string(write.owner) + ".json");
+        }
         wire::require(write.kind == Destination::event);
         const auto folder = root / "achievements" / std::to_string(title) /
                             write.context / std::to_string(write.owner);
@@ -151,12 +159,17 @@ namespace achievement_store
         const auto path = intentPath(root, title);
         if (!std::filesystem::exists(path))
             return;
-        const auto intent = read(path, maximumIntent);
+        auto intent = read(path, maximumIntent);
         wire::require(intent.is_object() && intent.size() == 5 && intent.at("schema") == 1 &&
-                      intent.at("title") == title && intent.at("phase") == "prepared" &&
-                      intent.at("writes").is_array() && !intent.at("writes").empty() &&
+                      intent.at("title") == title &&
+                      (intent.at("phase") == "prepared" || intent.at("phase") == "applied") &&
+                      intent.at("writes").is_array() &&
                       intent.at("writes").size() <= maximumWrites &&
                       intent.at("checksum") == digest(intent.at("writes")));
+        wire::require(intent.at("phase") == "prepared" ? !intent.at("writes").empty()
+                                                       : intent.at("writes").empty());
+        if (intent.at("phase") == "applied")
+            return;
         std::set<std::filesystem::path> destinations;
         std::vector<Write> pending;
         // Validate the entire persisted window before resuming even its first
@@ -179,8 +192,13 @@ namespace achievement_store
         }
         for (const auto &write : pending)
             publish(destination(root, title, write), write.document, maximumDocument);
-        if (!DeleteFileW(path.c_str()))
-            throw std::runtime_error("Achievement transaction retirement failed");
+        // Keep a flushed completion marker. A non-durable deletion can revive
+        // an old prepared intent after a power failure and conflict with later
+        // independent inventory or leaderboard writes.
+        intent["phase"] = "applied";
+        intent["writes"] = Json::array();
+        intent["checksum"] = digest(intent.at("writes"));
+        publish(path, intent, maximumIntent);
     }
 
     void commit(const std::filesystem::path &root,
@@ -211,6 +229,8 @@ namespace achievement_store
                 entries.back()["kind"] = "states";
             else if (write.kind == Destination::leaderboard)
                 entries.back()["kind"] = "leaderboard";
+            else if (write.kind == Destination::userState)
+                entries.back()["kind"] = "user_state";
         }
         // The complete intent reaches stable storage before any account journal
         // or archived retry receipt is changed. Keep it on every failure.

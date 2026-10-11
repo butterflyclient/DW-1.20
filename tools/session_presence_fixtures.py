@@ -81,7 +81,7 @@ def exercise(
         assert status == 200 and body["users"][0]["userID"] == peer_user
         return body["users"][0]["presence"]
 
-    def publish(connection):
+    def publish(connection, online=True, platform="bnet", lease=1):
         connection.task(
             255,
             10,
@@ -90,12 +90,12 @@ def exercise(
                 "UserPresence",
                 "set_user_presence",
                 0x505554,
-                {"online": True, "platform": "bnet", "data": {"lease": 1}},
+                {"online": online, "platform": platform, "data": {"lease": lease}},
                 uri=f"/v2/users/uno-{peer_user}/presence/?context=iw8",
             ),
         )
 
-    def notification(online):
+    def notification(online, platform="bnet", lease=1):
         kind, packet = observer.receive()
         assert kind == 2 and packet.startswith(prefix)
         changed = json.loads(packet[len(prefix) + 6 :])
@@ -103,7 +103,8 @@ def exercise(
             changed["userID"] == peer_user
             and changed["context"] == "iw8"
             and changed["presence"]["online"] is online
-            and changed["presence"]["data"] == {"lease": 1}
+            and changed["presence"]["platform"] == platform
+            and changed["presence"]["data"] == {"lease": lease}
         )
 
     def retired(connection):
@@ -133,6 +134,24 @@ def exercise(
             )
         )
         assert status == 200 and body["users"][0]["presence"]["online"] is True
+        publish(peer)
+        no_notification()
+        publish(peer, lease=2)
+        publish(peer, lease=2)
+        notification(True, lease=2)
+        no_notification()
+        publish(peer, platform="other", lease=2)
+        notification(True, platform="other", lease=2)
+        publish(peer, online=False, platform="other", lease=2)
+        notification(False, platform="other", lease=2)
+        publish(peer, online=False, platform="other", lease=2)
+        no_notification()
+        publish(peer)
+        notification(True)
+        no_notification()
+        checks.append(
+            "identical presence repeats emit no native push or stale a queued transition; data, platform and online changes each notify once"
+        )
         duplicate = connect(peer_auth)
         duplicate.close()
         assert presence()["online"] is True

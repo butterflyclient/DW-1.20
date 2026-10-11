@@ -71,8 +71,27 @@ def exercise(root, data, offset, checks):
             {"id": 1501, "name": "reset-mission", "kind": 15, "status": 3, "progress": 100, "target": 100},
             {"id": 2000015, "name": "iw8_ar_mike4", "kind": 5, "status": 1, "progress": 0, "target": 0,
              "multiProgress": [{"name": "xp", "current": 20000, "target": 0}, {"name": "rank", "current": 20, "target": 0}]},
-            {"id": 300001, "name": "reset-battlepass", "kind": 20, "status": 3, "progress": 100, "target": 100}]))
-    before = {p: p.read_bytes() for p in [inventory, leaderboard, *(f / 'events.json' for f in contexts), *(f / 'states.json' for f in contexts)]}
+            {"id": 3002000, "name": "battlepass_season3", "kind": 20, "status": 1,
+             "progress": 0, "target": 0, "premium": True}]))
+    def user_states(reply):
+        with NativeClient(root, port_offset=offset, platform_reply=reply) as client:
+            assert client.user == user
+            return {context: json.loads(fields(client.task(
+                125, 9, structure(text(1, context))))[1][0])
+                    for context in ("5800", "iw8")}
+
+    projected = user_states(login(version=1))
+    for context, state in projected.items():
+        assert state["battlepass3_owned"] == 1 and type(state["battlepass3_owned"]) is int
+        saved_state = data / "achievement-user-state/5800" / context / f"{user}.json"
+        assert json.loads(saved_state.read_bytes())["battlepass3_owned"] == 1
+        stored = json.loads(saved_state.read_bytes())
+        stored.update(br_tutorial_rewarded=True, player_xp_end_time=1234567890,
+                      weapon_xp_end_time=1234567891)
+        saved_state.write_text(json.dumps(stored))
+    user_state_paths = [data / "achievement-user-state/5800" / c / f"{user}.json"
+                        for c in ("5800", "iw8")]
+    before = {p: p.read_bytes() for p in [inventory, leaderboard, *(f / 'events.json' for f in contexts), *(f / 'states.json' for f in contexts), *user_state_paths]}
     for arguments in [dict(user=user + 1, restore=True, reset=True),
                       dict(user=user, restore=True, reset=True, xp=1),
                       dict(user=user, restore=True, reset=True, rank=2),
@@ -83,8 +102,51 @@ def exercise(root, data, offset, checks):
         except urllib.error.HTTPError as error:
             assert error.code in (400, 401)
         assert all(p.read_bytes() == value for p, value in before.items())
-    _, value = total(login(user=user, restore=True, reset=True))
+    with NativeClient(root, port_offset=offset, platform_reply=login(version=1)) as client:
+        blocker = user_state_paths[1].with_name(user_state_paths[1].name + ".pending")
+        blocker.mkdir()
+        try:
+            try:
+                login(user=user, restore=True, reset=True)
+                raise AssertionError('Blocked user-state reset publication accepted')
+            except urllib.error.HTTPError as error:
+                assert error.code == 400
+            intent = data / "achievements/5800/event-transaction.json"
+            prepared_bytes = intent.read_bytes()
+            prepared = json.loads(prepared_bytes)
+            user_writes = [w for w in prepared['writes'] if w.get('kind') == 'user_state']
+            assert prepared['phase'] == 'prepared' and len(user_writes) == 2
+            assert {w['context'] for w in user_writes} == {'5800', 'iw8'}
+            assert all(w['after'] == {} for w in user_writes)
+            assert json.loads(user_state_paths[0].read_bytes()) == {}
+            assert user_state_paths[1].read_bytes() == before[user_state_paths[1]]
+            for context in ('5800', 'iw8'):
+                try:
+                    client.task(125, 9, structure(text(1, context)))
+                    raise AssertionError('Partially reset user state exposed')
+                except RuntimeError as error:
+                    assert 'returned 102' in str(error)
+            assert intent.read_bytes() == prepared_bytes
+        finally:
+            blocker.rmdir()
+        # Read the still-old second-context document first on this existing
+        # authenticated connection. Recovery must run before loading its JSON,
+        # otherwise tutorial/boost fields can leak into the first reset reply.
+        for context in ('iw8', '5800'):
+            state = json.loads(fields(client.task(
+                125, 9, structure(text(1, context))))[1][0])
+            assert state == {}
+    checks.append('interrupted full reset journals both user-state snapshots and blocks native reads until complete roll-forward')
+    reset_reply = login(user=user, restore=True, reset=True)
+    _, value = total(reset_reply)
     assert value == {"xp": 0, "rank": 0}
+    for state in user_states(reset_reply).values():
+        assert state == {}
+        assert all(state.get(f"battlepass{season}_owned", 0) == 0 for season in range(7))
+    for state in user_states(login(version=1)).values():
+        assert state == {}
+        assert all(state.get(f"battlepass{season}_owned", 0) == 0 for season in range(7))
+    checks.append('full reset clears materialized premium Battle Pass ownership on native user-state reads in both contexts and after reconnect')
     for folder in contexts:
         journal = json.loads((folder / 'events.json').read_bytes())
         assert journal['player_xp'] == 0 and journal['weapon_xp'] == {} and journal['matches'] == {}
@@ -92,6 +154,7 @@ def exercise(root, data, offset, checks):
     fresh = json.loads(inventory.read_bytes())
     assert fresh['balances'] == [] and not any(i['1'] == 429001 for i in fresh['items'])
     assert json.loads(leaderboard.read_bytes()) == {}
+    assert all(json.loads(p.read_bytes()) == {} for p in user_state_paths)
     # Retrying a nonce-signed reset cannot resurrect the discarded state.
     final = {p: p.read_bytes() for p in before}
     _, value = total(login(user=user, restore=True, reset=True))

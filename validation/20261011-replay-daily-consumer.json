@@ -1,0 +1,268 @@
+{
+  "passed": true,
+  "source_consumer_logic_verified": true,
+  "new_pending_rows_expected_unchecked": true,
+  "prior_checked_checkbox_root_cause_verified": false,
+  "native_game_verified": false,
+  "rendered_ui_verified": false,
+  "no_game_launched": true,
+  "oracle": {
+    "database": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay.exe.sqlite",
+    "database_sha256": "1dc165f45a160692d3a15d26351531d511cfab1bb991698d748b611c39628929",
+    "original_executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay.exe",
+    "original_executable_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+  },
+  "native_functions": [
+    {
+      "va": "0x142102180",
+      "name": "sub_142102180",
+      "pseudocode": "{\n  char v4; // r14\n  char v5; // bl\n  __int64 v6; // rcx\n  _QWORD *v7; // rdi\n  _BYTE v9[8]; // [rsp+20h] [rbp-98h] BYREF\n  _BYTE v10[40]; // [rsp+30h] [rbp-88h] BYREF\n  __int64 v11; // [rsp+58h] [rbp-60h]\n  __int64 v12; // [rsp+60h] [rbp-58h]\n  _QWORD v13[3]; // [rsp+68h] [rbp-50h] BYREF\n\n  if ( (unsigned __int8)bdStructBufferDeserializer::readString(a1: a2, a2: 1, a3: a1 + 24, a4: 101) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt16(a1: a2, a2: 2, a3: a1 + 126) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt32(a1: a2, a2: 3, a3: a1 + 128) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt32(a1: a2, a2: 4, a3: a1 + 132) == 0\n    || (unsigned __int8)hkVertexFormat::addElement__Atlas_2DFA2C0(a1: a2, a2: 5, a3: a1 + 136) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt64(a1: a2, a2: 6, a3: a1 + 144) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt64(a1: a2, a2: 7, a3: a1 + 152) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt64(a1: a2, a2: 8, a3: a1 + 160) == 0\n    || (unsigned __int8)bdStructBufferDeserializer::readUInt32(a1: a2, a2: 9, a3: a1 + 168) == 0 )\n  {\n    return false;\n  }\n  *(_DWORD *)(a1 + 528) = 0;\n  v4 = 0;\n  while ( v4 == 0 )\n  {\n    sub_142101F10(a1: (__int64)v9, a2: 1);\n    if ( (unsigned __int8)sub_142150830(a1: a2, a2: 10, a3: v9) == 0 )\n      goto LABEL_17;\n    v5 = 1;\n    if ( (unsigned int)sub_142150560(a1: a2) == 1 )\n    {\n      v4 = 1;\n    }\n    else\n    {\n      v6 = *(unsigned int *)(a1 + 528);\n      if ( (unsigned int)v6 >= 4 )\n      {\nLABEL_17:\n        v5 = 0;\n        goto LABEL_18;\n      }\n      *(_DWORD *)(a1 + 528) = v6 + 1;\n      v7 = (_QWORD *)(a1 + 176 + 88 * v6);\n      bdReferencable::operator(a1: (__int64)v7 + *(int *)(v7[1] + 4LL) + 8);\n      qmemcpy(v7 + 2, v10, 33);\n      v7[7] = v11;\n      v7[8] = v12;\n    }\nLABEL_18:\n    sub_1420FB530(a1: (__int64)v10);\n    sub_1420EBB50(a1: v13);\n    if ( v5 == 0 )\n      return false;\n  }\n  return (unsigned __int8)bdStructBufferDeserializer::readUInt64(a1: a2, a2: 11, a3: a1 + 16) != 0;\n}",
+      "original_instructions": "mov     [rsp+arg_10], rbx\npush    rbp\npush    rsi\npush    rdi\npush    r14\npush    r15\nsub     rsp, 90h\nmov     rax, cs:__security_cookie\nxor     rax, rsp\nmov     [rsp+0B8h+var_38], rax\nmov     rsi, rdx\nlea     r8, [rcx+18h]\nmov     edx, 1\nmov     rbp, rcx\nmov     rcx, rsi\nlea     r9d, [rdx+64h]\ncall    bdStructBufferDeserializer__readString\ntest    al, al\njz      loc_14210239D\nloc_1421021c8:\nlea     r8, [rbp+7Eh]\nmov     edx, 2\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt16\ntest    al, al\njz      loc_14210239D\nloc_1421021e1:\nlea     r8, [rbp+80h]\nmov     edx, 3\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt32\ntest    al, al\njz      loc_14210239D\nloc_1421021fd:\nlea     r8, [rbp+84h]\nmov     edx, 4\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt32\ntest    al, al\njz      loc_14210239D\nloc_142102219:\nlea     r8, [rbp+88h]\nmov     edx, 5\nmov     rcx, rsi\ncall    hkVertexFormat__addElement__Atlas_2DFA2C0\ntest    al, al\njz      loc_14210239D\nloc_142102235:\nlea     r8, [rbp+90h]\nmov     edx, 6\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt64\ntest    al, al\njz      loc_14210239D\nloc_142102251:\nlea     r8, [rbp+98h]\nmov     edx, 7\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt64\ntest    al, al\njz      loc_14210239D\nloc_14210226d:\nlea     r8, [rbp+0A0h]\nmov     edx, 8\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt64\ntest    al, al\njz      loc_14210239D\nloc_142102289:\nlea     r8, [rbp+0A8h]\nmov     edx, 9\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt32\ntest    al, al\njz      loc_14210239D\nloc_1421022a5:\nlea     r15, [rbp+0B0h]\nmov     bl, 1\nmov     dword ptr [r15+160h], 0\nxor     r14b, r14b\nnop     dword ptr [rax+00h]\nloc_1421022c0:\ntest    r14b, r14b\njnz     loc_1421023C6\nloc_1421022c9:\nmov     edx, 1\nlea     rcx, [rsp+0B8h+var_98]\ncall    sub_142101F10\ntest    bl, bl\njz      loc_14210237F\nloc_1421022e0:\nlea     r8, [rsp+0B8h+var_98]\nmov     edx, 0Ah\nmov     rcx, rsi\ncall    sub_142150830\ntest    al, al\njz      loc_14210237F\nloc_1421022fa:\nmov     rcx, rsi\nmov     bl, 1\ncall    sub_142150560\ncmp     eax, 1\njnz     short loc_14210230F\nloc_142102309:\nmovzx   r14d, al\njmp     short loc_142102381\nloc_14210230f:\nmov     ecx, [r15+160h]\ncmp     ecx, 4\njnb     short loc_14210237F\nloc_14210231b:\nlea     eax, [rcx+1]\nimul    rdi, rcx, 58h ; 'X'\nmov     [r15+160h], eax\nlea     rdx, [rsp+0B8h+var_90]\nmov     rax, [rsp+0B8h+var_90]\nadd     rdi, r15\nmovsxd  rcx, dword ptr [rax+4]\nmov     rax, [rdi+8]\nadd     rdx, rcx\nmovsxd  rcx, dword ptr [rax+4]\nadd     rcx, 8\nadd     rcx, rdi\ncall    bdReferencable__operator\nmovaps  xmm0, [rsp+0B8h+var_88]\nmovups  xmmword ptr [rdi+10h], xmm0\nmovaps  xmm1, [rsp+0B8h+var_78]\nmovups  xmmword ptr [rdi+20h], xmm1\nmovzx   eax, [rsp+0B8h+var_68]\nmov     [rdi+30h], al\nmov     rax, [rsp+0B8h+var_60]\nmov     [rdi+38h], rax\nmov     rax, [rsp+0B8h+var_58]\nmov     [rdi+40h], rax\njmp     short loc_142102381\nloc_14210237f:\nxor     bl, bl\nloc_142102381:\nlea     rcx, [rsp+0B8h+var_88]\ncall    sub_1420FB530\nlea     rcx, [rsp+0B8h+var_50]\ncall    sub_1420EBB50\ntest    bl, bl\njnz     loc_1421022C0\nloc_14210239d:\nxor     al, al\nloc_14210239f:\nmov     rcx, [rsp+0B8h+var_38]\nxor     rcx, rsp; StackCookie\ncall    __security_check_cookie\nmov     rbx, [rsp+0B8h+arg_10]\nadd     rsp, 90h\npop     r15\npop     r14\npop     rdi\npop     rsi\npop     rbp\nretn\nloc_1421023c6:\ntest    bl, bl\njz      short loc_14210239D\nloc_1421023ca:\nlea     r8, [rbp+10h]\nmov     edx, 0Bh\nmov     rcx, rsi\ncall    bdStructBufferDeserializer__readUInt64\ntest    al, al\njz      short loc_14210239D\nloc_1421023df:\nmov     al, 1\njmp     short loc_14210239F",
+      "pseudocode_sha256": "a4b7ad8de80443aa054a75a885a7ae1530aedd04ab0dd5633e7a99218e6dd3f0",
+      "instructions_sha256": "b8d4f964f683cf70c536e8b159478963ef830b3ea82ad9635bdea63313b55e7f"
+    },
+    {
+      "va": "0x142102450",
+      "name": "q_bdAchievementState::getProgress",
+      "pseudocode": "{\n  return *(unsigned int *)(a1 + 128);\n}",
+      "original_instructions": "mov     eax, [rcx+80h]\nretn",
+      "pseudocode_sha256": "bd3cf04e0d0cc3789c5bec94cc2e6ad4d5372c01446528ff4aa67549d6cd4b83",
+      "instructions_sha256": "8a0276aef647411fe02f76fd8323182c21f908039521dab772a095240dfdbcda"
+    },
+    {
+      "va": "0x142102460",
+      "name": "sub_142102460",
+      "pseudocode": "{\n  return *(unsigned int *)(a1 + 132);\n}",
+      "original_instructions": "mov     eax, [rcx+84h]\nretn",
+      "pseudocode_sha256": "0412fc4d5e021a604f9a0107de3fd185dd15e0ada0570c2d9b03a0e84e5e3a16",
+      "instructions_sha256": "38ccbf3d18b688a2fb8da95a84d75c7efbf4f4b455724df8584597d2d15cdfb8"
+    },
+    {
+      "va": "0x142102470",
+      "name": "sub_142102470",
+      "pseudocode": "{\n  return *(unsigned int *)(a1 + 136);\n}",
+      "original_instructions": "mov     eax, [rcx+88h]\nretn",
+      "pseudocode_sha256": "e78289ba08501c88c6587a02cf659982eed2030a99b4118d45ff2d58382d5ed6",
+      "instructions_sha256": "a3d2cfcf819e4c9e9da8aff66cfaa46a44506df61ed904359808bec90311b142"
+    },
+    {
+      "va": "0x141066dc0",
+      "name": "OnlineScheduledChallenges::AddProgression",
+      "pseudocode": "{\n  __int64 v4; // rsi\n  double result; // xmm0_8\n  __int64 v7; // rsi\n  __int16 Kind; // ax\n  __int64 v9; // rcx\n  unsigned int v10; // ebx\n  __int64 v11; // rsi\n  unsigned int v12; // eax\n  int v13; // ebx\n  int v14; // eax\n  int v15; // ebx\n  int v16; // eax\n  __int64 v17; // rsi\n  __int64 v18; // rsi\n  __int64 v19; // rsi\n  unsigned int v20; // ebx\n  unsigned int v21; // eax\n  int v22; // ebx\n  int v23; // eax\n  int Progress; // ebx\n  int jumpbuf_sp_16; // eax\n\n  v4 = a2;\n  if ( (unsigned __int16)bdAchievementState::getKind(a1: a3) == 12\n    || (unsigned __int16)bdAchievementState::getKind(a1: a3) == 27\n    || (unsigned __int16)bdAchievementState::getKind(a1: a3) == 30 )\n  {\n    v17 = 56 * v4;\n    if ( (unsigned __int16)bdAchievementState::getKind(a1: a3) == 27 )\n    {\n      v18 = v17 + 6528;\n    }\n    else if ( (unsigned __int16)bdAchievementState::getKind(a1: a3) == 30 )\n    {\n      v18 = v17 + 12992;\n    }\n    else\n    {\n      v18 = v17 + 64;\n    }\n    v19 = a1 + v18;\n    v20 = 0;\n    v21 = *(_DWORD *)(v19 + 48);\n    if ( v21 != 0 )\n    {\n      while ( _except_get_jumpbuf_sp_16(a1: a3) != *(_QWORD *)(v19 + 16LL * v20) )\n      {\n        v21 = *(_DWORD *)(v19 + 48);\n        if ( ++v20 >= v21 )\n          goto LABEL_23;\n      }\n      *(_QWORD *)(v19 + 16LL * v20 + 8) = (unsigned int)q_bdAchievementState::getProgress(a1: a3);\n      Progress = q_bdAchievementState::getProgress(a1: a3);\n      jumpbuf_sp_16 = _except_get_jumpbuf_sp_16(a1: a3);\n      sub_1412B0820(a1: 25, a2: \"Updated Daily Challenge %lu with progress %d\\n\", jumpbuf_sp_16, Progress);\n    }\n    else\n    {\nLABEL_23:\n      if ( v21 >= 3 )\n      {\n        return sub_1412B0570(a1: 25, a2: \"Too many Daily Challenges sent from AE. Increase MAX_DAILY_CHALLENGES.\\n\");\n      }\n      else\n      {\n        v22 = q_bdAchievementState::getProgress(a1: a3);\n        v23 = _except_get_jumpbuf_sp_16(a1: a3);\n        sub_1412B0820(a1: 25, a2: \"Found Daily Challenge %lu with progress %d\\n\", v23, v22);\n        *(_QWORD *)(v19 + 16LL * *(unsigned int *)(v19 + 48)) = _except_get_jumpbuf_sp_16(a1: a3);\n        *(_QWORD *)(v19 + 16LL * (unsigned int)(*(_DWORD *)(v19 + 48))++ + 8) = (unsigned int)q_bdAchievementState::getProgress(a1: a3);\n      }\n    }\n  }\n  else if ( (unsigned __int16)bdAchievementState::getKind(a1: a3) == 11\n         || (unsigned __int16)bdAchievementState::getKind(a1: a3) == 26 )\n  {\n    v7 = a1 + 6408 * v4;\n    Kind = bdAchievementState::getKind(a1: a3);\n    v9 = 120;\n    if ( Kind == 26 )\n      v9 = 6584;\n    v10 = 0;\n    v11 = v9 + v7;\n    v12 = *(_DWORD *)(v11 + 6400);\n    if ( v12 != 0 )\n    {\n      while ( _except_get_jumpbuf_sp_16(a1: a3) != *(_QWORD *)(v11 + 16LL * v10) )\n      {\n        v12 = *(_DWORD *)(v11 + 6400);\n        if ( ++v10 >= v12 )\n          goto LABEL_11;\n      }\n      *(_QWORD *)(v11 + 16LL * v10 + 8) = (unsigned int)q_bdAchievementState::getProgress(a1: a3);\n      v15 = q_bdAchievementState::getProgress(a1: a3);\n      v16 = _except_get_jumpbuf_sp_16(a1: a3);\n      sub_1412B0820(a1: 25, a2: \"Updated Weekly Challenge %lu with progress %d\\n\", v16, v15);\n    }\n    else\n    {\nLABEL_11:\n      if ( v12 >= 0x190 )\n      {\n        return sub_1412B0570(a1: 25, a2: \"Too many Weekly Challenges sent from AE. Increase MAX_WEEKLY_CHALLENGES.\\n\");\n      }\n      else\n      {\n        v13 = q_bdAchievementState::getProgress(a1: a3);\n        v14 = _except_get_jumpbuf_sp_16(a1: a3);\n        sub_1412B0820(a1: 25, a2: \"Found Weekly Challenge %lu with progress %d\\n\", v14, v13);\n        *(_QWORD *)(v11 + 16LL * *(unsigned int *)(v11 + 6400)) = _except_get_jumpbuf_sp_16(a1: a3);\n        *(_QWORD *)(v11 + 16LL * (unsigned int)(*(_DWORD *)(v11 + 6400))++ + 8) = (unsigned int)q_bdAchievementState::getProgress(a1: a3);\n      }\n    }\n  }\n  return result;\n}",
+      "original_instructions": "mov     [rsp+arg_0], rbx\nmov     [rsp+arg_8], rbp\nmov     [rsp+arg_10], rsi\npush    rdi\nsub     rsp, 20h\nmov     rbx, rcx\nmovsxd  rsi, edx\nmov     rcx, r8\nmov     rdi, r8\ncall    bdAchievementState__getKind\ncmp     ax, 0Ch\njz      loc_141066F3E\nloc_141066def:\nmov     rcx, rdi\ncall    bdAchievementState__getKind\ncmp     ax, 1Bh\njz      loc_141066F3E\nloc_141066e01:\nmov     rcx, rdi\ncall    bdAchievementState__getKind\ncmp     ax, 1Eh\njz      loc_141066F3E\nloc_141066e13:\nmov     rcx, rdi\ncall    bdAchievementState__getKind\ncmp     ax, 0Bh\njz      short loc_141066E33\nloc_141066e21:\nmov     rcx, rdi\ncall    bdAchievementState__getKind\ncmp     ax, 1Ah\njnz     loc_14106704A\nloc_141066e33:\nimul    rsi, 1908h\nmov     rcx, rdi\nadd     rsi, rbx\ncall    bdAchievementState__getKind\ncmp     ax, 1Ah\nmov     ecx, 78h ; 'x'\nmov     edx, 19B8h\ncmovz   ecx, edx\nxor     ebx, ebx\nadd     rsi, rcx\nmov     eax, [rsi+1900h]\ntest    eax, eax\njz      short loc_141066E86\nloc_141066e65:\nmov     rcx, rdi\nmov     ebp, ebx\ncall    __except_get_jumpbuf_sp_16\nmov     ecx, ebx\nadd     rcx, rcx\ncmp     rax, [rsi+rcx*8]\njz      short loc_141066EF2\nloc_141066e7a:\nmov     eax, [rsi+1900h]\ninc     ebx\ncmp     ebx, eax\njb      short loc_141066E65\nloc_141066e86:\ncmp     eax, 190h\njnb     loc_141066F32\nloc_141066e91:\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     rcx, rdi\nmov     ebx, eax\ncall    __except_get_jumpbuf_sp_16\nmov     r9d, ebx\nlea     rdx, aFoundWeeklyCha; \"Found Weekly Challenge %lu with progres\"...\nmov     r8, rax\nmov     ecx, 19h\ncall    sub_1412B0820\nmov     rcx, rdi\ncall    __except_get_jumpbuf_sp_16\nmov     ecx, [rsi+1900h]\nadd     rcx, rcx\nmov     [rsi+rcx*8], rax\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     ecx, eax\nmov     eax, [rsi+1900h]\nadd     rax, rax\nmov     [rsi+rax*8+8], rcx\ninc     dword ptr [rsi+1900h]\njmp     loc_14106704A\nloc_141066ef2:\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     eax, eax\nadd     rbp, rbp\nmov     rcx, rdi\nmov     [rsi+rbp*8+8], rax\ncall    q_bdAchievementState__getProgress\nmov     rcx, rdi\nmov     ebx, eax\ncall    __except_get_jumpbuf_sp_16\nmov     r9d, ebx\nlea     rdx, aUpdatedWeeklyC; \"Updated Weekly Challenge %lu with progr\"...\nmov     r8, rax\nmov     ecx, 19h\ncall    sub_1412B0820\njmp     loc_14106704A\nloc_141066f32:\nlea     rdx, aTooManyWeeklyC; \"Too many Weekly Challenges sent from AE\"...\njmp     loc_141067040\nloc_141066f3e:\nmov     rcx, rdi\nimul    rsi, 38h ; '8'\ncall    bdAchievementState__getKind\ncmp     ax, 1Bh\njnz     short loc_141066F59\nloc_141066f50:\nadd     rsi, 1980h\njmp     short loc_141066F74\nloc_141066f59:\nmov     rcx, rdi\ncall    bdAchievementState__getKind\ncmp     ax, 1Eh\njnz     short loc_141066F70\nloc_141066f67:\nadd     rsi, 32C0h\njmp     short loc_141066F74\nloc_141066f70:\nadd     rsi, 40h ; '@'\nloc_141066f74:\nadd     rsi, rbx\nxor     ebx, ebx\nmov     eax, [rsi+30h]\ntest    eax, eax\njz      short loc_141066F9E\nloc_141066f80:\nmov     rcx, rdi\nmov     ebp, ebx\ncall    __except_get_jumpbuf_sp_16\nmov     ecx, ebx\nadd     rcx, rcx\ncmp     rax, [rsi+rcx*8]\njz      short loc_141066FFC\nloc_141066f95:\nmov     eax, [rsi+30h]\ninc     ebx\ncmp     ebx, eax\njb      short loc_141066F80\nloc_141066f9e:\ncmp     eax, 3\njnb     loc_141067039\nloc_141066fa7:\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     rcx, rdi\nmov     ebx, eax\ncall    __except_get_jumpbuf_sp_16\nmov     r9d, ebx\nlea     rdx, aFoundDailyChal; \"Found Daily Challenge %lu with progress\"...\nmov     r8, rax\nmov     ecx, 19h\ncall    sub_1412B0820\nmov     rcx, rdi\ncall    __except_get_jumpbuf_sp_16\nmov     ecx, [rsi+30h]\nadd     rcx, rcx\nmov     [rsi+rcx*8], rax\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     ecx, eax\nmov     eax, [rsi+30h]\nadd     rax, rax\nmov     [rsi+rax*8+8], rcx\ninc     dword ptr [rsi+30h]\njmp     short loc_14106704A\nloc_141066ffc:\nmov     rcx, rdi\ncall    q_bdAchievementState__getProgress\nmov     eax, eax\nadd     rbp, rbp\nmov     rcx, rdi\nmov     [rsi+rbp*8+8], rax\ncall    q_bdAchievementState__getProgress\nmov     rcx, rdi\nmov     ebx, eax\ncall    __except_get_jumpbuf_sp_16\nmov     r9d, ebx\nlea     rdx, aUpdatedDailyCh; \"Updated Daily Challenge %lu with progre\"...\nmov     r8, rax\nmov     ecx, 19h\ncall    sub_1412B0820\njmp     short loc_14106704A\nloc_141067039:\nlea     rdx, aTooManyDailyCh; \"Too many Daily Challenges sent from AE.\"...\nloc_141067040:\nmov     ecx, 19h\ncall    sub_1412B0570\nloc_14106704a:\nmov     rbx, [rsp+28h+arg_0]\nmov     rbp, [rsp+28h+arg_8]\nmov     rsi, [rsp+28h+arg_10]\nadd     rsp, 20h\npop     rdi\nretn",
+      "pseudocode_sha256": "3a44d60a19b2667f90ca37a6de2b08189ffc76d344544dcfd51dd628210bf8a6",
+      "instructions_sha256": "533999dbc826a82421bccb4ccc2d130d7f8daf6a9c16915f92494895ef80d970"
+    },
+    {
+      "va": "0x141067060",
+      "name": "sub_141067060",
+      "pseudocode": "{\n  __int64 v4; // rax\n  __int64 v5; // r10\n  const char *v6; // r9\n  __int64 v7; // r11\n  __int64 v8; // rsi\n  __int64 v9; // rdi\n  int v10; // edx\n  __int64 v11; // rax\n  int v12; // r8d\n  int v13; // ecx\n  int v14; // ecx\n  float v15; // xmm0_4\n  float v16; // xmm0_4\n  unsigned __int64 v17; // rcx\n  const char *v19; // r8\n  __int64 v20; // rdi\n  int v21; // edx\n  __int64 v22; // rax\n  int v23; // r9d\n  int v24; // ecx\n  int v25; // ecx\n  float v26; // xmm0_4\n\n  v4 = sub_141067580();\n  v5 = 0x7FFFFFFF;\n  v6 = \"sec\";\n  v7 = 0x7FFFFFFF;\n  v8 = v4 - (_QWORD)\"sec\";\n  v9 = v4;\n  while ( 1 )\n  {\n    v10 = (unsigned __int8)v6[v8];\n    v11 = v7;\n    v12 = *(unsigned __int8 *)v6++;\n    --v7;\n    if ( v11 == 0 )\n    {\nLABEL_10:\n      v15 = (float)(int)a3;\n      if ( a3 < 0 )\n        v15 = v15 + 1.8446744e19;\n      v16 = v15 * 0.001;\n      goto LABEL_13;\n    }\n    if ( v10 != v12 )\n    {\n      v13 = v10 + 32;\n      if ( (unsigned int)(v10 - 65) > 0x19 )\n        v13 = v10;\n      v10 = v13;\n      v14 = v12 + 32;\n      if ( (unsigned int)(v12 - 65) > 0x19 )\n        v14 = v12;\n      if ( v10 != v14 )\n        break;\n    }\n    if ( v10 == 0 )\n      goto LABEL_10;\n  }\n  v19 = \"min\";\n  v20 = v9 - (_QWORD)\"min\";\n  do\n  {\n    v21 = (unsigned __int8)v19[v20];\n    v22 = v5;\n    v23 = *(unsigned __int8 *)v19++;\n    --v5;\n    if ( v22 == 0 )\n      break;\n    if ( v21 != v23 )\n    {\n      v24 = v21 + 32;\n      if ( (unsigned int)(v21 - 65) > 0x19 )\n        v24 = v21;\n      v21 = v24;\n      v25 = v23 + 32;\n      if ( (unsigned int)(v23 - 65) > 0x19 )\n        v25 = v23;\n      if ( v21 != v25 )\n        return a3;\n    }\n  }\n  while ( v21 != 0 );\n  v26 = (float)(int)a3;\n  if ( a3 < 0 )\n    v26 = v26 + 1.8446744e19;\n  v16 = v26 * 0.000016666667;\nLABEL_13:\n  v17 = 0;\n  if ( v16 >= 9.223372e18 )\n  {\n    v16 = v16 - 9.223372e18;\n    if ( v16 < 9.223372e18 )\n      v17 = 0x8000000000000000uLL;\n  }\n  return v17 + (unsigned int)(int)v16;\n}",
+      "original_instructions": "mov     [rsp+arg_0], rbx\nmov     [rsp+arg_8], rsi\npush    rdi\nsub     rsp, 20h\nmov     rbx, r8\ncall    sub_141067580\nmov     r10d, 7FFFFFFFh\nlea     r9, aSec; \"sec\"\nmov     rsi, rax\nmov     r11d, r10d\nsub     rsi, r9\nmov     rdi, rax\nloc_141067090:\nmovzx   edx, byte ptr [rsi+r9]\nmov     rax, r11\nmovzx   r8d, byte ptr [r9]\nlea     r9, [r9+1]\ndec     r11\ntest    rax, rax\njz      short loc_1410670D2\nloc_1410670a8:\ncmp     edx, r8d\njz      short loc_1410670CE\nloc_1410670ad:\nlea     eax, [rdx-41h]\ncmp     eax, 19h\nlea     ecx, [rdx+20h]\nlea     eax, [r8-41h]\ncmova   ecx, edx\ncmp     eax, 19h\nmov     edx, ecx\nlea     ecx, [r8+20h]\ncmova   ecx, r8d\ncmp     edx, ecx\njnz     short loc_14106712C\nloc_1410670ce:\ntest    edx, edx\njnz     short loc_141067090\nloc_1410670d2:\nxorps   xmm0, xmm0\ncvtsi2ss xmm0, rbx\ntest    rbx, rbx\njns     short loc_1410670E7\nloc_1410670df:\naddss   xmm0, cs:dword_14275E840\nloc_1410670e7:\nmulss   xmm0, cs:dword_1423B25A8\nloc_1410670ef:\nmovss   xmm1, cs:dword_14275E83C\nxor     ecx, ecx\ncomiss  xmm0, xmm1\njb      short loc_141067114\nloc_1410670fe:\nsubss   xmm0, xmm1\ncomiss  xmm0, xmm1\njnb     short loc_141067114\nloc_141067107:\nmov     rax, 8000000000000000h\nmov     rcx, rax\nloc_141067114:\ncvttss2si rax, xmm0\nadd     rax, rcx\nmov     rbx, [rsp+28h+arg_0]\nmov     rsi, [rsp+28h+arg_8]\nadd     rsp, 20h\npop     rdi\nretn\nloc_14106712c:\nlea     r8, aMin; \"min\"\nsub     rdi, r8\nnop     word ptr [rax+rax+00000000h]\nloc_141067140:\nmovzx   edx, byte ptr [rdi+r8]\nmov     rax, r10\nmovzx   r9d, byte ptr [r8]\nlea     r8, [r8+1]\ndec     r10\ntest    rax, rax\njz      short loc_141067182\nloc_141067158:\ncmp     edx, r9d\njz      short loc_14106717E\nloc_14106715d:\nlea     eax, [rdx-41h]\ncmp     eax, 19h\nlea     ecx, [rdx+20h]\nlea     eax, [r9-41h]\ncmova   ecx, edx\ncmp     eax, 19h\nmov     edx, ecx\nlea     ecx, [r9+20h]\ncmova   ecx, r9d\ncmp     edx, ecx\njnz     short loc_1410671A4\nloc_14106717e:\ntest    edx, edx\njnz     short loc_141067140\nloc_141067182:\nxorps   xmm0, xmm0\ncvtsi2ss xmm0, rbx\ntest    rbx, rbx\njns     short loc_141067197\nloc_14106718f:\naddss   xmm0, cs:dword_14275E840\nloc_141067197:\nmulss   xmm0, cs:dword_14241E820\njmp     loc_1410670EF\nloc_1410671a4:\nmov     rsi, [rsp+28h+arg_8]\nmov     rax, rbx\nmov     rbx, [rsp+28h+arg_0]\nadd     rsp, 20h\npop     rdi\nretn",
+      "pseudocode_sha256": "dc31870578b1a34fd7ba32d12e13c9d606f9406cb91204d3ec19e5337edb1f2b",
+      "instructions_sha256": "d7ecce06bf2dd781117103a880d8853612cb51adc439430b1157d700ea8d3b69"
+    },
+    {
+      "va": "0x141067580",
+      "name": "sub_141067580",
+      "pseudocode": "{\n  int v4; // ecx\n  const char *v5; // rcx\n  __int64 v6; // rax\n  __int64 v7; // r9\n  const char *v9; // rcx\n  __int64 v10; // [rsp+40h] [rbp+18h] BYREF\n\n  if ( a1 <= 0x1E && (v4 = 1207963648, _bittest(&v4, a1)) )\n  {\n    if ( a1 == 27 )\n    {\n      v5 = \"br_daily_challenges.csv\";\n    }\n    else\n    {\n      v5 = \"cp_daily_challenges.csv\";\n      if ( a1 != 30 )\n        v5 = \"daily_challenges.csv\";\n    }\n    StringTable_GetAsset(a1: v5, a2: &v10);\n    v6 = va(a1: \"%lu\", a2);\n    v7 = 11;\n  }\n  else\n  {\n    if ( a1 != 11 && a1 != 26 )\n      return &byte_142716710;\n    v9 = \"weekly_challenges.csv\";\n    if ( a1 == 26 )\n      v9 = \"br_weekly_challenges.csv\";\n    StringTable_GetAsset(a1: v9, a2: &v10);\n    v6 = va(a1: \"%lu\", a2);\n    v7 = 10;\n  }\n  return (const char *)q_StringTable_Lookup(a1: v10, a2: 0, a3: v6, a4: v7);\n}",
+      "original_instructions": "push    rbx\nsub     rsp, 20h\nmov     rbx, rdx\nmov     eax, ecx\ncmp     ecx, 1Eh\nja      short loc_1410675DE\nloc_141067590:\nmov     ecx, 48001000h\nbt      ecx, eax\njnb     short loc_1410675DE\nloc_14106759a:\nlea     rdx, aDailyChallenge_7; \"daily_challenges.csv\"\ncmp     eax, 1Bh\njnz     short loc_1410675AF\nloc_1410675a6:\nlea     rcx, aBrDailyChallen; \"br_daily_challenges.csv\"\njmp     short loc_1410675BD\nloc_1410675af:\ncmp     eax, 1Eh\nlea     rcx, aCpDailyChallen; \"cp_daily_challenges.csv\"\ncmovnz  rcx, rdx\nloc_1410675bd:\nlea     rdx, [rsp+28h+arg_10]\ncall    StringTable_GetAsset\nmov     rdx, rbx\nlea     rcx, aLu; \"%lu\"\ncall    va\nmov     r9d, 0Bh\njmp     short loc_141067629\nloc_1410675de:\ncmp     eax, 0Bh\njz      short loc_1410675F5\nloc_1410675e3:\ncmp     eax, 1Ah\njz      short loc_1410675F5\nloc_1410675e8:\nlea     rax, byte_142716710\nadd     rsp, 20h\npop     rbx\nretn\nloc_1410675f5:\ncmp     eax, 1Ah\nlea     rdx, aBrWeeklyChalle; \"br_weekly_challenges.csv\"\nlea     rcx, aWeeklyChalleng; \"weekly_challenges.csv\"\ncmovz   rcx, rdx\nlea     rdx, [rsp+28h+arg_10]\ncall    StringTable_GetAsset\nmov     rdx, rbx\nlea     rcx, aLu; \"%lu\"\ncall    va\nmov     r9d, 0Ah\nloc_141067629:\nmov     rcx, [rsp+28h+arg_10]\nmov     r8, rax\nxor     edx, edx\ncall    q_StringTable_Lookup\nadd     rsp, 20h\npop     rbx\nretn",
+      "pseudocode_sha256": "4c484735bcbe16960e2b1312b13f6c7ead110f06a1f7f2381e1a491fe6994966",
+      "instructions_sha256": "5cd609c48f99434a1aee6303898a396174440d5d687fdb91ba28b68267bb0c6a"
+    },
+    {
+      "va": "0x141066c90",
+      "name": "LUI_CoD_LuaCall_GetCPDailyChallenges",
+      "pseudocode": "{\n  int v2; // esi\n  char *v3; // r14\n  unsigned int i; // ebp\n  __int64 v5; // rax\n  char Buffer[8]; // [rsp+20h] [rbp-38h] BYREF\n  __int64 v8; // [rsp+28h] [rbp-30h]\n  int v9; // [rsp+30h] [rbp-28h]\n\n  v2 = 1;\n  if ( (unsigned int)lua_gettop(a1) != 1 || (unsigned int)j_lua_isnumber(a1, a2: 1) == 0 )\n    j_luaL_error(a1, a2: &byte_142716710);\n  v3 = (char *)&unk_144497310 + 56 * (int)lui_tointeger32(a1, a2: 1);\n  if ( v3 != nullptr && *((_DWORD *)v3 + 12) != 0 )\n  {\n    q_j_lua_createtable(a1, a2: 0, a3: 0);\n    for ( i = 0; i < *((_DWORD *)v3 + 12); ++i )\n    {\n      *(_QWORD *)Buffer = 0;\n      v8 = 0;\n      v9 = 0;\n      sprintf(Buffer, Format: \"%d\", *(_DWORD *)&v3[16 * i]);\n      v5 = sub_141067060(a1: 30, a2: *(_QWORD *)&v3[16 * i], a3: *(_QWORD *)&v3[16 * i + 8]);\n      j_q_LuaShared_SetTableInt(a1: Buffer, a2: v5, a3: a1);\n    }\n  }\n  else\n  {\n    v2 = 0;\n  }\n  if ( v2 > (int)lua_gettop(a1) )\n    j_luaL_error(a1, a2: &byte_142716710);\n  return (unsigned int)v2;\n}",
+      "original_instructions": "push    rsi\npush    rdi\nsub     rsp, 48h\nmov     rax, cs:__security_cookie\nxor     rax, rsp\nmov     [rsp+58h+var_20], rax\nloc_141066ca6:\nmov     [rsp+58h+var_18], r14\nmov     rdi, rcx\ncall    lua_gettop\nmov     esi, 1\ncmp     eax, esi\njnz     short loc_141066CCA\nloc_141066cbc:\nmov     edx, esi\nmov     rcx, rdi\ncall    j_lua_isnumber\ntest    eax, eax\njnz     short loc_141066CD9\nloc_141066cca:\nlea     rdx, byte_142716710\nmov     rcx, rdi\ncall    j_luaL_error\nloc_141066cd9:\nmov     edx, esi\nmov     [rsp+58h+arg_10], rbp\nmov     rcx, rdi\ncall    lui_tointeger32\nmovsxd  rcx, eax\nlea     rax, unk_144497310\nimul    r14, rcx, 38h ; '8'\nadd     r14, rax\njz      loc_141066D7C\nloc_141066cff:\ncmp     dword ptr [r14+30h], 0\njbe     short loc_141066D7C\nloc_141066d06:\nxor     r8d, r8d\nxor     edx, edx\nmov     rcx, rdi\ncall    q_j_lua_createtable\nxor     ebp, ebp\ncmp     [r14+30h], ebp\njbe     short loc_141066D80\nloc_141066d1b:\nmov     [rsp+58h+arg_8], rbx\nloc_141066d20:\nxor     eax, eax\nmov     ebx, ebp\nadd     rbx, rbx\nmov     qword ptr [rsp+58h+Buffer], rax\nlea     rdx, aD; \"%d\"\nmov     [rsp+58h+var_30], rax\nlea     rcx, [rsp+58h+Buffer]; Buffer\nmov     [rsp+58h+var_28], eax\nmov     r8d, [r14+rbx*8]\ncall    sprintf\nmov     r8, [r14+rbx*8+8]\nmov     ecx, 1Eh\nmov     rdx, [r14+rbx*8]\ncall    sub_141067060\nmov     r8, rdi\nlea     rcx, [rsp+58h+Buffer]\nmov     rdx, rax\ncall    j_q_LuaShared_SetTableInt\ninc     ebp\ncmp     ebp, [r14+30h]\njb      short loc_141066D20\nloc_141066d75:\nmov     rbx, [rsp+58h+arg_8]\njmp     short loc_141066D80\nloc_141066d7c:\nxor     ebp, ebp\nmov     esi, ebp\nloc_141066d80:\nmov     rcx, rdi\ncall    lua_gettop\nmov     r14, [rsp+58h+var_18]\nmov     rbp, [rsp+58h+arg_10]\ncmp     esi, eax\njle     short loc_141066DA5\nloc_141066d96:\nlea     rdx, byte_142716710\nmov     rcx, rdi\ncall    j_luaL_error\nloc_141066da5:\nmov     eax, esi\nmov     rcx, [rsp+58h+var_20]\nxor     rcx, rsp; StackCookie\ncall    __security_check_cookie\nadd     rsp, 48h\npop     rdi\npop     rsi\nretn",
+      "pseudocode_sha256": "7b77bcaf80d7f9040c21789542aef1ea68b2b3d95432c1641b4164c1000c1a44",
+      "instructions_sha256": "7e987dbb8b055c8021c6012a7f162ca3ba0d2f92a3ae7ab6229d4b6d2b0613e0"
+    }
+  ],
+  "lua_assets": [
+    {
+      "source": "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\utils\\mp\\challengeutils.lua.2178.lua",
+      "source_sha256": "15638d7d37b9f73fc73a8c65a196e7787497d35b2c2b10bd0d8e37a09b6b3522",
+      "original_bytecode": "E:\\replay-compiler\\evidence\\workstation-luafile-actsexport\\mw19replay\\code_post_gfx\\assets\\luafile\\ui\\utils\\mp\\challengeutils.lua.2178.lua",
+      "original_bytecode_sha256": "24cfbff2bc0176b78064c39653be453e849a710a08e67a9348ef7a18c117a93c",
+      "evidence": [
+        {
+          "first_line": 563,
+          "last_line": 585,
+          "text": "function Challenge.GetDailyChallenges(arg_28_0)\n\tlocal var_28_0 = {}\n\tlocal var_28_1 = ScheduledChallenges.DCIDHEEHJA(arg_28_0)\n\n\tif not var_28_1 then\n\t\treturn nil\n\tend\n\n\tlocal var_28_2 = Engine.CFHBIHABCB(arg_28_0)\n\tlocal var_28_3 = StringTable.BFHCAIIDA(CSV.dailyChallenges.file)\n\n\tfor iter_28_0 = 0, var_28_3 - 1 do\n\t\tlocal var_28_4 = StringTable.CBGJCDIHCE(CSV.dailyChallenges.file, iter_28_0, CSV.dailyChallenges.cols.id)\n\n\t\tif var_28_1[var_28_4] ~= nil then\n\t\t\tlocal var_28_5 = CSV.ReadRow(CSV.dailyChallenges, iter_28_0)\n\n\t\t\tvar_28_5.amountEarned = var_28_1[var_28_4]\n\t\t\tvar_28_5.amountNeeded = tonumber(var_28_5.amount)\n\t\t\tvar_28_5.progress = var_28_5.amountEarned / var_28_5.amountNeeded\n\t\t\tvar_28_5.isComplete = var_28_5.amountEarned == var_28_5.amountNeeded\n\t\t\tvar_28_5.rewards = Challenge.GetRewards(var_28_5, Challenge.Type.DAILY)\n\t\t\tvar_28_5.unlocked = var_28_2"
+        },
+        {
+          "first_line": 613,
+          "last_line": 616,
+          "text": "\t\t\tvar_29_4.amountEarned = var_29_1[var_29_3]\n\t\t\tvar_29_4.amountNeeded = tonumber(var_29_4.amount)\n\t\t\tvar_29_4.progress = var_29_4.amountEarned / var_29_4.amountNeeded\n\t\t\tvar_29_4.isComplete = var_29_4.amountEarned == var_29_4.amountNeeded"
+        },
+        {
+          "first_line": 647,
+          "last_line": 650,
+          "text": "\t\t\tvar_30_5.amountEarned = var_30_1[var_30_4]\n\t\t\tvar_30_5.amountNeeded = tonumber(var_30_5.amount)\n\t\t\tvar_30_5.progress = var_30_5.amountEarned / var_30_5.amountNeeded\n\t\t\tvar_30_5.isComplete = var_30_5.amountEarned == var_30_5.amountNeeded"
+        },
+        {
+          "first_line": 484,
+          "last_line": 524,
+          "text": "function Challenge.GetRewards(arg_26_0, arg_26_1)\n\tlocal var_26_0 = {}\n\tlocal var_26_1 = Challenge.GetXPReward(arg_26_0.id, arg_26_1)\n\n\tif var_26_1 and type(var_26_1) == \"number\" and var_26_1 < 0 then\n\t\tvar_26_1 = \"\"\n\tend\n\n\tlocal var_26_2 = {\n\t\ttypeIconRenderedScale = 0.4,\n\t\ttype = \"xp\",\n\t\timage = \"icon_xp_token\",\n\t\trarityImage = \"icon_xp\",\n\t\ttypeIcon = \"icon_xp\",\n\t\ttypeIconRendered = \"icon_xp_token\",\n\t\tname = Engine.CBBHFCGDIC(\"CHALLENGE/N_XP\", var_26_1),\n\t\ttypeName = Engine.CBBHFCGDIC(\"LOOT_MP/XP\"),\n\t\tamount = var_26_1\n\t}\n\n\ttable.insert(var_26_0, var_26_2)\n\n\tif arg_26_0.loot and #arg_26_0.loot > 0 then\n\t\tlocal var_26_3 = tonumber(arg_26_0.loot)\n\t\tlocal var_26_4 = Challenge.GetLootReward(var_26_3)\n\n\t\tassert(var_26_4, \"Unable to get reward info for ID \" .. var_26_3 .. \".  Item type or ref may be invalid.\")\n\n\t\tif var_26_4 then\n\t\t\tvar_26_4.itemID = var_26_3\n\n\t\t\ttable.insert(var_26_0, var_26_4)\n\t\tend\n\tend\n\n\treturn var_26_0\nend\n\nfunction Challenge.GetActiveMissionData(arg_27_0, arg_27_1)\n\tlocal var_27_0\n"
+        }
+      ]
+    },
+    {
+      "source": "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\barrackschallengeitem.lua.66.lua",
+      "source_sha256": "07b2a3af37904037c7c08f6ad73096c23b522cd87a6a8b71ab7fbf41d0b9e252",
+      "original_bytecode": "E:\\replay-compiler\\evidence\\workstation-luafile-actsexport\\mw19replay\\code_post_gfx\\assets\\luafile\\ui\\frontend\\barrackschallengeitem.lua.66.lua",
+      "original_bytecode_sha256": "1543e2715d6bd1de575488c723ebb93f0a01f6e538cd4d7a0815148bf4854fef",
+      "evidence": [
+        {
+          "first_line": 40,
+          "last_line": 58,
+          "text": "\n\t\tACTIONS.AnimateSequence(arg_2_0, \"ShowIcon\" .. arg_2_0._numRewards)\n\tend\n\n\targ_2_0.CheckBox:SetValue(arg_2_0._challenge.isComplete)\n\n\tif arg_2_0._challenge.progress then\n\t\targ_2_0.ProgressBar:SetProgress(arg_2_0._challenge.progress, 0, 0)\n\t\targ_2_0.ProgressBar:SetAlpha(arg_2_0._isOver and 1 or 0.5)\n\n\t\targ_2_0._useProgressBar = true\n\n\t\tACTIONS.AnimateSequence(arg_2_0, arg_2_0._challenge.progress == 1 and \"Complete\" or \"Incomplete\")\n\tend\n\n\tif arg_2_0._challenge.amountEarned and arg_2_0._challenge.amountNeeded then\n\t\targ_2_0.ProgressDesc:setText(Engine.CBBHFCGDIC(\"LUA_MENU/X_OF_Y\", arg_2_0._challenge.amountEarned, arg_2_0._challenge.amountNeeded))\n\t\targ_2_0.ProgressDesc:SetAlpha(arg_2_0._isOver and 1 or 0.5)\n"
+        },
+        {
+          "first_line": 200,
+          "last_line": 212,
+          "text": "\tvar_10_4:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 800, 0, _1080p * 64)\n\tvar_10_0:addElement(var_10_4)\n\n\tvar_10_0.LoadoutItemButtonBackground = var_10_4\n\n\tlocal var_10_5\n\tlocal var_10_6 = MenuBuilder.BuildRegisteredType(\"GenericCheckBox\", {\n\t\tcontrollerIndex = var_10_1\n\t})\n\n\tvar_10_6.id = \"CheckBox\"\n\n\tvar_10_6:SetAlpha(0.5, 0)"
+        }
+      ]
+    },
+    {
+      "source": "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\widgets\\genericcheckbox.lua.2373.lua",
+      "source_sha256": "1adac5c3f0fa6b7102120cc19bfaf074b4a8354158a5f7136414a178377667e1",
+      "original_bytecode": "E:\\replay-compiler\\evidence\\workstation-luafile-actsexport\\mw19replay\\code_post_gfx\\assets\\luafile\\ui\\widgets\\genericcheckbox.lua.2373.lua",
+      "original_bytecode_sha256": "8a2b7942cf21a4161e9d828caf547f4b72d661b4a47b9999a75c9f45cfb2aa26",
+      "evidence": [
+        {
+          "first_line": 8,
+          "last_line": 34,
+          "text": "\tif arg_2_0.value ~= arg_2_1 then\n\t\tif arg_2_1 == true then\n\t\t\tACTIONS.AnimateSequence(arg_2_0, (not arg_2_0._widgetInitialized or arg_2_2) and \"Enabled\" or \"Check\")\n\t\telse\n\t\t\tACTIONS.AnimateSequence(arg_2_0, (not arg_2_0._widgetInitialized or arg_2_2) and \"Disabled\" or \"UnCheck\")\n\t\tend\n\n\t\targ_2_0.value = arg_2_1\n\tend\n\n\tif arg_2_0.callbackFunc then\n\t\targ_2_0.callbackFunc(arg_2_0.value)\n\tend\nend\n\nlocal function var_0_2(arg_3_0, arg_3_1, arg_3_2)\n\targ_3_0.GetValue = var_0_0\n\targ_3_0.SetValue = var_0_1\n\n\tif arg_3_2.defaultValue then\n\t\tvar_0_1(arg_3_0, arg_3_2.defaultValue)\n\telse\n\t\tvar_0_1(arg_3_0, false)\n\tend\n\n\targ_3_0:addEventHandler(\"button_up\", function(arg_4_0, arg_4_1)\n\t\tif not arg_4_1.controller then"
+        }
+      ]
+    },
+    {
+      "source": "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\barrackschallengesdaily.lua.72.lua",
+      "source_sha256": "1b4f009b8e05ae2c59e07522b9ec16d47a157a019131e4a6c0f235835eeb8c6f",
+      "original_bytecode": "E:\\replay-compiler\\evidence\\workstation-luafile-actsexport\\mw19replay\\code_post_gfx\\assets\\luafile\\ui\\frontend\\barrackschallengesdaily.lua.72.lua",
+      "original_bytecode_sha256": "d4e11e762169a7e0eee31cfd9481e5d0fbd8cb2650ea7a68ada9ae8dc190c3ee",
+      "evidence": [
+        {
+          "first_line": 218,
+          "last_line": 230,
+          "text": "\targ_9_0._BRChallenges = Challenge.GetBRDailyChallenges(arg_9_1)\n\targ_9_0._coreChallenges = Challenge.GetDailyChallenges(arg_9_1)\n\targ_9_0._CPChallenges = Challenge.GetCPDailyChallenges(arg_9_1)\n\n\tif arg_9_0._BRChallenges and #arg_9_0._BRChallenges > 0 or arg_9_0._coreChallenges and #arg_9_0._coreChallenges > 0 then\n\t\targ_9_0.Grid:SetAlpha(1)\n\t\tACTIONS.AnimateSequence(arg_9_0, \"ShowChallenges\")\n\t\tvar_0_6(arg_9_0, arg_9_1)\n\telse\n\t\targ_9_0.Grid:SetAlpha(0)\n\t\tACTIONS.AnimateSequence(arg_9_0, \"HideChallenges\")\n\tend\n"
+        },
+        {
+          "first_line": 286,
+          "last_line": 295,
+          "text": "\tlocal var_14_6 = LUI.UIText.new()\n\n\tvar_14_6.id = \"NoChallengesLabel\"\n\n\tvar_14_6:SetRGBFromTable(SWATCHES.genericButton.description, 0)\n\tvar_14_6:SetAlpha(0, 0)\n\tvar_14_6:setText(Engine.CBBHFCGDIC(\"CHALLENGE/NONE_AVAILABLE\"), 0)\n\tvar_14_6:SetFont(FONTS.GetFont(FONTS.MainRegular.File))\n\tvar_14_6:SetAlignment(LUI.Alignment.Center)\n\tvar_14_6:SetVerticalAlignment(LUI.Alignment.Center)"
+        }
+      ]
+    }
+  ],
+  "csv_source_hashes": {
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\daily_challenges.csv.62.csv": "8c7fe20ea522e8e5becf3e2a9a5cc3751653f68fc4fd8eef55ba8151ce5ebd5c",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\br_daily_challenges.csv.5.csv": "29b46beeca009506d62aede393e9f110432669ed3d3b11be32d84db780afdaad",
+    "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\cp_daily_challenges.csv.59.csv": "0d654edfd64fd143283485bbba6514f22151de7c811c5f275dda14d6c4f0ead6",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\luashared\\csvutils.lua.1.lua": "65ac2fbb044acd3ec22cb8ffd71fa51dfb12890e755b1bc65c7e2d571e140191"
+  },
+  "metadata_header_sha256": "04365b18a8b905cb036728d9ea1f03373e81aa183418f8513303354f86be1639",
+  "initial_rows": [
+    {
+      "id": 1797,
+      "kind": 12,
+      "target": 20,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 1798,
+      "kind": 12,
+      "target": 5,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 1799,
+      "kind": 12,
+      "target": 3,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 5000,
+      "kind": 27,
+      "target": 3,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 5001,
+      "kind": 27,
+      "target": 2,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 5002,
+      "kind": 27,
+      "target": 1,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 9055,
+      "kind": 30,
+      "target": 40,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 9056,
+      "kind": 30,
+      "target": 10,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    },
+    {
+      "id": 9057,
+      "kind": 30,
+      "target": 40,
+      "progress": 0,
+      "unit": "",
+      "isComplete": false
+    }
+  ],
+  "consumer_chain": [
+    "Deserializer field3 unsigned32 progress at +128; field4 target at +132; field5 status at +136.",
+    "AddProgression caches id and progress for kinds12/27/30 with at most3 each.",
+    "Unit conversion uses CSV col11; empty units preserve raw zero.",
+    "Original daily Lua uses CSV col4 positive amountNeeded and native cached amountEarned; isComplete = earned == needed, progress = earned / needed.",
+    "BarracksChallengeItem passes isComplete to checkbox SetValue and progress == 1 selects Complete animation.",
+    "GenericCheckBox false selects Disabled/UnCheck; daily item has no defaultValue override."
+  ],
+  "unlock_all_audit": {
+    "source": "E:\\DW\\IW8\\integration\\replay\\DW_LocalProgression.cpp",
+    "sha256": "c9ca0e425ba63abd88f35154e65f61f279cd3a53dd5bf54a21a03331a6ed356a",
+    "dvars": [
+      "unlock_all_loot",
+      "unlockAllItems",
+      "allEmblemsUnlocked",
+      "force_unlock_all_attachments",
+      "force_unlock_all_attachment_lines",
+      "force_unlock_all_killstreaks"
+    ],
+    "conclusion": "These six overrides are not referenced in the audited daily equality, reward display, checkbox setter or GenericCheckBox path. Lock availability is separate. No global claim beyond this path."
+  },
+  "limitations": [
+    "Previous missing assignment proof establishes empty lists and NONE_AVAILABLE; it does not explain the owner reported checked checkboxes.",
+    "Positive targets with zero progress imply unchecked in original source logic; no real game or rendered UI confirmation.",
+    "Older live profile, cached state and prior build causes remain unverified."
+  ],
+  "scope": "Receipt only; no production changes, build, deployment or game."
+}

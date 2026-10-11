@@ -134,6 +134,63 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
         "public and presence joins count primary plus secondary slots; compatible restricted/unrestricted PC parties retain native reservation/team documents"
     )
 
+    # Request bots through the authenticated host path, then exercise both
+    # admission routes before the native client can consume that fixed count.
+    capacity_key = bindings.get("party_maxplayers", "party_maxplayers")
+    for by_presence in (False, True):
+        for capacity in (3, 4):
+            reserved_create = copy.deepcopy(create)
+            reserved_create["ruleset_payload"]["dvar_overrides"][capacity_key] = capacity
+            lobby, documents = created(reserved_create)
+            document = copy.deepcopy(documents[0])
+            document["dw_bot_count"] = 1
+            assert host.task(
+                145, 15, u64(lobby) + u64(documents[1]["update_id"])
+                + text(json.dumps(document))
+            ) == boolean(True)
+            kind, update = host.receive()
+            assert kind == 2 and update.startswith(u32(2006) + u64(lobby))
+            path = root / "lobbies" / f"{lobby}.json"
+
+            def assert_reservation():
+                state = json.loads(path.read_bytes())
+                assert state["maximum_members"] == capacity
+                assert state["operator_bots_requested"]
+                assert state["operator_bot_count"] == 1
+                count_key = bindings.get("replay_dw_botCount", "replay_dw_botCount")
+                assert state["backend_doc"]["ruleset_payload"]["dvar_overrides"][count_key] == 1
+                return state
+
+            assert_reservation()
+            if by_presence:
+                reserved_join = {
+                    "members": [peer_user], "tokens": [peer_token],
+                    "player_id_to_slots": {str(peer_user): 1},
+                    "lobby_id_to_presence_join": lobby,
+                }
+            else:
+                reserved_join = copy.deepcopy(join)
+                reserved_join["ruleset_payload"]["dvar_overrides"][capacity_key] = capacity
+            # Host primary+guest and one reserved bot occupy three slots.
+            # A joining primary+guest must fail even when humans alone fit.
+            reject(peer, reserved_join, 108)
+            reserved_join["player_id_to_slots"][str(peer_user)] = 0
+            if capacity == 3:
+                reject(peer, reserved_join, 108)
+                assert_reservation()
+                disband(lobby)
+            else:
+                joined(peer, reserved_join, lobby, host)
+                state = assert_reservation()
+                assert state["members"] == [user, peer_user]
+                assert state["backend_doc"]["player_id_to_slots"] == {
+                    str(user): 1, str(peer_user): 0,
+                }
+                disband(lobby, True)
+    checks.append(
+        "Public and presence joins reserve queued native bot counts, count guest slots, reject exhausted capacity without writes and admit fitting real players without changing bot count or playlist limit"
+    )
+
     party = {
         **copy.deepcopy(create),
         "members": [user, peer_user],

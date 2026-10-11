@@ -433,7 +433,13 @@ namespace services
             for (const auto &user : query.at("members"))
                 if (!member(lobby, user.get<uint64_t>()))
                     members.push_back(user);
-            return occupiedSlots(members, slots) <= lobby.value("maximum_members", uint64_t{200});
+            const auto occupied = occupiedSlots(members, slots);
+            const auto capacity = lobby.value("maximum_members", uint64_t{200});
+            // A queued native bot count remains fixed for this round. Preserve
+            // its slots while admitting real primaries and their guest slots.
+            const auto bots = lobby.value("operator_bots_requested", false)
+                                  ? lobby.value("operator_bot_count", uint64_t{0}) : uint64_t{0};
+            return occupied <= capacity && bots <= capacity - occupied;
         }
 
         bool platformAllowed(const Json &query)

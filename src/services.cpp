@@ -678,9 +678,11 @@ namespace services
                    wire::Reader &p)
     {
         auto id = authenticatedIdentity;
+        // A task can wait behind durable store work. Validate its current lease
+        // after that wait, using the existing store -> platform lock order.
+        std::lock_guard lock(storeMutex);
         if (!platform::refreshLease(id))
             return Reply{101, {}, "service-session-expired-or-superseded"};
-        std::lock_guard lock(storeMutex);
         try
         {
             if (auto reply = channelServices(directory, id, service, task, p))

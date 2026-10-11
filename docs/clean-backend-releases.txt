@@ -54,8 +54,20 @@ with the test harness.
 
 Deploy a validated Linux image into a new immutable release directory. Stop
 the service, switch the current symlink atomically, restart, check health and
-hash the running /proc/<pid>/exe. Retain the old release for rollback. Restore
-the old symlink and restart it if health or process-hash verification fails.
+hash the running /proc/<pid>/exe. Retain the old release for rollback.
+
+When reverting to a release predating durable achievement completion markers,
+stop replay-dw first and confirm MainPID=0. Run
+  python3 tools/prepare-achievement-marker-rollback.py --data /var/lib/replay-dw
+to inspect, then repeat with --apply before restoring the old symlink. The
+helper validates and durably archives only an exact empty applied marker;
+prepared intents with old destinations stay intact for the older server's
+recovery. A prepared intent containing the new user_state destination must
+finish recovery on the current server before rollback. Malformed markers
+block rollback instead of being discarded. Keep the archived marker as evidence;
+never restore it over newer transaction work. Switch the old symlink, start the
+service, and verify health and its process image again. Ordinary rollback between
+marker-aware releases requires no marker migration.
 
 Preserve live player data, signing keys, publications and the installation's
 available-map policy. Update the local backend deployment receipt and the

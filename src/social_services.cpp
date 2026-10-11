@@ -964,7 +964,13 @@ namespace services
                 wire::require(presenceRevisions.contains(onlineKey) ||
                               presenceRevisions.size() < 65536);
                 const auto path = presencePath(root, id.titleId, id.userId, context);
+                auto previous = presenceOf(root, id, owner, context).at("presence");
+                auto proposed = body;
+                previous.erase("updateTime");
+                proposed.erase("updateTime");
                 save(path, body);
+                if (previous == proposed)
+                    return response(r, "presence-unchanged", 204);
                 const auto revision = revisePresence(onlineKey);
                 if (body.at("online").get<bool>())
                     publishedOnline.insert(onlineKey);

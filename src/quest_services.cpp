@@ -422,7 +422,13 @@ namespace services
         {
             auto selected = Json::array();
             const auto *owner = quest(number(state, "id"));
-            wire::require(owner);
+            if (!owner)
+            {
+                wire::require(replayDailyChallenge(number(state, "id")));
+                const auto bytes = state.dump();
+                return wire::base64Encode(crypto::sha256(
+                    {reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()}));
+            }
             for (const auto &candidate : states)
                 if (number(candidate, "kind") == 15 && number(candidate, "status") == 1)
                     if (const auto *definition = quest(number(candidate, "id"));
@@ -433,6 +439,151 @@ namespace services
                 {reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()}));
         }
     } // namespace
+
+    const ReplayDailyChallenge *replayDailyChallenge(uint64_t identity)
+    {
+        const auto row = std::find_if(replayDailyChallenges.begin(), replayDailyChallenges.end(),
+            [identity](const auto &value) { return value.id == identity; });
+        return row == replayDailyChallenges.end() ? nullptr : &*row;
+    }
+
+    bool synchronizeReplayDailies(Json &states, uint64_t now)
+    {
+        wire::require(states.is_array() && states.size() <= 15000 && now <= UINT64_MAX - 86400);
+        const auto cycle = now / 86400;
+        bool changed = false;
+        for (const auto &definition : replayDailyChallenges)
+        {
+            auto *existing = find(states, definition.id);
+            if (existing && number(*existing, "dailyCycle") == cycle && existing->contains("dailyCycle"))
+            {
+                wire::require(existing->at("name") == definition.name() &&
+                              number(*existing, "kind") == definition.kind &&
+                              number(*existing, "target") == definition.target &&
+                              number(*existing, "progress") <= definition.target &&
+                              number(*existing, "activationTimestamp") >= cycle * 86400 &&
+                              number(*existing, "activationTimestamp") <= now &&
+                              number(*existing, "expirationTimestamp") == (cycle + 1) * 86400 &&
+                              number(*existing, "status") == (number(*existing, "progress") == definition.target ? 3u : 1u));
+                continue;
+            }
+            Json initial{{"id", uint64_t{definition.id}}, {"name", definition.name()},
+                         {"kind", uint64_t{definition.kind}}, {"status", uint64_t{1}},
+                         {"progress", uint64_t{0}}, {"target", uint64_t{definition.target}},
+                         {"completionCount", uint64_t{0}}, {"completionTimestamp", uint64_t{0}},
+                         {"dailyCycle", cycle}, {"activationTimestamp", now},
+                         {"expirationTimestamp", (cycle + 1) * 86400}};
+            if (existing)
+            {
+                wire::require(number(*existing, "kind") == definition.kind);
+                *existing = std::move(initial);
+            }
+            else
+                states.push_back(std::move(initial));
+            changed = true;
+        }
+        // Never overfill the original three-entry caches with another unmanaged
+        // daily publication. Preserve it and report storage failure for review.
+        for (const auto kind : {12u, 27u, 30u})
+            wire::require(std::count_if(states.begin(), states.end(), [kind](const Json &state)
+                { return number(state, "kind") == kind; }) == 3);
+        return changed;
+    }
+
+    QuestProgress advanceReplayDailies(const Json &stored, const Json &events,
+                                     std::span<const ReplayQuestEventContext> contexts, uint64_t now)
+    {
+        wire::require(stored.is_array() && events.is_array() && contexts.size() == events.size());
+        QuestProgress result;
+        result.states = stored;
+        for (size_t index = 0; index < events.size(); ++index)
+        {
+            const auto &event = events[index];
+            const auto &values = event.at("values");
+            const auto timestamp = number(event, "timestamp");
+            if (event.at("name") != "kill" || !contexts[index].category ||
+                *contexts[index].category != 0 || number(values, "gamemode") != 2 ||
+                number(values, "version") != 1 || !completeParameters(values, 7) ||
+                timestamp > now)
+                continue;
+            ReplayKillEvent kill{};
+            for (unsigned slot = 0; slot < kill.parameters.size(); ++slot)
+                kill.parameters[slot] = number(values, ("Param" + std::to_string(slot)).c_str());
+            if (!kill.targets(ReplayKillTarget::Player))
+                continue;
+            for (const auto &definition : replayDailyChallenges)
+            {
+                auto *state = find(result.states, definition.id);
+                if (!state || definition.criterion == ReplayDailyCriterion::Pending ||
+                    number(*state, "status") != 1 || number(*state, "dailyCycle") != now / 86400 ||
+                    timestamp < number(*state, "activationTimestamp") ||
+                    timestamp >= number(*state, "expirationTimestamp") ||
+                    contexts[index].activationCutoff < number(*state, "activationTimestamp"))
+                    continue;
+                const bool matches = definition.criterion == ReplayDailyCriterion::PlayerKill ||
+                    (definition.criterion == ReplayDailyCriterion::Headshot && kill.cause() == 9) ||
+                    (definition.criterion == ReplayDailyCriterion::Melee && kill.cause() == 8);
+                if (!matches)
+                    continue;
+                const auto before = number(*state, "progress");
+                wire::require(before < definition.target && state->at("name") == definition.name() &&
+                              number(*state, "target") == definition.target &&
+                              number(*state, "kind") == definition.kind);
+                (*state)["progress"] = before + 1;
+                const bool completed = before + 1 == definition.target;
+                if (completed)
+                {
+                    (*state)["status"] = uint64_t{3};
+                    (*state)["completionCount"] = uint64_t{1};
+                    (*state)["completionTimestamp"] = timestamp;
+                    wire::require(result.xp <= UINT64_MAX - definition.xpReward);
+                    result.xp += definition.xpReward;
+                    if (definition.itemReward)
+                        result.items.insert(definition.itemReward);
+                }
+                result.updates[definition.id] = completed || result.updates[definition.id];
+            }
+        }
+        return result;
+    }
+
+    std::vector<Delivery> replayDailyUpdates(const platform::LobbyIdentity &id,
+                                           const std::string &context,
+                                           const QuestProgress &progress, bool refresh)
+    {
+        std::vector<Delivery> result;
+        for (const auto &[identity, completed] : progress.updates)
+        {
+            const auto *definition = replayDailyChallenge(identity);
+            wire::require(definition);
+            const auto state = std::find_if(progress.states.begin(), progress.states.end(),
+                [identity](const Json &value) { return number(value, "id") == identity; });
+            wire::require(state != progress.states.end());
+            Json event{{"type", "ACHIEVEMENT"}, {"kind", uint64_t{definition->kind}},
+                       {"id_", uint64_t{identity}}, {"name", definition->name()},
+                       {"progress", number(*state, "progress")},
+                       {"completionTimestamp", number(*state, "completionTimestamp")},
+                       {"reason", completed && !refresh ? "completed" : "inProgress"}};
+            wire::Writer push;
+            push.u32(67);
+            push.u8(1);
+            push.u64(id.userId);
+            push.text("uno");
+            push.text(context);
+            push.data.push_back(7);
+            wire::raw(push.data, int32_t{1});
+            push.u32(1);
+            push.data.push_back(7);
+            wire::raw(push.data, int32_t{1});
+            push.text(event.dump());
+            Delivery delivery{id.userId, std::move(push.data)};
+            delivery.questContext = context;
+            delivery.questId = identity;
+            delivery.questStateHash = snapshotHash(progress.states, *state);
+            result.push_back(std::move(delivery));
+        }
+        return result;
+    }
 
     bool replayQuestEventMayEarn(const std::string &name)
     {
@@ -615,7 +766,8 @@ namespace services
 
     bool replayQuestDeliveryValid(const Json &states, const Delivery &delivery)
     {
-        wire::require(states.is_array() && states.size() <= 15000 && quest(delivery.questId));
+        wire::require(states.is_array() && states.size() <= 15000 &&
+                      (quest(delivery.questId) || replayDailyChallenge(delivery.questId)));
         const auto row = std::find_if(states.begin(), states.end(), [&](const Json &value)
                                      { return number(value, "id") == delivery.questId; });
         return row != states.end() && snapshotHash(states, *row) == delivery.questStateHash;

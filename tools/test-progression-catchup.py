@@ -17,6 +17,7 @@ import urllib.request
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, binary, fields, integer, structure, text
 from progression_delivery_fixtures import reward
 
@@ -167,7 +168,7 @@ def main():
             # Recovery and notification must happen from the idle publisher,
             # without another client task or request.
             reward(client, 4000)
-            assert not (data / "achievements/5800/event-transaction.json").exists()
+            assert_applied(data / "achievements/5800/event-transaction.json")
             assert json.loads(journal.read_bytes())["player_xp_pending"] == 4000
             checks.append("a blocked accepted event cannot notify partial state; idle maintenance recovers and delivers it after the write blocker is removed")
         old = process.pid

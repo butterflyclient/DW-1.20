@@ -1,6 +1,7 @@
 #pragma once
 #include "services.h"
 #include "marketplace_services.h"
+#include "replay_daily_challenges.h"
 #include <map>
 #include <set>
 #include <string>
@@ -26,6 +27,17 @@ namespace services
         bool firstEnd = false;
         bool firstPlacement = false;
     };
+
+    const ReplayDailyChallenge *replayDailyChallenge(uint64_t identity);
+    bool synchronizeReplayDailies(nlohmann::json &states, uint64_t now);
+    QuestProgress advanceReplayDailies(const nlohmann::json &states,
+                                      const nlohmann::json &events,
+                                      std::span<const ReplayQuestEventContext> contexts,
+                                      uint64_t now);
+    std::vector<Delivery> replayDailyUpdates(const platform::LobbyIdentity &identity,
+                                           const std::string &context,
+                                           const QuestProgress &progress,
+                                           bool refresh = false);
 
     // Original Replay parser fields and shipped mission criteria only.
     // Unbound producer predicates leave their selected stages unchanged.

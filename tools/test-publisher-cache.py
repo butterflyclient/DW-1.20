@@ -148,6 +148,26 @@ def main():
         with NativeClient(fixture, port_offset=offset) as client:
             first = query(client)
             download()
+            for key in ("expiresOn", "created", "modified"):
+                for invalid in (1 << 63, (1 << 64) - 1, 0.5):
+                    metadata[key] = invalid
+                    save_metadata()
+                    query(client, error=102)
+                metadata[key] = 0
+                save_metadata()
+            metadata.update(extraData="eA==", extraDataSize=(1 << 32) + 1)
+            save_metadata()
+            query(client, error=102)
+            metadata["extraDataSize"] = 2049
+            save_metadata()
+            query(client, error=102)
+            metadata["extraDataSize"] = 1
+            save_metadata()
+            assert query(client)["extraDataSize"] == 1
+            metadata.pop("extraData")
+            metadata.pop("extraDataSize")
+            save_metadata()
+            checks.append("Publisher signed timestamps and native extraDataSize reject overflow before narrowing")
             stamp = cache.stat().st_mtime_ns
             assert query(client, vector=True) == first and cache.stat().st_mtime_ns == stamp
             checks.append(

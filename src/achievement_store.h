@@ -11,7 +11,8 @@ namespace achievement_store
         event,
         inventory,
         states,
-        leaderboard
+        leaderboard,
+        userState
     };
 
     struct Write

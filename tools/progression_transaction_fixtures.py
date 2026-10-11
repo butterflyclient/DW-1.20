@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import binary, fields, integer, structure, text
 
 
@@ -112,8 +113,29 @@ def exercise_mission_window(host, peer, data, checks):
         checks.append("a later mission-file failure retains the flushed mixed intent and blocks both achievement and inventory reads until recovery")
     finally:
         blocker.rmdir()
+    retirement_blocker = intent.with_name("event-transaction.json.pending")
+    retirement_blocker.mkdir()
+    try:
+        rejected(host, 125, 3, query, 102)
+        assert [json.loads(p.read_bytes()) for p in paths] == after
+        assert intent.read_bytes() == saved
+        rejected(peer, 80, 69, structure(text(1, "5800") + text(2, "") + integer(3, 100)), 102)
+        assert intent.read_bytes() == saved
+    finally:
+        retirement_blocker.rmdir()
     snapshots = [mission_snapshot(c) for c in (host, peer)]
-    assert [json.loads(p.read_bytes()) for p in paths] == after and not intent.exists()
+    assert [json.loads(p.read_bytes()) for p in paths] == after
+    assert_applied(intent)
+    marker = intent.read_bytes()
+    # A later independent inventory writer must not conflict with an already
+    # completed recovery window. Only this disposable fixture is modified.
+    independent = json.loads(inventory.read_bytes())
+    independent["balances"] = [{"currency": 20, "amount": 1}]
+    inventory.write_text(json.dumps(independent))
+    mission_snapshot(host)
+    assert json.loads(inventory.read_bytes()) == independent
+    assert intent.read_bytes() == marker
+    checks.append("failed completion-marker publication retains the prepared intent after all checkpoints apply; retry durably completes and permits a later independent inventory write")
     progress = {fields(p)[1][0].decode(): fields(p)[2][0]
                 for p in snapshots[0][0][1000000][10]}
     assert progress["xp"] == 3500
@@ -168,7 +190,8 @@ def exercise(host, peer, data, report, reward, checks):
     reward(last, old + 25)
     baseline = [path.read_bytes() for path in paths]
     rejected(host, 2, report([(first, 25), (last, 26)], conflict_id), 106)
-    assert [path.read_bytes() for path in paths] == baseline and not intent.exists()
+    assert [path.read_bytes() for path in paths] == baseline
+    assert_applied(intent)
     checks.append("a later owner's conflicting XP retry rejects every recipient before any journal changes")
 
     request = bytes([82]) * 16
@@ -221,7 +244,7 @@ def exercise(host, peer, data, report, reward, checks):
         progress = {fields(value)[1][0].decode(): fields(value)[2][0] for value in row[10]}
         assert progress["xp"] == json.loads(before)["player_xp"] + 37
         assert json.loads(path.read_bytes())["player_xp"] == progress["xp"]
-    assert not intent.exists()
+    assert_applied(intent)
     committed = [path.read_bytes() for path in paths]
     assert host.task(125, 2, packet) == b""
     assert [path.read_bytes() for path in paths] == committed

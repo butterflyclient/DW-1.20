@@ -1,5 +1,6 @@
 #include "host_os.h"
 #include "account_services.h"
+#include "achievement_services.h"
 #include "battlepass_services.h"
 #include "leaderboard_row.h"
 #include "protobuf.h"
@@ -91,6 +92,10 @@ namespace services
             wire::require(!context.empty());
             const auto path = directory / "achievement-user-state" / std::to_string(id.titleId) /
                               context / (std::to_string(id.userId) + ".json");
+            // Recovery may replace this very document during a full reset.
+            // Finish the complete transaction before taking its response image.
+            if (id.titleId == 5800 && (context == "5800" || context == "iw8"))
+                recoverAchievementWrites(directory, id.titleId);
             auto state = document(path, 4096);
             projectBattlepassUserState(directory, id, context, state);
             const auto json = state.dump();

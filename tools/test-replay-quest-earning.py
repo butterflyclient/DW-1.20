@@ -20,6 +20,7 @@ import urllib.request
 import uuid
 import zlib
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, binary, fields, integer, structure, text, u32, u64
 from progression_delivery_fixtures import decode_event67
 
@@ -833,7 +834,7 @@ def main():
             finally:
                 blocker.rmdir()
             snapshot(peer)
-            assert not intent.exists()
+            assert_applied(intent)
             saved_peer = snapshot(peer)
             assert host.task(125, 2, batch) == b""
             assert rewards(peer, 2, refresh=True)[0]["reason"] == "inProgress"

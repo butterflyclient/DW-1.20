@@ -353,8 +353,11 @@ namespace services
             wire::require(std::filesystem::file_size(path) <= 256 * 1024);
             std::ifstream stream(path);
             const auto json = Json::parse(stream);
-            result.status = json.at("status").get<uint32_t>();
-            wire::require(result.status >= 200 && result.status <= 599);
+            const auto &status = json.at("status");
+            if (!status.is_number_unsigned() || status.get<uint64_t>() < 200 ||
+                status.get<uint64_t>() > 599)
+                throw std::runtime_error("Configured REST status is invalid");
+            result.status = status.get<uint32_t>();
             result.body = json.at("body").dump();
             wire::require(result.body.size() <= 256 * 1024);
             reply.operation = "rest-configured-resource";

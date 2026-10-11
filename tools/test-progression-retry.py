@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, binary, fields, integer, structure, text, u32, u64
 from progression_delivery_fixtures import reward
 
@@ -187,7 +188,7 @@ def main():
         with NativeClient(fixture, profile="retry", port_offset=offset) as client:
             assert client.task(125, 1, blocked) == b""
             reward(client, 17775)
-            assert not (data / "achievements/5800/event-transaction.json").exists()
+            assert_applied(data / "achievements/5800/event-transaction.json")
             before = journal.read_bytes()
             assert client.task(125, 1, blocked) == b""
             reward(client, 17775)

@@ -248,10 +248,14 @@ namespace services
     {
         if (id.titleId != 5800 || (context != "5800" && context != "iw8"))
             return;
-        recoverAchievementWrites(root, id.titleId);
         const auto data = states(statePath(root, id, context));
         // Same-Replay 0x14105E1C0 resets each of the seven ownership flags and
         // reads Int32 battlepassN_owned. JSON booleans are not its wire contract.
+        // User-state documents can retain a previously projected premium flag.
+        // Rebuild ownership from the current authoritative season states so a
+        // progression reset also clears ownership on subsequent reads.
+        for (unsigned season = 0; season <= 6; ++season)
+            state.erase("battlepass" + std::to_string(season) + "_owned");
         for (const auto &row : data)
         {
             const auto identity = number(row, "id");

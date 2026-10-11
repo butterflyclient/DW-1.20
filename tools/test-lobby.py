@@ -1755,7 +1755,12 @@ try:
             client.task(125, 9, user_state_request, structured=True)
         )
     )
-    assert json.loads(state_result[1]) == user_state
+    # Battle Pass ownership is derived from authoritative season states. Keep
+    # unrelated saved keys intact while clearing a stale projected flag.
+    expected_state = {key: value for key, value in user_state.items()
+                      if key != "battlepass0_owned"}
+    assert json.loads(state_result[1]) == expected_state
+    assert json.loads(statepath.read_text()) == user_state
     client.task(125, 9, structure(pb_text(1, "../escape")), error=106)
     client.task(125, 9, structure(pb_text(1, "iw8") + pb_text(1, "other")), error=106)
     checks.append(
@@ -2623,6 +2628,19 @@ try:
     )
     status, body = rest_response(client.task(255, 10, rest_params()))
     assert status == 200 and body == {"fixture_value": 7}
+    for invalid_status in (199, 600, -1, 200.5, (1 << 32) + 200):
+        (restpath / "get.json").write_text(
+            json.dumps({"status": invalid_status, "body": {"fixture_value": 7}})
+        )
+        client.task(255, 10, rest_params(), error=102)
+    (restpath / "get.json").write_text(
+        json.dumps({"status": 599, "body": {"fixture_value": 7}})
+    )
+    assert rest_response(client.task(255, 10, rest_params()))[0] == 599
+    (restpath / "get.json").write_text(
+        json.dumps({"status": 200, "body": {"fixture_value": 7}})
+    )
+    checks.append("configured REST statuses reject invalid types/ranges before numeric narrowing")
     client.task(255, 10, rest_params("../escape"), error=106)
     client.task(255, 10, rest_params(body=b"illegal"), error=106)
     checks.append(
@@ -4616,7 +4634,7 @@ try:
                 )
             )[1]
         )
-        == user_state
+        == expected_state
     )
     assert json.loads(statpath.read_text()) == json.loads(before)
     assert client.task(

@@ -4,6 +4,7 @@ import base64
 import json
 import time
 
+from achievement_transaction_fixtures import assert_applied
 from native_wire_client import NativeClient, binary, fields, integer, structure, text
 
 
@@ -54,7 +55,8 @@ def exercise(fixture, data, offset, restart, checks):
         )))
         row = next(fields(row) for row in states[1] if fields(row)[11] == [1000000])
         progress = {fields(value)[1][0].decode(): fields(value)[2][0] for value in row[10]}
-        assert progress["xp"] == xp + 123 and not intent.exists()
+        assert progress["xp"] == xp + 123
+        assert_applied(intent)
         committed = journal.read_bytes()
         assert len(json.loads(committed)["requests"]) == 256
         assert client.task(125, 2, packet) == b"" and journal.read_bytes() == committed

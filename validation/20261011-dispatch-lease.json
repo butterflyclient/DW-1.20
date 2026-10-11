@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "source_sha256": "7a031776586579ba2d71ae39724416d6c40bccde19996355c690c4347661e579",
+  "extracted_entry": "        auto id = authenticatedIdentity;\n        // A task can wait behind durable store work. Validate its current lease\n        // after that wait, using the existing store -> platform lock order.\n        std::lock_guard lock(storeMutex);\n        if (!platform::refreshLease(id))\n            return Reply{101, {}, \"service-session-expired-or-superseded\"};\n",
+  "modeled_platform_boundary": true,
+  "native_game_verified": false,
+  "old_order_control": "FAIL: error=0 mutations=1 refreshes=1",
+  "check": "PASS: authorization revoked while dispatch waits; handler was not entered"
+}

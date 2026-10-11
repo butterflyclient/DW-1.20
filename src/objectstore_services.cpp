@@ -516,6 +516,8 @@ namespace services
             for (const auto *key : {"expiresOn", "created", "modified"})
             {
                 require(data.at(key).is_number_integer());
+                require(!data.at(key).is_number_unsigned() ||
+                        data.at(key).get<uint64_t>() <= uint64_t(INT64_MAX));
                 (void)data.at(key).get<int64_t>();
             }
             require(data.at("contentLength").is_number_unsigned());
@@ -530,7 +532,7 @@ namespace services
             {
                 (void)string("extraData", 2733);
                 require(data.at("extraDataSize").is_number_unsigned() &&
-                        data.at("extraDataSize").get<uint32_t>() <= 2048);
+                        data.at("extraDataSize").get<uint64_t>() <= 2048);
             }
             if (data.contains("hasSummary"))
                 require(data.at("hasSummary").is_boolean());

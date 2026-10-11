@@ -57,7 +57,14 @@ def exercise(client, peer, directory, title, user, peer_user, helpers, checks):
     def publish(value=catalog):
         pending = catalog_path.with_suffix(".json.pending")
         pending.write_text(json.dumps(value))
-        pending.replace(catalog_path)
+        for attempt in range(50):
+            try:
+                pending.replace(catalog_path)
+                break
+            except PermissionError:
+                if attempt == 49:
+                    raise
+                time.sleep(0.01)
 
     def start(value=query, error=0):
         result = client.task(145, 18, text(json.dumps(value)), error=error)
