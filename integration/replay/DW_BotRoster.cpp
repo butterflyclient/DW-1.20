@@ -51,6 +51,7 @@ extern "C"
     int func_141B0D530(uint16_t);                        // GetInt
     bool func_141192AC0(const void *);                   // Party_UsingTeams (verified below)
     bool func_141192AA0(const void *);                   // Party_UsingSquads
+    extern uint8_t replay_rva_0c27e4b0[];                // Native matchmaker lobby identity
 }
 
 namespace
@@ -95,6 +96,13 @@ namespace
     static_assert(sizeof(MemberRecord) == 488 && offsetof(MemberRecord, team) == 392);
     static_assert(offsetof(MemberRecord, xuid) == 408);
     dvar_t *s_reserved{}, *s_squadSize{};
+    BotRecord s_rosterRecords[200]{};
+    unsigned s_rosterSlots[200]{};
+    bool s_rosterCreated[200]{};
+    const void *s_rosterParty = nullptr;
+    uint64_t s_rosterLobby = 0;
+    unsigned s_rosterStart = 0, s_rosterCandidate = 0;
+    bool s_rosterValid = false;
 
     bool SelectAppearance(BotRecord &bot)
     {
@@ -473,40 +481,110 @@ extern "C" void DW_BotPolicy_BuildRoster(const void *party, unsigned capacity, u
 {
     if (!party || !count || count > 199 || capacity > 200 || count > capacity || !func_140CA2250())
         return;
-    // Native selection fills a prefix and does not clear old valid records.
-    // Place exactly the requested bots in unused real party indices, including
-    // holes left by departing humans, using the complete native 88-byte record.
-    static BotRecord selected[200]{};
-    const unsigned start = (static_cast<const BotRecord *>(func_140CA2230(0))->nameIndex +
-                            static_cast<const BotRecord *>(func_140CA2230(0))->skill) % DWBotNameCount;
-    unsigned candidate = 0;
+    const uint64_t lobby = *reinterpret_cast<const uint64_t *>(replay_rva_0c27e4b0 + 79656);
+    if (!s_rosterValid || s_rosterLobby != lobby || s_rosterParty != party)
+    {
+        s_rosterLobby = lobby;
+        s_rosterParty = party;
+        s_rosterStart = (static_cast<const BotRecord *>(func_140CA2230(0))->nameIndex +
+                         static_cast<const BotRecord *>(func_140CA2230(0))->skill) % DWBotNameCount;
+        s_rosterCandidate = 0;
+        for (unsigned i = 0; i < 200; ++i)
+        {
+            s_rosterCreated[i] = false;
+            s_rosterSlots[i] = 200;
+        }
+        s_rosterValid = true;
+    }
+    unsigned available = 0;
+    for (unsigned slot = 0; slot < capacity; ++slot)
+        if (!func_14118E020(party, slot))
+            ++available;
+    if (count > available)
+        return;
+    // Keep complete native records and their prior slots across gradual fills.
+    // The native selector may have regenerated its prefix, so reuse the cache
+    // before copying any newly selected record. Only a human collision moves
+    // an existing bot; a reduction retires the highest logical ordinals.
     for (unsigned i = 0; i < count; ++i)
     {
-        selected[i] = *static_cast<const BotRecord *>(func_140CA2230(i));
+        const bool created = s_rosterCreated[i];
+        if (!created)
+            s_rosterRecords[i] = *static_cast<const BotRecord *>(func_140CA2230(i));
+        auto &selected = s_rosterRecords[i];
+        bool collision = false;
+        for (unsigned human = 0; human < capacity; ++human)
+            if (func_14118E020(party, human) && SameName(Member(party, human).name, selected.name))
+                collision = true;
+        if (created && !collision)
+            continue;
         // 73 is coprime to 150: all base names occur once before a uniquely
         // suffixed overflow name is needed for a native 151..199-bot lobby.
         bool unique = false;
-        while (!unique && candidate < DWBotNameCount * 3)
+        unsigned attempts = 0;
+        while (!unique && attempts++ < DWBotNameCount * 3)
         {
-            const unsigned name = (start + (candidate % DWBotNameCount) * 73) % DWBotNameCount;
-            selected[i].nameIndex = uint16_t(0x8000 | (name + (candidate / DWBotNameCount) * DWBotNameCount));
-            ++candidate;
-            BG_GameStateInfo_ExpandBotData(&selected[i].nameIndex, &selected[i]);
+            const unsigned candidate = s_rosterCandidate++ % (DWBotNameCount * 3);
+            const unsigned name = (s_rosterStart + (candidate % DWBotNameCount) * 73) % DWBotNameCount;
+            selected.nameIndex = uint16_t(0x8000 | (name + (candidate / DWBotNameCount) * DWBotNameCount));
+            BG_GameStateInfo_ExpandBotData(&selected.nameIndex, &selected);
             unique = true;
             for (unsigned human = 0; human < capacity; ++human)
-                if (func_14118E020(party, human) && SameName(Member(party, human).name, selected[i].name))
+                if (func_14118E020(party, human) && SameName(Member(party, human).name, selected.name))
+                    unique = false;
+            for (unsigned previous = 0; previous < 200; ++previous)
+                if (previous != i && s_rosterCreated[previous] &&
+                    SameName(s_rosterRecords[previous].name, selected.name))
                     unique = false;
         }
         if (!unique)
             return;
-        SelectAppearance(selected[i]);
+        if (!created)
+            SelectAppearance(selected);
+        s_rosterCreated[i] = true;
     }
+    bool claimed[200]{};
+    for (unsigned i = count; i < 200; ++i)
+        s_rosterSlots[i] = 200;
+    for (unsigned i = 0; i < count; ++i)
+    {
+        const unsigned slot = s_rosterSlots[i];
+        if (slot < capacity && !func_14118E020(party, slot) && !claimed[slot])
+            claimed[slot] = true;
+        else
+            s_rosterSlots[i] = 200;
+    }
+    for (unsigned i = 0; i < count; ++i)
+        if (s_rosterSlots[i] == 200)
+            for (unsigned slot = 0; slot < capacity; ++slot)
+                if (!claimed[slot] && !func_14118E020(party, slot))
+                {
+                    s_rosterSlots[i] = slot;
+                    claimed[slot] = true;
+                    break;
+                }
     for (unsigned i = 0; i < 200; ++i)
         *static_cast<BotRecord *>(func_140CA2210(i)) = {};
-    unsigned used = 0;
-    for (unsigned i = 0; i < capacity && used < count; ++i)
-        if (!func_14118E020(party, i))
-            *static_cast<BotRecord *>(func_140CA2210(i)) = selected[used++];
+    for (unsigned i = 0; i < count; ++i)
+        *static_cast<BotRecord *>(func_140CA2210(s_rosterSlots[i])) = s_rosterRecords[i];
+}
+
+extern "C" void DW_BotPolicy_ResetRoster()
+{
+    s_rosterValid = false;
+}
+
+extern "C" void DW_BotPolicy_CaptureRoster()
+{
+    if (!s_rosterValid || !func_140CA2250())
+        return;
+    for (unsigned i = 0; i < 200; ++i)
+        if (s_rosterCreated[i] && s_rosterSlots[i] < 200)
+        {
+            const auto &record = *static_cast<const BotRecord *>(func_140CA2230(s_rosterSlots[i]));
+            if (record.valid)
+                s_rosterRecords[i] = record;
+        }
 }
 
 extern "C" void BG_GameStateInfo_ExpandBotData(const void *wireData, void *displayData)

@@ -9,6 +9,11 @@ extern "C"
     void DW_BotPolicy_Register();
     void DW_BotPolicy_Prepare(const void *);
     void DW_BotPolicy_BuildRoster(const void *, unsigned, unsigned);
+    void DW_BotPolicy_ResetRoster();
+    void DW_BotPolicy_CaptureRoster();
+    void DW_PlaylistUI_Frame();
+    uint64_t DW_LobbyControls_StartMatchInternalNative(void *, const void *);
+    bool DW_LobbyControls_ReadyToLaunchNative(const void *, const void *);
     void replay_rva_00ca2070();                 // BG_GameStateInfo_ClearBotData
     bool replay_rva_01187fa0();                 // Lobby_IsInLobby
     void *replay_rva_01187ee0();                // Lobby_GetPartyData
@@ -69,6 +74,7 @@ namespace
         ColorXYZ = 11
     };
     dvar_t *s_start{}, *s_bots{}, *s_botCount{};
+    dvar_t *s_autoFill{}, *s_autoActive{}, *s_autoComplete{}, *s_autoTarget{}, *s_autoRevision{}, *s_autoAck{};
     bool s_started = false, s_filled = false;
     unsigned s_luaPoll = 0;
     cmd_function_s s_fillCommand{};
@@ -76,6 +82,12 @@ namespace
     int s_commandBotCount = 0;
     unsigned s_requestStarted = 0;
     bool s_requestPending = false;
+    bool s_autoRequest = false, s_autoWanted = false, s_autoRequestedComplete = false;
+    bool s_autoClockValid = false, s_autoWasHost = false, s_autoNeedsClear = false;
+    bool s_autoArmAcknowledged = false;
+    unsigned s_autoStarted = 0, s_requestRevision = 0;
+    unsigned s_autoRequestId = 0;
+    unsigned s_filledCount = 0, s_filledHumans = 0, s_filledCapacity = 0;
     char s_requestDocument[16384]{};
 
     void SyncLobby()
@@ -88,14 +100,141 @@ namespace
         s_lobby = lobby;
         s_commandBotCount = 0;
         s_requestPending = false;
+        s_autoRequest = false;
+        s_autoClockValid = false;
+        s_autoWanted = false;
+        // Keep request tokens unique across allocations in this process. Old
+        // publication dvars can outlive the native lobby identity by a frame.
+        s_autoArmAcknowledged = false;
         s_filled = false;
         s_started = false;
+        DW_BotPolicy_ResetRoster();
+    }
+
+    unsigned NativeBots(const void *party, unsigned capacity)
+    {
+        unsigned count = 0;
+        if (replay_rva_00ca2250() && capacity <= 200)
+            for (unsigned slot = 0; slot < capacity; ++slot)
+                if (!replay_rva_0118e020(party, slot) && replay_rva_00ca2270(slot))
+                    ++count;
+        return count;
+    }
+
+    bool AutoFillPending(const void *party)
+    {
+        if (!DW_LocalBackend_IsEnabled() || !s_autoFill || !s_autoActive || !party ||
+            !replay_rva_0118dd00(party) || replay_rva_01528420() ||
+            Com_GameMode_GetActiveGameMode() == 3 || !DVARBOOL_onlinegame ||
+            !DVARBOOL_onlinegame->current.enabled || !gl_14D386820 ||
+            gl_14D386820->current.enabled)
+            return false;
+        if (!s_autoFill->current.enabled && !s_autoActive->current.enabled)
+            return s_autoRequest && s_requestPending && s_autoNeedsClear;
+        const unsigned capacity = replay_rva_0118c7d0(party);
+        const unsigned humans = replay_rva_0118ab60(party, 1);
+        if (!s_autoActive->current.enabled || !s_autoComplete->current.enabled ||
+            !s_autoClockValid || !s_autoArmAcknowledged ||
+            unsigned(replay_rva_0148fce0() - s_autoStarted) < 45000 ||
+            s_requestPending || !s_filled || capacity > 200 || humans > capacity ||
+            s_autoTarget->current.integer < 0 ||
+            unsigned(s_autoTarget->current.integer) > capacity - humans ||
+            s_filledHumans != humans || s_filledCapacity != capacity)
+            return true;
+        const unsigned target = unsigned(s_autoTarget->current.integer);
+        return unsigned(s_botCount->current.integer) != target || NativeBots(party, capacity) != target;
+    }
+
+    void QueueAuto(unsigned count, bool complete)
+    {
+        if (s_autoRequestId == 0x7FFFFFFFU)
+            return;
+        s_commandBotCount = int(count);
+        s_autoRequestedComplete = complete;
+        s_autoRequest = true;
+        s_requestPending = true;
+        s_requestStarted = replay_rva_0148fce0();
+        s_requestRevision = unsigned(s_autoRevision->current.integer);
+        ++s_autoRequestId;
+        *reinterpret_cast<bool *>(replay_rva_0c27e4b0 + 79636) = true;
+        *reinterpret_cast<unsigned *>(replay_rva_0c27e4b0 + 79640) = 0;
+    }
+
+    void AutoFillFrame(const void *party)
+    {
+        const bool wanted = s_autoFill->current.enabled;
+        const unsigned now = replay_rva_0148fce0();
+        if (wanted && !s_autoWanted && !s_autoActive->current.enabled &&
+            ((s_filled && s_botCount->current.integer > 0) ||
+             (s_requestPending && !s_autoRequest)))
+        {
+            DvarValue off{};
+            Dvar_SetVariant(s_autoFill, &off, 0);
+            Com_Printf(25, "Fill lobby with bots: this lobby already has a manual bot request.\n");
+            return;
+        }
+        if (wanted != s_autoWanted)
+        {
+            s_autoWanted = wanted;
+            s_autoClockValid = wanted;
+            s_autoArmAcknowledged = false;
+            s_autoStarted = now;
+            s_autoNeedsClear = true;
+            s_filled = false;
+            s_requestPending = false;
+            QueueAuto(0, false);
+        }
+        if (!wanted)
+        {
+            if (s_autoActive->current.enabled && !s_requestPending)
+                QueueAuto(0, false);
+            return;
+        }
+        if (!s_autoClockValid)
+        {
+            s_autoClockValid = true;
+            s_autoStarted = now;
+            s_autoNeedsClear = true;
+            s_filled = false;
+            QueueAuto(0, false);
+            return;
+        }
+        if (s_requestPending)
+            return;
+        if (!s_autoArmAcknowledged)
+        {
+            QueueAuto(0, false);
+            return;
+        }
+        const unsigned elapsed = unsigned(now - s_autoStarted);
+        if (!s_autoActive->current.enabled)
+        {
+            QueueAuto(0, false);
+            return;
+        }
+        const int supplied = s_autoTarget->current.integer;
+        const unsigned capacity = replay_rva_0118c7d0(party), humans = replay_rva_0118ab60(party, 1);
+        if (supplied < 0 || capacity > 200 || humans > capacity || unsigned(supplied) > capacity - humans)
+            return;
+        const unsigned target = unsigned(supplied);
+        const unsigned progress = elapsed <= 30000 ? 0 : elapsed >= 45000 ? 15000 : elapsed - 30000;
+        const unsigned desired = target * progress / 15000;
+        const unsigned acknowledged = unsigned(s_botCount->current.integer);
+        const bool complete = elapsed >= 45000 && acknowledged == target && s_filled &&
+                              s_filledHumans == humans && NativeBots(party, capacity) == target;
+        if (desired != acknowledged || complete != s_autoComplete->current.enabled)
+            QueueAuto(desired, complete);
     }
 
     void FillLobby_f()
     {
         if (!DW_LocalBackend_IsEnabled() || !Sys_IsMainThread() || !s_botCount)
             return;
+        if ((s_autoFill && s_autoFill->current.enabled) || (s_autoActive && s_autoActive->current.enabled))
+        {
+            Com_Printf(25, "fill_lobby: disable Fill lobby with bots before adding bots manually.\n");
+            return;
+        }
         unsigned requested = 0;
         const char *text = Cmd_Argc() == 2 ? Cmd_Argv(1) : nullptr;
         if (!text || !*text)
@@ -159,6 +298,7 @@ namespace
         const auto available = capacity - humans - bots;
         const auto added = requested < available ? requested : available;
         s_commandBotCount = int(bots + added);
+        s_autoRequest = false;
         s_requestPending = true;
         s_requestStarted = replay_rva_0148fce0();
         // Queue the SDK's existing authenticated 145/15 host document update.
@@ -241,7 +381,9 @@ namespace
 
     bool BotsRequested()
     {
-        return DW_LocalBackend_IsEnabled() && s_botCount && s_botCount->current.integer > 0;
+        return DW_LocalBackend_IsEnabled() && s_botCount &&
+               (s_botCount->current.integer > 0 || (s_autoFill && s_autoFill->current.enabled) ||
+                (s_autoActive && s_autoActive->current.enabled));
     }
 } // namespace
 
@@ -272,28 +414,67 @@ extern "C" void DW_LobbyControls_Frame()
             "replay_dw_fillBots", 0, 0, 1, 0, "Legacy DW bot request; use replay_dw_botCount");
         s_botCount = Dvar_RegisterInt(
             "replay_dw_botCount", 0, 0, 199, 0, "DW operator number of native bots to add");
+        s_autoFill = Dvar_RegisterBool("replay_dw_autoFillBots", false, 0,
+                                      "Fill eligible lobby slots with native bots before starting");
+        s_autoActive = Dvar_RegisterBool("replay_dw_autoFillBotsActive", false, 0,
+                                        "Authoritative DW automatic bot fill state");
+        s_autoComplete = Dvar_RegisterBool("replay_dw_autoFillBotsComplete", false, 0,
+                                          "Authoritative DW native bot fill completion");
+        s_autoTarget = Dvar_RegisterInt("replay_dw_autoFillBotTarget", 0, 0, 199, 0,
+                                       "Eligible bot slots after human and No Fill reservations");
+        s_autoRevision = Dvar_RegisterInt("replay_dw_autoFillRevision", 0, 0, 0x7FFFFFFF, 0,
+                                         "Authoritative automatic fill publication revision");
+        s_autoAck = Dvar_RegisterInt("replay_dw_autoFillAck", 0, 0, 0x7FFFFFFF, 0,
+                                    "Accepted host automatic fill request token");
         DW_BotPolicy_Register();
         Dvar_EndPermanentRegistration();
         Cmd_AddCommandInternal("fill_lobby", FillLobby_f, &s_fillCommand);
     }
+    DW_PlaylistUI_Frame();
     if (!s_start->current.integer)
         s_started = false;
-    if (!s_botCount->current.integer)
+    if (!s_botCount->current.integer && !s_autoFill->current.enabled && !s_autoActive->current.enabled)
         s_filled = false;
     if (!Com_FrontEndScene_IsActive() || !replay_rva_01187fa0())
+    {
+        s_autoWasHost = false;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
         return;
+    }
     auto *party = replay_rva_01187ee0();
     if (!party || !replay_rva_0118dd00(party) || !replay_rva_01189120(party))
+    {
+        s_autoWasHost = false;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
         return;
+    }
     SyncLobby();
+    if (!s_lobby)
+        return;
+    if (!s_autoWasHost)
+    {
+        s_autoWasHost = true;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
+        s_requestPending = false;
+    }
     if (s_requestPending)
     {
-        if (s_botCount->current.integer == s_commandBotCount)
+        const bool acknowledged = s_autoRequest
+            ? unsigned(s_autoAck->current.integer) == s_autoRequestId &&
+              s_autoActive->current.enabled == s_autoWanted
+            : s_botCount->current.integer == s_commandBotCount;
+        if (acknowledged)
         {
             s_requestPending = false;
-            s_filled = false;
+            if (s_autoRequest && s_autoWanted && !s_commandBotCount && !s_autoRequestedComplete)
+                s_autoArmAcknowledged = true;
+            if (!s_autoRequest || s_filledCount != unsigned(s_botCount->current.integer))
+                s_filled = false;
             Com_Printf(
-                25, "fill_lobby: backend accepted %u native bots.\n", unsigned(s_commandBotCount));
+                25, "fill_lobby: backend accepted %u native bots.\n", unsigned(s_botCount->current.integer));
         }
         else if (unsigned(replay_rva_0148fce0() - s_requestStarted) > 15000)
         {
@@ -303,6 +484,9 @@ extern "C" void DW_LobbyControls_Frame()
     }
     if (gl_14D386820->current.enabled)
     {
+        s_autoWasHost = false;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
         if (gl_14D386840->current.integer != 200 || replay_rva_0118c7d0(party) != 200)
         {
             DvarValue maximum{};
@@ -312,6 +496,35 @@ extern "C" void DW_LobbyControls_Frame()
             replay_rva_0119a5a0(party);
         }
         return;
+    }
+    if (replay_rva_01528420() || Com_GameMode_GetActiveGameMode() == 3 ||
+        !DVARBOOL_onlinegame || !DVARBOOL_onlinegame->current.enabled)
+    {
+        s_autoWasHost = false;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
+        return;
+    }
+    AutoFillFrame(party);
+    if (s_autoWanted && !s_autoArmAcknowledged)
+        return;
+    const auto currentHumans = replay_rva_0118ab60(party, 1);
+    const auto currentCapacity = replay_rva_0118c7d0(party);
+    const auto currentBots = unsigned(s_botCount->current.integer);
+    if (s_filled && (s_filledCount != currentBots || s_filledHumans != currentHumans ||
+                     s_filledCapacity != currentCapacity))
+        s_filled = false;
+    if (!currentBots && s_autoNeedsClear && !s_requestPending)
+    {
+        replay_rva_00ca2070();
+        if (!s_autoWanted)
+            DW_BotPolicy_ResetRoster();
+        replay_rva_0119a5a0(party);
+        s_autoNeedsClear = false;
+        s_filled = true;
+        s_filledCount = 0;
+        s_filledHumans = currentHumans;
+        s_filledCapacity = currentCapacity;
     }
     if (s_botCount->current.integer && !s_filled)
     {
@@ -343,6 +556,7 @@ extern "C" void DW_LobbyControls_Frame()
         }
         // Initialize only the native bot quotas and pool. Party slots and their
         // network encoding retain the playlist's actual capacity (e.g. 152 BR).
+        DW_BotPolicy_CaptureRoster();
         replay_rva_00ca2070();
         replay_rva_00ca2370(int(total), saved.integer == 2 ? 2 : 0);
         if (saved.integer == 2)
@@ -363,13 +577,16 @@ extern "C" void DW_LobbyControls_Frame()
         replay_rva_00ca2110();
         replay_rva_0119a5a0(party);
         s_filled = true;
+        s_filledCount = requested;
+        s_filledHumans = humans;
+        s_filledCapacity = capacity;
         Com_Printf(
             25,
             "DW_LOBBY_BOTS native pool prepared for %u bots; playlist capacity %u retained.\n",
             requested,
             capacity);
     }
-    if (s_start->current.integer && !s_started)
+    if (s_start->current.integer && !s_started && !AutoFillPending(party))
     {
         replay_rva_0119cfa0(party, true);
         s_started = true;
@@ -387,8 +604,11 @@ extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
     if (!s_requestPending || lobby != s_lobby || result != replay_rva_0c27e4b0 + 131864 ||
         !*reinterpret_cast<const bool *>(replay_rva_0c27e4b0 + 80128))
         return;
+    if (s_autoRequest && (replay_rva_01528420() || Com_GameMode_GetActiveGameMode() == 3 ||
+                          gl_14D386820->current.enabled || !DVARBOOL_onlinegame->current.enabled))
+        return;
     if (!document || !*document || !length || *length < 3 ||
-        *length > sizeof(s_requestDocument) - 64 || (*document)[*length - 1] != 0 ||
+        *length > sizeof(s_requestDocument) - 192 || (*document)[*length - 1] != 0 ||
         (*document)[*length - 2] != '}')
     {
         s_requestPending = false;
@@ -397,10 +617,15 @@ extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
     }
     for (unsigned i = 0; i < *length - 2; ++i)
         s_requestDocument[i] = (*document)[i];
-    const int added = Com_sprintf(s_requestDocument + *length - 2,
-                                  sizeof(s_requestDocument) - (*length - 2),
-                                  ",\"dw_bot_count\":%u}",
-                                  unsigned(s_commandBotCount));
+    const int added = s_autoRequest
+        ? Com_sprintf(s_requestDocument + *length - 2,
+                      sizeof(s_requestDocument) - (*length - 2),
+                      ",\"dw_bot_count\":%u,\"dw_auto_fill_bots\":%s,\"dw_auto_fill_complete\":%s,\"dw_auto_fill_request\":%u}",
+                      unsigned(s_commandBotCount), s_autoWanted ? "true" : "false",
+                      s_autoRequestedComplete ? "true" : "false", s_autoRequestId)
+        : Com_sprintf(s_requestDocument + *length - 2,
+                      sizeof(s_requestDocument) - (*length - 2),
+                      ",\"dw_bot_count\":%u}", unsigned(s_commandBotCount));
     if (added <= 0 || unsigned(added) >= sizeof(s_requestDocument) - (*length - 2))
     {
         s_requestPending = false;
@@ -408,4 +633,24 @@ extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
     }
     *length = *length - 2 + unsigned(added) + 1;
     *document = s_requestDocument;
+}
+
+// Both native launch entry points retain complete recovered native bodies.
+// The final internal guard also covers PartyHost_Frame's direct manual branch,
+// which bypasses the ordinary readiness predicate and countdown.
+extern "C" bool func_14119B0E0(void *party, const void *activeClient)
+{
+    const bool nativeReady = DW_LobbyControls_ReadyToLaunchNative(party, activeClient);
+    return nativeReady && !AutoFillPending(party);
+}
+
+extern "C" uint64_t func_14119E3D0(void *party, const void *activeClient)
+{
+    return AutoFillPending(party) ? uint64_t{0}
+                                 : DW_LobbyControls_StartMatchInternalNative(party, activeClient);
+}
+
+extern "C" bool DW_LobbyControls_AutoFillEnabled()
+{
+    return s_autoFill && s_autoFill->current.enabled;
 }

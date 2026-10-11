@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "game_launched": false,
+  "modeled_engine_boundaries": true,
+  "preserved_record_size": 88,
+  "checks": [
+    "growth preserves earlier full records and slots",
+    "reduction retains lower ordinals",
+    "human collision moves only collided bot",
+    "199 unique names preserve native200 capacity",
+    "name collision retains appearance",
+    "new lobby resets old roster cache"
+  ],
+  "inputs": {
+    "E:\\DW\\IW8\\tools\\bot_roster_growth_harness.cpp": "70fb0f5bab5b0d513bc2ef16cfd685f42d0c8b2fc2fd3234af3b3cffde355090",
+    "E:\\DW\\IW8\\integration\\replay\\DW_BotRoster.cpp": "fee95df16716543793c7afbb8d7787f11a3d7b50ba5c48b505078b240de40bb3",
+    "E:\\DW\\IW8\\integration\\replay\\DW_BotNames.h": "88bbdb15b301e9613bbc273483e60c0bdc60384c2d4f67b3226f3e247c4f7947",
+    "data\\startup-toast-unlock-update-r4-final-20261011\\compiler-source\\src\\DW_BotBindings.h": "181b5e7afcf4ccf7e712dc5c4a723cfba42268c7efe23974f651569a3d66bd8f"
+  }
+}

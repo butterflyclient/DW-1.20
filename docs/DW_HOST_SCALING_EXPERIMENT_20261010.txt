@@ -1,7 +1,7 @@
 Replay high-population host experiment
 
 Scope
-Eleven host/navigation routines are replaced by freshly compiled C++ in the private DW
+Thirteen host/navigation routines are replaced by freshly compiled C++ in the private DW
 EXE. Their identities, extents, relocation targets and unwind placement come
 from the normal Replay compiler. No existing executable is edited in place.
 All code and build outputs for this experiment remain under E:\DW\IW8.
@@ -269,6 +269,89 @@ the map's full capacity. In a 150-slot match, the host occupies one of those
 slots, leaving 149 for bots/other players. Stable 150-participant operation and
 the behavior of many remote human players remain live validation gates.
 
+Revision 5: owner-run 152-member match (2026-10-11)
+The current deployed release hash was
+09159e5a3d6c262fde03a4b71147f30309ce58747e3137205e0fde478c89bc29.
+Its R4 host source bodies were verified in the corresponding build report.
+Read-only counters confirmed 152 occupied slots: 151 bots and one human,
+com_optimized 1 and a configured 16 ms server frame.
+
+In a 10.969-second context-sampling window, server thread 19040 accumulated
+10.796875 CPU seconds. Of 350 samples on that thread, 188 were in the general
+closest-area KD walker and 76 in its candidate collector. Sample counts include
+capture overhead and are not CPU percentages. A later, separate 4.008-second
+counter-only window advanced 4000 ms / 250 frames, about 62.4 Hz. Bot decisions
+averaged 2.083 ms and movement 0.462 ms. Thus the game could maintain its native
+cadence in that window but had costly navigation work in the earlier capture.
+Do not combine those two windows into a claim of one steady frame time.
+
+The counter window contained 3614 nearby-area queries and 2380 unrestricted
+fallbacks. Fourteen coherent query packets repeatedly used a point at z=-8000;
+two incoherent packets from separate context/memory reads were excluded.
+Such deep requests cannot usually find ground within the 1024-unit first probe.
+The original KD walker tracks the largest single-axis separation, which is a
+loose bound when the vertical component dominates the nearest distance.
+
+R5 changes two additional native BFX bodies:
+- Bfx_ClosestAreaTreeStep tracks independent lower bounds for all three axes
+  within the current call. A Euclidean lower bound can reject branches that
+  cannot improve the native nearest result. The native pending entries,
+  traversal order, leaf layout, child-list strides and incremental progress
+  remain in use. The extra 256-entry bounds array is local stack state; no
+  navigation pointers or handles persist between queries or frames.
+- Bfx_ClosestAreaCollect checks obstacle/area eligibility before geometry work
+  in profiles 1/2. Its projection, heap insertion, distance limit and native
+  floating-point comparisons are retained. Square root uses the original SSE
+  instruction behavior rather than adding a CRT math/errno dependency.
+
+Profile 0 follows the original tree/filter order. R4's bot decision intervals,
+movement cadence, perception budgets and collision ownership remain intact.
+There is no further AI-rate reduction in R5.
+
+The tighter bound includes a conservative rounding margin covering both local
+and world coordinates. A translated-space edge fixture at 100 million units
+demonstrated that the earlier candidate could choose the wrong area; that build
+was stopped and rejected. The corrected compiled instructions match native in
+that case. Existing pending entries start with unknown/zero added bounds on
+each call, so interrupted searches remain conservative rather than retaining
+untracked state in native padding.
+
+143 navigation instruction cases pass in both preflight and the linked R5 EXE.
+They cover original-mode equivalence, rotated and translated spaces, ties,
+empty/negative step limits, resumed searches, allocation/filter behavior and
+native floating-point edge cases. In the 4096-area modeled query, native
+candidate visits fall from 56 to 25 with the same selected area. This is an
+isolated work-count result, not a measured live R5 speedup.
+
+R5 is based on the currently verified complete DW release. 103 existing C++
+source bodies are preserved exactly; the existing updater alone is pinned to
+its no-public-update outcome for this private experiment. Both new BFX units
+are bound to verified native identities and full instruction hashes. Layout,
+references and placement are derived by the normal compiler.
+
+Revision 5 ready artifact
+E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_hostscale_r5_dw.exe
+Its matching INI is copied from the current main DW configuration.
+Build directory:
+E:\DW\IW8\data\host-scale-20261010\build-r5\builds\build-workstation-74e0a93a43e24bde
+Frozen source:
+E:\DW\IW8\data\host-scale-20261010\build-r5\compiler-source-ready
+EXE SHA256:
+c019c24a17b92de1b71aa12ff956d41d536d09a2981153345af0411d4c8de148
+Size: 99,759,104 bytes. Fresh C++ units: 106. Unresolved symbols: 0.
+
+The full compiler job succeeded, including relocation auditing, source
+provenance and 683 Windows unwind cases. Against this exact linked EXE, all
+143 navigation and 339 host instruction cases passed. All 150 current unique
+bot names are embedded. Readiness receipt:
+E:\DW\IW8\data\host-scale-20261010\r5-ready.json
+
+No R5 game run was performed. The owner's active game and the DW server were
+not restarted or replaced. The next comparison should use the same map,
+collision package, 152-slot population and com_optimized 1, watching simulation
+stalls/remote movement as well as rendered FPS. The private updater pin prevents
+the public release from replacing R5 during this comparison.
+
 Combined production release 19 (2026-10-11)
 The main EXE now includes the verified R4 bot/navigation source, bindings and
 all 150 current names together with the latest DW unlock, auth-address and
@@ -289,3 +372,19 @@ Public and deployment proof: validation/20261011-bot-r4-production-readiness.jso
 For a future production build, use --optimized --host-scale without
 --pin-experimental-updater. The latter flag is only for private comparisons and
 requires --host-scale. The publisher rejects a disabled/pinned updater.
+
+Combined production release 20 (2026-10-11)
+The main DW EXE now includes both verified R5 nearest-area geometry bodies and
+bindings, the automatic playlist bot-fill checkbox, timed fill and native start
+guards. R4 decision scheduling and native movement commands are preserved.
+The private R5 comparison updater pin is not present in this production image.
+Installed EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+SHA256: 25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9
+Fresh job c0e4b73fe5b14292 compiled 108 CPP units; no unresolved symbols.
+All 690 unwind, 339 host and 143 navigation instruction cases passed, alongside
+the UI, native start-body/entry-reference, roster, unlock and updater gates.
+The full EXE is published as release 20 on the primary droplet. The embedded
+helper's signed prepare/download and current-version paths pass. The existing
+main INI was preserved. No new game run or live bot-population benchmark was
+performed, so no measured R5 FPS gain is claimed by these fixtures.
+Production evidence: validation/20261011-playlist-auto-fill-readiness.json.

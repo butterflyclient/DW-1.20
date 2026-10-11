@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "modeled_engine_boundaries": true,
+  "native_game_verified": false,
+  "checks": [
+    "count parsing",
+    "host/frontend/public/online gates",
+    "queued additions",
+    "existing pool additions",
+    "capacity clamp",
+    "MP team balance",
+    "BR team restoration and No Fill preparation",
+    "one-shot application",
+    "new lobby reset",
+    "invalid team counts before pool mutation",
+    "BOOL global toggle and playlist frame callback",
+    "30 second delay and 15 second gradual host-document fill",
+    "exact request-token acknowledgement and timer-skew clamps",
+    "native readiness side effects retained while final start body is gated",
+    "no early start before actual native slot presence and completion acknowledgement",
+    "human joins invalidate completion and native migration restarts the arm",
+    "BR152 capacity with authoritative No Fill eligible target",
+    "disable clears automatic native pool and restores normal launch"
+  ],
+  "source_sha256": {
+    "E:\\DW\\IW8\\tools\\lobby_controls_harness.cpp": "c9546207bd18367f83b1b929e26ae5acc04bf7ba53611d2e7a90247c4348b09f",
+    "E:\\DW\\IW8\\integration\\replay\\DW_LobbyControls.cpp": "3b0de22f564c974c6c45971d849924b20db03b5647b2eb41fb991e496a8f59c1"
+  }
+}

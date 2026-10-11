@@ -78,3 +78,55 @@ Earlier game evidence (not a new run of the 20261011 client):
 Use controlled restarts. The current dw_leave command remains unsuitable for tests.
 The direct xstartlobby command faulted in this build; normal Quick Play menu entry
 successfully matched and loaded both clients. Use the normal menus for this test.
+
+Automatic matchmaking bot fill (20261011):
+1. Open Multiplayer or Warzone's Play screen. One checkbox above the playlist
+   entries reads "Fill lobby with bots". The same setting appears above the
+   full playlist list, and stays in sync across these screens. It starts off.
+2. Enable it before matchmaking. The current lobby host arms the backend,
+   waits 30 seconds, then adds bots gradually over the following 15 seconds.
+   Existing minimum-player and lobby-wait rules still apply. The match cannot
+   start until the backend acknowledges the target and the native roster is
+   present; slow acknowledgements may extend the wait beyond 45 seconds.
+3. Watch the pregame roster with another party member. Retained bots must keep
+   their names, operators and customized weapons as more bots join. A joining
+   human replaces eligible bot space without changing the playlist capacity.
+4. In BR, turn Party Fill off. Bots must not occupy the vacant teammate places
+   reserved for that party. Other eligible squads may still be filled with bots.
+5. Disable the checkbox for ordinary matchmaking. The existing fill_lobby
+   command and operator-panel bot controls remain available when auto-fill is
+   off. Private, offline, System Link and co-op games keep their own bot setup.
+6. Confirm the entry that previously displayed PLAYLIST/BRSOLOSTIM_NAME2 reads
+   "BR Stimulus Solos". An available native translation takes precedence.
+
+These steps require owner playtesting; stock-Lua, linked-client and protocol
+fixtures are separate evidence and do not prove the rendered UI or gameplay.
+
+Current production release 20 (2026-10-11):
+- Installed main EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+  SHA256: 25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9
+- The existing INI and local profiles were preserved. com_optimized defaults to
+  1; automatic playlist bot fill defaults to off. No additional proxy is needed.
+- The single global checkbox uses the shipped checkbox controls on MP/BR Play
+  and full playlist screens. Mouse, keyboard and controller navigation are
+  covered by the stock-Lua component fixture. The display periodically follows
+  the actual dvar, including a rejected toggle or a console-side change.
+- Both native launch paths wait for the completed timed fill, authoritative
+  backend acknowledgement and actual roster. Host migration, round reset,
+  human replacement and disabling clear or refresh the correct bot state.
+- The production image now includes verified side-chat R5 nearest-area geometry
+  changes while preserving R4 bot decision policy, native movement commands,
+  individual operator/customized weapon records and all 150 current base names.
+- Fresh compilation of 108 CPP units passed with zero unresolved symbols and
+  690 Windows unwind cases. Exact-image checks passed 339 host, 143 navigation,
+  13 UI cases, 11 control groups and 10 roster groups, plus native body/ABI,
+  original entry-reference inventory, unlock and active updater checks.
+- Windows and Linux backend builds each passed 310 encrypted protocol groups,
+  with focused auto-fill, migration, daily and publisher/cache checks. The exact
+  Linux image is deployed and its live process hash verified on 162.243.115.160.
+- Full EXE release 20 is published. Signed checks passed for 20 older/unknown
+  hashes. The actual embedded Windows helper downloaded and verified this EXE
+  in prepare mode; the current-version check staged nothing. Apply/relaunch
+  and game UI/gameplay were not run for this release.
+- Final combined evidence: validation/20261011-playlist-auto-fill-readiness.json.
+  Earlier release 19 and private R5 notes above remain historical evidence.

@@ -358,6 +358,29 @@ if (snapshot / "src/DW_BotRoster.cpp").exists():
     private_overrides.append({"id": bot_integration["replacement"],
                               "content_sha256": bot_integration["source_sha256"],
                               "source": str(private_sources / "DW_BotRoster.cpp")})
+if (snapshot / "src/DW_PlaylistUI.cpp").exists():
+    spec = importlib.util.spec_from_file_location(
+        "prepare_private_playlist_ui", ROOT / "tools/prepare-playlist-ui.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    playlist_ui = module.prepare(snapshot, receipts / "playlist-ui-preparation.json",
+                                 private_sources / "DW_PlaylistUI.lua")
+    for generated in (snapshot / "src/DW_PlaylistUI_Source.h", snapshot / "src/DW_PlaylistUI.lua"):
+        copy_file(generated, generated)
+    private_overrides.append({"source": str(private_sources / "DW_PlaylistUI.lua"),
+                              "content_sha256": playlist_ui["source_sha256"],
+                              "preparation_receipt": str(receipts / "playlist-ui-preparation.json")})
+    clone_receipt = receipts / "lobby-native-clones.json"
+    subprocess.run([sys.executable, "-B", str(ROOT / "tools/prepare-lobby-native-clones.py"),
+                    "--snapshot", str(snapshot), "--output", str(clone_receipt)], check=True)
+    for changed in (snapshot / "source-units.json", units_path):
+        record = next(item for item in records if Path(item["snapshot"]) == changed)
+        record.setdefault("original_sha256", record["sha256"])
+        record["sha256"] = hashlib.sha256(changed.read_bytes()).hexdigest()
+    copy_file(snapshot / "src/DW_LobbyControls_Native.cpp", snapshot / "src/DW_LobbyControls_Native.cpp")
+    private_overrides.append({"source": str(ROOT / "tools/prepare-lobby-native-clones.py"),
+                              "generator_sha256": hashlib.sha256((ROOT / "tools/prepare-lobby-native-clones.py").read_bytes()).hexdigest(),
+                              "preparation_receipt": str(clone_receipt)})
 if args.match_events:
     spec = importlib.util.spec_from_file_location(
         "prepare_private_match_events", ROOT / "tools/prepare-match-event-integration.py")

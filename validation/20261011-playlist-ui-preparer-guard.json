@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "tool": "E:\\DW\\IW8\\tools\\prepare-playlist-ui.py",
+  "latest_guarded_preparer_sha256": "7f73104d79d9cb6dcbad5d4db144104cb1676b97ff3727890ff45e6133439f44",
+  "da60_build_used_preparer_sha256": "981b274e5e8874028d100349b0e6d31293cfbf128e9dd8406a944cdfb418528b",
+  "da60_image_sha256": "da60acaf5d46599c5fc020ae4f8bcbf2a856df1750c0dd944110ce4d3ab25258",
+  "guarded_revision_produced_da60": false,
+  "sealed_candidate_rejected": true,
+  "sealed_before_after_hashes": {
+    "E:\\DW\\IW8\\data\\playlist-auto-fill-r4-20261011\\compiler-source\\src\\DW_PlaylistUI_Source.h": "97b170b3c9ae727f984d6b06e016f701608def8e6dae33d9b9dee165ccb6ea7f",
+    "E:\\DW\\IW8\\data\\playlist-auto-fill-r4-20261011\\compiler-source\\src\\DW_PlaylistUI.lua": "e80bfc58d5fca774ec76728fe07d3295fd312505c25cb71c2b6fcec8dfebad5a",
+    "E:\\DW\\IW8\\data\\playlist-auto-fill-r4-20261011\\source-receipt.json": "7d0c0350d3e45f38d5d003a18b0b5c9fee4677116bd3d37a8a4d0b85befdc0b8",
+    "E:\\DW\\IW8\\data\\playlist-auto-fill-r4-20261011\\client-readiness.json": "b2c2fd13378816bee76244e1e9487a3d9c8b77d7258a413541dab503bae74a68"
+  },
+  "sealed_failure": "Traceback (most recent call last):\n  File \"E:\\DW\\IW8\\tools\\prepare-playlist-ui.py\", line 52, in <module>\n    print(json.dumps(prepare(args.snapshot, args.output, args.source), indent=2))\n                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"E:\\DW\\IW8\\tools\\prepare-playlist-ui.py\", line 16, in prepare\n    raise ValueError(\"Never regenerate a sealed completed client snapshot\")\nValueError: Never regenerate a sealed completed client snapshot\n",
+  "shared_lua_rejected_before_header_write": true,
+  "shared_failure": "Traceback (most recent call last):\n  File \"E:\\DW\\IW8\\tools\\prepare-playlist-ui.py\", line 52, in <module>\n    print(json.dumps(prepare(args.snapshot, args.output, args.source), indent=2))\n                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"E:\\DW\\IW8\\tools\\prepare-playlist-ui.py\", line 23, in prepare\n    raise ValueError(\"Playlist generated inputs must be independent private copies: \" + str(path))\nValueError: Playlist generated inputs must be independent private copies: E:\\DW\\IW8\\data\\playlist-ui-preparer-guard-20261011\\unsealed\\compiler-source\\src\\DW_PlaylistUI.lua\n",
+  "unsealed_emitted_header_sha256": "97b170b3c9ae727f984d6b06e016f701608def8e6dae33d9b9dee165ccb6ea7f",
+  "unsealed_emitted_lua_sha256": "e80bfc58d5fca774ec76728fe07d3295fd312505c25cb71c2b6fcec8dfebad5a",
+  "emitted_bytes_identical_to_original_build": true,
+  "recompile_performed": false,
+  "game_launched": false
+}

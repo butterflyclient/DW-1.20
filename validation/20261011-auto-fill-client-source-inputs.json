@@ -1,0 +1,13 @@
+{
+  "inputs": {
+    "integration/replay/DW_LobbyControls.cpp": "3b0de22f564c974c6c45971d849924b20db03b5647b2eb41fb991e496a8f59c1",
+    "integration/replay/DW_BotRoster.cpp": "fee95df16716543793c7afbb8d7787f11a3d7b50ba5c48b505078b240de40bb3",
+    "tools/lobby_controls_harness.cpp": "c9546207bd18367f83b1b929e26ae5acc04bf7ba53611d2e7a90247c4348b09f",
+    "tools/test-lobby-controls-harness.py": "6c6f45371c18cdcc85b693898388d76aa725426f2785c77d7ac8c0fd67844480",
+    "tools/test-lobby-controls.py": "10a133d2b112e6658be312dd025be764909d837e97d2622a85280af87a86559b",
+    "tools/test-native-bot-roster.py": "c14e6b73b65cc3e31a00ec9d9c8f01cf3e85cc1edecd58a43765313b7dffc6be",
+    "tools/bot_roster_growth_harness.cpp": "70fb0f5bab5b0d513bc2ef16cfd685f42d0c8b2fc2fd3234af3b3cffde355090",
+    "tools/test-bot-roster-growth-harness.py": "cea518beebb3e229fe9998229153349f76a19782d4ef41c4584c19c750949d9c"
+  },
+  "game_launched": false
+}

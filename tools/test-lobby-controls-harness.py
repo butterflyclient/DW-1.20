@@ -79,6 +79,14 @@ def main():
             "one-shot application",
             "new lobby reset",
             "invalid team counts before pool mutation",
+            "BOOL global toggle and playlist frame callback",
+            "30 second delay and 15 second gradual host-document fill",
+            "exact request-token acknowledgement and timer-skew clamps",
+            "native readiness side effects retained while final start body is gated",
+            "no early start before actual native slot presence and completion acknowledgement",
+            "human joins invalidate completion and native migration restarts the arm",
+            "BR152 capacity with authoritative No Fill eligible target",
+            "disable clears automatic native pool and restores normal launch",
         ],
         source_sha256={
             str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in (source, integration)

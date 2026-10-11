@@ -52,6 +52,33 @@ namespace HostScale
         NavReachQueue *queue;
     };
     struct NavTreeEntry { uint8_t *node; float distance, unused12; };
+    struct NavClosestAreaArray
+    {
+        void **items;
+        int32_t count, capacity;
+        uint32_t allocationFlags, unused20;
+    };
+    struct NavClosestCollector
+    {
+        const NavSearchSpec *spec;
+        float maximumDistance;
+        uint32_t unused12;
+        NavClosestAreaArray areas;
+        int32_t desiredCount;
+        uint8_t unused44[12];
+        uint8_t *resource;
+    };
+    struct NavClosestAreaView
+    {
+        uint8_t unused0[8];
+        uint8_t *children;
+        uint8_t unused16[16];
+        Vec3 center;
+        float radius;
+        uint32_t unused48, areaFlags, shapeFlags;
+        uint8_t unused60[8];
+        uint32_t obstacleFlags;
+    };
     struct NavTreeWalk
     {
         Vec3 localPoint, point;
@@ -78,6 +105,13 @@ namespace HostScale
     static_assert(offsetof(NavIsland, edgeCount) == 40 && sizeof(NavIsland) == 48);
     static_assert(sizeof(NavReachQueue) == 48 && sizeof(NavIncrementalSearch) == 24);
     static_assert(offsetof(NavTreeWalk, stack) == 40 && sizeof(NavTreeWalk) == 4136);
+    static_assert(sizeof(NavTreeEntry) == 16 && offsetof(NavTreeEntry, distance) == 8);
+    static_assert(sizeof(NavClosestAreaArray) == 24 && offsetof(NavClosestAreaArray, allocationFlags) == 16);
+    static_assert(offsetof(NavClosestCollector, maximumDistance) == 8);
+    static_assert(offsetof(NavClosestCollector, areas) == 16 && offsetof(NavClosestCollector, desiredCount) == 40);
+    static_assert(offsetof(NavClosestCollector, resource) == 56 && sizeof(NavClosestCollector) == 64);
+    static_assert(offsetof(NavClosestAreaView, center) == 32 && offsetof(NavClosestAreaView, radius) == 44);
+    static_assert(offsetof(NavClosestAreaView, shapeFlags) == 56 && sizeof(NavClosestAreaView) == 72);
     static_assert(offsetof(NavSearchStep, looseAreas) == 4160);
     static_assert(offsetof(NavSearchStep, subArea) == 4176 && sizeof(NavSearchStep) == 4192);
 }
@@ -95,5 +129,7 @@ extern "C"
     unsigned Bfx_ClosestReachableTreeStep(HostScale::NavTreeWalk *, int);
     unsigned Bfx_ClosestReachableSearchStep(HostScale::NavSearchStep *, int);
     void Bfx_IncrementalSearchToIsland(HostScale::NavIncrementalSearch *, int);
+    unsigned Bfx_ClosestAreaTreeStep(HostScale::NavTreeWalk *, int);
+    void Bfx_ClosestAreaCollect(HostScale::NavClosestCollector *, HostScale::NavClosestAreaView *, const HostScale::Vec3 *);
     void Scr_GetClosestReachablePointOnNavmesh(void *, uint32_t);
 }

@@ -24,10 +24,12 @@ REPLACEMENTS = (
     ("fn_bd90054f36a2d719", "Bfx_ClosestReachableSearchStep", "6aa50f1f8717d5fa4145e0b9b71bd1d17db396030a52d403cfbf1ccd6c4187f5"),
     ("fn_63be27bde9d7b86c", "Bfx_IncrementalSearchToIsland", "8032184c10b84de2db6b6432c701d7aca98b8105e5c28cceb518ab87314a8a47"),
     ("fn_52282ba9de7c27ad", "Bfx_GetClosestArea", "8bacbce48b3608d6cf3cf84e06507fc7ef2a1e626f6ed4ddfdfb4570f2e5bb78"),
+    ("fn_8c399c4d7d3e1836", "Bfx_ClosestAreaTreeStep", "0fead1cff23e729a1e7b5f1b07992ab541b538be4f36fcd1bc2fbf430d5a7d67"),
+    ("fn_4bdeea2a50a7d8d0", "Bfx_ClosestAreaCollect", "b9c0f3c1437372073ed51b2776f181dd9fd141d6d02c379d6bbe49d63ac80bbd"),
 )
 
 
-def prepare(snapshot):
+def prepare(snapshot, replace_owned=False):
     snapshot = Path(snapshot).resolve()
     if not snapshot.is_relative_to(ROOT / "data"):
         raise ValueError("Host-scaling integration requires a private DW compiler snapshot")
@@ -202,6 +204,14 @@ def prepare(snapshot):
     assert len(planner_calls) == 2 and planner_calls[1] == funcs["SVHS_NavFree"]
     funcs["SVHS_NavGetClosestAreas"] = planner_calls[0]
     globals_["SVHS_NavUnlimitedRadius"] = rip(planner, "movss", "xmm3,")
+    closest_tree_calls = direct_calls(decoded["Bfx_ClosestAreaTreeStep"])
+    assert len(closest_tree_calls) == 2 and closest_tree_calls[0] == closest_tree_calls[1]
+    funcs["SVHS_NavCollectClosest"] = closest_tree_calls[0]
+    assert funcs["SVHS_NavCollectClosest"] == base + by_id[REPLACEMENTS[-1][0]]["rva"]
+    closest_collector_calls = direct_calls(decoded["Bfx_ClosestAreaCollect"])
+    assert len(closest_collector_calls) == 3
+    funcs.update(zip(("SVHS_NavProjectClosest", "SVHS_NavInsertClosest", "SVHS_NavFarthestClosest"),
+                     closest_collector_calls))
     header = '''#pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -270,6 +280,10 @@ void *SVHS_NavMemmove(void *, const void *, size_t);
 void SVHS_NavFree(void *, void *);
 void SVHS_NavGetClosestAreas(void *, const void *, const void *, float, int, void *);
 extern const float SVHS_NavUnlimitedRadius;
+void SVHS_NavCollectClosest(void *, void *, const void *);
+void SVHS_NavProjectClosest(void *, const void *, const void *, const void *);
+void SVHS_NavInsertClosest(void *, const void *, float);
+float SVHS_NavFarthestClosest(void *);
 }
 '''
     (snapshot / "src/SV_HostScaleBindings.h").write_text(header, encoding="utf-8")
@@ -277,15 +291,23 @@ extern const float SVHS_NavUnlimitedRadius;
     spec = importlib.util.spec_from_file_location("private_host_scale_catalog", snapshot / "tools/source_catalog.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    associations = json.loads((snapshot / "source-units.json").read_bytes())
+    existing_imports = {row["symbol"]: row["symbol_id"] for row in associations.get("imports", [])}
+    existing_sources = {row["function_id"]: row for row in associations["units"]}
+    def bind_import(identity, name):
+        if replace_owned and name in existing_imports:
+            assert existing_imports[name] == identity, "Prior native alias differs: " + name
+        else:
+            module.bind_import(identity, name)
     bindings = []
     for name, address in funcs.items():
         row = by_address[address]
-        module.bind_import(row["id"], name)
+        bind_import(row["id"], name)
         bindings.append(dict(name=name, identity=row["id"], original_rva=row["rva"], kind="function"))
     for name, address in globals_.items():
         row = one([s for s in catalog["symbols"] if s["rva"] == address - base
                    and s.get("kind") == "data-address" and not s.get("quarantined")])
-        module.bind_import(row["id"], name)
+        bind_import(row["id"], name)
         bindings.append(dict(name=name, identity=row["id"], original_rva=row["rva"], kind="data"))
     units_path = snapshot / "source-workstation/units.json"
     units = json.loads(units_path.read_bytes())
@@ -306,8 +328,19 @@ extern const float SVHS_NavUnlimitedRadius;
     for item in proof:
         identity, symbol = item["identity"], item["symbol"]
         source = "src/" + symbol + ".cpp"
+        if replace_owned:
+            prior_units = [u for u in units["units"] if u["function_id"] == identity]
+            assert len(prior_units) <= 1
+            if prior_units:
+                prior = prior_units[0]
+                assert prior["kind"] == "cpp" and prior["source"] == source and prior["symbol"] == symbol
+                units["units"].remove(prior)
         assert not any(u["function_id"] == identity for u in units["units"])
-        module.bind(identity, Path(source), symbol)
+        if replace_owned and identity in existing_sources:
+            prior = existing_sources[identity]
+            assert prior["source"] == source and prior["symbol"] == symbol
+        else:
+            module.bind(identity, Path(source), symbol)
         digest = hashlib.sha256((snapshot / source).read_bytes()).hexdigest()
         units["units"].append(dict(function_id=identity, kind="cpp", source=source, symbol=symbol,
                                   sha256=digest, revision=digest, language="cpp"))

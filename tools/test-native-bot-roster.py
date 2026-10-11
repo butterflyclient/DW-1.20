@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--header-source", type=Path)
     args = parser.parse_args()
     report = json.loads((args.build / "build-report.json").read_bytes())
     executable = Path(report["executable"])
@@ -462,8 +463,11 @@ def main():
     candidates = list(Path("E:/DW/IW8/data").glob("compiler-snapshot-*/src/DW_BotBindings.h"))
     matching = [p for p in candidates if hashlib.sha256((p.parent / "DW_BotRoster.cpp").read_bytes()).hexdigest()
                 in {r["source_sha256"] for r in report["cpp"]}]
-    assert matching
-    header_text = matching[-1].read_text()
+    assert matching or args.header_source
+    selected_header = args.header_source or matching[-1]
+    assert hashlib.sha256((selected_header.parent / "DW_BotRoster.cpp").read_bytes()).hexdigest() in {
+        r["source_sha256"] for r in report["cpp"]}
+    header_text = selected_header.read_text()
     section = header_text.split("DWBotOperatorSkins[] = {", 1)[1].split("};", 1)[0]
     skin_pairs = [(int(a), int(b)) for a, b in re.findall(r"\{(\d+), (\d+)\}", section)]
     groups = base + symbols["DW_Bot_CustomizationGroups"]
@@ -485,6 +489,30 @@ def main():
     assert len({r[:36].split(b"\0")[0] for r in selected_records}) == 9
     assert all((struct.unpack_from("<I", r, 52)[0], struct.unpack_from("<I", r, 56)[0]) in skin_pairs for r in selected_records)
     checks.append("Roster rebuilding assigns distinct list names and exact paired operator skin IDs from native registered packages, clears stale tail entries and respects noncontiguous human slots")
+    run("DW_BotPolicy_CaptureRoster")
+    for i in range(200):
+        data = bytearray(88)
+        struct.pack_into("<H", data, 48, i)
+        struct.pack_into("<H", data, 78, 1000 + i)
+        data[84] = 1
+        write(pool + 88 * i, bytes(data))
+    run("DW_BotPolicy_BuildRoster", party, 152, 17)
+    assert all(bytes(vm.mem_read(pool + 88 * (i + 1), 88)) == record
+               for i, record in enumerate(selected_records))
+    prior = {i: bytes(vm.mem_read(pool + 88 * i, 88)) for i in range(1, 12)}
+    run("DW_BotPolicy_CaptureRoster")
+    run("DW_BotPolicy_BuildRoster", party, 152, 11)
+    assert all(bytes(vm.mem_read(pool + 88 * i, 88)) == record for i, record in prior.items())
+    assert not any(read(pool + 88 * i + 84, "<B") for i in range(12, 200))
+    write(member(party, 5) + 402, 5, "<B")
+    run("DW_BotPolicy_CaptureRoster")
+    run("DW_BotPolicy_BuildRoster", party, 152, 11)
+    assert not read(pool + 88 * 5 + 84, "<B")
+    assert bytes(vm.mem_read(pool + 88 * 12, 88)) == prior[5]
+    assert all(bytes(vm.mem_read(pool + 88 * i, 88)) == record
+               for i, record in prior.items() if i != 5)
+    write(member(party, 5) + 402, 0, "<B")
+    checks.append("Gradual roster growth preserves all 88 bytes and prior slots; reduction removes excess records and a new human moves only its collided bot")
     # Expand the actual synchronized native 36-byte bot wire data on a guest.
     for record in selected_records:
         write(arena + 0x7200, record[48:84])
@@ -509,6 +537,8 @@ def main():
                 schema=1,
                 passed=True,
                 game_sha256=report["sha256"],
+                checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                bindings_header_sha256=hashlib.sha256(selected_header.read_bytes()).hexdigest(),
                 checks=checks,
                 native_game_verified=False,
             ),

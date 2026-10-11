@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "host": "162.243.115.160",
+  "release": 20,
+  "executable_sha256": "25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9",
+  "bytes": 99771904,
+  "tested_older_hashes": 20,
+  "release_history_sha256": "af2349bb011bf355dcb98660db83ab78f64e4c4037ba49c01504b65be0205443",
+  "helper_sha256": "ea7898bb932096f610d2a5bed4c7474450cd120f28a6b59530095ce4d4311d5d",
+  "pinned_trust_sha256": "dd938c08c31afb1e783d191744505674c19ac4a3f967e46bbea3c676f05a507f",
+  "checks": [
+    "Signed fresh-nonce full-image replies point all tested older hashes directly to the latest release",
+    "Latest executable receives current status without another download/update loop",
+    "Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged",
+    "Actual embedded helper recognizes the current release and stages no replacement"
+  ],
+  "game_runs_performed": false,
+  "installed_game_modified": false,
+  "apply_or_relaunch_invoked": false,
+  "temporary_fixture_removed": true,
+  "legacy_delta_only_clients_require_bootstrap": true,
+  "publication": {
+    "published": true,
+    "format": "full-executable-v1",
+    "release": 20,
+    "latest": "25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9",
+    "bytes": 99771904,
+    "compiled_updater_verified": true,
+    "updater_verification_sha256": "ad7a5e20d46e0d53f197ffa4375814ae595295beb86aa7d66f388a09647b98a2"
+  },
+  "retained_history": {
+    "host": "162.243.115.160",
+    "pinned_ssh": true,
+    "legacy_catalog_sha256": "e1681effd6cbfb831e6d989ae32fd6ec5bcbd69fc9cb65f028764ff74a9e3329",
+    "full_catalog_sha256": "2351c32c04c152cb20090eb1101ba8f9dc84a0318c9822aa11a8cffb0d1d833b",
+    "retained_hashes": 20,
+    "remote_modified": false
+  }
+}

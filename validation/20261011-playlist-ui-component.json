@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "checks": [
+    "Original MP/BR list builders contain one native checkbox before all playlists, with mouse and controller navigation",
+    "Playlist and BR playlist grids retain their native scrolling layout with one checkbox in the gap above the entries",
+    "One shared boolean preference updates every surviving checkbox in both directions",
+    "Native policy rejection and console changes refresh all checkboxes through the actual periodic C++ probe",
+    "Later playlist insertion stays below the global toggle",
+    "Parent post-load navigation includes the toggle in both directions",
+    "Only the confirmed missing playlist title gets a fallback; native translations and unrelated keys remain authoritative",
+    "Repeated installation is idempotent and creates no sealed global/module fields"
+  ],
+  "source_sha256": "af9bf16e9aed277090c2096f512de6413653b2e36d9d8981fd5ae53492783eed",
+  "original_lua_inputs": {
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\utils\\lui.lua.2168.lua": "9e4c83b2ab99ee2d50bcbec67803f94034d911ca850e011730e0fb3847a88901",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\menubuilder.lua.2077.lua": "99d42e44b745a287948f7b7ec9b89f89cf3f6afb6eddc55705b50fd38ea1c830",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\widgets\\genericcheckbox.lua.2373.lua": "1adac5c3f0fa6b7102120cc19bfaf074b4a8354158a5f7136414a178377667e1",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\genericcheckboxbuttonwithlabel.lua.288.lua": "81bd4266b7dc92ca6048a1332e47f0f8fbd919807c6f454a372c1cfade20297f",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\mp\\mpplaymenubuttons.lua.561.lua": "2043b2bdce1b45d8637237b020c25567fcf399913feb6d86a48b08c4b079a6ae",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\mp\\brplaymenubuttons.lua.395.lua": "46b478d7e21d708a59f28e453fee161fd6ef035b986070295a7e3fcaf2fa0363",
+    "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\playlistlist.lua.742.lua": "9f15ef7f0fa77f014bd87ad66a848c08c474a2646c0625884bb03f957be6c32c"
+  },
+  "lua_version": "Lua 5.1",
+  "modeled_boundaries": "Native rendering/input/model APIs; original builder, checkbox and list Lua execute",
+  "game_runs_performed": false,
+  "rendered_ui_verified": false
+}

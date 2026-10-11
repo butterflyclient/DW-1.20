@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "image_sha256": "25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9",
+  "checks": [
+    "DW disabled early return",
+    "off-thread early return",
+    "absent VM unlocks safely",
+    "load error restores stack",
+    "pcall error restores stack and suppresses repeated error log",
+    "installer load error restores stack",
+    "installer pcall error restores stack",
+    "ineligible installer remains retryable",
+    "retry installs exact compiled Lua",
+    "one-second throttle",
+    "marker idempotence",
+    "VM reload at reused address reinstalls",
+    "replacement VM installs and reports success"
+  ],
+  "checker_sha256": "71609370ab8d7c32e3da7adc9494699638266e03a2769daa191e1bc47f7dc1f6",
+  "lua_source": "E:\\DW\\IW8\\data\\playlist-auto-fill-r5-ui-refresh-20261011\\compiler-source\\src\\DW_PlaylistUI.lua",
+  "lua_source_sha256": "af9bf16e9aed277090c2096f512de6413653b2e36d9d8981fd5ae53492783eed",
+  "embedded_lua_sha256": "af9bf16e9aed277090c2096f512de6413653b2e36d9d8981fd5ae53492783eed",
+  "evidence": "Actual linked frame instructions; modeled native Lua and locking boundaries",
+  "game_launched": false
+}

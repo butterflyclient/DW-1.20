@@ -41,6 +41,9 @@ def main():
     parser.add_argument("--base-exe", required=True, type=Path)
     parser.add_argument("--host", default="162.243.115.160")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--release-history", type=Path,
+                        default=ROOT / "data/executable-releases/releases.json",
+                        help="Older executable hashes retained locally or fetched from the pinned server")
     args = parser.parse_args()
     catalog = json.loads((args.publication / "full-image-catalog.json").read_bytes())
     image = args.publication / (catalog["latest"] + ".exe")
@@ -52,7 +55,10 @@ def main():
     modulus = int.from_bytes(trust[24 + exponent_size:24 + exponent_size + modulus_size], "big")
     public = rsa.RSAPublicNumbers(exponent, modulus).public_key()
     checks = []
-    old = {row["sha256"] for row in json.loads((ROOT / "data/executable-releases/releases.json").read_bytes())}
+    history_bytes = args.release_history.read_bytes()
+    history = json.loads(history_bytes)
+    old = {row["sha256"] for row in history}
+    assert all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in old)
     old.add(sha(args.base_exe))
     old.add("a" * 64)  # Full images do not require an inventory of prior builds.
 
@@ -117,6 +123,7 @@ def main():
     result = dict(passed=True, host=args.host, release=catalog["release"],
                   executable_sha256=catalog["latest"], bytes=catalog["target_size"],
                   tested_older_hashes=len(old - {catalog["latest"]}),
+                  release_history_sha256=hashlib.sha256(history_bytes).hexdigest(),
                   helper_sha256=helper_hash, pinned_trust_sha256=hashlib.sha256(trust).hexdigest(),
                   checks=checks, game_runs_performed=False, installed_game_modified=False,
                   apply_or_relaunch_invoked=False, temporary_fixture_removed=True,

@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "created_utc": "2026-10-11T07:23:02.321730+00:00",
+  "passed": true,
+  "deployed": true,
+  "job_id": "c0e4b73fe5b14292",
+  "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "sha256": "25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9",
+  "bytes": 99771904,
+  "fresh_cpp_units": 108,
+  "unresolved_symbols": 0,
+  "windows_unwind_cases": 690,
+  "host_instruction_cases": 339,
+  "navigation_instruction_cases": 143,
+  "native_ui_cases": 13,
+  "controls_groups": 11,
+  "roster_groups": 10,
+  "backend": {
+    "path": "validation/20261011-auto-fill-backend-readiness.json",
+    "sha256": "0e28185382365d6495bc531d312aabac5f855cf734d882de7e44466989c8813b"
+  },
+  "server": {
+    "pid": 300286,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261011-b8da13b51a28/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261011-b8da13b51a28/iw8-dw-server",
+    "sha256": "b8da13b51a286f5613de1bf1164ed1fea1d3f080ed243a6f12ce6770f70b4ce7",
+    "process_sha256": "b8da13b51a286f5613de1bf1164ed1fea1d3f080ed243a6f12ce6770f70b4ce7",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "public_release": 20,
+  "older_or_unknown_update_hashes_tested": 20,
+  "signed_full_executable_publication_verified": true,
+  "actual_embedded_helper_prepare_verified": true,
+  "updater_apply_or_relaunch_tested": false,
+  "owner_ini_preserved": true,
+  "owner_ini_sha256": "6147496a527726fe0ecd21015909346b9f8524fbf0e335a316f41c10d4d2ce80",
+  "owner_profiles_modified": false,
+  "side_chat_bot_revision": 5,
+  "active_production_updater_preserved": true,
+  "com_optimized_default": 1,
+  "playlist_auto_fill_default": false,
+  "bot_delay_seconds": 30,
+  "bot_ramp_seconds": 15,
+  "native_launch_waits_for_actual_roster_and_backend_ack": true,
+  "br_no_fill_reserved_team_slots": true,
+  "existing_playlist_capacity_preserved": true,
+  "localize_fallback": {
+    "PLAYLIST/BRSOLOSTIM_NAME2": "BR Stimulus Solos"
+  },
+  "existing_native_translations_preserved": true,
+  "game_runs_performed": false,
+  "native_runtime_verified": false,
+  "source_inputs": {
+    "integration/replay/DW_LobbyControls.cpp": "3b0de22f564c974c6c45971d849924b20db03b5647b2eb41fb991e496a8f59c1",
+    "integration/replay/DW_BotRoster.cpp": "fee95df16716543793c7afbb8d7787f11a3d7b50ba5c48b505078b240de40bb3",
+    "integration/replay/DW_PlaylistUI.cpp": "1cb6ac6ebc0002fd764da270037772c1322d58a5e857676aa61990dc52110e25",
+    "integration/replay/DW_PlaylistUI.lua": "af9bf16e9aed277090c2096f512de6413653b2e36d9d8981fd5ae53492783eed",
+    "integration/host-scale/Bfx_ClosestAreaTreeStep.cpp": "b40aa42f1a3fa6557a73e0178e7df324323f93a964a39dc4242882359930423a",
+    "integration/host-scale/Bfx_ClosestAreaCollect.cpp": "cbb83d8aead5f06d83509e4850b61a4acca7aa4c96e94e93148d1f919dfe69a9",
+    "integration/host-scale/sv_host_navigation.h": "dab9ba180933bb566beb54cffc5a09f66ed54e16b03b16f3ea962e2f2f566579",
+    "tools/lobby_controls_harness.cpp": "c9546207bd18367f83b1b929e26ae5acc04bf7ba53611d2e7a90247c4348b09f",
+    "tools/test-lobby-controls-harness.py": "6c6f45371c18cdcc85b693898388d76aa725426f2785c77d7ac8c0fd67844480",
+    "tools/test-lobby-controls.py": "10a133d2b112e6658be312dd025be764909d837e97d2622a85280af87a86559b",
+    "tools/test-native-bot-roster.py": "c14e6b73b65cc3e31a00ec9d9c8f01cf3e85cc1edecd58a43765313b7dffc6be",
+    "tools/bot_roster_growth_harness.cpp": "70fb0f5bab5b0d513bc2ef16cfd685f42d0c8b2fc2fd3234af3b3cffde355090",
+    "tools/test-bot-roster-growth-harness.py": "cea518beebb3e229fe9998229153349f76a19782d4ef41c4584c19c750949d9c",
+    "tools/prepare-playlist-ui.py": "7f73104d79d9cb6dcbad5d4db144104cb1676b97ff3727890ff45e6133439f44",
+    "tools/prepare-lobby-native-clones.py": "2e3eafc2ad1cc91ef9fed82fb619dfe79c44764e69078b6a260c45bc2f5bb0bb",
+    "tools/test-host-navigation.py": "c0cd8d742acce70dbf05f31d5fec34c39dab4db7b8e185a292dc4702015a0ebf",
+    "tools/test-playlist-ui-native.py": "71609370ab8d7c32e3da7adc9494699638266e03a2769daa191e1bc47f7dc1f6"
+  },
+  "private_checker_inputs": [
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-host-scale.py",
+      "sha256": "82ba9a403653c3849e62fd58d43ae4ef328947ded6461dadf46f1f4038a17a65"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-host-navigation.py",
+      "sha256": "c0cd8d742acce70dbf05f31d5fec34c39dab4db7b8e185a292dc4702015a0ebf"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-executable-update-integration.py",
+      "sha256": "aea2af202d9e27b2979a964c05885bfa4f92e62093685617eb6871421eb5b8d0"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-compiled-unlock-progression.py",
+      "sha256": "2b5987363284a01d781cd8deb2498d8079ac6914fe2d63dd35cc865760951ea0"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-lobby-controls.py",
+      "sha256": "10a133d2b112e6658be312dd025be764909d837e97d2622a85280af87a86559b"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-native-bot-roster.py",
+      "sha256": "c14e6b73b65cc3e31a00ec9d9c8f01cf3e85cc1edecd58a43765313b7dffc6be"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-20261011/test-lobby-native-clones.py",
+      "sha256": "4842c18bda8a8a7cde53209151c0e0b9462875cfef454115dd2e2821275bb2ac"
+    },
+    {
+      "path": "tools/test-playlist-ui-native.py",
+      "sha256": "71609370ab8d7c32e3da7adc9494699638266e03a2769daa191e1bc47f7dc1f6"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-host-scale.json",
+      "sha256": "620d56203ff5f6a574884f72fc2d691bf21c32c5b5a352735d97d82f17fafe9d"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-navigation.json",
+      "sha256": "0b1210b55c9147e1e25033ebec23ae374a0e49adfa659b799ee85314080366ee"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-lobby-controls.json",
+      "sha256": "eac1236c90f87f7515a315aabc60683ec3fa9c529be75e32cc27b32c08b563b6"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-native-bot-roster.json",
+      "sha256": "04d0865b88cd96bbd985cc007863d86db7a6cebe239f3a88183e098fdea396f4"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-playlist-ui.json",
+      "sha256": "f0c811df9931ef317a04f84d2ef2eb7508a0f3a2c893cfb9482abc0713885a1a"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-lobby-native-clones.json",
+      "sha256": "430436f92f8aacd21f23505fc140685233a0ef62ae1b71df63b0aecccb20ab12"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-unlock-progression.json",
+      "sha256": "643288ea1149cbc6d8b9641a48e4523ed97821018aaf6fecf4c8412444ddf694"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-executable-update.json",
+      "sha256": "ad7a5e20d46e0d53f197ffa4375814ae595295beb86aa7d66f388a09647b98a2"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/client-readiness.json",
+      "sha256": "8d950bbc60bb2911b81923c45545519594236234ac34a1921701b3865305134d"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/client-deployment.json",
+      "sha256": "a10a4b3dba0340fb1b5fa3b40bec8e3376e15c52876ff7dcf0d996c376b5e0fb"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/source-receipt.json",
+      "sha256": "d0d3f87806ea2cdcf58fff1d3a7d8bc89a3fc57e149d80bcb7074dff997c2ad6"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/linked-check-inputs.json",
+      "sha256": "d6d4b3ea4b4dfd422f1ed26af46a87bf63f86a16ec8ce4ee701d33dffaaf9c83"
+    },
+    {
+      "path": "data/playlist-auto-fill-r5-ui-refresh-20261011/native-entry-inventory.json",
+      "sha256": "a0dbb9ada4bd557123ad1a4a861a01360e0a6d4b93181bcfcb5c702ff380a0c8"
+    },
+    {
+      "path": "data/full-executable-publication-release20-20261011/public-verification.json",
+      "sha256": "22c97db20b7f996f9d7b1624349c3796e8b11e8ec7afd787c83526b9ae5b0679"
+    },
+    {
+      "path": "data/full-executable-publication-release20-20261011/droplet-publication.json",
+      "sha256": "bc537f7ead2b41debe27d9f5b7d1c84ccd00f7a909093aad3471a73c44a7b201"
+    },
+    {
+      "path": "data/full-executable-publication-release20-20261011/full-image-catalog.json",
+      "sha256": "2351c32c04c152cb20090eb1101ba8f9dc84a0318c9822aa11a8cffb0d1d833b"
+    },
+    {
+      "path": "data/full-executable-publication-release20-20261011/retained-release-history-source.json",
+      "sha256": "2e640583615c121e26f32a632efad216e565ca5148198ae5aa957f09053ce1fe"
+    },
+    {
+      "path": "data/full-executable-publication-release20-20261011/retained-release-history.json",
+      "sha256": "af2349bb011bf355dcb98660db83ab78f64e4c4037ba49c01504b65be0205443"
+    },
+    {
+      "path": "validation/20261011-playlist-auto-fill-public-update.json",
+      "sha256": "0d4f8644a933710dfe408c01f8e927c7882153a9a078f034d3f83a7e9a37e710"
+    }
+  ],
+  "scope": "Fresh builds, exact-image instruction/component proofs and live deployment; owner gameplay/UI test remains"
+}

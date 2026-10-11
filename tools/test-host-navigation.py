@@ -4,6 +4,7 @@ import bisect
 import hashlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 import random
 import struct
@@ -17,7 +18,7 @@ from unicorn.x86_const import *
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ("Scr_GetClosestReachablePointOnNavmesh", "Bfx_ClosestReachableTreeStep",
            "Bfx_ClosestReachableSearchStep", "Bfx_IncrementalSearchToIsland", "SV_HostScaleNavigation",
-           "Bfx_GetClosestArea")
+           "Bfx_GetClosestArea", "Bfx_ClosestAreaTreeStep", "Bfx_ClosestAreaCollect")
 
 
 class Runner:
@@ -233,6 +234,24 @@ class Machine:
             self.put(items,0 if selected is None else 0x560000000+selected*128,'<Q')
             self.put(output,items,'<Q');self.put(output+8,int(selected is not None),'<I')
             self.put(output+12,1,'<I');self.ret()
+        elif kind=="SVHS_NavCollectClosest":
+            point=struct.unpack('<fff',self.uc.mem_read(c,12))
+            center=struct.unpack('<fff',self.uc.mem_read(b+32,12))
+            distance=float32(math.sqrt(sum((x-y)**2 for x,y in zip(point,center))))
+            self.events.append(('candidate',b))
+            if distance<=self.get(a+8,'<f'):
+                self.closest_selected=b
+                self.put(a+8,distance,'<f')
+            self.ret()
+        elif kind=="SVHS_NavProjectClosest":
+            self.events.append(('project',b))
+            self.put(a,struct.pack('<fff',*self.projection));self.ret()
+        elif kind=="SVHS_NavInsertClosest":
+            distance=struct.unpack('<f',struct.pack('<I',self.uc.reg_read(UC_X86_REG_XMM2)&0xffffffff))[0]
+            self.events.append(('insert',self.get(b,'<Q'),struct.pack('<f',distance).hex()))
+            self.put(a+8,1,'<i');self.ret()
+        elif kind=="SVHS_NavFarthestClosest":
+            self.uc.reg_write(UC_X86_REG_XMM0,struct.unpack('<I',struct.pack('<f',self.farthest))[0]);self.ret()
         else:raise AssertionError(kind)
 
 
@@ -330,6 +349,75 @@ def closest(vm,distances,layer=0,present=True,tracked=True):
     return result,queries
 
 
+def float32(value):
+    return struct.unpack('<f',struct.pack('<f',value))[0]
+
+
+def nearest_tree(vm,seed,count=256,point=(150.,-220.,-8000.),steps=0x7fffffff,maximum=9.2233715e18,
+                 coordinates=None,offset=(0.,0.,0.),axes=(0,1,2),rotation=0.):
+    rng=random.Random(seed)
+    points=[tuple(float32(rng.uniform(-50000.,50000.)) for _ in range(2))+
+            (float32(rng.uniform(-1000.,1000.)),) for _ in range(count)]
+    # Include a known ground point beneath the request and ties at its distance.
+    if count>=3:points[:3]=[(point[0],point[1],20.),(point[0],point[1],20.),(point[0],point[1],40.)]
+    if coordinates is not None:
+        points=[tuple(float32(v) for v in row) for row in coordinates]
+        count=len(points)
+    def world(position):
+        cosine,sine=math.cos(rotation),math.sin(rotation)
+        return (float32(position[0]*cosine-position[1]*sine+offset[0]),
+                float32(position[0]*sine+position[1]*cosine+offset[1]),float32(position[2]+offset[2]))
+    world_point=world(point)
+    walk,collector,resource,areas,nodes=0x57000000,0x57002000,0x57003000,0x58000000,0x59000000
+    vm.put(walk,bytes(4136));vm.put(collector,bytes(64));vm.put(resource,bytes(32))
+    vm.put(collector+8,maximum,'<f');vm.put(collector+56,resource,'<Q');vm.put(resource+24,areas,'<Q')
+    vm.put(walk,struct.pack('<ffffff',*point,*world_point));vm.put(walk+32,collector,'<Q')
+    for index,center in enumerate(points):
+        vm.put(areas+index*96,bytes(96));vm.put(areas+index*96+32,struct.pack('<fff',*world(center)))
+    raw=bytearray()
+    def node(indices,depth):
+        at=len(raw);raw.extend(bytes(12))
+        if len(indices)==1:
+            struct.pack_into('<I',raw,at,0x80000000|indices[0]*96)
+            return at
+        axis=axes[depth%3]
+        indices=sorted(indices,key=lambda index:points[index][axis])
+        middle=len(indices)//2;left,right=indices[:middle],indices[middle:]
+        assert node(left,depth+1)==at+12
+        offset=node(right,depth+1)-at
+        struct.pack_into('<Iff',raw,at,(axis<<28)|offset,max(points[i][axis] for i in left),min(points[i][axis] for i in right))
+        return at
+    if count:
+        node(list(range(count)),0);vm.put(nodes,bytes(raw))
+        vm.put(walk+40,struct.pack('<QfI',nodes,0.,0));vm.put(walk+24,walk+56,'<Q')
+    else:vm.put(walk+24,walk+40,'<Q')
+    vm.closest_selected=0
+    calls=0
+    if not count:assert vm.call('Bfx_ClosestAreaTreeStep',walk,steps)==0
+    while vm.get(walk+24,'<Q')>walk+40:
+        vm.call('Bfx_ClosestAreaTreeStep',walk,steps);calls+=1
+        assert calls<=len(points)*4+1,'Tree failed to make progress'
+    return dict(selected=vm.closest_selected,maximum=vm.get(collector+8,'<f'),
+                events=vm.events,top=vm.get(walk+24,'<Q'),calls=calls)
+
+
+def nearest_collector(vm,case):
+    collector,area,point,spec=0x57002000,0x58000000,0x58001000,0x58002000
+    vm.put(collector,bytes(64));vm.put(area,bytes(96));vm.put(point,struct.pack('<fff',*case['point']))
+    vm.put(spec,struct.pack('<5I',case.get('obstacle_mode',0),case.get('obstacle_mask',7),case.get('area_mask',2),0,0))
+    vm.put(collector,spec,'<Q');vm.put(collector+8,case.get('maximum',100.),'<f')
+    vm.put(collector+40,1,'<i')
+    vm.put(area+32,struct.pack('<fff',*case.get('center',(0.,0.,0.))))
+    vm.put(area+44,case.get('radius',0.),'<f');vm.put(area+52,case.get('area_flags',2),'<I')
+    vm.put(area+56,case.get('shape_flags',0),'<I');vm.put(area+68,case.get('obstacle_flags',0),'<I')
+    vm.projection=case.get('projection',(0.,0.,0.));vm.farthest=case.get('farthest',12.)
+    # Tree fixtures model the collector boundary; this fixture executes the
+    # actual native/recompiled collector rather than that tree boundary model.
+    vm.hooks.pop(vm.entries['Bfx_ClosestAreaCollect'],None)
+    vm.call('Bfx_ClosestAreaCollect',collector,area,point)
+    return dict(events=vm.events,maximum=bytes(vm.uc.mem_read(collector+8,4)).hex(),count=vm.get(collector+24,'<i'))
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot",type=Path,required=True)
@@ -396,9 +484,56 @@ def main():
     for layer,present in ((32,True),(0xffffffff,True),(0,False)):
         assert closest(runner.machine(True,1),[1.],layer,present)==(0,[])
         total+=1
+    work=[]
+    for seed in range(12):
+        for point in ((150.,-220.,-8000.),(150.,-220.,40.)):
+            original=nearest_tree(runner.machine(False),seed,point=point)
+            off=nearest_tree(runner.machine(True,0),seed,point=point)
+            on=nearest_tree(runner.machine(True,1),seed,point=point)
+            assert off==original,('nearest tree baseline',seed,point)
+            assert (on['selected'],on['maximum'],on['top'])==(original['selected'],original['maximum'],original['top']),('nearest tree result',seed,point,on,original)
+            assert len(on['events'])<=len(original['events'])
+            work.append(dict(seed=seed,point=point,native_candidates=len(original['events']),optimized_candidates=len(on['events'])))
+            total+=1
+    for count,steps,maximum in ((0,1,1.),(1,1,9.2233715e18),(64,1,9.2233715e18),
+                                 (64,7,9.2233715e18),(512,0x7fffffff,1024.),(4096,0x7fffffff,9.2233715e18)):
+        original=nearest_tree(runner.machine(False),7,count=count,steps=steps,maximum=maximum)
+        on=nearest_tree(runner.machine(True,1),7,count=count,steps=steps,maximum=maximum)
+        assert (on['selected'],on['maximum'],on['top'])==(original['selected'],original['maximum'],original['top'])
+        work.append(dict(count=count,steps=steps,native_candidates=len(original['events']),optimized_candidates=len(on['events'])))
+        total+=1
+    for extra in (dict(offset=(100000.,-230000.,45000.),rotation=1.2345),
+                  dict(offset=(1.e8,1.e8,0.),point=(0.,0.,0.),axes=(1,0,2),
+                       coordinates=[(7.9,0.,1.),(3.9,7.9,0.),(-100.,8.,0.)])):
+        original=nearest_tree(runner.machine(False),11,**extra)
+        for mode in (0,1,2):
+            on=nearest_tree(runner.machine(True,mode),11,**extra)
+            assert (on['selected'],on['maximum'],on['top'])==(original['selected'],original['maximum'],original['top']),('World transform precision',extra,mode,on,original)
+        total+=1
+    for count in (0,0xffffffff):
+        vm=runner.machine(True,1);walk=0x57000000
+        vm.put(walk,bytes(4136));vm.put(walk+24,walk+40,'<Q')
+        assert vm.call('Bfx_ClosestAreaTreeStep',walk,count)==0
+        total+=1
+    for obstacle_mode in (0,1):
+        for obstacle_flags in (0,1,7):
+            for area_flags in (0,1,2):
+                for point in ((5.,6.,7.),(200.,0.,0.)):
+                    case=dict(obstacle_mode=obstacle_mode,obstacle_flags=obstacle_flags,
+                              shape_flags=0x20000000,area_flags=area_flags,point=point)
+                    original=nearest_collector(runner.machine(False),case)
+                    for mode in (0,1):
+                        assert nearest_collector(runner.machine(True,mode),case)==original,('nearest collector',case,mode)
+                    total+=1
+    for case in (dict(point=(float('nan'),0.,0.)),dict(point=(float('inf'),0.,0.)),
+                 dict(point=(100.,0.,0.),maximum=100.),dict(point=(1.,0.,0.),farthest=200.),
+                 dict(point=(1.,0.,0.),farthest=float('nan'))):
+        original=nearest_collector(runner.machine(False),case)
+        for mode in (0,1):assert nearest_collector(runner.machine(True,mode),case)==original,(case,mode)
+        total+=1
     receipt=dict(passed=True,cases=total,scope=__doc__,live_game_tested=False,
         linked_executable_sha256=runner.report["sha256"] if runner.report else None,
-        graph_budget=2048,spatial_budget=512,occupied_slots_fairness=150)
+        graph_budget=2048,spatial_budget=512,occupied_slots_fairness=150,nearest_tree_work=work)
     args.output.write_text(json.dumps(receipt,indent=2)+"\n")
     print("PASS",total,"navigation instruction cases",flush=True)
 

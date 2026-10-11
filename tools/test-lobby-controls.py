@@ -119,8 +119,14 @@ def main():
         "Dvar_BeginPermanentRegistration",
         "Dvar_EndPermanentRegistration",
         "Dvar_RegisterInt",
+        "Dvar_RegisterBool",
         "DW_BotPolicy_Register",
         "DW_BotPolicy_Prepare",
+        "DW_BotPolicy_ResetRoster",
+        "DW_BotPolicy_CaptureRoster",
+        "DW_PlaylistUI_Frame",
+        "DW_LobbyControls_StartMatchInternalNative",
+        "DW_LobbyControls_ReadyToLaunchNative",
         "Dvar_SetVariant",
         "Dvar_FindVarByName",
         "Com_Printf",
@@ -254,8 +260,16 @@ def main():
             assert values[:3] == [arena + 0x8000, settings["slots"], settings["requested"]]
             returned()
         elif name == "Com_sprintf":
-            assert string(values[2]) == ',"dw_bot_count":%u}'
-            body = (',"dw_bot_count":' + str(values[3]) + "}").encode()
+            format = string(values[2])
+            assert format in (',"dw_bot_count":%u}',
+                ',"dw_bot_count":%u,"dw_auto_fill_bots":%s,"dw_auto_fill_complete":%s,"dw_auto_fill_request":%u}')
+            text = ',"dw_bot_count":' + str(values[3])
+            if "dw_auto_fill_bots" in format:
+                rsp = machine.reg_read(UC_X86_REG_RSP)
+                text += ',"dw_auto_fill_bots":' + string(read(rsp + 40, "<Q"))
+                text += ',"dw_auto_fill_complete":' + string(read(rsp + 48, "<Q"))
+                text += ',"dw_auto_fill_request":' + str(read(rsp + 56, "<Q"))
+            body = (text + "}").encode()
             assert len(body) + 1 <= values[1]
             vm.mem_write(values[0], body + b"\0")
             returned(len(body))
@@ -280,12 +294,32 @@ def main():
                 "replay_dw_forceStart",
                 "replay_dw_fillBots",
                 "replay_dw_botCount",
-            ) and values[1:4] == [0, 0, 199 if key == "replay_dw_botCount" else 1]
+                "replay_dw_autoFillBotTarget",
+                "replay_dw_autoFillRevision",
+                "replay_dw_autoFillAck",
+            ) and values[1:4] == [0, 0, 0x7FFFFFFF if key in (
+                "replay_dw_autoFillRevision", "replay_dw_autoFillAck") else
+                199 if key in ("replay_dw_botCount", "replay_dw_autoFillBotTarget") else 1]
             assert key not in registered
             pointer = arena + 0x2000 + len(registered) * 0x100
             write(pointer + 29, 5, "<B")
             registered[key] = pointer
             returned(pointer)
+        elif name == "Dvar_RegisterBool":
+            key = string(values[0])
+            assert key in ("replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete")
+            assert values[1:3] == [0, 0] and key not in registered
+            pointer = arena + 0x2000 + len(registered) * 0x100
+            write(pointer + 29, 0, "<B")
+            registered[key] = pointer
+            returned(pointer)
+        elif name in ("DW_BotPolicy_ResetRoster", "DW_BotPolicy_CaptureRoster", "DW_PlaylistUI_Frame"):
+            returned()
+        elif name == "DW_LobbyControls_ReadyToLaunchNative":
+            returned(1)
+        elif name == "DW_LobbyControls_StartMatchInternalNative":
+            calls.append("native-start-body")
+            returned(7)
         elif name == "Dvar_SetVariant":
             machine.mem_write(values[0] + 40, bytes(machine.mem_read(values[1], 16)))
             returned()
@@ -537,6 +571,85 @@ def main():
     checks.append(
         "A command-owned bot request is cleared when native matchmaking changes lobby identity"
     )
+    # New public allocation: native pooled bots stay empty until the 30-second
+    # delay, then grow through authenticated host documents and exact token ACKs.
+    write(lobby_identity, 4, "<Q")
+    settings.update(initialized=False, bots=0, humans=2, slots=152, requested=0)
+    write(registered["replay_dw_botCount"] + 40, 0)
+    write(registered["replay_dw_autoFillBots"] + 40, 1)
+    lua["now"] = 100000
+    run("DW_LobbyControls_Frame")
+
+    def auto_document(count, complete=False, active=True):
+        body = b'{"test":1}\0'
+        vm.mem_write(arena + 0x6300, body)
+        command["submitted"] = None
+        run("func_140F77B40", arena + 0xC200, arena + 0xC900,
+            read(lobby_identity, "<Q"), base + symbols["gl_14C27E4B0"] + 131864,
+            arena + 0x6300, len(body), 123)
+        doc = command["submitted"]
+        assert doc["dw_bot_count"] == count
+        assert doc["dw_auto_fill_bots"] is active and doc["dw_auto_fill_complete"] is complete
+        assert type(doc["dw_auto_fill_request"]) is int and doc["dw_auto_fill_request"] > 0
+        return doc["dw_auto_fill_request"]
+
+    def auto_ack(token, count, complete=False, active=True):
+        write(registered["replay_dw_autoFillAck"] + 40, token)
+        write(registered["replay_dw_autoFillBotsActive"] + 40, int(active))
+        write(registered["replay_dw_autoFillBotsComplete"] + 40, int(complete))
+        write(registered["replay_dw_botCount"] + 40, count)
+        settings["requested"] = count
+        run("DW_LobbyControls_Frame")
+
+    token = auto_document(0)
+    write(registered["replay_dw_autoFillBotTarget"] + 40, 148)
+    auto_ack(token, 0)
+    assert settings["bots"] == 0
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 0
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    lua["now"] = 129999
+    run("DW_LobbyControls_Frame")
+    assert settings["bots"] == 0
+    lua["now"] = 135000
+    run("DW_LobbyControls_Frame")
+    token = auto_document(49)
+    # An unrelated publication revision must not falsely acknowledge a request.
+    write(registered["replay_dw_autoFillRevision"] + 40, 123)
+    run("DW_LobbyControls_Frame")
+    assert auto_document(49) == token
+    auto_ack(token, 48)  # server clock skew can clamp the accepted count
+    assert settings["bots"] == 48
+    token = auto_document(49)
+    auto_ack(token, 49)
+    assert settings["bots"] == 49
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    lua["now"] = 145000
+    run("DW_LobbyControls_Frame")
+    token = auto_document(148)
+    auto_ack(token, 148)
+    assert settings["bots"] == 148 and settings["slots"] == 152
+    run("DW_LobbyControls_Frame")
+    token = auto_document(148, complete=True)
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    auto_ack(token, 148, complete=True)
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 1
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    settings["bots"] = 147
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    settings["bots"] = 148
+    settings["humans"] = 3
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    run("DW_LobbyControls_Frame")
+    token = auto_document(0, active=False)
+    write(registered["replay_dw_autoFillBotsActive"] + 40, 0)
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    auto_ack(token, 0, active=False)
+    assert settings["bots"] == 0
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    checks.append(
+        "Linked 30/15-second automatic fill uses authenticated token ACKs, native pooled presence and authoritative No Fill target; both native launch entry points stay gated until completion and restore on disable"
+    )
     write(base + symbols["gl_151868880"], arena + 0x9000, "<Q")
     lua["now"] += 1000
     write(dvars["gl_14D386820"] + 40, 1)
@@ -603,6 +716,7 @@ def main():
                 schema=1,
                 passed=True,
                 game_sha256=report["sha256"],
+                checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 checks=checks,
                 native_game_verified=False,
             ),
