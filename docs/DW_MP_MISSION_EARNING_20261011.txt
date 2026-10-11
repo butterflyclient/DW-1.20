@@ -1,0 +1,110 @@
+REPLAY MP MISSION EARNING - 2026-10-11
+
+Implemented: 29 additional category-0 stages in replay_mp_mission_earning.h.
+Validation: 123 original ProcessParams cases; 1421 compiled helper checks.
+MSVC C++20 /W4 /WX passed. No backend launch, game launch or game interaction.
+The root task owns integration, combined backend builds and encrypted tests.
+
+INTEGRATION
+
+Include replay_mp_mission_earning.h in quest_services.cpp.
+Keep the existing public-lobby authorization, gamemode=2 and version=1 gates.
+At the existing complete seven-parameter kill packet path, consult
+replay_mp_mission_earning::killProgress(id, ReplayKillEvent).
+For field_end, read all three unsigned parameters and call
+replay_mp_mission_earning::fieldProgress(id, std::array<uint64_t,3>).
+For killstreak_end, read all seven unsigned parameters and call
+replay_mp_mission_earning::killstreakProgress(id, std::array<uint64_t,7>).
+Add field_end and killstreak_end to replayQuestEventMayEarn admission.
+Do not use received event names alone to authorize public MP progress.
+The helper returns the earned increment; the existing chain owns progression.
+
+SUPPORTED STAGES
+
+1502: one called killstreak, credited at its native terminal report.
+1516: player kills with native suppressor attachments 35,36,37,184.
+1545: Personal Radar terminal report, native streak ID 70009.
+1546: Shield Turret kills, 70012.
+1547,10009: UAV terminal reports, 70000.
+1548,10010: Care Package terminal reports, 70001.
+1549: Cluster Strike kills, 70013.
+1550: Precision Airstrike kills, 70003.
+1551: Wheelson kills, 70017.
+1552: Chopper Gunner kills, 70018.
+1566: field-upgrade deployment/use from the nine retained native end producers.
+1575: killstreak kills from the native end counter.
+1601: native MOD_MELEE=8 plus fast-melee weapon attachment 120.
+1602: native Hipfire modifier plus laser attachment 54..58.
+10005: the same laser/Hipfire requirement plus native SMG class mask 5.
+10011: Counter UAV terminal reports, 70002.
+10014,10017: Recon Drone marks, super 280010, native result count.
+10015,10016: Munitions Box resupplies, super 280019, native result count.
+10018: Dead Silence kills, super 280017, native result count.
+10019: Stopping Power kills, super 280012, native result count.
+10020: Trophy System projectile stops, super 280015, native result count.
+10021: Deployable Cover use, super 280009, one per native end report.
+10022: Tactical Insertion successful spawn, super 280018, result exactly 1.
+10023: EMP Drone hits, super 280011, native result count.
+10024: Weapon Drop weapons given, super 280021, native result count.
+
+EVIDENCE AND RESULT LAYOUT
+
+The original untouched Replay image SHA256 is
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+The research tool executes its original ProcessParams instructions at
+0x140F35980..0x140F385DC using the established CRT/asset boundaries.
+It does not reproduce packing with a backend encoder.
+
+Param3 in kill packets holds five complete 12-bit attachment ordinals plus
+one. Param5 low byte holds the recognized count; 255 means no_attachments.
+Tests cover changed order, the fifth slot, unknown references, the sentinel,
+wrong victim types, missing Hipfire, and a wrong SMG weapon class.
+The upper four bits cannot establish a complete sixth attachment ID.
+
+Original global_mp ScriptFile 6273 recordkillstreakendstats sends
+streakname,duration,endtime,kills,0,0,0. The original parser emits
+streakID,kills,0,0,0,duration,endtime. Never credit duration as kills.
+All 37 shipped streak table IDs were exercised; specialist perk grants
+70033..70036 are excluded from called-killstreak credit.
+The retained English Localize tail independently resolves Personal Radar,
+Shield Turret, Cluster Strike, Wheelson, Precision Airstrike and Chopper
+Gunner names, including checked prior-string aliases.
+
+field_end emits superID,result,operators. The result has distinct semantics:
+ammo box uses, recon marks, EMP hits, weapon gifts, trophy stops, Dead Silence
+kills, Stopping Power kills, successful insertion 0/1, and cover damage.
+Cover damage earns one deployment; it never earns that many cover uses.
+A destroyed insertion with result 0 does not earn successful insertion stage
+10022, but its deployment still satisfies generic field-upgrade use 1566.
+The helper rejects signed-wrap and oversized counters and unknown super IDs.
+
+Native producer payloads and their export-index hashes are retained privately
+under data/remaining-mp-missions-20261011/native-producers. Public proofs are
+validation/20261011-replay-mp-mission-events.json and
+validation/20261011-replay-mp-mission-helper.json. The former retains the
+original source-zone/export/payload/decompiled-source evidence chain.
+
+OPEN CRITERIA
+
+1561 Scavenger: native pickup scripts update scavengerPickedUp, but the
+candidate scavenger/resupply event names are rejected by ProcessParams.
+Do not turn generic pickup or local ammo mutation into this stage's credit.
+1564 Spotter: original hack parsing and perk 27 are verified. A successful
+equipment-hack caller and the meaning of its first argument remain open.
+1567 Kill Chain: killstreak_end has no loadout perk snapshot. Its aggregate
+kills cannot prove the player had Kill Chain at each kill.
+10002 Golem: native operator IDs alone do not prove the requested faction
+selection; the operator lookup/faction consumer needs retained evidence.
+10008 near enemy smoke: Insmoke marks the attacker, so it is insufficient.
+1599 unsuppressed barrel, 10042 named mini-reflex, and other named attachment
+variants need their exact original remapping/consumer semantics. Family
+collapse must not manufacture a more specific variant identity.
+1516 recognizes the four proven muzzle suppressor families. Integrated
+suppressed barrel variants need their own retained classification mapping.
+Rapid multi-kills, per-life counts and minute-window criteria require native
+timing/reset contracts. Arrival timestamps or adjacent reports do not prove
+rapid kills, a continuous life, or the requested in-game minute window.
+Vehicle-specific missions require the original vehicle/weapon identity
+mapping and actor/victim distinction; the generic vehicle bit is insufficient.
+Other generic field-upgrade alternatives remain open until their original
+end producers/results are recovered. No unknown branch receives credit.

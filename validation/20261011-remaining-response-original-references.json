@@ -1,0 +1,256 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-11T00:40:52.085973+00:00",
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "c1e1ac47cf76c19edd62b4ad378c8c5771915aac08a41d99ad5f3f026df2f413",
+  "literal_addresses": {},
+  "candidate_chunks": 9,
+  "address_evidence": {
+    "path": "data/remaining-response-bindings-20261011/targets.json",
+    "sha256": "e2706a7c5ff5608c1668552246726bccc23a075db26f262101b5cbc021d0b88e"
+  },
+  "unowned_nominations": [],
+  "decode_coverage": [
+    {
+      "start": 5384911760,
+      "end": 5384911955,
+      "decoded_bytes": 195,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5384912160,
+      "end": 5384912355,
+      "decoded_bytes": 195,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403521984,
+      "end": 5403522885,
+      "decoded_bytes": 901,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403524976,
+      "end": 5403525038,
+      "decoded_bytes": 62,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403525280,
+      "end": 5403525636,
+      "decoded_bytes": 356,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403525648,
+      "end": 5403526012,
+      "decoded_bytes": 364,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403526016,
+      "end": 5403526776,
+      "decoded_bytes": 760,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403562832,
+      "end": 5403562891,
+      "decoded_bytes": 59,
+      "complete": true,
+      "matched": true
+    },
+    {
+      "start": 5403708320,
+      "end": 5403708502,
+      "decoded_bytes": 182,
+      "complete": true,
+      "matched": true
+    }
+  ],
+  "matches": [
+    {
+      "owner": 5384911760,
+      "start": 5384911760,
+      "end": 5384911955,
+      "bytes_sha256": "c2ee45e9f6e1f198ddb7be61ff78b7a04b3848221595c7ffb80c438bd3e55ef1",
+      "hits": [
+        {
+          "address": 5384911868,
+          "mnemonic": "call",
+          "operands": "0x14212a960",
+          "target": 5403486560,
+          "literals": [
+            "0x14212a960"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5384912160,
+      "start": 5384912160,
+      "end": 5384912355,
+      "bytes_sha256": "35a18c69e52b12a96be9bc7c4a28bcff3179bfefdbc73fe1ca7074e43fe8abf2",
+      "hits": [
+        {
+          "address": 5384912268,
+          "mnemonic": "call",
+          "operands": "0x14212aa70",
+          "target": 5403486832,
+          "literals": [
+            "0x14212aa70"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403521984,
+      "start": 5403521984,
+      "end": 5403522885,
+      "bytes_sha256": "5884b41f6f5f3df147d5f268029534193e55f4efe39956c2ef41586d42e11524",
+      "hits": [
+        {
+          "address": 5403522187,
+          "mnemonic": "call",
+          "operands": "0x142131e60",
+          "target": 5403516512,
+          "literals": [
+            "0x142131e60"
+          ],
+          "direct_branch": true
+        },
+        {
+          "address": 5403522487,
+          "mnemonic": "call",
+          "operands": "0x142131e60",
+          "target": 5403516512,
+          "literals": [
+            "0x142131e60"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403524976,
+      "start": 5403524976,
+      "end": 5403525038,
+      "bytes_sha256": "004a6e912855e7803e416a9a966028bbb00d4959d43e4e6e7b841f101a428176",
+      "hits": [
+        {
+          "address": 5403525024,
+          "mnemonic": "call",
+          "operands": "0x142133e60",
+          "target": 5403524704,
+          "literals": [
+            "0x142133e60"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403525280,
+      "start": 5403525280,
+      "end": 5403525636,
+      "bytes_sha256": "ab25f3b88ebe903d1cf6f177a6dbba3d15e4eb37161951e40f4a1ffc3b537404",
+      "hits": [
+        {
+          "address": 5403525372,
+          "mnemonic": "call",
+          "operands": "0x142131e60",
+          "target": 5403516512,
+          "literals": [
+            "0x142131e60"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403525648,
+      "start": 5403525648,
+      "end": 5403526012,
+      "bytes_sha256": "e697c368cee1774c94a29862becb1bffaebb9a6a5728301451e04461eb7d521d",
+      "hits": [
+        {
+          "address": 5403525752,
+          "mnemonic": "call",
+          "operands": "0x142131e60",
+          "target": 5403516512,
+          "literals": [
+            "0x142131e60"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403526016,
+      "start": 5403526016,
+      "end": 5403526776,
+      "bytes_sha256": "9496f6ff67b5f901dcc6f69afcf57d985b47c88ffcf706774a8f6bb19ddf1213",
+      "hits": [
+        {
+          "address": 5403526133,
+          "mnemonic": "call",
+          "operands": "0x142131e60",
+          "target": 5403516512,
+          "literals": [
+            "0x142131e60"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403562832,
+      "start": 5403562832,
+      "end": 5403562891,
+      "bytes_sha256": "f521363b27d4cb648030ce9fe5c72a4f49021a0d2c7048027416da569d49d4f3",
+      "hits": [
+        {
+          "address": 5403562877,
+          "mnemonic": "call",
+          "operands": "0x14213d250",
+          "target": 5403562576,
+          "literals": [
+            "0x14213d250"
+          ],
+          "direct_branch": true
+        }
+      ]
+    },
+    {
+      "owner": 5403707760,
+      "start": 5403708320,
+      "end": 5403708502,
+      "bytes_sha256": "deed3757fdd28f1e600dae6e57eefacc0008cd6a9623d369fe46db489e1d0e90",
+      "hits": [
+        {
+          "address": 5403708360,
+          "mnemonic": "call",
+          "operands": "0x14215ffe0",
+          "target": 5403705312,
+          "literals": [
+            "0x14215ffe0"
+          ],
+          "direct_branch": true
+        }
+      ]
+    }
+  ],
+  "sqlite_names_used": false,
+  "linear_disassembly": true,
+  "branch_feasibility_checked": false,
+  "scope": "Potential references in linear-decoded original unwind chunks; one relocated pointer level. Unowned raw displacements remain nominations, with no guessed function owner. Missing matches do not establish absence: indirect control flow, incomplete decoding, embedded data, branch feasibility and live consumption remain unverified."
+}

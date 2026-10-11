@@ -22,6 +22,9 @@ namespace services
     {
         std::optional<unsigned> category;
         uint64_t activationCutoff = UINT64_MAX;
+        uint64_t nativeMatch = 0;
+        bool firstEnd = false;
+        bool firstPlacement = false;
     };
 
     // Original Replay parser fields and shipped mission criteria only.

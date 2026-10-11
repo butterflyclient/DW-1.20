@@ -1,0 +1,521 @@
+{
+  "original_contract_verified": true,
+  "implemented": false,
+  "stage_ids": [
+    1515,
+    1572,
+    1591,
+    10048
+  ],
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "native_mode": {
+    "script": "arm",
+    "id": 32,
+    "native_table_row": [
+      "arm",
+      "LUA_MENU_MP/ARMSRACE",
+      "LUA_MENU_MP/ARMSRACE_DESC",
+      "icon_mp_mode_war",
+      "1",
+      "1",
+      "Alternate",
+      "",
+      "LUA_MENU/WARGAME_DEATHMATCH",
+      "OBJECTIVES/BTM_HINT",
+      "OBJECTIVES/BTM_HINT",
+      "0",
+      "1",
+      "icon_mp_mode_war_hcore",
+      "icon_mp_mode_tdm_realism",
+      "1",
+      "1",
+      "1.1",
+      "0",
+      "1.5",
+      "40",
+      "0",
+      "icon_mp_mode_war",
+      "LUA_MENU_MP/CDL_DOM_NAME",
+      ""
+    ],
+    "localize": {
+      "path": "data/workstation-cache/fastfiles/rwt-localize-readback-0u3txpf6/mw19replay/eng_code_post_gfx/assets/localize/lua_menu_mp/armsrace.9604.json",
+      "sha256": "b1a7d8d7cb3e45342fe463f5ff621f13d58d6b8bb4b6d69a53e6fb47e0438d66",
+      "name": "lua_menu_mp/armsrace",
+      "value": "Ground War"
+    }
+  },
+  "native_weapon": {
+    "reference": "iw8_pi_decho_mp",
+    "id": 3,
+    "native_stat_row": [
+      "3",
+      "weapon_pistol",
+      "weapon_pistol",
+      "WEAPON/PI_DECHO",
+      "iw8_pi_decho",
+      "iw8_pi_decho_mp",
+      "icon_weapon_pi_decho",
+      "PERKS/PI_DECHO"
+    ],
+    "native_loot_row": [
+      "3",
+      "iw8_pi_decho",
+      "0",
+      "0",
+      "0",
+      "0",
+      "iw8_pi_decho_variant_0"
+    ],
+    "localize": {
+      "path": "data/workstation-cache/fastfiles/rwt-localize-readback-0u3txpf6/mw19replay/eng_code_post_gfx/assets/localize/weapon/pi_decho.21848.json",
+      "sha256": "ed184e9260902415adab381ad4ca6cd39ba71aec5f92224603908102f6256319",
+      "name": "weapon/pi_decho",
+      "value": ".50 GS"
+    }
+  },
+  "tables": [
+    {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\gametypestable.csv.325.csv",
+      "sha256": "cb1401b3c09c3b22c6ad8b8eccba0bd6a17a3a974847e6cadc8274fdf336062f"
+    },
+    {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\mp\\statstable.csv.613.csv",
+      "sha256": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2"
+    },
+    {
+      "path": "E:\\replay-compiler\\evidence\\workstation-stringtable-actsexport-fixed\\mw19replay\\code_post_gfx\\mw19replay\\code_post_gfx\\assets\\stringtable\\loot\\weapon_ids.csv.235.csv",
+      "sha256": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019"
+    }
+  ],
+  "mode_proof_sha256": "3215dd4b4c9161674f2d2ae5a255e186e3de23dc4aa931f878a0e330893d7bb4",
+  "owner_publication": {
+    "path": "data/unified_large_playlist_tu19.aggr",
+    "sha256": "45f492de7bea978ceabb07e4ccda183b7b872b5275ea52e21d154b1920ea615e",
+    "gametype": "arm",
+    "name": "PLAYLIST/GROUND_WAR_NAME",
+    "note": "Corroborating owner-retained catalog; native StringTable and Localize establish identity independently."
+  },
+  "cases": [
+    {
+      "name": "capture",
+      "input": "32,0,0,unknown_operator",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        32,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {},
+      "fixture_label": "groundwar_capture_32"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,32,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        137438953472,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_32_iw8_pi_decho_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_golf21_mp,0,0,unknown_operator,32,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486849,
+        0,
+        137438953472,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_32_iw8_pi_golf21_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,32,no_attachments,no_perks,32,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        137438953472,
+        0,
+        0,
+        36310271997772031,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_32_iw8_pi_decho_mp_32"
+    },
+    {
+      "name": "capture",
+      "input": "8,0,0,unknown_operator",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        8,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {},
+      "fixture_label": "groundwar_capture_8"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,8,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        34359738368,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_8_iw8_pi_decho_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_golf21_mp,0,0,unknown_operator,8,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486849,
+        0,
+        34359738368,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_8_iw8_pi_golf21_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,8,no_attachments,no_perks,32,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        34359738368,
+        0,
+        0,
+        36310271997772031,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_8_iw8_pi_decho_mp_32"
+    },
+    {
+      "name": "capture",
+      "input": "6,0,0,unknown_operator",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        6,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {},
+      "fixture_label": "groundwar_capture_6"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,6,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        25769803776,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_6_iw8_pi_decho_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_golf21_mp,0,0,unknown_operator,6,no_attachments,no_perks,1,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486849,
+        0,
+        25769803776,
+        0,
+        0,
+        36310271995740415,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_6_iw8_pi_golf21_mp_1"
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_pi_decho_mp,0,0,unknown_operator,6,no_attachments,no_perks,32,no_super,0,MOD_PISTOL_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486851,
+        0,
+        25769803776,
+        0,
+        0,
+        36310271997772031,
+        65536
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      },
+      "fixture_label": "groundwar_kill_6_iw8_pi_decho_mp_32"
+    }
+  ],
+  "case_count": 12,
+  "required_earning_rules": {
+    "1515_1572_1591": "capture; complete native two-param objective packet; gameType()==ReplayChallengeGameType::arm",
+    "10048": "kill; complete native seven-param packet; Player target; weapon()==3; gameType()==ReplayChallengeGameType::arm"
+  },
+  "scope": "Original instruction/native asset evidence. No source/helper modification, full build, deployment or game interaction. Root must integrate and validate earning."
+}

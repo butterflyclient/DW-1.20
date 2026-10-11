@@ -1,0 +1,165 @@
+REPLAY EMULATABLE MISSION SCOPE - 2026-10-11
+
+Exact source partition: 181 implemented stages; 51 excluded stages; 232 canonical rows.
+Implemented means a retained-contract earning predicate exists.
+Ground War source integration is present. Combined Windows/Linux
+builds and encrypted lifecycle tests belong to the root task and are pending here.
+This document makes no claim that excluded contracts are inherently impossible.
+
+BASELINE EVIDENCE
+
+The prior 127 stage baseline is bound to passed exact-binary Windows/Linux receipts.
+Their fixture SHA matches the retained CRLF bytes and commit c835073 fixture content.
+108 IDs appear explicitly in receipt checks; 19 more are covered by named Stim, pickup,
+timer and revive/Gulag fixture loops. Source stage selectors match this exact 127.
+A broad numeric scan is invalid: weapon ID 50017 collides with BR stage 50017.
+
+IMPLEMENTED IDS
+
+baseline127 (127):
+1501, 1503, 1505, 1506, 1507, 1508, 1509, 1510, 1512, 1513, 1514, 1517, 1553, 1555, 1556, 1557, 1558, 1559, 1560, 1562, 1563, 1565, 1569, 1570, 1571, 1573, 1576, 1577, 1586, 1588, 1589, 1590, 1592, 1594, 1595, 1596, 1597, 1598, 1600, 1624, 10000, 10001, 10003, 10004, 10006, 10007, 10012, 10013, 10038, 10039, 10040, 10044, 10046, 10047, 10130, 10131, 10134, 10135, 50000, 50001, 50003, 50005, 50006, 50007, 50008, 50009, 50010, 50011, 50012, 50014, 50015, 50016, 50019, 50021, 50022, 50023, 50024, 50026, 50027, 50028, 50029, 50030, 50031, 50033, 50034, 50035, 50036, 50037, 50038, 50040, 50041, 50042, 50043, 50044, 50047, 50048, 50049, 50050, 50051, 50052, 50054, 50055, 50057, 50058, 50059, 50061, 50062, 50063, 50064, 50065, 50066, 50068, 50069, 50070, 50071, 50072, 50073, 50075, 50076, 50077, 50078, 50079, 50082, 50083, 50084, 50085, 50086
+
+mp_actions29 (29):
+1502, 1516, 1545, 1546, 1547, 1548, 1549, 1550, 1551, 1552, 1566, 1575, 1601, 1602, 10005, 10009, 10010, 10011, 10014, 10015, 10016, 10017, 10018, 10019, 10020, 10021, 10022, 10023, 10024
+
+br12 (12):
+50017, 50018, 50025, 50032, 50039, 50046, 50053, 50060, 50067, 50074, 50081, 50088
+
+mp_completion9 (9):
+1500, 1504, 1511, 1568, 1574, 1578, 1579, 1587, 1593
+
+groundwar4 (4):
+1515, 1572, 1591, 10048
+
+EXCLUDED IDS AND ORIGINAL CONTRACT BLOCKERS
+
+stun (1554)
+Required: Count successful stuns of enemy players from the native stun producer and packed result.
+Missing: Parser acceptance does not establish which count/result distinguishes enemy stuns from other affected actors or duration.
+1554: Stun &&1 enemies with Stun Grenades
+
+scavenger (1561)
+Required: Original Scavenger enemy-ammo pickup achievement report.
+Missing: Retained scripts update scavengerPickedUp locally; candidate scavenger/resupply event names are rejected by original ProcessParams.
+1561: Using Scavenger, resupply ammo from enemies &&1 time(s)
+
+spotter (1564)
+Required: Successful enemy-equipment hack producer plus first-argument semantics and Spotter perk snapshot.
+Missing: Hack packing and native Spotter27 are verified; a successful equipment-hack caller and the meaning of Param0 remain unverified.
+1564: Using Spotter, hack &&1 pieces of Equipment
+
+kill_chain (1567)
+Required: Per-kill native Kill Chain eligibility attached to killstreak earnings.
+Missing: Terminal killstreak_end aggregates kills without a loadout perk snapshot; it cannot prove Kill Chain eligibility for those kills.
+1567: Using Kill Chain, get &&1 kills using Killstreaks
+
+unsuppressed_barrel (1599)
+Required: Exact original barrel remapping/classification and distinction from integral suppression.
+Missing: Generic attachment packing does not prove the requested unsuppressed barrel family.
+1599: Get &&1 Longshot Kills on an Assault Rifle using an unsuppressed Barrel Attachment
+
+golem_operator (10002)
+Required: Original operator/faction selection mapping for the specified faction slot.
+Missing: A numeric operator ID alone does not prove Golem is selected in the requested faction/slot.
+10002: Get &&1 kills using an SMG and while having Golem as your Coalition Operator
+
+enemy_near_smoke (10008)
+Required: Victim proximity to smoke at the kill.
+Missing: The retained Insmoke modifier describes the attacker; using it would credit a different condition.
+10008: Get &&1 kills using an SMG on enemies near smoke
+
+specific_optics (10042, 10043)
+Required: Exact native attachment remapping for Cronen LP945 Mini Reflex and Scout optic.
+Missing: Native family collapse/reticle class does not establish these requested named optic identities.
+10042: Get &&1 Point Blank Kills using a Cronen LP945 Mini Reflex
+10043: Get &&1 kills while ADS using a Scout Optic
+
+mp_vehicle_identity (10032, 10033, 10034, 10035, 10036, 10037)
+Required: Original IAV/APC/Little Bird actor/weapon and vehicle destruction identity contracts.
+Missing: A generic actor/victim vehicle bit does not prove the exact vehicle, turret, runover, or one distinct destruction.
+10032: Kill &&1 Players using the IAV Turrets
+10033: Run over &&1 Players with Little Bird
+10034: Get &&1 kills with the APC Turret
+10035: Run over or kill &&1 Players with Vehicles
+10036: Destroy &&1 vehicle(s) with APC
+10037: Destroy &&1 vehicle(s) with IAV
+
+br_vehicle_assists (50013, 50045, 50080)
+Required: Kill-or-assist reports with native attacker vehicle state.
+Missing: Original assist packet contains zero modifier words and no vehicle-state field. Counting only kills would omit qualifying assists.
+50013: Get &&1 kills or assists while in a vehicle
+50045: Get &&1 kills or assists while in a vehicle
+50080: Get &&1 kills or assists while in a vehicle
+
+br_occupied_vehicle_destruction (50020, 50056, 50087)
+Required: One unique enemy-occupied vehicle destruction report.
+Missing: Player-kill vehicle explosion/victim flags do not identify one destruction; counting occupants would overcount.
+50020: Destroy &&1 vehicle(s) carrying enemies
+50056: Destroy &&1 vehicle(s) carrying enemies
+50087: Destroy &&1 vehicle(s) carrying enemies
+
+co_op_operations (10057, 10058, 10059, 10060, 10061, 10062, 10063, 10064, 10065, 10066, 10067, 10068, 10069)
+Required: Eligible public co-op operation family, operation identity/completion, and stage-specific actors/actions.
+Missing: Retained agent/weapon/operator bits and accepted cp_complete do not establish public operation ownership or successful operation completion; survival/trial cannot substitute.
+10057: Get &&1 kills with Sniper Rifles or Marksman Rifles in any Co-Op Operation
+10058: Get &&1 Juggernaut Kills in any Co-Op Operation with Otter as your Coalition Operator
+10059: Execute &&1 Finishing Moves in any Operation
+10060: Destroy &&1  Tanks in any Co-Op Operation
+10061: Get &&1 kills with Precision Airstrike in any Co-Op Operation
+10062: Complete any &&1 Co-Op Operations
+10063: Get &&1 Assists on enemies in any Co-Op Operation
+10064: Get &&1 Kills using Thermite in any Co-Op Operation with Minotaur as your Spetsnaz Operator
+10065: Get &&1 Sentry Gun Kills in any Co-Op Operation
+10066: Get &&1 Pistol Kills in any Co-Op Operation
+10067: Get &&1 Throwing Knife Kills in any Co-Op Operation with Kreuger as your Chimera Operator
+10068: Get &&1 Kills using a Vehicle in any Co-Op Operation
+10069: Use Killstreaks / Munitions &&1 times in any Co-Op Operation
+
+rapid_kills (1580, 1582, 1584, 10041, 10132)
+Required: Original rapid grouping/consumption, exact event occurrence ordering and stage-specific weapon/optic qualifiers.
+Missing: Native script rearms a 4-second wait after kills, but emitted challenge packets carry no rapid counter; authoritative timestamps/order and consumption are unproven.
+1580: Get &&1 Double Kills (2 rapid kills)
+1582: Get &&1 Triple Kills (3 rapid kills)
+1584: Get &&1 Fury Kills (4 rapid kills)
+10041: Get &&1 Double Kills using a Hybrid Optic
+10132: Get &&1 Double kills using the FR 5.56
+
+repeated_per_life (1581, 1583, 1585, 10045, 10133)
+Required: Ordered owner kills/deaths and reset/consumption rules for each requested repeated streak.
+Missing: Native kill/death arrival ordering and repeat/reset semantics are not proven by packet acceptance.
+1581: Get 5 kills without dying &&1 time(s)
+1583: Get 10 kills without dying &&1 time(s)
+1585: Get 15 kills without dying &&1 time(s)
+10045: Get 2 kills in a single life with the 1911 &&1 time(s)
+10133: Get 3 Kills without dying &&1 times using the FN Scar 17
+
+headshots_single_life (10049)
+Required: Two ordered qualifying pistol headshots in one continuous native life.
+Missing: Authoritative kill/death ordering and reset at activation/start/death/end still need integration evidence. This target1 criterion does not require a time window.
+10049: Get 2 Headshot Kills with a pistol in a single life
+
+minute_windows (10136, 10137, 10138, 10139, 10140, 10141)
+Required: Exact native 60-second window origin/boundaries, timestamp precision and overlapping/repeated-window policy.
+Missing: The 60-second producer/window/counter and repeated consumption semantics remain unverified.
+10136: Get 7 kills in a minute &&1 times
+10137: Get 3 Headshot kills in a minute &&1 times
+10138: Get 4 Longshot kills in a minute &&1 times
+10139: Execute 2 Finishing Moves in a minute &&1 times
+10140: Get 3 Quickscope kills in a minute &&1 times
+10141: Get 3 Point Blank kills in a minute &&1 times
+
+BOUNDARIES
+
+Public ownership/version/gamemode, complete packet validation, exact target/reward,
+retry idempotency and stage activation/lifecycle remain the shared service gates.
+Generic public event names do not grant ownership. Generic vehicle or attacker-smoke
+flags do not replace distinct actor/victim/destruction criteria.
+Implemented stage 1566 accepts only nine proven native field-end types. Implemented stage 1516
+recognizes four proven muzzle suppressor families; integral suppressed barrel
+alternatives still need their own retained mapping. Terminal streak actions earn
+when the native terminal report arrives. This is not an instantaneous client hook.
+Unknown original semantics receive no approximate credit. Missing generic live UI
+callback evidence is a separate verification gate, not an impossibility finding.
+
+Exact232row details, source/proof SHA256 values, per-group evidence and all IDs:
+validation/20261011-emulatable-stage-inventory.json

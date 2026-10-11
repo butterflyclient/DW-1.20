@@ -1,0 +1,71 @@
+REPLAY REMAINING RESPONSE BINDINGS - 2026-10-11
+
+Result: zero additional routes enabled. The six requested response contracts
+remain unresolved. No generic success or ordinary metadata substitution was
+added. No backend build, deployment, game launch or game interaction occurred.
+
+Target: original game_dx12_ship_replay.exe, SHA256
+68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0.
+
+50/22 AND 58/22 LIVE CONTENT DOWNLOAD
+An original-image reference scan identifies nine complete unwind chunks, with
+no incomplete decoding or unowned displacement nominations. It validates all
+five direct references to initDownload at 0x142131E60. Each call supplies null
+as argument eight, the pointer stored into stream +64816. The calls are:
+  0x14213348B, 0x1421335B7: batch download branches.
+  0x1421340FC, 0x142134278: publisher download wrappers.
+  0x1421343F5: summary download wrapper.
+
+Five focused VM cases execute the unchanged original argument setup and capture
+the Windows x64 argument at callee RSP +0x40. The outgoing stack starts poisoned;
+all five cases explicitly initialize the extended response argument to zero.
+The summary case models one ordinary metadata reset call using its ABI boundary.
+The fixture does not execute initDownload, a response parser or task completion.
+
+The sole recovered direct caller of 50/22 writer 0x142133E60 is the page wrapper
+0x142133F70. The sole recovered direct caller of 58/22 writer 0x14213D250 is page
+wrapper 0x14213D350. These wrappers read the cached result pointer and do not
+allocate it. Thus this direct-call route does not identify an extended result
+constructor or deserialize vtable. The existing 28992-byte consumer layout
+evidence remains useful but does not establish its wire reader.
+
+193/9 AND 193/10 CATEGORY LISTS
+Original direct references confirm the prior engine wrappers at 0x140F73B90
+and 0x140F73D20 call SDK writers 0x14212A960 and 0x14212AA70. The prior eight
+constructor cases bind StructBuffer subobjects at response +8 and +432.
+This does not identify the externally supplied category response allocation
+or its deserialize slot. No recovered RTTI table matched the candidate class
+names examined in this pass.
+
+193/12 AND 193/24 LARGE UPLOAD COMPLETION
+The original pump 0x142160970 calls completion state machine 0x14215FFE0.
+The prior original-instruction cases prove task selection and preservation of
+the cached request and response. This pass examined original SDK-region +0xA0
+and +0xA8 references; displacement matches alone are not stream-owner evidence.
+No concrete completion response parser was bound. The known incompatible
+SHA1/HMAC and CRT aliases remain rejected.
+
+LIMITS
+The reference scan checks direct branches and one relocated pointer level in
+linear-decoded original unwind chunks. It does not establish that indirect
+paths, leaf functions or unexamined owners are absent. Missing RTTI and missing
+JSON literals cannot establish parser absence. SQLite was used only for private
+nominations; the retained caller/argument checks use original bytes.
+
+READINESS
+The new research fixture passed all five cases. Production services are
+unchanged; there is no response-handler recompile to claim ready. Integrating
+these routes still requires original constructor/vtable ownership and an
+executed response reader against the proposed wire bytes.
+
+Reproduce from repository root:
+  python tools/research-native-rip-literals.py --addresses
+    data/remaining-response-bindings-20261011/targets.json --output
+    validation/20261011-remaining-response-original-references.json
+  python tools/research-remaining-response-bindings.py
+
+Receipts:
+  validation/20261011-remaining-response-original-references.json
+  validation/20261011-remaining-response-live-ownership.json
+Private nominations and expanded field scan:
+  data/remaining-response-bindings-20261011/

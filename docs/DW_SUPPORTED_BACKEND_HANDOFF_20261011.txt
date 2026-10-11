@@ -1,0 +1,109 @@
+REPLAY DW SUPPORTED EMULATION HANDOFF
+2026-10-11 UTC
+
+Scope
+The owner permits exclusions where the original data or target contract does
+not support faithful emulation. This release implements the verified contracts
+and preserves explicit failures for unsupported operations. It does not claim
+a complete audit of every indirect SDK call or a new live-game callback test.
+
+Changes
+67 mission stages were added in the two integration batches: original kill
+modifiers/rarity/circle context, 29 MP attachment/streak/field stages, 12 BR
+placement/downed stages, nine qualified match completion/win stages, and four
+Ground War stages. There are now 181 earning stages among the 232 canonical
+definitions. All definitions remain available; 51 earning predicates are
+excluded with individual IDs, descriptions, missing contracts, and evidence.
+
+MP terminal streak reports contain kills in Param1, rather than duration.
+Field-upgrade results retain their original meanings: resupplies, marks, hits,
+projectiles, weapons given, successful insertion, or damage. Cover damage is
+not a use count. Attachment matching follows five native 12-bit slots and the
+recognized count, preserving no-attachment and unknown values.
+
+The original qualified outcomes are 1=win, 2=loss, 3=tie. Undefined/unclassified
+0 does not complete a mission. The native FFA win classification is qualified
+top three. Specific-mode wins use the exact original game-type identity.
+
+Stock start_match reports bind to their authenticated current public allocation
+without requiring custom dw_match_id fields. Tagged starts still require the
+explicit matching lobby. Stock terminal reports resolve only one eligible
+captured native start in that same allocation/session. Ambiguity earns nothing.
+The first qualified end and first placement are durable and cannot be replayed
+under a new request ID. A late placement bounded by the recorded end can arrive
+after the end report. Stage activation and closed-match cutoffs remain enforced.
+Legacy nine/ten-field match records remain valid; the optional placement record
+adds rank and event timestamp to the full validated layout.
+
+Ground War is bound by the original game-type table and independent Localize
+and playlist evidence to arm, mode 32. The .50 GS is original weapon ID 3.
+Ordinary Domination/TDM packets and another pistol do not substitute for it.
+
+Exclusions
+Six native routes remain explicitly unavailable: 50/22, 58/22, 193/9, 193/10,
+193/12, and 193/24. Their original response reader/ownership contracts remain
+unbound. They return error 108 with no results. Unknown valid REST operations
+return status 503 and LocalServiceUnavailable; the connection remains usable.
+No ordinary DTO is substituted for an unverified extended result layout.
+
+The 51 excluded mission predicates need original CP operation ownership,
+specific vehicle/destruction identity, occurrence/life/window consumption,
+Scavenger or successful hack semantics, Kill Chain or faction selection, or
+exact named attachment data. Missing native callback testing is a separate
+gate and is not used as an impossibility claim. The inventory also documents
+the partial native alternatives for generic field-upgrade and suppressor rules.
+
+Verification
+Final readiness and running-image evidence:
+  validation/20261011-emulation-finalization-readiness.json
+  data/emulation-finalization-r2-20261011/
+
+Each fresh Windows/Linux build compiles all 46 backend translation units from
+the same frozen C++ inputs. The release gate requires, on each exact image:
+  303 independent encrypted protocol/service checks.
+  241 encrypted mission earning checks covering all 181 implemented stages.
+  14 mission management checks.
+  14 explicit unsupported-operation checks.
+534 original Replay parser cases bind the earning packets. Isolated original
+instruction and compiled predicate proofs remain separate from live gameplay.
+No game is launched by these checks and no real player profile is reset.
+
+Deployment
+Primary droplet: 162.243.115.160.
+The staged Linux binary is activated using separate stop and start operations,
+then checked against its process image, health response, source/build receipts,
+all matching-image suites, and the unchanged installed-map policy. The previous
+release remains available for rollback. Actual activation is recorded in the
+readiness receipt. The owner authorized updates with connected players.
+
+Client
+No game recompile is required for this backend update. The current shipping file
+was changed by another session and is preserved:
+  E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
+  ed0548c1347be46415810c5608c4a7e0d58470cba39939a07dc2dda0b9a02051
+That file's compilation/runtime is not verified by this backend release. The
+earlier separately compiled release-17 client was
+bd792a7c871c683baf34409f1024fe5688e18d77f3ed3a34f8f1b109530bedfb.
+The full-EXE updater publication is not changed by this task. Unrelated compiler,
+host-scaling, bot-name, and diagnostic work is not included in these builds.
+
+Owner playtest
+Restart the game and sign in to the primary server. Use public matchmaking
+for mission earning; private allocation does not establish public eligibility.
+Select a mission with a newly supported stage, then complete its native action
+on Shipment: call a streak, get its kills, resupply ammunition, mark targets,
+use a field upgrade, or use the required suppressor/laser/fast-melee attachment.
+Finish one qualified MP match and verify the selected stage, reward and next
+stage update once. Reconnect and confirm the progress/items remain saved.
+For BR, verify a top-15 result or a downed-enemy stage and its persistence.
+Ground War stages require actual Ground War; ordinary Domination is insufficient.
+Check existing party/invite/chat/store/Battle Pass/progression flows as normal.
+The reset command's No/Escape paths should leave progression untouched.
+
+Further references
+  docs/DW_EMULATABLE_SCOPE_20261011.txt
+  validation/20261011-emulatable-stage-inventory.json
+  docs/DW_EMULATION_EXCLUSIONS_20261011.txt
+  docs/DW_KILL_MODIFIER_MISSIONS_20261011.txt
+  docs/DW_MP_MISSION_EARNING_20261011.txt
+  docs/DW_BR_CP_MISSIONS_20261011.txt

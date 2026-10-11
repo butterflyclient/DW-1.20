@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "tool_sha256": "5f84e407fed1e869df2abdf557885308f09aff50d99f33adf5a5663563419dee",
+  "header_sha256": "fe8de7d420e6149e8ab21332fb9104514b23153f1af7c78bfa7e105871313742",
+  "native_cases": 5,
+  "placement_boundary_checks": 231,
+  "scope": "Isolated MSVC helper assertions, no server build, game launch or interaction"
+}

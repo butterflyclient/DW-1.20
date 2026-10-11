@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-11T00:41:53.549491+00:00",
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "e3e727660f1fb8b3b8917d3566dfd96534bcfacd2c4f0802d149e96382f8d5ea",
+  "reference_receipt_sha256": "a8984a496fb29354e6511dbfafeb4b310540c874b9a234eea2103ecb1299b999",
+  "cases": [
+    {
+      "start": "0x142133457",
+      "call": "0x14213348b",
+      "original_bytes_sha256": "58257cd3062f40dcdd21cdd5adb7ec15f33543d099ff7c9ca4b82fa92cc8305e",
+      "executed_original_instructions": 13,
+      "extended_response_argument": 0,
+      "passed": true,
+      "modeled_calls": []
+    },
+    {
+      "start": "0x142133583",
+      "call": "0x1421335b7",
+      "original_bytes_sha256": "e808ee2f69091fde1334d8a413abdaa100fb1cbdc39955cc5fab4c546260ac98",
+      "executed_original_instructions": 13,
+      "extended_response_argument": 0,
+      "passed": true,
+      "modeled_calls": []
+    },
+    {
+      "start": "0x1421340a0",
+      "call": "0x1421340fc",
+      "original_bytes_sha256": "476497a4b08b33a0c46217c621ef8d00809f0d15645ca59278a4decb4204e8a0",
+      "executed_original_instructions": 22,
+      "extended_response_argument": 0,
+      "passed": true,
+      "modeled_calls": []
+    },
+    {
+      "start": "0x142134210",
+      "call": "0x142134278",
+      "original_bytes_sha256": "61d470a203e58880245068e097b1e23e35b0ac056a46a336ba27d0ae9a2508d2",
+      "executed_original_instructions": 26,
+      "extended_response_argument": 0,
+      "passed": true,
+      "modeled_calls": []
+    },
+    {
+      "start": "0x142134380",
+      "call": "0x1421343f5",
+      "original_bytes_sha256": "638d76c43361c4644e31e34a31cfda357f142d4c16126ccbf5776f4cc3a333ba",
+      "executed_original_instructions": 30,
+      "extended_response_argument": 0,
+      "passed": true,
+      "modeled_calls": [
+        "0x14213de70"
+      ]
+    }
+  ],
+  "supported_routes_added": 0,
+  "response_deserializer_verified": false,
+  "native_task_completion_verified": false,
+  "scope": "All five decoded direct/one-relocated-pointer initDownload references supply null extended metadata. Indirect references and serializer ownership remain unresolved."
+}

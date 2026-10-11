@@ -1,0 +1,247 @@
+{
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "7771d76cfd9c502de268f274941764e025f06bb2da5a0b7b997ae05cbc5240e7",
+  "evidence": [
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\common_base_mp\\10793.gsc",
+      "sha256": "0216b80630157832c757d5ea423e11e0578cd67e6978372297480e851192ad95"
+    },
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\common_base_mp\\10793.gscbin",
+      "sha256": "f5811637b282e755343b5ab02ae721c1aaf3cef0ac3bfd0cd7f79ea75f66c262"
+    },
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\common_base_mp\\10702.gsc",
+      "sha256": "06b1a1bd3506773d87cf251f23729b7fc6d162fa9342f1783d6594346ce7799a"
+    },
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\common_base_mp\\10702.gscbin",
+      "sha256": "4d325e7ef6162bb5594b0be6d07396b9c3d0b11d572f73b818027f9babe03842"
+    },
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\producer-recovery.json",
+      "sha256": "51f9ddcac8e90ce2e37f48bb9cf9215bf32f286ccc04ce0e9f9a24b010d85c55"
+    },
+    {
+      "path": "data\\remaining-match-outcomes-20261010\\challenge-parser-verified.json",
+      "sha256": "8b09e903d8e39b4e0a86f5e2bbd91baa54f6f5ca67473d284f1b0fc03c138139"
+    },
+    {
+      "path": "data\\remaining-match-completion-20261011\\disassembled\\iw8\\producer.gscasm",
+      "sha256": "3e1cbcb19969f56e058de4f545e0e98c077834ad250d29b587713be98c55066f"
+    },
+    {
+      "path": "src\\replay_match_completion.h",
+      "sha256": "a163d82b1b86bb263f90967755fb20202487cfeeb03d3631cf84275694c901c6"
+    }
+  ],
+  "original_outcome_constants": [
+    {
+      "offset": 1323,
+      "value": 3,
+      "bytes": "1603"
+    },
+    {
+      "offset": 1362,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1401,
+      "value": 2,
+      "bytes": "1602"
+    },
+    {
+      "offset": 1446,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1463,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1521,
+      "value": 3,
+      "bytes": "1603"
+    },
+    {
+      "offset": 1565,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1579,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1588,
+      "value": 2,
+      "bytes": "1602"
+    },
+    {
+      "offset": 1758,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1772,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1824,
+      "value": 1,
+      "bytes": "1601"
+    },
+    {
+      "offset": 1833,
+      "value": 2,
+      "bytes": "1602"
+    },
+    {
+      "offset": 1854,
+      "value": 1,
+      "bytes": "1601"
+    }
+  ],
+  "outcomes": {
+    "0": "unclassified, undefined result, unqualified FFA or postgame join",
+    "1": "team win or qualified FFA top three",
+    "2": "team loss or qualified FFA outside top three",
+    "3": "team tie"
+  },
+  "stages": [
+    1500,
+    1504,
+    1511,
+    1568,
+    1574,
+    1578,
+    1579,
+    1587,
+    1593
+  ],
+  "native_packets": [
+    {
+      "name": "end_match",
+      "input": "11,22,33,44,55",
+      "accepted": true,
+      "parameter_count": 5,
+      "values": [
+        11,
+        22,
+        33,
+        44,
+        55
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "end_match",
+      "input": "-1,-2,-3,-4,-5",
+      "accepted": true,
+      "parameter_count": 5,
+      "values": [
+        4294967295,
+        18446744073709551614,
+        18446744073709551613,
+        18446744073709551612,
+        18446744073709551611
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "end_match",
+      "input": "",
+      "accepted": true,
+      "parameter_count": 5,
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x142225f88"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "end_match",
+      "input": "6,1,0,2,3,wyatt_western|spetsnaz_eastern",
+      "accepted": true,
+      "parameter_count": 5,
+      "values": [
+        5629866908535750662,
+        1,
+        0,
+        2,
+        3
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      },
+      "fixture_label": "end_match_mode_operators"
+    }
+  ],
+  "native_widths": {
+    "Param0": "low32 game type; upper32 packed operator IDs",
+    "Param1": "full64 result; no truncation",
+    "Param2": "full64 unused producer zero",
+    "Param3": "full64 scavenger count",
+    "Param4": "full64 restock count"
+  },
+  "predicate_assertions": 280,
+  "lifecycle_requirements": [
+    "eligible public MP owner",
+    "previous native start and exact specificgameMode",
+    "first native end only",
+    "completion requires result 1,2,3; result0 is never completion",
+    "win requires exact result1",
+    "disconnect or synthetic end without native outcome earns nothing"
+  ],
+  "limits": [
+    "Packet assertions are isolated helper tests; root owns backend lifecycle integration.",
+    "Original producer branch meanings are bytecode-corroborated; no live callback execution claim.",
+    "RIP/parser acceptance alone does not establish completion."
+  ]
+}

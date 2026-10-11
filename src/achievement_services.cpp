@@ -1311,6 +1311,7 @@ namespace services
                 std::optional<unsigned> legacyCategory;
                 if (std::any_of(events.begin(), events.end(), [](const Json &event)
                     { return event.at("name") == "start_match" ||
+                        event.at("name") == "end_match" || event.at("name") == "match_placement" ||
                         event.at("values").contains("dw_match_id"); }))
                     allocation = matchmakingPublicMatchContext(root, id, false);
                 if (std::any_of(events.begin(), events.end(), [](const Json &event)

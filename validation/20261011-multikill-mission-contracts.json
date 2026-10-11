@@ -1,0 +1,364 @@
+{
+  "audit_passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "tool_sha256": "634c8fb82ec42ac075199ea19f9d5ff162a0845652f6a6f0d8a38a6ffeb338f4",
+  "scanned_zones": [
+    {
+      "zone": "global_mp",
+      "scanned_payloads": 82,
+      "defaults": 1,
+      "hits": [],
+      "index_sha256": "347d30bc04080d7c67a38990fa4be6d8c2e0b225d672328571a84efe1964053d"
+    },
+    {
+      "zone": "code_post_gfx",
+      "scanned_payloads": 2,
+      "defaults": 1,
+      "hits": [],
+      "index_sha256": "5f1fbab26f29ffb7ac94070990afb6389ed7d230dfa54bd6e8591ea1e1da72e2"
+    },
+    {
+      "zone": "mp_shipment",
+      "scanned_payloads": 158,
+      "defaults": 8,
+      "hits": [],
+      "index_sha256": "ed090930133eb96cea577a7b1834f912de55ba8db0cdbc88fafd35d1f562b77c"
+    },
+    {
+      "zone": "common_base_mp",
+      "scanned_payloads": 550,
+      "defaults": 4,
+      "hits": [
+        {
+          "zone": "common_base_mp",
+          "asset_index": 10695,
+          "name": "1843",
+          "sha256": "fafa6157e03c0f3900963014753a9294b923c8b13e518a5292aeb55ede2be4cc",
+          "retained_path": "data\\remaining-multikill-20261011\\common_base_mp-10695.gscbin"
+        },
+        {
+          "zone": "common_base_mp",
+          "asset_index": 10776,
+          "name": "2225",
+          "sha256": "a3cdc37cbfae4806652c82011ad51ec1433f72ad7100fd10502ddfb9809d85a1",
+          "retained_path": "data\\remaining-multikill-20261011\\common_base_mp-10776.gscbin"
+        },
+        {
+          "zone": "common_base_mp",
+          "asset_index": 10777,
+          "name": "2226",
+          "sha256": "6328aa932ffe0174621c947a1ef635b54dc357a1f4f06f36a6a791f395cbb718",
+          "retained_path": "data\\remaining-multikill-20261011\\common_base_mp-10777.gscbin"
+        },
+        {
+          "zone": "common_base_mp",
+          "asset_index": 10782,
+          "name": "2231",
+          "sha256": "265b8ee426525ea3276b97b8040e542bf7f0436b4e989400bb90583b6ecfc8b0",
+          "retained_path": "data\\remaining-multikill-20261011\\common_base_mp-10782.gscbin"
+        }
+      ],
+      "index_sha256": "c6e06b5e1e47375192647af5001b8a891e58bbf733e8c1da07ffd245597c741f"
+    }
+  ],
+  "rapid_native_rule": "rearm a 4.0-second wait after every kill; emit buffered script notification; no rapid counter field in native seven-parameter kill packet",
+  "rapid_listeners": "airstrike kill count, chopper gunner dialog, gunship dialog; none reports achievement events",
+  "death_packet": {
+    "name": "death",
+    "input": "",
+    "accepted": true,
+    "parameter_count": 0,
+    "values": [],
+    "external_boundaries": [
+      "0x1412b0820",
+      "0x142036a10",
+      "0x1421ccf60",
+      "0x1421f6cc0"
+    ],
+    "asset_sha256": {}
+  },
+  "descriptions": [
+    {
+      "id": 1580,
+      "target": 10,
+      "category": 0,
+      "name": "ch_quest008_stage001",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_1",
+      "next_name": "ch_quest008_stage002",
+      "xp_reward": 2000,
+      "item_reward": 80116,
+      "next_id": 1581,
+      "localized_description": "Get ^5&&1^7 Double Kills (2 rapid kills)",
+      "plain_description": "Get &&1 Double Kills (2 rapid kills)",
+      "localize_root_offset": 801064
+    },
+    {
+      "id": 1581,
+      "target": 10,
+      "category": 0,
+      "name": "ch_quest008_stage002",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_2",
+      "next_name": "ch_quest008_stage003",
+      "xp_reward": 5000,
+      "item_reward": 170155,
+      "next_id": 1582,
+      "localized_description": "Get 5 kills without dying ^5&&1^7 time(s)",
+      "plain_description": "Get 5 kills without dying &&1 time(s)",
+      "localize_root_offset": 801112
+    },
+    {
+      "id": 1582,
+      "target": 1,
+      "category": 0,
+      "name": "ch_quest008_stage003",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_3",
+      "next_name": "ch_quest008_stage004",
+      "xp_reward": 7500,
+      "item_reward": 330098,
+      "next_id": 1583,
+      "localized_description": "Get ^5&&1^7 Triple Kills (3 rapid kills)",
+      "plain_description": "Get &&1 Triple Kills (3 rapid kills)",
+      "localize_root_offset": 801160
+    },
+    {
+      "id": 1583,
+      "target": 5,
+      "category": 0,
+      "name": "ch_quest008_stage004",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_4",
+      "next_name": "ch_quest008_stage005",
+      "xp_reward": 7500,
+      "item_reward": 170131,
+      "next_id": 1584,
+      "localized_description": "Get ^510^7 kills without dying ^5&&1^7 time(s)",
+      "plain_description": "Get 10 kills without dying &&1 time(s)",
+      "localize_root_offset": 801208
+    },
+    {
+      "id": 1584,
+      "target": 3,
+      "category": 0,
+      "name": "ch_quest008_stage005",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_5",
+      "next_name": "ch_quest008_stage006",
+      "xp_reward": 9000,
+      "item_reward": 80115,
+      "next_id": 1585,
+      "localized_description": "Get ^5&&1^7 Fury Kills (4 rapid kills)",
+      "plain_description": "Get &&1 Fury Kills (4 rapid kills)",
+      "localize_root_offset": 801303
+    },
+    {
+      "id": 1585,
+      "target": 1,
+      "category": 0,
+      "name": "ch_quest008_stage006",
+      "description": "CHALLENGE/LAUNCH_QUEST_8_STEP_6",
+      "next_name": "ch_quest008_stage007",
+      "xp_reward": 9000,
+      "item_reward": 180302,
+      "next_id": 1586,
+      "localized_description": "Get 15 kills without dying ^5&&1^7 time(s)",
+      "plain_description": "Get 15 kills without dying &&1 time(s)",
+      "localize_root_offset": 801351
+    },
+    {
+      "id": 10041,
+      "target": 15,
+      "category": 0,
+      "name": "ch_quest031_stage004",
+      "description": "CHALLENGE/SEASON_2_QUEST_2_STEP_4",
+      "next_name": "ch_quest031_stage005",
+      "xp_reward": 5000,
+      "item_reward": 170139,
+      "next_id": 10042,
+      "localized_description": "Get ^5&&1^7 Double Kills using a Hybrid Optic",
+      "plain_description": "Get &&1 Double Kills using a Hybrid Optic",
+      "localize_root_offset": 820905
+    },
+    {
+      "id": 10045,
+      "target": 10,
+      "category": 0,
+      "name": "ch_quest032_stage002",
+      "description": "CHALLENGE/SEASON_2_QUEST_3_STEP_2",
+      "next_name": "ch_quest032_stage003",
+      "xp_reward": 3000,
+      "item_reward": 180027,
+      "next_id": 10046,
+      "localized_description": "Get ^52^7 kills in a single life with the 1911 ^5&&1^7 time(s)",
+      "plain_description": "Get 2 kills in a single life with the 1911 &&1 time(s)",
+      "localize_root_offset": 821485
+    },
+    {
+      "id": 10049,
+      "target": 1,
+      "category": 0,
+      "name": "ch_quest032_stage006",
+      "description": "CHALLENGE/SEASON_2_QUEST_3_STEP_6",
+      "next_name": "",
+      "xp_reward": 7500,
+      "item_reward": 403,
+      "next_id": 0,
+      "localized_description": "Get ^52^7 Headshot Kills with a pistol in a single life",
+      "plain_description": "Get 2 Headshot Kills with a pistol in a single life",
+      "localize_root_offset": 821901
+    },
+    {
+      "id": 10132,
+      "target": 5,
+      "category": 0,
+      "name": "ch_quest075_stage003",
+      "description": "CHALLENGE/SEASON_3_QUEST_1_STEP_3",
+      "next_name": "ch_quest075_stage004",
+      "xp_reward": 3000,
+      "item_reward": 330144,
+      "next_id": 10133,
+      "localized_description": "Get ^5&&1^7 Double kills using the FR 5.56",
+      "plain_description": "Get &&1 Double kills using the FR 5.56",
+      "localize_root_offset": 823988
+    },
+    {
+      "id": 10133,
+      "target": 5,
+      "category": 0,
+      "name": "ch_quest075_stage004",
+      "description": "CHALLENGE/SEASON_3_QUEST_1_STEP_4",
+      "next_name": "ch_quest075_stage005",
+      "xp_reward": 3500,
+      "item_reward": 180250,
+      "next_id": 10134,
+      "localized_description": "Get ^53^7 Kills without dying ^5&&1^7 times using the FN Scar 17",
+      "plain_description": "Get 3 Kills without dying &&1 times using the FN Scar 17",
+      "localize_root_offset": 824081
+    },
+    {
+      "id": 10136,
+      "target": 3,
+      "category": 0,
+      "name": "ch_quest076_stage001",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_1",
+      "next_name": "ch_quest076_stage002",
+      "xp_reward": 2000,
+      "item_reward": 180256,
+      "next_id": 10137,
+      "localized_description": "Get ^57^7 kills in a minute ^5&&1^7 times",
+      "plain_description": "Get 7 kills in a minute &&1 times",
+      "localize_root_offset": 824633
+    },
+    {
+      "id": 10137,
+      "target": 5,
+      "category": 0,
+      "name": "ch_quest076_stage002",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_2",
+      "next_name": "ch_quest076_stage003",
+      "xp_reward": 2500,
+      "item_reward": 170502,
+      "next_id": 10138,
+      "localized_description": "Get ^53^7 Headshot kills in a minute ^5&&1^7 times",
+      "plain_description": "Get 3 Headshot kills in a minute &&1 times",
+      "localize_root_offset": 824725
+    },
+    {
+      "id": 10138,
+      "target": 3,
+      "category": 0,
+      "name": "ch_quest076_stage003",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_3",
+      "next_name": "ch_quest076_stage004",
+      "xp_reward": 3000,
+      "item_reward": 180241,
+      "next_id": 10139,
+      "localized_description": "Get ^54^7 Longshot kills in a minute ^5&&1^7 times",
+      "plain_description": "Get 4 Longshot kills in a minute &&1 times",
+      "localize_root_offset": 824826
+    },
+    {
+      "id": 10139,
+      "target": 2,
+      "category": 0,
+      "name": "ch_quest076_stage004",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_4",
+      "next_name": "ch_quest076_stage005",
+      "xp_reward": 3500,
+      "item_reward": 180096,
+      "next_id": 10140,
+      "localized_description": "Execute ^52^7 Finishing Moves in a minute ^5&&1^7 times",
+      "plain_description": "Execute 2 Finishing Moves in a minute &&1 times",
+      "localize_root_offset": 824927
+    },
+    {
+      "id": 10140,
+      "target": 3,
+      "category": 0,
+      "name": "ch_quest076_stage005",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_5",
+      "next_name": "ch_quest076_stage006",
+      "xp_reward": 4000,
+      "item_reward": 180258,
+      "next_id": 10141,
+      "localized_description": "Get ^53^7 Quickscope kills in a minute ^5&&1^7 times",
+      "plain_description": "Get 3 Quickscope kills in a minute &&1 times",
+      "localize_root_offset": 825033
+    },
+    {
+      "id": 10141,
+      "target": 3,
+      "category": 0,
+      "name": "ch_quest076_stage006",
+      "description": "CHALLENGE/SEASON_3_QUEST_2_STEP_6",
+      "next_name": "",
+      "xp_reward": 5000,
+      "item_reward": 121,
+      "next_id": 0,
+      "localized_description": "Get ^53^7 Point Blank kills in a minute ^5&&1^7 times",
+      "plain_description": "Get 3 Point Blank kills in a minute &&1 times",
+      "localize_root_offset": 825136
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1580,
+        1582,
+        1584,
+        10041,
+        10132
+      ],
+      "required": "native rapid ordinal/chain identity, or ordered subsecond occurrence times and original count/overlap policy",
+      "missing": "uploaded rapid chain/ordinal; native 4-second timer state; exact threshold boundary from serialized kill timestamps"
+    },
+    {
+      "ids": [
+        1581,
+        1583,
+        1585,
+        10045,
+        10133
+      ],
+      "required": "ordered per-owner kills/deaths, life start/reset and repeated threshold consumption policy",
+      "missing": "life sequence/generation and original repeated threshold consumption policy; death is present as a zero-param marker; native SDK submission/processing order, life generation and original repeated threshold policy remain unbound; parameter count alone does not select the four named aggregate caches"
+    },
+    {
+      "ids": [
+        10049
+      ],
+      "required": "ordered per-owner kills/deaths, reset at stage activation/start/death/end",
+      "missing": "authoritative ordering/replay identity still requires root integration proof; native SDK submission/processing and event occurrence order remain unproven; death is not inferred to use an aggregate cache; this non-repeating target1 criterion needs no time window"
+    },
+    {
+      "ids": [
+        10136,
+        10137,
+        10138,
+        10139,
+        10140,
+        10141
+      ],
+      "required": "exact occurrence timestamp precision, native 60-second window origin/boundaries and repeated/overlap policy",
+      "missing": "60-second producer/window/counter; precise window and consumption semantics"
+    }
+  ],
+  "scope": "Hash-verified original ScriptFile payload scan plus disassembled rapid producer and native parser death packet. No backend earning, game execution or absence claim beyond scanned zones."
+}

@@ -1,0 +1,4554 @@
+{
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "original_parser_range": [
+    "0x140F35980",
+    "0x140F385DC"
+  ],
+  "base_parser_tool_sha256": "cdded3c509428ef1654c7580657efdb9456ebe0e16cf0acac419453829357d26",
+  "sources": [
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10650.gsc",
+      "sha256": "9962a2382fab5e6265e560a22d65c9c4ee5cbf36c12989c7fdae1f661a1cb230"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10666.gsc",
+      "sha256": "3f03a09bb3bd721a1983d95116691e5fa6f3fc272d0e1afc6e1dc6f67399e071"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10693.gsc",
+      "sha256": "38a986d5ab91ceff058d1993d14552a76505479152d1832386ad3689f517deaa"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10716.gsc",
+      "sha256": "7fe9d7c528ade74f52839d1c28224306c000d6fc1129f6bb800e1cb65c9b6707"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10726.gsc",
+      "sha256": "b93a5d8659a475d7fd17e7fca947c6829c1b473e76ee2e7fe7892e24749a613c"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10774.gsc",
+      "sha256": "9302f96fc1e50cd140ff766d4d7ac8293050e850addc4b4402586932c71a1515"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10776.gsc",
+      "sha256": "d8de4209877b9f80c459ff59c2e849b57c1730ef3fe531d1734d32b613f83485"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10777.gsc",
+      "sha256": "10ec182ea231ad090fc491da9969373894cac9eb7219bcb347b0a4b5ba66a481"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10778.gsc",
+      "sha256": "d85d7c10151db8ef7bed6ba187cd16cbf2b847af4cfaa62ca2d94bc4c850acd9"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10779.gsc",
+      "sha256": "2b72045ad7d959da0a381edc7408cb50b6d57ec7b36b67bb7ea4c816cfa0d583"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10781.gsc",
+      "sha256": "552539bcccccfeb5234594d4c0340c84271f7bd915bf3ee49e4d544db981c241"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10783.gsc",
+      "sha256": "22b6301422cebcf78f6a2536248d674e07c61dcc0749f8c2d729c66f88cc9c0d"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10785.gsc",
+      "sha256": "909060f99a694f8e331abc8288ebd14892ee3c4f3f96abce51ee5df22fa179b6"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10788.gsc",
+      "sha256": "83f971c92b96ad3c670a347bf425b571799eb6fabdcba36b3c73f2322de1beb6"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10789.gsc",
+      "sha256": "a87f4858a1befeb40ef8266a0c13543e2ef327033fd1e285f1a08840c1135488"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10790.gsc",
+      "sha256": "b6ba977be79767185a8ed5ee3ddd57f1fa52e1c0fe113da826d979dfb74628bf"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10793.gsc",
+      "sha256": "0216b80630157832c757d5ea423e11e0578cd67e6978372297480e851192ad95"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10830.gsc",
+      "sha256": "30997905510ef510501208ca4d423098a4a3e75e74bb7f285939ea386c28cc7c"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10845.gsc",
+      "sha256": "8941017fd2e2de4ad001efae10d23b74d1dd7eb4a81b5d86c768af120191dffb"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10846.gsc",
+      "sha256": "53ebd7374cac77d40feb3a185a305d22f228b4d88baaedfea21bb43547b6230c"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10847.gsc",
+      "sha256": "f85f5d4ba407e5b693a7226bd27fda0b848d9293b5f2bce76467eb2f3567db34"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10850.gsc",
+      "sha256": "bc7a004c99a42cbbfa94f3cac3ca73d5635af7f302b277b35b4b820de2af342e"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10857.gsc",
+      "sha256": "4d8ebee1d2ab68f7cb191983e99cd6089a3f84d2c4d2e89e7fc9699bd6a8451c"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10862.gsc",
+      "sha256": "cb974fc837d0d00d1afdeeffe57dd03a9433c539872a190714ecda7820c89e87"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10864.gsc",
+      "sha256": "d0e1b7cec653bcf5b1c00e6bcb8ca305086a1364cb79b79e38bed4b8e09ad8ad"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10871.gsc",
+      "sha256": "1dd3b4334cb28985c743968f88914bd3be7e5977a7c1173f82fdc8f5884ae559"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10872.gsc",
+      "sha256": "e0302d50d51d6eaad3b418ea7a46688d61c3bc8f2ef40d19f8a69d7c53d06996"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10874.gsc",
+      "sha256": "477109e55070d6955ee348703ae7c0942c27610f124ae57a6cd998b0d636a1cb"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10881.gsc",
+      "sha256": "97759e0a804934174a956043db32f29f6c536b4010d96d6787df5ce1c05e65e7"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10885.gsc",
+      "sha256": "28b11411134f5e8c61c092215e4a4113248e3ef7a2622f779f405ea0959d1696"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10886.gsc",
+      "sha256": "64e8515e1ea27d15e237b9d795e67fe68f448bdeca119d47381f30407dcef56e"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10888.gsc",
+      "sha256": "23ac29239d4d4564387229b9f050e10b099e806e98ecc8d519c8debd374e1e2e"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10904.gsc",
+      "sha256": "7f95e96e6d36b40fd6557611bd3aa66d35627ab71468c133d6cc8a2b80d00fd7"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10905.gsc",
+      "sha256": "fbbebfe7d0566e20b2ba92dcd769fdf01bfce8f55f8f315ebaaf79762ae67f25"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/common_base_mp-10964.gsc",
+      "sha256": "05942866c957852559e344f5a7abee01ab3fe8647fa7af71763b6944fbe1090e"
+    },
+    {
+      "path": "data/remaining-mp-missions-20261011/native-producers/global_mp-6273.gsc",
+      "sha256": "0094036da5376df8ed6944daf20982beeb65fcbae21ec2f6de2bb53cc178df38"
+    },
+    {
+      "path": "data/remaining-contracts-20261009/native-challenge-scripts/scripts/cp_mp/challenges.gsc",
+      "sha256": "7911cb883f9e752e611bbe8e26296a30c33be503e7bc03bbb5385c33c38a7b2b"
+    },
+    {
+      "path": "data/remaining-match-outcomes-20261010/common_base_mp/10845.gsc",
+      "sha256": "8941017fd2e2de4ad001efae10d23b74d1dd7eb4a81b5d86c768af120191dffb"
+    },
+    {
+      "path": "data/remaining-match-outcomes-20261010/common_base_mp/10847.gsc",
+      "sha256": "f85f5d4ba407e5b693a7226bd27fda0b848d9293b5f2bce76467eb2f3567db34"
+    }
+  ],
+  "producer_chain": {
+    "receipt_sha256": "6ea99d1039000d3bea78adc9e89a2639113df8c2cde0665d8747bbfac4192f71",
+    "zones": [
+      {
+        "zone": "global_mp",
+        "source": {
+          "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\global_mp.ff",
+          "bytes": 11796616,
+          "sha256": "3c61a8064b840111ecbf0de7b0d5665473ad6122fe8d7c0289c9ca9465d77a82",
+          "header": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4047,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0
+          },
+          "header_signature_marker": "IWffs100",
+          "signature_block_sha256": "c6930a8f278ecc1de60537a9e9dd6c8b3b9110a54651cee719db08b661827d59",
+          "observed_replay_revisions": [
+            4045,
+            4047,
+            4053,
+            4065,
+            4083,
+            4085,
+            4087
+          ],
+          "revision_seen_in_observed_set": true,
+          "patches": [
+            {
+              "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\global_mp.fp",
+              "extension": ".fp",
+              "header_version": 6,
+              "previous": {
+                "magic": "IWffa100",
+                "header_version": 11,
+                "xfile_version": 4047,
+                "compression": 1,
+                "encryption": 0,
+                "transient_type": 0
+              },
+              "target": {
+                "magic": "IWffa100",
+                "header_version": 11,
+                "xfile_version": 4087,
+                "compression": 1,
+                "encryption": 0,
+                "transient_type": 0
+              },
+              "previous_layout": {
+                "decoded_size": 66408855,
+                "block_sizes": [
+                  0,
+                  1106192,
+                  65440,
+                  0,
+                  0,
+                  823352,
+                  332139,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "target_layout": {
+                "decoded_size": 34489690,
+                "block_sizes": [
+                  0,
+                  1048848,
+                  85408,
+                  0,
+                  0,
+                  1214976,
+                  346088,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "previous_header_hex": "49576666613130300b000000cf0f0000010000000000b4006b656970000000009751f50300000000f362000000000000000000000000000010e1100000000000a0ff0000000000000000000000000000000000000000000038900c00000000006b110500000000000000000000000000000000000000000000000000000000000000000000000000",
+              "target_header_hex": "49576666613130300b000000f70f00000100000000008b00d3add56e204400005a450e02000000000a9300000000000000000000000000001001100000000000a04d01000000000000000000000000000000000000000000008a120000000000e8470500000000000000000000000000000000000000000000000000000000000000000000000000",
+              "header_only_zero_payload": false,
+              "bytes": 3244360,
+              "sha256": "0ded1fbe67cf53875b1773dd26426e93a9539770c1992582162542ab63704544"
+            }
+          ],
+          "final_header": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4087,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0,
+            "decoded_size": 34489690,
+            "block_sizes": [
+              0,
+              1048848,
+              85408,
+              0,
+              0,
+              1214976,
+              346088,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "header_only_zero_payload_chain": false
+        },
+        "body_sha256": "d109c079265f2cfc5603558fbf7570ced178b2b2da5adb970242c73d339affb3",
+        "export_index_path": "data/remaining-match-outcomes-20261010/cache/global_mp/3fe1451c4c8e22d50c022e6775fea216f3bf968ea9d50bb38ba3e3fca00d9fc8/native-exports/e97c6cf41636bccd1a41b290ba8f2814819e951d53fd77c46662e3b084bbb6c0/asset-payload-index.json",
+        "export_index_sha256": "347d30bc04080d7c67a38990fa4be6d8c2e0b225d672328571a84efe1964053d"
+      },
+      {
+        "zone": "common_base_mp",
+        "source": {
+          "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\common_base_mp.ff",
+          "bytes": 133218440,
+          "sha256": "fe29f14466473a59eb8b454ef60d31ae794d594911c54ab18883f09a6fa6c58c",
+          "header": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4065,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0
+          },
+          "header_signature_marker": "IWffs100",
+          "signature_block_sha256": "3535e902b6c081b5e27034ac76503241340b14e41c4cf5c7048f6cf9ec03e851",
+          "observed_replay_revisions": [
+            4045,
+            4047,
+            4053,
+            4065,
+            4083,
+            4085,
+            4087
+          ],
+          "revision_seen_in_observed_set": true,
+          "patches": [
+            {
+              "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\common_base_mp.fp",
+              "extension": ".fp",
+              "header_version": 6,
+              "previous": {
+                "magic": "IWffa100",
+                "header_version": 11,
+                "xfile_version": 4065,
+                "compression": 1,
+                "encryption": 0,
+                "transient_type": 0
+              },
+              "target": {
+                "magic": "IWffa100",
+                "header_version": 11,
+                "xfile_version": 4087,
+                "compression": 1,
+                "encryption": 0,
+                "transient_type": 0
+              },
+              "previous_layout": {
+                "decoded_size": 236633766,
+                "block_sizes": [
+                  0,
+                  2560272,
+                  1888192,
+                  0,
+                  0,
+                  186139334,
+                  2489427,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "target_layout": {
+                "decoded_size": 267508476,
+                "block_sizes": [
+                  0,
+                  2022672,
+                  2023584,
+                  0,
+                  0,
+                  205444414,
+                  2682710,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "previous_header_hex": "49576666613130300b000000e10f00000100000000c0f007f15a69f4608f5907a6be1a0e00000000f65700000000000000000000000000001011270000000000c0cf1c000000000000000000000000000000000000000000c642180b0000000053fc2500000000000000000000000000000000000000000000000000000000000000000000000000",
+              "target_header_hex": "49576666613130300b000000f70f00000100000000409808cf57d22a90b82b09fcdaf10f000000001d61000000000000000000000000000010dd1e0000000000a0e01e0000000000000000000000000000000000000000003ed53e0c0000000056ef2800000000000000000000000000000000000000000000000000000000000000000000000000",
+              "header_only_zero_payload": false,
+              "bytes": 25133384,
+              "sha256": "e1e3bf3d04aa8a2218f3014390d2f95681332abdb394f80e1fa3c2b379b209b7"
+            }
+          ],
+          "final_header": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4087,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0,
+            "decoded_size": 267508476,
+            "block_sizes": [
+              0,
+              2022672,
+              2023584,
+              0,
+              0,
+              205444414,
+              2682710,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "header_only_zero_payload_chain": false
+        },
+        "body_sha256": "faab9d06c7710fdc7b03e5b6c29b2c8149717ae7bd9250f251a72ff7efde6745",
+        "export_index_path": "data/remaining-match-outcomes-20261010/cache/common_base_mp/4a4ce5d1a1b34579a86013cb5322336d1c4b1cc01bc919e0a9c972d722a4bb6c/native-exports/38f2861201c918e97312e33765c117d33cfe337f2b0ebeb9fde6811adedf8756/asset-payload-index.json",
+        "export_index_sha256": "c6e06b5e1e47375192647af5001b8a891e58bbf733e8c1da07ffd245597c741f"
+      }
+    ],
+    "scripts": [
+      {
+        "zone": "global_mp",
+        "asset_index": 6273,
+        "name": "2246",
+        "hits": [
+          "onKillStreakEnd"
+        ],
+        "payload_sha256": "0d0b2fa8350da8887f7971c9acfb42fdd782e3d750798aa0e59353776d1d0ec4"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10650,
+        "name": "16",
+        "hits": [
+          "scavengerPickedUp"
+        ],
+        "payload_sha256": "3ccf098de0ca413a63dee6af7616284cc37947cf60b91f8811b82c70f8fe8a64"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10666,
+        "name": "1809",
+        "hits": [
+          "trophySystemHits",
+          "deadSilenceKills",
+          "stoppingPowerKills",
+          "reconDroneMarks"
+        ],
+        "payload_sha256": "e042af98968d0fc191039d6e5e2c3678421e111d208ba416ef499b0bec573041"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10693,
+        "name": "1841",
+        "hits": [
+          "onHack"
+        ],
+        "payload_sha256": "b704a37f30a49493bebf42413fcf20361acc5061411472bd157dd4a055ef7387"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10716,
+        "name": "1864",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "onKillStreakEnd",
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "5d0c8de2da4bfd6597f4bcd6c8c64d57782ac8926d8ea7e6198c18d499d03ace"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10726,
+        "name": "1874",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "bb5dbe4fdb10b774862f0140d8daa06f437e2ce3c6411ba9b697cccaa121f876"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10774,
+        "name": "2223",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "9c52971ff5bab70f6dc273af21c0f69150b9494f50d61b88cd2bb79063005765"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10776,
+        "name": "2225",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "a3cdc37cbfae4806652c82011ad51ec1433f72ad7100fd10502ddfb9809d85a1"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10777,
+        "name": "2226",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "6328aa932ffe0174621c947a1ef635b54dc357a1f4f06f36a6a791f395cbb718"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10778,
+        "name": "2227",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "3111b802076bf3713a3f3bb819e3e755d7b3f1d5a968a81ca44bbb47f3f2f41e"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10779,
+        "name": "2228",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "01c6fc997ce5d060470490ac48dca8bfc487779d99eee690c4816f5460094196"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10781,
+        "name": "2230",
+        "hits": [
+          "onFieldUpgradeEnd"
+        ],
+        "payload_sha256": "4c5d18c2fba17ffa25925f68144b05e7aaa0af1509045c43d4048abd250e8189"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10783,
+        "name": "2232",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "logKillstreakEvent",
+          "reconDroneMarks"
+        ],
+        "payload_sha256": "a7cb785883697e3d35f6cd504a0444b51e2d2c36cbfc022d753d43a63726bd16"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10785,
+        "name": "2234",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "a5e77e39e1f818d15e4ec1cff8e74e6908badd77bf1b6eebeec69d784ca7637b"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10788,
+        "name": "2238",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "c95bedff409f1ea94252e1291336a69527db4851e80919dda706131f0a1ba120"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10789,
+        "name": "2239",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "a50d8e48b9f76bc2827764b8b8f9c36e54a4dc0b17a886c9a418d9069b64b42c"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10790,
+        "name": "2240",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "9ad791492893585f52dfdec20c9624496fd87d57ce6ba0fddda088579e4483f9"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10793,
+        "name": "2244",
+        "hits": [
+          "scavengerPickedUp"
+        ],
+        "payload_sha256": "f5811637b282e755343b5ab02ae721c1aaf3cef0ac3bfd0cd7f79ea75f66c262"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10807,
+        "name": "2261",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "55f5172d1660f1845c78e39f202737334ab8778ce4ea8746ca6314bf829b1d5f",
+        "error": "GSC Tool decomp failed (1): [ERROR]:disassembler: couldn't resolve function name at index 0x8981 at 10807.gscbin"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10830,
+        "name": "2299",
+        "hits": [
+          "onFieldUpgradeEnd"
+        ],
+        "payload_sha256": "3930449559368433b70d6bdb455896f26d87fcc0997574e473eb634602a2542b"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10845,
+        "name": "2314",
+        "hits": [
+          "onFieldUpgradeEnd"
+        ],
+        "payload_sha256": "367d45a4b4a5d6752edb678b645f1c59c5b5c3432368325d1acaa333b464fcec"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10846,
+        "name": "2315",
+        "hits": [
+          "onFieldUpgradeEnd"
+        ],
+        "payload_sha256": "f80f46db186d9c18fe0e4b9d95f2b0616a241f3946f62f3e0851d44c663fbdb2"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10847,
+        "name": "2316",
+        "hits": [
+          "onFieldUpgradeEnd"
+        ],
+        "payload_sha256": "36bd13d58e7d6892d59ffc5142fa42c875e6880419bca386a0ede79e9a5571f8"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10850,
+        "name": "2319",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "trophySystemHits"
+        ],
+        "payload_sha256": "75a868f901b43551ced833de4f2be6f9761180ab3b709230c81de5658d9eba35"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10857,
+        "name": "2334",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "a5c6059c604eb7d64d4b3431598629f2014b8a998460ffa08a953b99cfb901a8"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10862,
+        "name": "2339",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "faca41eb226a8b6d1ad21f60811f03c1b3ee86025bbd63d063f2dcd0019a0c7b"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10864,
+        "name": "2341",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "c26e47dea52835a92d332f720a0cadc7a1f07c24558819cf20d0343429793714"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10865,
+        "name": "2342",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "b88482616af0ef5c1909585c305e2a80e15c38004ba3fffaf3dbb7f4168b73d8",
+        "error": "GSC Tool decomp failed (1): [ERROR]:disassembler: couldn't resolve function name at index 0x2765 at 10865.gscbin"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10871,
+        "name": "2348",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "b8e97746fb85edb6e0354ab1dcd413612f615db08562ec236baf2f6343464212"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10872,
+        "name": "2349",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "207f81a45741d03b0b3acf0c8844b94c6cfb2ce09693abe042843f40b921a9c5"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10874,
+        "name": "2352",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "f933e197b2de69827c7243ebf3b8ec85c72e6b2e5eeb468af762de8eb98e0108"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10881,
+        "name": "2359",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "6ff9b39c9f21ddbd370903f06e3a7a8172e530d3abd867bf012a35d454756d41"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10885,
+        "name": "2363",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "ea128c2d932e07e0d79552b8ce93678ab06ee5cc6068a5a8d6a9e43c9f3ece6d"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10886,
+        "name": "2364",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "dfec97ba21f33a3bf5d411dab26d2af9b2f88f9e01c02b93616961362a9560ae"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10888,
+        "name": "2366",
+        "hits": [
+          "logKillstreakEvent"
+        ],
+        "payload_sha256": "5ed4bc63677a2bc1d7819314b417fa319ceef777f4f60475f49ea3f38d0a4b5f"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10904,
+        "name": "2382",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "deadSilenceKills"
+        ],
+        "payload_sha256": "b473efeec5f4694841a24726ecb6f914d1119706a39acce8b116542baf04f0b4"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10905,
+        "name": "2383",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "stoppingPowerKills"
+        ],
+        "payload_sha256": "f810df6909be751dce0d81277ff794987e71a1d00408aa3134a24c8484ae6227"
+      },
+      {
+        "zone": "common_base_mp",
+        "asset_index": 10964,
+        "name": "scripts/cp_mp/challenges.gsc",
+        "hits": [
+          "onFieldUpgradeEnd",
+          "onKillStreakEnd",
+          "onHack",
+          "field_end",
+          "killstreak_end"
+        ],
+        "payload_sha256": "074bcfaf5cd6fe39c6fde4f02321b7db9ab90197f1eab7d43afbc47a938694f7"
+      }
+    ]
+  },
+  "killstreak_labels": {
+    "source": {
+      "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\english\\eng_global_mp.ff",
+      "bytes": 213128,
+      "sha256": "7af917b2edc4eef6361c8c8df672b1383ade65928729170347a6591bde4667a3",
+      "header": {
+        "magic": "IWffa100",
+        "header_version": 11,
+        "xfile_version": 4047,
+        "compression": 1,
+        "encryption": 0,
+        "transient_type": 0
+      },
+      "header_signature_marker": "IWffs100",
+      "signature_block_sha256": "ebc05c832d27e7ef290f9c59ee5f376a63d8c510a2b26f74d4d561df038a39f8",
+      "observed_replay_revisions": [
+        4045,
+        4047,
+        4053,
+        4065,
+        4083,
+        4085,
+        4087
+      ],
+      "revision_seen_in_observed_set": true,
+      "patches": [
+        {
+          "path": "E:\\IW8\\Builds\\1.20-replay\\zone\\english\\eng_global_mp.fp",
+          "extension": ".fp",
+          "header_version": 6,
+          "previous": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4047,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0
+          },
+          "target": {
+            "magic": "IWffa100",
+            "header_version": 11,
+            "xfile_version": 4087,
+            "compression": 1,
+            "encryption": 0,
+            "transient_type": 0
+          },
+          "previous_layout": {
+            "decoded_size": 551295,
+            "block_sizes": [
+              0,
+              262416,
+              43552,
+              0,
+              0,
+              135359,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "target_layout": {
+            "decoded_size": 357655,
+            "block_sizes": [
+              0,
+              64,
+              126336,
+              0,
+              0,
+              294428,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "previous_header_hex": "49576666613130300b000000cf0f00000100000000400300ae2c0f2b000000007f6908000000000018000000000000000000000000000000100104000000000020aa00000000000000000000000000000000000000000000bf1002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "target_header_hex": "49576666613130300b000000f70f0000010000000080010060dc0a8d00000000177505000000000006000000000000000000000000000000400000000000000080ed010000000000000000000000000000000000000000001c7e04000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "header_only_zero_payload": false,
+          "bytes": 82248,
+          "sha256": "397a45c3326f6f5531e0c69cbc378da771e87668369f96ea78187cb39348b97a"
+        }
+      ],
+      "final_header": {
+        "magic": "IWffa100",
+        "header_version": 11,
+        "xfile_version": 4087,
+        "compression": 1,
+        "encryption": 0,
+        "transient_type": 0,
+        "decoded_size": 357655,
+        "block_sizes": [
+          0,
+          64,
+          126336,
+          0,
+          0,
+          294428,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "header_only_zero_payload_chain": false
+    },
+    "body_sha256": "9064b8bd049aa978b218271ef5f6c2638dabf56a3b22e7bb74c3ea06802935a7",
+    "rows": [
+      {
+        "name": "killstreaks/radar_drone_overwatch",
+        "value": "Personal Radar",
+        "word": 18446744073709551614,
+        "after_name": 258514,
+        "following": 258529,
+        "archive_offset": 258464
+      },
+      {
+        "name": "killstreaks/manual_turret",
+        "value": "Shield Turret",
+        "word": 21474955462,
+        "after_name": 257025,
+        "following": 257025,
+        "archive_offset": 256983
+      },
+      {
+        "name": "killstreaks/toma_strike",
+        "value": "Cluster Strike",
+        "word": 21474947354,
+        "after_name": 259387,
+        "following": 259387,
+        "archive_offset": 259347
+      },
+      {
+        "name": "killstreaks/pac_sentry",
+        "value": "Wheelson",
+        "word": 21474960012,
+        "after_name": 258103,
+        "following": 258103,
+        "archive_offset": 258064
+      },
+      {
+        "name": "killstreaks/precision_airstrike",
+        "value": "Precision Airstrike",
+        "word": 21474953925,
+        "after_name": 258339,
+        "following": 258339,
+        "archive_offset": 258291
+      },
+      {
+        "name": "killstreaks/chopper_gunner",
+        "value": "Chopper Gunner",
+        "word": 21474946965,
+        "after_name": 255229,
+        "following": 255229,
+        "archive_offset": 255186
+      }
+    ],
+    "decoder_sha256": "80ee1c0e8d839564e8904d4e980a256b6b90b1e643b551a356280663f1b6001f"
+  },
+  "case_count": 123,
+  "cases": [
+    {
+      "name": "killstreak_end",
+      "input": "uav,11,22,33,44,55,66, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70000,
+        33,
+        44,
+        55,
+        66,
+        11,
+        22
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_ammo_drop,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280019,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_tac_cover,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280009,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "claymore,specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        0,
+        27
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "claymore,no_perks",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "killstreak",
+      "input": "uav, ",
+      "accepted": false,
+      "parameter_count": 0,
+      "values": [],
+      "external_boundaries": [
+        "0x140d38d50",
+        "0x140e60c20",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "fieldupgrade",
+      "input": "super_ammo_drop, ",
+      "accepted": false,
+      "parameter_count": 0,
+      "values": [],
+      "external_boundaries": [
+        "0x140d38d50",
+        "0x140e60c20",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "scavenger",
+      "input": "1, ",
+      "accepted": false,
+      "parameter_count": 0,
+      "values": [],
+      "external_boundaries": [
+        "0x140d38d50",
+        "0x140e60c20",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "resupply",
+      "input": "1, ",
+      "accepted": false,
+      "parameter_count": 0,
+      "values": [],
+      "external_boundaries": [
+        "0x140d38d50",
+        "0x140e60c20",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0"
+      ],
+      "asset_sha256": {}
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,no_attachments,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883619071,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laser,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        54,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laserir,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        55,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laserrange,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        56,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laserbalanced,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        57,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laserads,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        58,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,laser|silencer,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        143414,
+        0,
+        1407374883618818,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,silencer|laser,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        221219,
+        0,
+        1407374883618818,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,reflex|laser|silencer,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        587423749,
+        0,
+        1407374883618819,
+        131073
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,silencer,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        35,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,silencer2,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        36,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,silencer3,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        37,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,barrel,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883618816,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,barrel_long,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883618816,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "1,specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        1,
+        27
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "1,specialty_ghost|specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        1,
+        1769524
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "1,specialty_ghost|specialty_doubletime|specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        1,
+        1769524
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "2,specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        2,
+        27
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "hack",
+      "input": "-1,specialty_spotter",
+      "accepted": true,
+      "parameter_count": 2,
+      "values": [
+        18446744073709551615,
+        27
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,silencer4,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        184,
+        0,
+        1407374883618817,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,reflex|gripvert|xmags|stockl|laser,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        15203704047296517,
+        0,
+        1407374883618821,
+        131073
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,reflex|gripvert|xmags|stockl|gunperk_fastmelee,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        33781052510199813,
+        0,
+        1407374883618821,
+        131073
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,reflex|gripvert|xmags|stockl|silencer,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        9855679489794053,
+        0,
+        1407374883618821,
+        131073
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,reflex|laser|silencer|gripvert|xmags,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        14357835739783173,
+        0,
+        1407374883618821,
+        131073
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,frontlight,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883618816,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,frontlong,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883618816,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,frontsilenced,no_perks,1,no_super,0,MOD_RIFLE_BULLET,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        0,
+        0,
+        1407374883618816,
+        131072
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_MELEE,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        524288
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_MELEE_ALT,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        0
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "kill",
+      "input": "1|2,iw8_sm_mpapa5_mp,16,0,unknown_operator,6,gunperk_fastmelee,no_perks,1,no_super,0,MOD_HEAD_SHOT,0,0",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        562949953486854,
+        16,
+        25769803776,
+        120,
+        0,
+        1407374883618817,
+        589824
+      ],
+      "external_boundaries": [
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2b40",
+        "0x1413e2b90",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x142036f40",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/weapon_ids.csv": "266c8607dc9ed42bd382d8b32d03c0ed4230435e5537df5239c858d005e46019",
+        "mp/statstable.csv": "1c61aba44835340e6f6da374b75667109ed1ed293f803fcebb5e2e585ed694a2",
+        "mp/weaponClassTable.csv": "12dac9f26849b3c6e6b59ceae066c99992c383fef8dbdfe9de16da90c136d400",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e",
+        "loot/iw8_pi_golf21_attachment_ids.csv": "b04e64e9172ddaca7639a812e837e9d5214d717d310e11a92039e490b4685a46",
+        "mp/reticlecategorytable.csv": "a24eeb7cf7fdb5ea2367414eb463f44295b294de34a629ed20d4913b25f9600f",
+        "mp/perktable.csv": "65afdeb28787db040c13c047fb7a80a2615e319f2a6af2b1a90684a6d6ee3372",
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_ammo_drop,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280019,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_ammo_drop,-1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280019,
+        18446744073709551615,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "unknown_super,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        0,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_tac_cover,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280009,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_recon_drone,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280010,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_recon_drone,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280010,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_recon_drone,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280010,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_emp_drone,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280011,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_emp_drone,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280011,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_emp_drone,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280011,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_support_box,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280012,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_support_box,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280012,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_support_box,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280012,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_trophy,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280015,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_trophy,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280015,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_trophy,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280015,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_deadsilence,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280017,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_deadsilence,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280017,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_deadsilence,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280017,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_tac_insert,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280018,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_tac_insert,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280018,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_tac_insert,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280018,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_weapon_drop,0, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280021,
+        0,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_weapon_drop,1, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280021,
+        1,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "field_end",
+      "input": "super_weapon_drop,17, ",
+      "accepted": true,
+      "parameter_count": 3,
+      "values": [
+        280021,
+        17,
+        0
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/super_ids.csv": "0d1295c6fe6abdb6484b5b2a42cc97fcf3a5a3213aa95399904086ec2b7bfcc2",
+        "loot/operator_ids.csv": "78a97c18797745e5b103150f32aaf5d4067199b216643fe8ba773ac24313b95e"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "uav,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70000,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "uav,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70000,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "airdrop,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70001,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "airdrop,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70001,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "counter_uav,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70002,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "counter_uav,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70002,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "radar_drone_overwatch,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70009,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "radar_drone_overwatch,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70009,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "manual_turret,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70012,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "manual_turret,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70012,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "toma_strike,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70013,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "toma_strike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70013,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "precision_airstrike,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70003,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "precision_airstrike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70003,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "pac_sentry,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70017,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "pac_sentry,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70017,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "chopper_gunner,1234,5678,0,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70018,
+        0,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "chopper_gunner,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70018,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "unknown_streak,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        0,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "specialist_perk_1,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70033,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "uav,1234,5678,-1,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70000,
+        18446744073709551615,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "uav,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70000,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "airdrop,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70001,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "counter_uav,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70002,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "precision_airstrike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70003,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "directional_uav,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70004,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "nuke,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70005,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "bradley,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70006,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "radar_drone_recon,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70007,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "radar_drone_escort,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70008,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "radar_drone_overwatch,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70009,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "scrambler_drone_escort,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70010,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "scrambler_drone_guard,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70011,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "manual_turret,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70012,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "toma_strike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70013,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "multi_airstrike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70014,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "cruise_predator,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70015,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "emp,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70016,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "pac_sentry,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70017,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "chopper_gunner,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70018,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "gunship,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70019,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "tacops_beacon_mp,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70020,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "jackal,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70021,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "fuel_airstrike,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70022,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "chopper_support,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70023,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "flash_turret,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70024,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "juggernaut,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70025,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "emp_drone,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70026,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "sentry_gun,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70027,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "white_phosphorus,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70028,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "hover_jet,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70029,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "death_switch,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70030,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "airdrop_multiple,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70031,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "nuke_select_location,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70032,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "specialist_perk_1,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70033,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "specialist_perk_2,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70034,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "specialist_perk_3,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70035,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    },
+    {
+      "name": "killstreak_end",
+      "input": "specialist_perk_bonus,1234,5678,17,0,0,0, ",
+      "accepted": true,
+      "parameter_count": 7,
+      "values": [
+        70036,
+        17,
+        0,
+        0,
+        0,
+        1234,
+        5678
+      ],
+      "external_boundaries": [
+        "0x140e60c20",
+        "0x1412b0820",
+        "0x1413e2b00",
+        "0x1413e2ba0",
+        "0x142036a10",
+        "0x1421ccf60",
+        "0x1421f6cc0",
+        "0x1421fb0e4",
+        "0x142225f88"
+      ],
+      "asset_sha256": {
+        "loot/killstreak_ids.csv": "1dfbb3ea0777925d6712a8c497079a4b3bbb65186a738b36290ee5a9d44b19ed"
+      }
+    }
+  ]
+}

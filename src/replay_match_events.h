@@ -32,7 +32,7 @@ namespace services
                           native && native != UINT64_MAX && std::to_string(native) == key);
             const auto &row = entry.value();
             wire::require(
-                row.is_object() && row.size() == (row.contains("reporters") ? 10u : 9u) &&
+                row.is_object() && row.size() == 9u + row.contains("reporters") + row.contains("placement") &&
                 row.at("schema") == 1 && replayMatchNumber(row, "lobby") &&
                 replayMatchNumber(row, "category") <= 1 &&
                 replayMatchNumber(row, "mode") <= UINT32_MAX &&
@@ -51,6 +51,18 @@ namespace services
             wire::require((end == 0 && row.at("outcome") == 0) ||
                           (end >= replayMatchNumber(row, "start") &&
                            end <= replayMatchNumber(row, "expires")));
+            if (row.contains("placement"))
+            {
+                const auto &placement = row.at("placement");
+                const auto timestamp = replayMatchNumber(placement, "timestamp");
+                wire::require(placement.is_object() && placement.size() == 2 &&
+                              replayMatchNumber(row, "category") == 1 &&
+                              replayMatchNumber(placement, "rank") > 0 &&
+                              replayMatchNumber(placement, "rank") <= UINT32_MAX &&
+                              timestamp >= replayMatchNumber(row, "start") &&
+                              timestamp <= replayMatchNumber(row, "expires") &&
+                              (!end || timestamp <= end));
+            }
             std::set<std::string> sessions;
             for (const auto &session : row.at("sessions"))
                 wire::require(session.is_string() &&
@@ -130,13 +142,15 @@ namespace services
             const auto &name = event.at("name");
             const auto timestamp = replayMatchNumber(event, "timestamp");
             const bool tagged = values.contains("dw_match_id");
-            const auto native = tagged ? replayMatchNumber(values, "dw_match_id") : uint64_t{0};
+            auto native = tagged ? replayMatchNumber(values, "dw_match_id") : uint64_t{0};
             const auto family = values.value("gamemode", uint64_t{0});
             const bool versioned = values.value("version", uint64_t{0}) == 1;
             if (name == "start_match" && versioned && allocation && timestamp &&
                 timestamp <= serverTime + 300 && values.contains("Param0") &&
-                values.contains("Param1") && values.contains("dw_lobby_id") &&
-                replayMatchNumber(values, "dw_lobby_id") == allocation->lobby)
+                values.contains("Param1") &&
+                (!tagged || values.contains("dw_lobby_id")) &&
+                (!values.contains("dw_lobby_id") ||
+                 replayMatchNumber(values, "dw_lobby_id") == allocation->lobby))
             {
                 const auto startId = replayMatchNumber(values, "Param0");
                 const auto mode = replayMatchNumber(values, "Param1");
@@ -186,8 +200,40 @@ namespace services
             }
             std::optional<unsigned> category = tagged ? std::nullopt : legacyCategory;
             auto cutoff = timestamp;
+            bool firstEnd = false, firstPlacement = false;
+            // Stock Replay does not attach dw_match_id to terminal reports.
+            // Bind those reports to one open native start in this exact public
+            // allocation/session. Multiple candidates are ambiguous and earn
+            // nothing. Never infer history from a different current lobby.
+            if (!tagged && allocation && versioned && values.contains("Param0") &&
+                (name == "end_match" || name == "match_placement"))
+            {
+                const auto mode = name == "end_match"
+                    ? replayMatchNumber(values, "Param0") & UINT32_MAX
+                    : replayMatchNumber(values, "Param0");
+                unsigned candidates = 0;
+                for (const auto &entry : result.matches.items())
+                {
+                    const auto &row = entry.value();
+                    const auto &sessions = row.at("sessions");
+                    const auto ended = replayMatchNumber(row, "end");
+                    const bool terminalEligible = !ended ||
+                        (name == "match_placement" && !row.contains("placement") && timestamp <= ended);
+                    if (terminalEligible && row.at("mode") == mode &&
+                        timestamp >= replayMatchNumber(row, "start") &&
+                        timestamp <= replayMatchNumber(row, "expires") &&
+                        std::find(sessions.begin(), sessions.end(), session) != sessions.end() &&
+                        replayMatchAllocationMatches(row, *allocation, session))
+                    {
+                        ++candidates;
+                        native = std::stoull(entry.key());
+                    }
+                }
+                if (candidates != 1)
+                    native = 0;
+            }
             const auto found = result.matches.find(std::to_string(native));
-            if (tagged && found != result.matches.end() && timestamp <= serverTime + 300)
+            if (native && found != result.matches.end() && timestamp <= serverTime + 300)
             {
                 auto &row = found.value();
                 const auto &sessions = row.at("sessions");
@@ -212,20 +258,35 @@ namespace services
                         static_cast<unsigned>(replayMatchNumber(row, "category"));
                     const bool familyMatches =
                         capturedCategory == 0 ? family == 2 : family == 8 || family == 24;
+                    if (name == "match_placement" && versioned && familyMatches &&
+                        capturedCategory == 1 && (!ended || timestamp <= ended) &&
+                        !row.contains("placement") && values.contains("Param0") &&
+                        values.contains("Param1") && values.contains("Param2") &&
+                        replayMatchNumber(values, "Param0") == replayMatchNumber(row, "mode") &&
+                        replayMatchNumber(values, "Param1") > 0 &&
+                        replayMatchNumber(values, "Param1") <= UINT32_MAX)
+                    {
+                        row["placement"] = Json{{"rank", replayMatchNumber(values, "Param1")},
+                                                 {"timestamp", timestamp}};
+                        firstPlacement = true;
+                    }
                     if (name == "end_match" && versioned && values.contains("Param0") &&
                         values.contains("Param1") && values.contains("Param2") &&
                         values.contains("Param3") && values.contains("Param4") &&
                         (replayMatchNumber(values, "Param0") & UINT32_MAX) ==
                             replayMatchNumber(row, "mode") &&
                         replayMatchNumber(values, "Param1") <= 3 && familyMatches &&
+                        (!row.contains("placement") ||
+                         replayMatchNumber(row.at("placement"), "timestamp") <= timestamp) &&
                         row.at("end") == 0)
                     {
                         row["end"] = timestamp;
                         row["outcome"] = replayMatchNumber(values, "Param1");
+                        firstEnd = true;
                     }
                 }
             }
-            result.contexts.push_back({category, cutoff});
+            result.contexts.push_back({category, cutoff, native, firstEnd, firstPlacement});
         }
         validateReplayMatches(result.matches);
         return result;

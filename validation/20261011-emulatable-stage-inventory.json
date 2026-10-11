@@ -1,0 +1,3166 @@
+{
+  "partition_verified": true,
+  "canonical_stage_count": 232,
+  "implemented_stage_count": 181,
+  "excluded_stage_count": 51,
+  "implemented_stage_ids": [
+    1500,
+    1501,
+    1502,
+    1503,
+    1504,
+    1505,
+    1506,
+    1507,
+    1508,
+    1509,
+    1510,
+    1511,
+    1512,
+    1513,
+    1514,
+    1515,
+    1516,
+    1517,
+    1545,
+    1546,
+    1547,
+    1548,
+    1549,
+    1550,
+    1551,
+    1552,
+    1553,
+    1555,
+    1556,
+    1557,
+    1558,
+    1559,
+    1560,
+    1562,
+    1563,
+    1565,
+    1566,
+    1568,
+    1569,
+    1570,
+    1571,
+    1572,
+    1573,
+    1574,
+    1575,
+    1576,
+    1577,
+    1578,
+    1579,
+    1586,
+    1587,
+    1588,
+    1589,
+    1590,
+    1591,
+    1592,
+    1593,
+    1594,
+    1595,
+    1596,
+    1597,
+    1598,
+    1600,
+    1601,
+    1602,
+    1624,
+    10000,
+    10001,
+    10003,
+    10004,
+    10005,
+    10006,
+    10007,
+    10009,
+    10010,
+    10011,
+    10012,
+    10013,
+    10014,
+    10015,
+    10016,
+    10017,
+    10018,
+    10019,
+    10020,
+    10021,
+    10022,
+    10023,
+    10024,
+    10038,
+    10039,
+    10040,
+    10044,
+    10046,
+    10047,
+    10048,
+    10130,
+    10131,
+    10134,
+    10135,
+    50000,
+    50001,
+    50003,
+    50005,
+    50006,
+    50007,
+    50008,
+    50009,
+    50010,
+    50011,
+    50012,
+    50014,
+    50015,
+    50016,
+    50017,
+    50018,
+    50019,
+    50021,
+    50022,
+    50023,
+    50024,
+    50025,
+    50026,
+    50027,
+    50028,
+    50029,
+    50030,
+    50031,
+    50032,
+    50033,
+    50034,
+    50035,
+    50036,
+    50037,
+    50038,
+    50039,
+    50040,
+    50041,
+    50042,
+    50043,
+    50044,
+    50046,
+    50047,
+    50048,
+    50049,
+    50050,
+    50051,
+    50052,
+    50053,
+    50054,
+    50055,
+    50057,
+    50058,
+    50059,
+    50060,
+    50061,
+    50062,
+    50063,
+    50064,
+    50065,
+    50066,
+    50067,
+    50068,
+    50069,
+    50070,
+    50071,
+    50072,
+    50073,
+    50074,
+    50075,
+    50076,
+    50077,
+    50078,
+    50079,
+    50081,
+    50082,
+    50083,
+    50084,
+    50085,
+    50086,
+    50088
+  ],
+  "excluded_stage_ids": [
+    1554,
+    1561,
+    1564,
+    1567,
+    1580,
+    1581,
+    1582,
+    1583,
+    1584,
+    1585,
+    1599,
+    10002,
+    10008,
+    10032,
+    10033,
+    10034,
+    10035,
+    10036,
+    10037,
+    10041,
+    10042,
+    10043,
+    10045,
+    10049,
+    10057,
+    10058,
+    10059,
+    10060,
+    10061,
+    10062,
+    10063,
+    10064,
+    10065,
+    10066,
+    10067,
+    10068,
+    10069,
+    10132,
+    10133,
+    10136,
+    10137,
+    10138,
+    10139,
+    10140,
+    10141,
+    50013,
+    50020,
+    50045,
+    50056,
+    50080,
+    50087
+  ],
+  "implementation_groups": {
+    "baseline127": [
+      1501,
+      1503,
+      1505,
+      1506,
+      1507,
+      1508,
+      1509,
+      1510,
+      1512,
+      1513,
+      1514,
+      1517,
+      1553,
+      1555,
+      1556,
+      1557,
+      1558,
+      1559,
+      1560,
+      1562,
+      1563,
+      1565,
+      1569,
+      1570,
+      1571,
+      1573,
+      1576,
+      1577,
+      1586,
+      1588,
+      1589,
+      1590,
+      1592,
+      1594,
+      1595,
+      1596,
+      1597,
+      1598,
+      1600,
+      1624,
+      10000,
+      10001,
+      10003,
+      10004,
+      10006,
+      10007,
+      10012,
+      10013,
+      10038,
+      10039,
+      10040,
+      10044,
+      10046,
+      10047,
+      10130,
+      10131,
+      10134,
+      10135,
+      50000,
+      50001,
+      50003,
+      50005,
+      50006,
+      50007,
+      50008,
+      50009,
+      50010,
+      50011,
+      50012,
+      50014,
+      50015,
+      50016,
+      50019,
+      50021,
+      50022,
+      50023,
+      50024,
+      50026,
+      50027,
+      50028,
+      50029,
+      50030,
+      50031,
+      50033,
+      50034,
+      50035,
+      50036,
+      50037,
+      50038,
+      50040,
+      50041,
+      50042,
+      50043,
+      50044,
+      50047,
+      50048,
+      50049,
+      50050,
+      50051,
+      50052,
+      50054,
+      50055,
+      50057,
+      50058,
+      50059,
+      50061,
+      50062,
+      50063,
+      50064,
+      50065,
+      50066,
+      50068,
+      50069,
+      50070,
+      50071,
+      50072,
+      50073,
+      50075,
+      50076,
+      50077,
+      50078,
+      50079,
+      50082,
+      50083,
+      50084,
+      50085,
+      50086
+    ],
+    "mp_actions29": [
+      1502,
+      1516,
+      1545,
+      1546,
+      1547,
+      1548,
+      1549,
+      1550,
+      1551,
+      1552,
+      1566,
+      1575,
+      1601,
+      1602,
+      10005,
+      10009,
+      10010,
+      10011,
+      10014,
+      10015,
+      10016,
+      10017,
+      10018,
+      10019,
+      10020,
+      10021,
+      10022,
+      10023,
+      10024
+    ],
+    "br12": [
+      50017,
+      50018,
+      50025,
+      50032,
+      50039,
+      50046,
+      50053,
+      50060,
+      50067,
+      50074,
+      50081,
+      50088
+    ],
+    "mp_completion9": [
+      1500,
+      1504,
+      1511,
+      1568,
+      1574,
+      1578,
+      1579,
+      1587,
+      1593
+    ],
+    "groundwar4": [
+      1515,
+      1572,
+      1591,
+      10048
+    ]
+  },
+  "baseline_evidence": {
+    "commit": "c835073",
+    "git_source_blob_sha256": "84e9a7a522e81f638a03cd8916f1ed885f35e75de93367bdd2b0b7e4c8a0a7ae",
+    "git_fixture_blob_sha256": "060d0692060a93f8996e1db0502e69c4e37f784963ce9ab68cede1d82f78cc47",
+    "retained_crlf_fixture_sha256": "7d90596a6a8bc89f3687dc76ded3d2c3fb72be88272fed9fa2ee2aa1cca44ad7",
+    "explicit_receipt_stage_count": 108,
+    "grouped_fixture_stage_count": 19,
+    "grouped_fixture_evidence": [
+      {
+        "ids": [
+          1558
+        ],
+        "fixture_contract": "stim tests explicitly seed/complete1558",
+        "receipt_check": "Stim counts native integer health rather than uses; fractional/zero/wrong-mode reports, exact target, XP/item/successor and retry are correct"
+      },
+      {
+        "ids": [
+          50005,
+          50007,
+          50010,
+          50031,
+          50042,
+          50066,
+          50069,
+          50084
+        ],
+        "fixture_contract": "br_pickups dictionary and complete/retry loop",
+        "receipt_check": "All eight BR weapon/cash/cache pickup stages consume original aggregated fields, clamp targets and preserve retries without MP-mode cross-credit"
+      },
+      {
+        "ids": [
+          50008,
+          50009,
+          50021,
+          50059,
+          50063
+        ],
+        "fixture_contract": "literal five-stage native timer iteration",
+        "receipt_check": "Five BR gas/driving/non-downed timers preserve fractional units and retries; seconds/minutes do not round up from milliseconds"
+      },
+      {
+        "ids": [
+          50014,
+          50048,
+          50049,
+          50076,
+          50077
+        ],
+        "fixture_contract": "actions dictionary and complete/retry loop",
+        "receipt_check": "Five BR revive/Gulag stages distinguish the actor, self-revival and win/loss; malformed flags, MP mode and retries cannot duplicate credit"
+      }
+    ],
+    "compiled_receipts": [
+      {
+        "path": "data/remaining-kill-modifiers-20261010/windows-earning.json",
+        "sha256": "23539bcf5c69f4aabee3c4708670bd808ecfe7c09ec38f34118dfc9e8d8bba17",
+        "server_sha256": "a89bf688f22108d85a616103a9d61b5518e20fac3078051a5c1784d5e9e123e8",
+        "supported_stage_count": 127
+      },
+      {
+        "path": "data/remaining-kill-modifiers-20261010/linux-earning.json",
+        "sha256": "9889feddf840917864d88d5138fa69c615f209cf8959a9ad5db998ebd9a89b19",
+        "server_sha256": "b29b665e61158bd669263e803e4137c39a420e381f71f977d8304d1c3619c61d",
+        "supported_stage_count": 127
+      }
+    ]
+  },
+  "blocker_groups": [
+    {
+      "key": "stun",
+      "stage_ids": [
+        1554
+      ],
+      "required_original_contract": "Count successful stuns of enemy players from the native stun producer and packed result.",
+      "missing_contract": "Parser acceptance does not establish which count/result distinguishes enemy stuns from other affected actors or duration.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "scavenger",
+      "stage_ids": [
+        1561
+      ],
+      "required_original_contract": "Original Scavenger enemy-ammo pickup achievement report.",
+      "missing_contract": "Retained scripts update scavengerPickedUp locally; candidate scavenger/resupply event names are rejected by original ProcessParams.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "spotter",
+      "stage_ids": [
+        1564
+      ],
+      "required_original_contract": "Successful enemy-equipment hack producer plus first-argument semantics and Spotter perk snapshot.",
+      "missing_contract": "Hack packing and native Spotter27 are verified; a successful equipment-hack caller and the meaning of Param0 remain unverified.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "kill_chain",
+      "stage_ids": [
+        1567
+      ],
+      "required_original_contract": "Per-kill native Kill Chain eligibility attached to killstreak earnings.",
+      "missing_contract": "Terminal killstreak_end aggregates kills without a loadout perk snapshot; it cannot prove Kill Chain eligibility for those kills.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "unsuppressed_barrel",
+      "stage_ids": [
+        1599
+      ],
+      "required_original_contract": "Exact original barrel remapping/classification and distinction from integral suppression.",
+      "missing_contract": "Generic attachment packing does not prove the requested unsuppressed barrel family.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "golem_operator",
+      "stage_ids": [
+        10002
+      ],
+      "required_original_contract": "Original operator/faction selection mapping for the specified faction slot.",
+      "missing_contract": "A numeric operator ID alone does not prove Golem is selected in the requested faction/slot.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "enemy_near_smoke",
+      "stage_ids": [
+        10008
+      ],
+      "required_original_contract": "Victim proximity to smoke at the kill.",
+      "missing_contract": "The retained Insmoke modifier describes the attacker; using it would credit a different condition.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "specific_optics",
+      "stage_ids": [
+        10042,
+        10043
+      ],
+      "required_original_contract": "Exact native attachment remapping for Cronen LP945 Mini Reflex and Scout optic.",
+      "missing_contract": "Native family collapse/reticle class does not establish these requested named optic identities.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "mp_vehicle_identity",
+      "stage_ids": [
+        10032,
+        10033,
+        10034,
+        10035,
+        10036,
+        10037
+      ],
+      "required_original_contract": "Original IAV/APC/Little Bird actor/weapon and vehicle destruction identity contracts.",
+      "missing_contract": "A generic actor/victim vehicle bit does not prove the exact vehicle, turret, runover, or one distinct destruction.",
+      "evidence_paths": [
+        "docs/DW_MP_MISSION_EARNING_20261011.txt",
+        "validation/20261011-replay-mp-mission-events.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "br_vehicle_assists",
+      "stage_ids": [
+        50013,
+        50045,
+        50080
+      ],
+      "required_original_contract": "Kill-or-assist reports with native attacker vehicle state.",
+      "missing_contract": "Original assist packet contains zero modifier words and no vehicle-state field. Counting only kills would omit qualifying assists.",
+      "evidence_paths": [
+        "docs/DW_BR_CP_MISSIONS_20261011.txt",
+        "validation/20261011-replay-br-cp-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "br_occupied_vehicle_destruction",
+      "stage_ids": [
+        50020,
+        50056,
+        50087
+      ],
+      "required_original_contract": "One unique enemy-occupied vehicle destruction report.",
+      "missing_contract": "Player-kill vehicle explosion/victim flags do not identify one destruction; counting occupants would overcount.",
+      "evidence_paths": [
+        "docs/DW_BR_CP_MISSIONS_20261011.txt",
+        "validation/20261011-replay-br-cp-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "co_op_operations",
+      "stage_ids": [
+        10057,
+        10058,
+        10059,
+        10060,
+        10061,
+        10062,
+        10063,
+        10064,
+        10065,
+        10066,
+        10067,
+        10068,
+        10069
+      ],
+      "required_original_contract": "Eligible public co-op operation family, operation identity/completion, and stage-specific actors/actions.",
+      "missing_contract": "Retained agent/weapon/operator bits and accepted cp_complete do not establish public operation ownership or successful operation completion; survival/trial cannot substitute.",
+      "evidence_paths": [
+        "docs/DW_BR_CP_MISSIONS_20261011.txt",
+        "validation/20261011-replay-br-cp-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "rapid_kills",
+      "stage_ids": [
+        1580,
+        1582,
+        1584,
+        10041,
+        10132
+      ],
+      "required_original_contract": "Original rapid grouping/consumption, exact event occurrence ordering and stage-specific weapon/optic qualifiers.",
+      "missing_contract": "Native script rearms a 4-second wait after kills, but emitted challenge packets carry no rapid counter; authoritative timestamps/order and consumption are unproven.",
+      "evidence_paths": [
+        "validation/20261011-multikill-mission-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "repeated_per_life",
+      "stage_ids": [
+        1581,
+        1583,
+        1585,
+        10045,
+        10133
+      ],
+      "required_original_contract": "Ordered owner kills/deaths and reset/consumption rules for each requested repeated streak.",
+      "missing_contract": "Native kill/death arrival ordering and repeat/reset semantics are not proven by packet acceptance.",
+      "evidence_paths": [
+        "validation/20261011-multikill-mission-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "headshots_single_life",
+      "stage_ids": [
+        10049
+      ],
+      "required_original_contract": "Two ordered qualifying pistol headshots in one continuous native life.",
+      "missing_contract": "Authoritative kill/death ordering and reset at activation/start/death/end still need integration evidence. This target1 criterion does not require a time window.",
+      "evidence_paths": [
+        "validation/20261011-multikill-mission-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    },
+    {
+      "key": "minute_windows",
+      "stage_ids": [
+        10136,
+        10137,
+        10138,
+        10139,
+        10140,
+        10141
+      ],
+      "required_original_contract": "Exact native 60-second window origin/boundaries, timestamp precision and overlapping/repeated-window policy.",
+      "missing_contract": "The 60-second producer/window/counter and repeated consumption semantics remain unverified.",
+      "evidence_paths": [
+        "validation/20261011-multikill-mission-contracts.json"
+      ],
+      "classification": "excluded_until_contract_is_verified",
+      "impossibility_claim": false
+    }
+  ],
+  "stages": [
+    {
+      "id": 1500,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest001_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_1_STEP_1",
+      "description": "Complete 1 Public Match",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1501,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest001_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_1_STEP_2",
+      "description": "Get 5 Public Match kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1502,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest001_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_1_STEP_3",
+      "description": "Call in a Killstreak",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1503,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest001_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_1_STEP_4",
+      "description": "Get 3 kills using Lethal Equipment",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1504,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest001_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_1_STEP_5",
+      "description": "Win 1 Public Match",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1505,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest002_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_1",
+      "description": "Get &&1 kills with an Assault Rifle",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1506,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest002_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_2",
+      "description": "Get &&1 kills with an SMG",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1507,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest002_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_3",
+      "description": "Get &&1 kills with a Shotgun",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1508,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest002_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_4",
+      "description": "Get &&1 kills with an LMG",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1509,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest002_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_5",
+      "description": "Get &&1 kills with a Sniper Rifle",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1510,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest002_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_6",
+      "description": "Get &&1 kills with a Pistol",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1511,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest003_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_1",
+      "description": "Infil and complete &&1 Public matches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1512,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest003_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_2",
+      "description": "Capture &&1 Flags in Domination",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1513,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest003_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_3",
+      "description": "Execute &&1 Finishing Moves",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1514,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest003_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_4",
+      "description": "Get &&1 kills with Ghost Perk enabled",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1515,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest003_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_5",
+      "description": "Capture &&1 Flags in Ground War",
+      "status": "implemented_source",
+      "implementation_or_blocker": "groundwar4"
+    },
+    {
+      "id": 1516,
+      "category": 0,
+      "target": 60,
+      "name": "ch_quest003_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_6",
+      "description": "Get &&1 kills using suppressed weapons",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1517,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest003_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_3_STEP_7",
+      "description": "Capture &&1 Headquarters in Headquarters Mode",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1545,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest004_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_1",
+      "description": "Call in &&1 Personal Radars",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1546,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest004_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_2",
+      "description": "Get &&1 kills with Shield Turrets",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1547,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest004_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_3",
+      "description": "Call in &&1 UAVs",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1548,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest004_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_4",
+      "description": "Call in &&1 Care Packages",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1549,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest004_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_5",
+      "description": "Get &&1 kills with Cluster Strikes",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1550,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest004_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_6",
+      "description": "Get &&1 kills with Precision Airstrike",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1551,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest004_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_7",
+      "description": "Get &&1 kills with Wheelson",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1552,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest004_stage008",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_4_STEP_8",
+      "description": "Get &&1 kills with Chopper Gunner",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1553,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest005_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_1",
+      "description": "Get &&1 Frag Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1554,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest005_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_2",
+      "description": "Stun &&1 enemies with Stun Grenades",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "stun"
+    },
+    {
+      "id": 1555,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest005_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_3",
+      "description": "Get &&1 Molotov Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1556,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest005_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_4",
+      "description": "Get &&1 Proxy Mine Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1557,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest005_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_5",
+      "description": "Get &&1 Semtex Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1558,
+      "category": 0,
+      "target": 2500,
+      "name": "ch_quest005_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_6",
+      "description": "Regain &&1 health with Stim",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1559,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest005_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_7",
+      "description": "Get &&1 Throwing Knife kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1560,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest005_stage008",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_5_STEP_8",
+      "description": "Get &&1 Thermite kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1561,
+      "category": 0,
+      "target": 60,
+      "name": "ch_quest006_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_1",
+      "description": "Using Scavenger, resupply ammo from enemies &&1 time(s)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "scavenger"
+    },
+    {
+      "id": 1562,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest006_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_2",
+      "description": "Using Shrapnel, get &&1 kills using Lethal Equipment",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1563,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest006_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_3",
+      "description": "Using Ghost, get &&1 kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1564,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest006_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_4",
+      "description": "Using Spotter, hack &&1 pieces of Equipment",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "spotter"
+    },
+    {
+      "id": 1565,
+      "category": 0,
+      "target": 60,
+      "name": "ch_quest006_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_5",
+      "description": "Using Overkill, get &&1 kills with your Secondary",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1566,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest006_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_6",
+      "description": "Use &&1 Field Upgrades",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1567,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest006_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_6_STEP_7",
+      "description": "Using Kill Chain, get &&1 kills using Killstreaks",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "kill_chain"
+    },
+    {
+      "id": 1568,
+      "category": 0,
+      "target": 2,
+      "name": "ch_quest007_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_1",
+      "description": "Get &&1 Public Wins",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1569,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest007_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_2",
+      "description": "Get &&1 kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1570,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest007_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_3",
+      "description": "Get &&1 Headshots in Team Deathmatch",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1571,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest007_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_4",
+      "description": "Get &&1 kills with Equipment",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1572,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest007_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_5",
+      "description": "Capture &&1 Flags in Ground War",
+      "status": "implemented_source",
+      "implementation_or_blocker": "groundwar4"
+    },
+    {
+      "id": 1573,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest007_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_6",
+      "description": "Get &&1 Point-Blank kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1574,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest007_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_7",
+      "description": "Get &&1 win(s) in Search and Destroy",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1575,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest007_stage008",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_8",
+      "description": "Get &&1 kills with Killstreaks",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1576,
+      "category": 0,
+      "target": 40,
+      "name": "ch_quest007_stage009",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_9",
+      "description": "Get &&1 kills with your Secondary Weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1577,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest007_stage010",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_10",
+      "description": "Get &&1 Longshot Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1578,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest007_stage011",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_11",
+      "description": "Get &&1 win(s) in Gunfight",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1579,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest007_stage012",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_7_STEP_12",
+      "description": "Win &&1 Public Matches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1580,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest008_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_1",
+      "description": "Get &&1 Double Kills (2 rapid kills)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "rapid_kills"
+    },
+    {
+      "id": 1581,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest008_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_2",
+      "description": "Get 5 kills without dying &&1 time(s)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "repeated_per_life"
+    },
+    {
+      "id": 1582,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest008_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_3",
+      "description": "Get &&1 Triple Kills (3 rapid kills)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "rapid_kills"
+    },
+    {
+      "id": 1583,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest008_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_4",
+      "description": "Get 10 kills without dying &&1 time(s)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "repeated_per_life"
+    },
+    {
+      "id": 1584,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest008_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_5",
+      "description": "Get &&1 Fury Kills (4 rapid kills)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "rapid_kills"
+    },
+    {
+      "id": 1585,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest008_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_6",
+      "description": "Get 15 kills without dying &&1 time(s)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "repeated_per_life"
+    },
+    {
+      "id": 1586,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest008_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_8_STEP_7",
+      "description": "Get &&1 Quad Feeds (4 uninterrupted Kills in the Kill Feed)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1587,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest009_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_1",
+      "description": "Complete &&1 Gunfight matches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1588,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest009_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_2",
+      "description": "Capture &&1 Flags in Domination",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1589,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest009_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_3",
+      "description": "Get &&1 kills in Team Deathmatch",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1590,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest009_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_4",
+      "description": "Plant or Defuse &&1 Bombs in Search and Destroy or Cyber Attack",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1591,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest009_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_5",
+      "description": "Capture &&1 Flags in Ground War",
+      "status": "implemented_source",
+      "implementation_or_blocker": "groundwar4"
+    },
+    {
+      "id": 1592,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest009_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_6",
+      "description": "Get &&1 kills in Headquarters",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1593,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest009_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_9_STEP_7",
+      "description": "Get &&1 win(s) in Cyber Attack",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_completion9"
+    },
+    {
+      "id": 1594,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest010_stage001",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_1",
+      "description": "Get &&1 kills with 1 Attachment on a Weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1595,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest010_stage002",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_2",
+      "description": "Get &&1 Headshots using a Reflex Optic",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1596,
+      "category": 0,
+      "target": 70,
+      "name": "ch_quest010_stage003",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_3",
+      "description": "Get &&1 kills with 5 Attachments on an LMG",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1597,
+      "category": 0,
+      "target": 35,
+      "name": "ch_quest010_stage004",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_4",
+      "description": "Get &&1 kills using the FR 5.56",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1598,
+      "category": 0,
+      "target": 70,
+      "name": "ch_quest010_stage005",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_5",
+      "description": "Get &&1 kills with 5 Attachments on a Marksman Rifle",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1599,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest010_stage006",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_6",
+      "description": "Get &&1 Longshot Kills on an Assault Rifle using an unsuppressed Barrel Attachment",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "unsuppressed_barrel"
+    },
+    {
+      "id": 1600,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest010_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_7",
+      "description": "Get &&1 Headshots with 5 Attachments on a Sniper Rifle",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 1601,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest010_stage008",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_8",
+      "description": "Get &&1 Melee kills using the fast melee perk",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1602,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest010_stage009",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_10_STEP_9",
+      "description": "Get &&1 Hip Fire Kills using a Laser",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 1624,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest002_stage007",
+      "description_key": "CHALLENGE/LAUNCH_QUEST_2_STEP_7",
+      "description": "Get &&1 kills with a Pistol using a Reflex Optic",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10000,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest026_stage001",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_1",
+      "description": "Get &&1 Headshots using an SMG",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10001,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest026_stage002",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_2",
+      "description": "Get &&1 kills using an SMG in the Secondary Slot with Overkill",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10002,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest026_stage003",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_3",
+      "description": "Get &&1 kills using an SMG and while having Golem as your Coalition Operator",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "golem_operator"
+    },
+    {
+      "id": 10003,
+      "category": 0,
+      "target": 100,
+      "name": "ch_quest026_stage004",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_4",
+      "description": "Get &&1 kills using an SMG and equipped with the Tracker perk",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10004,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest026_stage005",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_5",
+      "description": "Get &&1 kills with an SMG in the Gunfight mode",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10005,
+      "category": 0,
+      "target": 90,
+      "name": "ch_quest026_stage006",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_6",
+      "description": "Get &&1 Hipfire Kills using an SMG with a Laser attachment",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10006,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest026_stage007",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_7",
+      "description": "Get &&1 kills with an SMG and equipped with the Double Time perk",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10007,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest026_stage008",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_8",
+      "description": "Get &&1 Throwing Knife Kills",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10008,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest026_stage009",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_1_STEP_9",
+      "description": "Get &&1 kills using an SMG on enemies near smoke",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "enemy_near_smoke"
+    },
+    {
+      "id": 10009,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest027_stage001",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_1",
+      "description": "Call in &&1 UAVs",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10010,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest027_stage002",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_2",
+      "description": "Call in &&1 Care Packages",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10011,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest027_stage003",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_3",
+      "description": "Call in &&1 Counter UAVs",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10012,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest027_stage004",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_4",
+      "description": "Destroy &&1 vehicle(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10013,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest027_stage005",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_5",
+      "description": "Destroy &&1 Enemy Killstreaks",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10014,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest027_stage006",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_6",
+      "description": "Mark &&1 Enemies using the Recon Drone",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10015,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest027_stage007",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_2_STEP_7",
+      "description": "Resupply Ammo &&1 times with the Munitions Box",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10016,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest028_stage001",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_1",
+      "description": "Resupply Ammo &&1 times with the Munitions Box",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10017,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest028_stage002",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_2",
+      "description": "Mark &&1 Enemies using the Recon Drone",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10018,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest028_stage003",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_3",
+      "description": "Get &&1 kills while using Dead Silence",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10019,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest028_stage004",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_4",
+      "description": "Get &&1 kills while using Stopping Power",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10020,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest028_stage005",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_5",
+      "description": "Stop &&1 Projectiles using the Trophy System",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10021,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest028_stage006",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_6",
+      "description": "Use the Deployable Cover &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10022,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest028_stage007",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_7",
+      "description": "Use Tactical Insert &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10023,
+      "category": 0,
+      "target": 20,
+      "name": "ch_quest028_stage008",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_8",
+      "description": "Hit &&1 targets with the EMP Drone",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10024,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest028_stage009",
+      "description_key": "CHALLENGE/SEASON_1_QUEST_3_STEP_9",
+      "description": "Give &&1 Weapons using the Weapon Drop Field Upgrade",
+      "status": "implemented_source",
+      "implementation_or_blocker": "mp_actions29"
+    },
+    {
+      "id": 10032,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest030_stage001",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_1",
+      "description": "Kill &&1 Players using the IAV Turrets",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10033,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest030_stage002",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_2",
+      "description": "Run over &&1 Players with Little Bird",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10034,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest030_stage003",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_3",
+      "description": "Get &&1 kills with the APC Turret",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10035,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest030_stage004",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_4",
+      "description": "Run over or kill &&1 Players with Vehicles",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10036,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest030_stage005",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_5",
+      "description": "Destroy &&1 vehicle(s) with APC",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10037,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest030_stage006",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_1_STEP_6",
+      "description": "Destroy &&1 vehicle(s) with IAV",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "mp_vehicle_identity"
+    },
+    {
+      "id": 10038,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest031_stage001",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_1",
+      "description": "Get &&1 kills while ADS on a Reflex Sight Optic",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10039,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest031_stage002",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_2",
+      "description": "Get &&1 Longshot Kills using a Thermal Sight Optic",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10040,
+      "category": 0,
+      "target": 50,
+      "name": "ch_quest031_stage003",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_3",
+      "description": "Get &&1 Headshot Kills using a Variable Zoom Scope",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10041,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest031_stage004",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_4",
+      "description": "Get &&1 Double Kills using a Hybrid Optic",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "rapid_kills"
+    },
+    {
+      "id": 10042,
+      "category": 0,
+      "target": 15,
+      "name": "ch_quest031_stage005",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_5",
+      "description": "Get &&1 Point Blank Kills using a Cronen LP945 Mini Reflex",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "specific_optics"
+    },
+    {
+      "id": 10043,
+      "category": 0,
+      "target": 75,
+      "name": "ch_quest031_stage006",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_2_STEP_6",
+      "description": "Get &&1 kills while ADS using a Scout Optic",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "specific_optics"
+    },
+    {
+      "id": 10044,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest032_stage001",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_1",
+      "description": "Get &&1 kills with the X16",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10045,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest032_stage002",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_2",
+      "description": "Get 2 kills in a single life with the 1911 &&1 time(s)",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "repeated_per_life"
+    },
+    {
+      "id": 10046,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest032_stage003",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_3",
+      "description": "Get &&1 kills using the .357 with 3 attachments",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10047,
+      "category": 0,
+      "target": 25,
+      "name": "ch_quest032_stage004",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_4",
+      "description": "Get &&1 kills in Domination using the M19",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10048,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest032_stage005",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_5",
+      "description": "Get &&1 kills in Ground War while using the .50 GS",
+      "status": "implemented_source",
+      "implementation_or_blocker": "groundwar4"
+    },
+    {
+      "id": 10049,
+      "category": 0,
+      "target": 1,
+      "name": "ch_quest032_stage006",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_3_STEP_6",
+      "description": "Get 2 Headshot Kills with a pistol in a single life",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "headshots_single_life"
+    },
+    {
+      "id": 10057,
+      "category": 4,
+      "target": 100,
+      "name": "ch_quest034_stage001",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_1",
+      "description": "Get &&1 kills with Sniper Rifles or Marksman Rifles in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10058,
+      "category": 4,
+      "target": 50,
+      "name": "ch_quest034_stage002",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_2",
+      "description": "Get &&1 Juggernaut Kills in any Co-Op Operation with Otter as your Coalition Operator",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10059,
+      "category": 4,
+      "target": 20,
+      "name": "ch_quest034_stage003",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_3",
+      "description": "Execute &&1 Finishing Moves in any Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10060,
+      "category": 4,
+      "target": 10,
+      "name": "ch_quest034_stage004",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_4",
+      "description": "Destroy &&1  Tanks in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10061,
+      "category": 4,
+      "target": 50,
+      "name": "ch_quest034_stage005",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_5",
+      "description": "Get &&1 kills with Precision Airstrike in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10062,
+      "category": 4,
+      "target": 4,
+      "name": "ch_quest034_stage006",
+      "description_key": "CHALLENGE/SEASON_2_QUEST_5_STEP_6",
+      "description": "Complete any &&1 Co-Op Operations",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10063,
+      "category": 4,
+      "target": 100,
+      "name": "ch_quest059_stage001",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_1",
+      "description": "Get &&1 Assists on enemies in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10064,
+      "category": 4,
+      "target": 25,
+      "name": "ch_quest059_stage002",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_2",
+      "description": "Get &&1 Kills using Thermite in any Co-Op Operation with Minotaur as your Spetsnaz Operator",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10065,
+      "category": 4,
+      "target": 75,
+      "name": "ch_quest059_stage003",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_3",
+      "description": "Get &&1 Sentry Gun Kills in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10066,
+      "category": 4,
+      "target": 50,
+      "name": "ch_quest059_stage004",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_4",
+      "description": "Get &&1 Pistol Kills in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10067,
+      "category": 4,
+      "target": 25,
+      "name": "ch_quest059_stage005",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_5",
+      "description": "Get &&1 Throwing Knife Kills in any Co-Op Operation with Kreuger as your Chimera Operator",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10068,
+      "category": 4,
+      "target": 25,
+      "name": "ch_quest059_stage006",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_6",
+      "description": "Get &&1 Kills using a Vehicle in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10069,
+      "category": 4,
+      "target": 125,
+      "name": "ch_quest059_stage007",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_4_STEP_7",
+      "description": "Use Killstreaks / Munitions &&1 times in any Co-Op Operation",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "co_op_operations"
+    },
+    {
+      "id": 10130,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest075_stage001",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_1",
+      "description": "Get &&1 Longshot kills while using the Oden",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10131,
+      "category": 0,
+      "target": 10,
+      "name": "ch_quest075_stage002",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_2",
+      "description": "Get &&1 Headshot kills using the AK-47",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10132,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest075_stage003",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_3",
+      "description": "Get &&1 Double kills using the FR 5.56",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "rapid_kills"
+    },
+    {
+      "id": 10133,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest075_stage004",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_4",
+      "description": "Get 3 Kills without dying &&1 times using the FN Scar 17",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "repeated_per_life"
+    },
+    {
+      "id": 10134,
+      "category": 0,
+      "target": 30,
+      "name": "ch_quest075_stage005",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_5",
+      "description": "Get &&1 Kills while Aiming Down Sights using the FAL",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10135,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest075_stage006",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_1_STEP_6",
+      "description": "Kill the enemy in first place &&1 times using the M13 ",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 10136,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest076_stage001",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_1",
+      "description": "Get 7 kills in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 10137,
+      "category": 0,
+      "target": 5,
+      "name": "ch_quest076_stage002",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_2",
+      "description": "Get 3 Headshot kills in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 10138,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest076_stage003",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_3",
+      "description": "Get 4 Longshot kills in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 10139,
+      "category": 0,
+      "target": 2,
+      "name": "ch_quest076_stage004",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_4",
+      "description": "Execute 2 Finishing Moves in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 10140,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest076_stage005",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_5",
+      "description": "Get 3 Quickscope kills in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 10141,
+      "category": 0,
+      "target": 3,
+      "name": "ch_quest076_stage006",
+      "description_key": "CHALLENGE/SEASON_3_QUEST_2_STEP_6",
+      "description": "Get 3 Point Blank kills in a minute &&1 times",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "minute_windows"
+    },
+    {
+      "id": 50000,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_1",
+      "description": "Ping an Enemy",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50001,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_2",
+      "description": "Ping an object on the ground",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50003,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_3",
+      "description": "Ping 'danger' in the world",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50005,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_4",
+      "description": "Collect 1 weapon in a match",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50006,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_5",
+      "description": "Collect your Loadout &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50007,
+      "category": 1,
+      "target": 15,
+      "name": "ch_quest035_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_6",
+      "description": "Collect &&1 piles of cash from the ground",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50008,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest035_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_7",
+      "description": "Survive &&1 second(s) in the gas field",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50009,
+      "category": 1,
+      "target": 5,
+      "name": "ch_quest035_stage008",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_8",
+      "description": "Pilot a vehicle for &&1 minutes",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50010,
+      "category": 1,
+      "target": 10,
+      "name": "ch_quest035_stage009",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_9",
+      "description": "Open &&1 Caches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50011,
+      "category": 1,
+      "target": 6,
+      "name": "ch_quest035_stage010",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_1_STEP_10",
+      "description": "Use &&1 armor plates",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50012,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest036_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_1",
+      "description": "Start &&1 Contract(s) at the Gora Dam",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50013,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest036_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_2",
+      "description": "Get &&1 kills or assists while in a vehicle",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_vehicle_assists"
+    },
+    {
+      "id": 50014,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest036_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_3",
+      "description": "Revive yourself &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50015,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest036_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_4",
+      "description": "Start &&1 Contract(s) near the BCH TV Station",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50016,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest036_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50017,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest036_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_6",
+      "description": "Kill &&1 downed enemies",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50018,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest036_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_2_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50019,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest037_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_1",
+      "description": "Start &&1 Contract(s) at the Verdansk Port",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50020,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest037_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_2",
+      "description": "Destroy &&1 vehicle(s) carrying enemies",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_occupied_vehicle_destruction"
+    },
+    {
+      "id": 50021,
+      "category": 1,
+      "target": 5,
+      "name": "ch_quest037_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_3",
+      "description": "Pilot a vehicle for &&1 minutes",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50022,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest037_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_4",
+      "description": "Start &&1 Contract(s) at the Verdansk Train Station",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50023,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest037_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50024,
+      "category": 1,
+      "target": 6,
+      "name": "ch_quest037_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_6",
+      "description": "Use &&1 armor plates",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50025,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest037_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_3_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50026,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest038_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_1",
+      "description": "Start &&1 Contract(s) in the Krovnik Farmland",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50027,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest038_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_2",
+      "description": "Get &&1 kills with an epic weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50028,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest038_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_3",
+      "description": "Get &&1 kills with a legendary weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50029,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest038_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_4",
+      "description": "Start &&1 Contract(s) at the Atlas Superstore",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50030,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest038_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50031,
+      "category": 1,
+      "target": 10,
+      "name": "ch_quest038_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_6",
+      "description": "Open &&1 Caches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50032,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest038_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_4_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50033,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest039_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_1",
+      "description": "Start &&1 Contract(s) at the Gorengard Lumberyard",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50034,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest039_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_2",
+      "description": "Collect your loadout &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50035,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest039_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_3",
+      "description": "Buy &&1 Killstreaks",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50036,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest039_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_4",
+      "description": "Start &&1 Contract(s) in the Zhokov Boneyard",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50037,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest039_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50038,
+      "category": 1,
+      "target": 5,
+      "name": "ch_quest039_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_6",
+      "description": "Get &&1 kills with a common weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50039,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest039_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_5_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50040,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest040_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_1",
+      "description": "Start &&1 Contract(s) at the Verdansk Airport",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50041,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest040_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_2",
+      "description": "Get a kill before the first circle closes &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50042,
+      "category": 1,
+      "target": 15,
+      "name": "ch_quest040_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_3",
+      "description": "Collect &&1 piles of cash from the ground",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50043,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest040_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_4",
+      "description": "Start &&1 Contract(s) in Downtown Tavorsk",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50044,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest040_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50045,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest040_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_6",
+      "description": "Get &&1 kills or assists while in a vehicle",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_vehicle_assists"
+    },
+    {
+      "id": 50046,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest040_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_6_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50047,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest041_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_1",
+      "description": "Start &&1 Contract(s) at the Zordaya Prison Complex",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50048,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest041_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_2",
+      "description": "Win &&1 one on one fight(s) as a prisoner",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50049,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest041_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_3",
+      "description": "Revive a Teammate &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50050,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest041_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_4",
+      "description": "Start &&1 Contract(s) at the Verdansk Hospital",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50051,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest041_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50052,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest041_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_6",
+      "description": "Buy your Team back into the game &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50053,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest041_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_7_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50054,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest042_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_1",
+      "description": "Start &&1 Contract(s) at the Arklov Peak Military Base",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50055,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest042_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_2",
+      "description": "Buy &&1 Loadout Drop(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50056,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest042_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_3",
+      "description": "Destroy &&1 vehicle(s) carrying enemies",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_occupied_vehicle_destruction"
+    },
+    {
+      "id": 50057,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest042_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_4",
+      "description": "Start &&1 Contract(s) at Verdansk Stadium",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50058,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest042_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50059,
+      "category": 1,
+      "target": 20,
+      "name": "ch_quest042_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_6",
+      "description": "Survive &&1 minutes without being downed",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50060,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest042_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_8_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50061,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest043_stage001",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_1",
+      "description": "Start &&1 Contract(s) in Storage Town",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50062,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest043_stage002",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_2",
+      "description": "Buy &&1 Munitions Box(es)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50063,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest043_stage003",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_3",
+      "description": "Survive &&1 second(s) in the gas field",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50064,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest043_stage004",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_4",
+      "description": "Start &&1 Contract(s) at the Karst River Quarry",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50065,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest043_stage005",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_5",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50066,
+      "category": 1,
+      "target": 15,
+      "name": "ch_quest043_stage006",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_6",
+      "description": "Collect &&1 piles of cash from the ground",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50067,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest043_stage007",
+      "description_key": "CHALLENGE/BR_SEASON_2_QUEST_9_STEP_7",
+      "description": "Earn top 15 placement with your team &&1 time(s)\n",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50068,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest056_stage001",
+      "description_key": "CHALLENGE/BR_DAILY_PORT_PATROL_DESC",
+      "description": "Start &&1 Contract(s) at the Verdansk Port",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50069,
+      "category": 1,
+      "target": 15,
+      "name": "ch_quest056_stage002",
+      "description_key": "CHALLENGE/BR_DAILY_EASY_MONEY_DESC",
+      "description": "Collect &&1 piles of cash from the ground",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50070,
+      "category": 1,
+      "target": 6,
+      "name": "ch_quest056_stage003",
+      "description_key": "CHALLENGE/BR_DAILY_WELL_PROTECTED_DESC",
+      "description": "Use &&1 armor plates",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50071,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest056_stage004",
+      "description_key": "CHALLENGE/BR_DAILY_AIRFIELD_ASCENDENCY_DESC",
+      "description": "Start &&1 Contract(s) at the Arklov Peak Military Base",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50072,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest056_stage005",
+      "description_key": "CHALLENGE/BR_DAILY_MISSION_FOCUSED_DESC",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50073,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest056_stage006",
+      "description_key": "CHALLENGE/BR_DAILY_EXECUTIONER_DESC",
+      "description": "Kill &&1 downed enemies",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50074,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest056_stage007",
+      "description_key": "CHALLENGE/BR_DAILY_BEST_OF_THE_BEST_DESC",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50075,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest057_stage001",
+      "description_key": "CHALLENGE/BR_DAILY_TRAINYARD_TYRANT_DESC",
+      "description": "Start &&1 Contract(s) at the Verdansk Train Station",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50076,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest057_stage002",
+      "description_key": "CHALLENGE/BR_DAILY_IN_CHARGE_OF_THE_YARD_DESC",
+      "description": "Win &&1 one on one fight(s) as a prisoner",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50077,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest057_stage003",
+      "description_key": "CHALLENGE/BR_DAILY_BOUNCEBACKALICIOUS_DESC",
+      "description": "Revive yourself &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50078,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest057_stage004",
+      "description_key": "CHALLENGE/BR_DAILY_FARM_FATALITY_DESC",
+      "description": "Start &&1 Contract(s) in the Krovnik Farmland",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50079,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest057_stage005",
+      "description_key": "CHALLENGE/BR_DAILY_MISSION_FOCUSED_DESC",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50080,
+      "category": 1,
+      "target": 2,
+      "name": "ch_quest057_stage006",
+      "description_key": "CHALLENGE/BR_DAILY_HOMMICIDAL_VEHICLE_DESC",
+      "description": "Get &&1 kills or assists while in a vehicle",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_vehicle_assists"
+    },
+    {
+      "id": 50081,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest057_stage007",
+      "description_key": "CHALLENGE/BR_DAILY_BEST_OF_THE_BEST_DESC",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    },
+    {
+      "id": 50082,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest058_stage001",
+      "description_key": "CHALLENGE/BR_DAILY_TELEVISION_TRIUMPH_DESC",
+      "description": "Start &&1 Contract(s) near the BCH TV Station",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50083,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest058_stage002",
+      "description_key": "CHALLENGE/BR_DAILY_CRUSHING_WITH_COMMONS_DESC",
+      "description": "Get &&1 kills with a common weapon",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50084,
+      "category": 1,
+      "target": 10,
+      "name": "ch_quest058_stage003",
+      "description_key": "CHALLENGE/BR_DAILY_TREASURE_HUNTER_DESC",
+      "description": "Open &&1 Caches",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50085,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest058_stage004",
+      "description_key": "CHALLENGE/BR_DAILY_GULAG_GOVERNOR_DESC",
+      "description": "Start &&1 Contract(s) at the Zordaya Prison Complex",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50086,
+      "category": 1,
+      "target": 3,
+      "name": "ch_quest058_stage005",
+      "description_key": "CHALLENGE/BR_DAILY_MISSION_FOCUSED_DESC",
+      "description": "Complete any &&1 Contract(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "baseline127"
+    },
+    {
+      "id": 50087,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest058_stage006",
+      "description_key": "CHALLENGE/BR_DAILY_VEHICULAR_HOMMICIDE_DESC",
+      "description": "Destroy &&1 vehicle(s) carrying enemies",
+      "status": "excluded_contract_unverified",
+      "implementation_or_blocker": "br_occupied_vehicle_destruction"
+    },
+    {
+      "id": 50088,
+      "category": 1,
+      "target": 1,
+      "name": "ch_quest058_stage007",
+      "description_key": "CHALLENGE/BR_DAILY_BEST_OF_THE_BEST_DESC",
+      "description": "Earn top 15 placement with your team &&1 time(s)",
+      "status": "implemented_source",
+      "implementation_or_blocker": "br12"
+    }
+  ],
+  "source_and_proof_hashes": [
+    {
+      "path": "data/remaining-contracts-20261009/mission-descriptions-eng_ui-verified.json",
+      "sha256": "b65411b28da51afafe2ef7cddc0ec4a17ba846e1037e57688049e64a594778cf"
+    },
+    {
+      "path": "src/replay_quest_data.h",
+      "sha256": "887a2bb5f46c9f11d969fbfbc2f036956a603df99faa2261c91e8e983413548a"
+    },
+    {
+      "path": "src/quest_services.cpp",
+      "sha256": "dc6f33aa09b28110df6ae6e63d8349556f710bfba046948eeb73a0a052bdcc11"
+    },
+    {
+      "path": "src/quest_services.h",
+      "sha256": "f8ade47d548973d592bf0ce7de9de252b92ceaf95d944d0f28c89aa1b4c5bcd9"
+    },
+    {
+      "path": "src/replay_mp_mission_earning.h",
+      "sha256": "c1ce377a949f1c2f560c2efa070a0bbb512daa57881a0e5e651e2e36d1165bd2"
+    },
+    {
+      "path": "src/replay_br_cp_mission_earning.h",
+      "sha256": "fe8de7d420e6149e8ab21332fb9104514b23153f1af7c78bfa7e105871313742"
+    },
+    {
+      "path": "src/replay_match_completion.h",
+      "sha256": "a163d82b1b86bb263f90967755fb20202487cfeeb03d3631cf84275694c901c6"
+    },
+    {
+      "path": "src/replay_groundwar_mission_earning.h",
+      "sha256": "778e7433604eb3a03a169c79b9e650c993b3a6b5df4cf82b78063bc9610938ac"
+    },
+    {
+      "path": "tools/test-replay-quest-earning.py",
+      "sha256": "b7a9e56caabd16e0e79a48e4a51ab1ac5186d42640921083bc5c35b4079a9fe7"
+    },
+    {
+      "path": "data/remaining-kill-modifiers-20261010/validation-cohort/tools/test-replay-quest-earning.py",
+      "sha256": "7d90596a6a8bc89f3687dc76ded3d2c3fb72be88272fed9fa2ee2aa1cca44ad7"
+    },
+    {
+      "path": "validation/20261011-replay-mp-mission-events.json",
+      "sha256": "026996eec630d3d86e8864932407c694d929cd75cdbb378514d95fd6a849125d"
+    },
+    {
+      "path": "validation/20261011-replay-mp-mission-helper.json",
+      "sha256": "ce7321eb89c3ae88e41a4ee5a845030050fa0de598a090c5365e0d46419fd6db"
+    },
+    {
+      "path": "validation/20261011-replay-br-cp-contracts.json",
+      "sha256": "0f69ecfc272a0af0026c70b542005071f1a03c8bfe702d45cdc949f14312aa4c"
+    },
+    {
+      "path": "validation/20261011-replay-br-cp-predicates.json",
+      "sha256": "da9bed7c5f898a497fabbc02593d278562f82f793491945ac2a09ca90bdcd206"
+    },
+    {
+      "path": "validation/20261011-match-completion-contracts.json",
+      "sha256": "3f706d396d08ef8aa6379ea3c61f1284f576258ae78e3b006803a2f9ca0654cb"
+    },
+    {
+      "path": "validation/20261011-multikill-mission-contracts.json",
+      "sha256": "a8ae2b2f14cc5e55d484fe4baddf8e287fbf489c8fc559ba96d48c512e9b3414"
+    },
+    {
+      "path": "validation/20261011-ground-war-mission-contracts.json",
+      "sha256": "a50e277c5b463764ea2812c2f430a8a80f71f6708d56b31c9aa532a3850eac78"
+    },
+    {
+      "path": "validation/20261011-ground-war-mission-helper.json",
+      "sha256": "2b4a5b54d6566b54fd5b518bd87924505880bc24e9a5900e2dfda4118a86c385"
+    }
+  ],
+  "validation_scope": {
+    "baseline": "Prior exact-binary encrypted Windows/Linux receipts for 127 stages, matched to retained fixture bytes.",
+    "new_mp_helper": "123 original parser cases and 1421 isolated compiled helper assertions.",
+    "new_br_helper": "12 source predicates and isolated compiled helper assertions.",
+    "new_mp_completion": "9 source predicates with original producer/outcome proof; combined lifecycle test owned by root.",
+    "new_groundwar_helper": "4 source-integrated predicates; 12 original parser packets and 162 isolated MSVC helper checks. Combined validation owned by root.",
+    "combined_build_ready": false,
+    "combined_validation": "Pending root combined build and encrypted suites; this inventory is source/proof-bound, not a final binary readiness receipt.",
+    "game_interactions": 0,
+    "runtime_callbacks_proven_by_inventory": false
+  }
+}

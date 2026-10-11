@@ -1,0 +1,53 @@
+Replay BR and co-op mission predicates, 2026-10-11
+
+Implemented: 12 additional BR stages.
+50017: kill a downed player in BR, using the original VictimLastStand bit.
+50018/50025/50032/50039/50046/50053/50060/50067/50074/50081/50088:
+finish in positions 1 through 15, with exact BR game type 24.
+
+Integration: include replay_br_cp_mission_earning.h in quest_services.cpp.
+For complete seven-parameter BR kill packets call
+replay_br_cp_mission_earning::killMatches(stage, kill).
+For complete three-parameter match_placement packets call
+replay_br_cp_mission_earning::placementMatches(stage, {Param0, Param1, Param2}).
+The owning service must enforce an active eligible public BR match, exact
+specificgameMode, one placement report per match, and reject reports after
+the first accepted native end. The helper owns packet semantics only.
+
+Evidence: the original native parser already executed placement_br_15,
+placement_br_16 and positive/negative downed packets. Hash-verified original
+cp_mp/challenges ScriptFile producer reports mode, placement, operators.
+research-replay-br-cp-missions.py verifies retained source/payload receipts
+and stores the selected original native packets. No SQLite aliases are used.
+
+Validation: isolated MSVC C++17 /W4 /WX helper compiled and executed.
+231 placement boundary checks, original downed positive/negative packets,
+wrong game type, wrong target and unrelated stage rejection passed.
+No game launch, game interaction, server deployment or full shared build.
+
+Still blocked: vehicle assists 50013/50045/50080.
+Shipped onplayerkillassist reports [0,0], the weapon pair and operators.
+It contains no vehicle-state field. Counting only qualifying kills would
+miss legitimate assists and is not a complete implementation.
+
+Still blocked: occupied vehicle destruction 50020/50056/50087.
+VehicleExplosive is set when a kill inflictor is a vehicle; VictimInVehicle
+identifies victim state. These player-kill flags do not establish a unique
+vehicle destruction. Multiple occupant kills would overcount one vehicle.
+A verified distinct destruction producer/identity contract is required.
+
+Still blocked: category 4 co-op 10057 through 10069.
+Original kill packet keeps agent targets, weapons, operators and modifiers.
+But public CP operation family eligibility and operation identity have not
+been proven; survival/trial packets cannot stand in for an operation.
+The cp_complete parser accepts one parameter, but parser acceptance does
+not prove successful operation completion or the public owning player.
+Original RIP scan finds one candidate literal consumer: ProcessParams.
+Its incomplete linear decode is not proof that other producers are absent.
+The shared ScriptFile's usedkillstreak is empty. killstreak_end records end
+data and cannot safely count distinct successful uses without its producer
+and cancellation/duplicate contract. No approximate CP credit was added.
+
+Readiness: the 12 BR helper predicates are ready for the root service's
+lifecycle integration and combined Windows/Linux/encrypted fixture gates.
+All 13 CP stages and six vehicle stages remain explicit blockers.

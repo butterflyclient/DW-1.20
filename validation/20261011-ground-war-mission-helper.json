@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "stage_ids": [
+    1515,
+    1572,
+    1591,
+    10048
+  ],
+  "original_parser_cases": 12,
+  "checks": 162,
+  "header_sha256": "778e7433604eb3a03a169c79b9e650c993b3a6b5df4cf82b78063bc9610938ac",
+  "parser_proof_sha256": "a50e277c5b463764ea2812c2f430a8a80f71f6708d56b31c9aa532a3850eac78",
+  "scope": "Isolated C++20 MSVC/W4/WX helper; no combined backend build, deployment or game interaction."
+}

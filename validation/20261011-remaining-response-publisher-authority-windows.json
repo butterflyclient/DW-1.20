@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "passed": true,
+  "server_sha256": "a89bf688f22108d85a616103a9d61b5518e20fac3078051a5c1784d5e9e123e8",
+  "fixture_directory": "E:\\DW\\IW8\\data\\publisher-cache-fixture-1791679566176793500",
+  "checks": [
+    "Single/vector metadata publish one durable reference; healthy cache is retained",
+    "Truncated and same-length corrupt cache is repaired before returning either native metadata envelope",
+    "Real blocked atomic publication reports storage failure; retry repairs without a false successful URL",
+    "Malformed durable references and checksum-invalid source fail without destroying valid stored bytes",
+    "Retained URLs respect current ACL/expiry/removal; identical bytes remain public through another valid publisher",
+    "Actual process restart retains publication identity and repairs both damaged cache and abandoned staging"
+  ],
+  "native_game_verified": false
+}

@@ -1,0 +1,82 @@
+REPLAY EMULATION EXCLUSIONS - 2026-10-11
+
+These six native tasks are deliberately unavailable. They are not credited as
+emulated routes. Error handling is implemented and independently verified;
+the target response contracts needed for successful replies remain unresolved.
+This is a bounded exclusion list, not a claim that every unknown task is covered.
+
+50/22 - ContentStreaming live download
+58/22 - PooledStorage multipart download
+  Original writers and extended result consumers are present. Consumers use a
+  28992-byte result with URL storage +18700, count +28952 and part offset +28968.
+  The constructor, deserialize vtable and response wire order remain unbound.
+  All five recovered direct initDownload callers pass null extended metadata.
+  Ordinary 19744-byte file metadata cannot establish this extended contract.
+
+193/9 - Publisher objects by category
+193/10 - User objects by category
+  Original engine/SDK request paths and response StructBuffer subobjects +8
+  and +432 are verified. Externally owned response allocation and concrete
+  reader ownership remain unbound. The verified user-list pageToken parser
+  cannot be assigned to these category response owners without that evidence.
+
+193/12 - Single large-object upload completion
+193/24 - Multiple large-object upload completion
+  Original streaming modes 2 and 4 select these tasks after HTTP completion,
+  preserving cached request +0xA0 and response +0xA8. Their concrete response
+  serializer classes and initiating upload owners remain unverified. Previously
+  proposed database aliases resolve to SHA1/HMAC and CRT bodies, not readers.
+
+OBSERVED FAILURE CONTRACT
+  Native tasks above return existing error 108 with no results. Payload contents
+  are not decoded as an implemented operation. Twelve authenticated encrypted
+  fixture requests verify empty and malformed payloads for each excluded route.
+  The error frame ends after transaction/error; no false empty-success results
+  are appended. A subsequent server-time task proves the connection remains usable.
+  No content-streaming, objectstore or REST domain data is created by these calls.
+
+  Unknown valid REST operations return an ordinary REST envelope containing
+  HTTP status 503 and error name LocalServiceUnavailable. Outer task transport
+  success carries that explicit domain failure; it does not mean the operation
+  was emulated. Both GET and PUT fixture operations were checked. Configured
+  local GET resources remain operator-supplied fixtures, not generic emulation.
+
+PUBLICATION AND CONTROL AUDIT
+  Native publisher tasks read operator-published metadata/content. Local disk
+  publication through publish-publisher-object.py is an operator tool, not an
+  emulated native publisher upload/completion operation.
+  Publisher cache presence alone does not authorize HTTP publication. Current
+  public ACL, expiry and publication references must authorize the exact bytes.
+  The existing focused publisher test passed six groups on the same prototype:
+  single/vector references, corruption recovery, blocked atomic publication,
+  malformed records/source rejection, ACL/expiry/removal, and process restart.
+  These checks found no production error-handling change needed in the owned
+  content/objectstore modules. Other platform/control routes are outside this
+  narrow exclusion audit and retain their separate validation requirements.
+
+UNRESOLVED CONTRACT VS UNRUN GAME CALLBACK
+  The six exclusions lack a sufficiently verified target reader contract for
+  implementation. Implemented services elsewhere may have working encrypted
+  backend fixtures while their actual game callback remains untested. These are
+  different evidence gaps: this audit neither disables those implemented routes
+  nor claims their live game consumers have been verified. No game was launched.
+
+EVIDENCE
+  Original target SHA256:
+  68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0
+  Prototype executable SHA256:
+  a89bf688f22108d85a616103a9d61b5518e20fac3078051a5c1784d5e9e123e8
+  docs/DW_TARGET_CONSUMER_AUDIT_20261006.txt
+  docs/DW_OBJECTSTORE_COMPLETION_20261007.txt
+  docs/DW_REMAINING_RESPONSE_BINDINGS_20261011.txt
+  validation/20261009-objectstore-category-constructors.json
+  validation/20261011-remaining-response-original-references.json
+  validation/20261011-remaining-response-live-ownership.json
+  validation/20261011-remaining-response-exclusions-windows.json
+  validation/20261011-remaining-response-publisher-authority-windows.json
+
+REPEATABLE CHECK
+  python tools/test-emulation-exclusions.py --server <prototype executable>
+    --output validation/20261011-remaining-response-exclusions-<platform>.json
+  The exclusion fixture starts only a disposable backend with isolated data and
+  ports, terminates it, and removes its temporary fixture directory automatically.

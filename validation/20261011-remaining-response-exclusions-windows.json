@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "passed": true,
+  "server_sha256": "a89bf688f22108d85a616103a9d61b5518e20fac3078051a5c1784d5e9e123e8",
+  "cases": [
+    {
+      "service": 50,
+      "task": 22,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 50,
+      "task": 22,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 58,
+      "task": 22,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 58,
+      "task": 22,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 9,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 9,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 10,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 10,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 12,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 12,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 24,
+      "malformed_payload": false,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "service": 193,
+      "task": 24,
+      "malformed_payload": true,
+      "native_error": 108,
+      "result_bytes": 0,
+      "passed": true
+    },
+    {
+      "rest_method": 4670804,
+      "status": 503,
+      "error": "LocalServiceUnavailable",
+      "passed": true
+    },
+    {
+      "rest_method": 5264724,
+      "status": 503,
+      "error": "LocalServiceUnavailable",
+      "passed": true
+    }
+  ],
+  "connection_survived": true,
+  "excluded_route_domain_writes": false,
+  "native_game_verified": false,
+  "disposable_fixture_removed": true
+}

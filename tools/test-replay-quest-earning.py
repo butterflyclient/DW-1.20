@@ -18,11 +18,13 @@ import subprocess
 import time
 import urllib.request
 import uuid
+import zlib
 
 from native_wire_client import NativeClient, binary, fields, integer, structure, text, u32, u64
 from progression_delivery_fixtures import decode_event67
 
 ROOT = Path(__file__).resolve().parents[1]
+UINT64_MAX = (1 << 64) - 1
 
 
 def main():
@@ -30,6 +32,7 @@ def main():
     parser.add_argument("--server", type=Path, required=True)
     parser.add_argument("--parser-proof", type=Path, required=True)
     parser.add_argument("--battlepass-publication", type=Path, required=True)
+    parser.add_argument("--mp-contract", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     original = json.loads(args.parser_proof.read_bytes())
@@ -37,6 +40,17 @@ def main():
     cases = {row["fixture_label"]: row for row in original["cases"] if "fixture_label" in row}
     assert all(row["accepted"] for row in cases.values())
     assert all(row["parameter_count"] == 7 for row in cases.values() if row["name"] == "kill")
+    mp_contract = None
+    if args.mp_contract:
+        mp_contract = json.loads(args.mp_contract.read_bytes())
+        assert mp_contract["passed"] and mp_contract["target_image_sha256"] == original["target_image_sha256"]
+        for index, row in enumerate(mp_contract["cases"]):
+            if row["accepted"]:
+                cases[f"mp_action_{index}"] = row
+
+    def native_action(name, predicate):
+        return next(label for label, row in cases.items()
+                    if label.startswith("mp_action_") and row["name"] == name and predicate(row["values"]))
     metadata = json.loads((ROOT / "validation/20261008-replay-quest-rewards-assets.json").read_bytes())
     quests = {row["id"]: row for row in metadata["quests"]}
     fixtures = {1501: "pistol", 1503: "frag", 1505: "assault", 1506: "smg",
@@ -61,11 +75,31 @@ def main():
                 10001: "secondary_smg_specialty_munitions_2",
                 10038: "ads_reflex", 10039: "longshot_thermal",
                 10130: "oden_longshot", 10134: "fal_ads", 10135: "m13_kingslayer"}
+    if mp_contract:
+        fixtures.update({
+            1516: native_action("kill", lambda p: p[3] == 35),
+            1601: native_action("kill", lambda p: p[3] == 120 and p[6] >> 16 == 8),
+            1602: native_action("kill", lambda p: p[3] == 54),
+            10005: native_action("kill", lambda p: p[3] == 54),
+            1515: "groundwar_capture_32",
+            1572: "groundwar_capture_32",
+            1591: "groundwar_capture_32",
+            10048: "groundwar_kill_32_iw8_pi_decho_mp_1",
+        })
     fixture = ROOT / "data" / f"quest-earning-fixture-{time.time_ns()}"
     data = fixture / "data"
     data.mkdir(parents=True)
     shutil.copy2(ROOT / "data/replay-traffic-kdf.bin", data)
-    catalog = runpy.run_path(str(ROOT / "tools/prepare-playlist-catalog.py"))["prepare"](data, ["mp_shipment", "mp_donetsk"], 1)
+    available = ["mp_shipment", "mp_donetsk"]
+    completion_playlists = {6: 1, 25: 15}
+    if mp_contract:
+        native_catalog = json.loads(zlib.decompress((ROOT / "data/unified_large_playlist_tu19.aggr").read_bytes()).rstrip(b"\0"))
+        for mode, script in ((7, "sd"), (26, "cyber")):
+            publication = next(row for row in native_catalog["playlists"]
+                               if any(entry["gametype"] == script for entry in row["maps"]))
+            completion_playlists[mode] = publication["playlist"]
+            available.append(next(entry["map"] for entry in publication["maps"] if entry["gametype"] == script))
+    catalog = runpy.run_path(str(ROOT / "tools/prepare-playlist-catalog.py"))["prepare"](data, available, 1)
     runpy.run_path(str(ROOT / "tools/publish-replay-battlepass.py"))["publish"](args.battlepass_publication, data)
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     for profile in ("quest-host", "quest-peer"):
@@ -155,6 +189,10 @@ def main():
         return raw
 
     def send(client, request, events):
+        # Native 125/1 bounds its request token to 25 bytes. Long descriptive
+        # fixture labels use one stable 22-character UUID token, as the SDK does.
+        if len(request.encode()) > 25:
+            request = base64.urlsafe_b64encode(hashlib.sha256(request.encode()).digest()[:16]).decode().rstrip("=")
         packet = structure(text(1, "5800") + b"".join(binary(2, row) for row in events) + text(3, request))
         assert client.task(125, 1, packet) == b""
         return packet
@@ -312,7 +350,7 @@ def main():
             assert kind == 2 and packet.startswith(u32(expected)), packet[:32].hex()
             return packet
 
-    def create_match(host, peer, private=False, phase="in_game", br=False):
+    def create_match(host, peer, private=False, phase="in_game", br=False, playlist=1):
         tokens = []
         for client in (host, peer):
             info = {"dedicated_server": {"build_name": "replay-quest-fixture"},
@@ -324,7 +362,7 @@ def main():
             tokens.append(struct.unpack_from("<Q", client.task(145, 3, b"", structured=False), 1)[0])
         query = {"members": [host.user, peer.user], "tokens": tokens,
                  "lobby_slots": {"min": 1, "max": 4}, "team_balance": {"num_teams": 2},
-                 "ruleset_payload": {"filter": {"playlist_id": 1, "netcode_version": 66514,
+                 "ruleset_payload": {"filter": {"playlist_id": playlist, "netcode_version": 66514,
                                                   "playlist_version": catalog["version"]}}}
         if private:
             query["private_lobby"] = {"initial_party_id": 61}
@@ -1045,10 +1083,12 @@ def main():
             checks.append("Signed listen-host REST purchase reporting credits only the authorized remote buyer and grants its exact reward")
             br_kill_stages = {50027: "br_rarity_3", 50028: "br_rarity_4", 50038: "br_rarity_0",
                               50083: "br_rarity_0", 50041: "br_circle_0", 50073: "br_victim_downed"}
+            if mp_contract:
+                br_kill_stages[50017] = "br_victim_downed"
             for identity, label in br_kill_stages.items():
                 if identity == 50041:
                     negatives = [f"br_circle_{value}" for value in (1, 2, 256, 65535)]
-                elif identity == 50073:
+                elif identity in (50017, 50073):
                     negatives = ["br_attacker_downed", "br_equipment_downed", "modifier_victim_down_wrong_word"]
                 else:
                     rarity = {50027: 3, 50028: 4, 50038: 0, 50083: 0}[identity]
@@ -1080,6 +1120,132 @@ def main():
                 assert all(row["reason"] == "inProgress" for row in rewards(host, 2, refresh=True))
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: exact original BR rarity/circle/victim flags credit one player kill, exclude unknown and wrong fields, and preserve completion/retry rewards")
+            if mp_contract:
+                create_match(host, peer)
+                action_rules = {
+                    1502: ("killstreak_end", 70000, 1),
+                    1545: ("killstreak_end", 70009, 1),
+                    1546: ("killstreak_end", 70012, 17),
+                    1547: ("killstreak_end", 70000, 1),
+                    1548: ("killstreak_end", 70001, 1),
+                    1549: ("killstreak_end", 70013, 17),
+                    1550: ("killstreak_end", 70003, 17),
+                    1551: ("killstreak_end", 70017, 17),
+                    1552: ("killstreak_end", 70018, 17),
+                    1566: ("field_end", 280019, 1),
+                    1575: ("killstreak_end", 70000, 17),
+                    10009: ("killstreak_end", 70000, 1),
+                    10010: ("killstreak_end", 70001, 1),
+                    10011: ("killstreak_end", 70002, 1),
+                    10014: ("field_end", 280010, 17),
+                    10015: ("field_end", 280019, 17),
+                    10016: ("field_end", 280019, 17),
+                    10017: ("field_end", 280010, 17),
+                    10018: ("field_end", 280017, 17),
+                    10019: ("field_end", 280012, 17),
+                    10020: ("field_end", 280015, 17),
+                    10021: ("field_end", 280009, 1),
+                    10022: ("field_end", 280018, 1),
+                    10023: ("field_end", 280011, 17),
+                    10024: ("field_end", 280021, 17),
+                }
+                for identity, (name, kind, increment) in action_rules.items():
+                    label = native_action(name, lambda p: p[0] == kind and p[1] == (1 if identity == 10022 else 17))
+                    seed(host, identity, False)
+                    before = snapshot(host)
+                    for index, changes in enumerate((dict(extra={"Param0": 0}),
+                            dict(extra={"Param1": UINT64_MAX}), dict(mode=8),
+                            dict(omit=("Param2" if name == "field_end" else "Param6",)))):
+                        send(host, f"action-negative-{identity}-{index}", [event(label, **changes)])
+                        after = snapshot(host)
+                        assert after[0] == before[0] and after[2] == before[2]
+                    send(host, f"action-counter-{identity}", [event(label)])
+                    target = quests[identity]["target"]
+                    update = rewards(host, 2 if increment >= target else 1)
+                    assert next(row for row in update if row["kind"] == 15)["progress"] == min(increment, target)
+                    seed(host, identity)
+                    packet = send(host, f"action-complete-{identity}", [event(label)])
+                    assert next(row for row in rewards(host, 2) if row["kind"] == 15)["reason"] == "completed"
+                    saved = snapshot(host)
+                    assert host.task(125, 1, packet) == b""
+                    rewards(host, 2, refresh=True)
+                    assert snapshot(host) == saved
+                    checks.append(f"Stage {identity}: original {name} counter earns exact progress/rewards, rejects incomplete/unknown/wrong-family fields and retries once")
+
+                br_lobby = create_match(host, peer, br=True)
+                top15 = (50018, 50025, 50032, 50039, 50046, 50053, 50060, 50067, 50074, 50081, 50088)
+                for index, identity in enumerate(top15):
+                    native = 99000000 + index
+                    seed(host, identity, False)
+                    send(host, f"placement-start-{identity}", [event("start_br", timestamp=2000,
+                         mode=8, extra={"Param0": native})])
+                    before = snapshot(host)
+                    for negative_index, (label, changes) in enumerate((("placement_br_15", dict(extra={"Param1": 0})),
+                            ("placement_br_15", dict(extra={"Param0": 6})),
+                            ("placement_br_15", dict(extra={"Param1": UINT64_MAX})),
+                            ("placement_br_15", dict(omit=("Param2",))))):
+                        send(host, f"placement-invalid-{identity}-{negative_index}",
+                             [event(label, timestamp=2001, mode=8, **changes)])
+                        after = snapshot(host)
+                        assert after[0] == before[0] and after[2] == before[2]
+                    if index % 2:
+                        send(host, f"placement-end-first-{identity}", [event("end_br", timestamp=2002,
+                             mode=8, extra={"dw_match_id": native})])
+                    send(host, f"placement-good-{identity}", [event("placement_br_15", timestamp=2001, mode=8)])
+                    update = rewards(host, 2 if quests[identity]["target"] == 1 else 1)
+                    assert next(row for row in update if row["kind"] == 15)["progress"] == 1
+                    if not index % 2:
+                        send(host, f"placement-close-{identity}", [event("end_br", timestamp=2002,
+                             mode=8, extra={"dw_match_id": native})])
+                    before = snapshot(host)
+                    send(host, f"placement-repeat-{identity}", [event("placement_br_15", timestamp=2001,
+                         mode=8, extra={"dw_match_id": native})])
+                    assert snapshot(host)[0] == before[0]
+                    seed(host, identity)
+                    send(host, f"placement-finish-start-{identity}", [event("start_br", timestamp=2003,
+                         mode=8, extra={"Param0": native + 100})])
+                    send(host, f"placement-finish-{identity}", [event("placement_br_15", timestamp=2004, mode=8)])
+                    assert next(row for row in rewards(host, 2) if row["kind"] == 15)["reason"] == "completed"
+                    send(host, f"placement-finish-close-{identity}", [event("end_br", timestamp=2005,
+                         mode=8, extra={"dw_match_id": native + 100})])
+                    stored = json.loads(states_path(host).with_name("events.json").read_bytes())["matches"]
+                    assert stored[str(native)]["placement"] == {"rank": 15, "timestamp": 2001}
+                    checks.append(f"Stage {identity}: authenticated stock BR placement earns once, tolerates terminal arrival order, and grants its exact completion reward")
+
+                completion_rules = {1500: (6, 2), 1511: (6, 3), 1504: (6, 1),
+                    1568: (6, 1), 1579: (6, 1), 1574: (7, 1), 1578: (25, 1),
+                    1587: (25, 2), 1593: (26, 1)}
+                for index, (identity, (mode, outcome)) in enumerate(completion_rules.items()):
+                    lobby = create_match(host, peer, playlist=completion_playlists[mode])
+                    label = f"complete_end_{mode}_{outcome}"
+                    native = 99100000 + index
+                    seed(host, identity)
+                    before = snapshot(host)
+                    send(host, f"completion-no-start-{identity}", [event(label, timestamp=3001)])
+                    assert snapshot(host)[0] == before[0]
+                    send(host, f"completion-stock-start-{identity}", [event(f"complete_start_{mode}",
+                         timestamp=3000, extra={"Param0": native})])
+                    for negative_index, negative in enumerate((dict(omit=("Param4",)), dict(extra={"Param1": 4294967297}),
+                                     dict(extra={"Param0": 24}), dict(mode=8))):
+                        send(host, f"completion-negative-{identity}-{negative_index}",
+                             [event(label, timestamp=3001, **negative)])
+                        assert snapshot(host)[0] == before[0]
+                    packet = send(host, f"completion-good-{identity}", [event(label, timestamp=3002)])
+                    assert next(row for row in rewards(host, 2) if row["kind"] == 15)["reason"] == "completed"
+                    saved = snapshot(host)
+                    assert host.task(125, 1, packet) == b""
+                    rewards(host, 2, refresh=True)
+                    assert snapshot(host) == saved
+                    seed(host, identity)
+                    before = snapshot(host)
+                    send(host, f"completion-new-id-repeat-{identity}", [event(label, timestamp=3002,
+                         extra={"dw_match_id": native})])
+                    assert snapshot(host)[0] == before[0]
+                    row = json.loads(states_path(host).with_name("events.json").read_bytes())["matches"][str(native)]
+                    assert row["end"] == 3002 and row["outcome"] == outcome and row["lobby"] == int(lobby.stem)
+                    checks.append(f"Stage {identity}: exact native mode/outcome completes once from a stock start, with complete packets, reward retry and immutable first result")
+
+                create_match(host, peer, br=True)
             seed(host, 50009)
             packet = send(host, "timer-restart", [event("driving_ms", mode=8)])
             rewards(host, 1)
@@ -1180,10 +1346,11 @@ def main():
     args.output.write_text(json.dumps(dict(passed=True, server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(),
                                          parser_proof_sha256=hashlib.sha256(args.parser_proof.read_bytes()).hexdigest(),
                                          tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                                         supported_stage_count=len(fixtures) + 70, checks=checks,
+                                         supported_stage_count=len(fixtures) + 70 + (46 if mp_contract else 0), checks=checks,
+                                         mp_contract_sha256=hashlib.sha256(args.mp_contract.read_bytes()).hexdigest() if mp_contract else None,
                                          fixture_directory=str(fixture), game_runs_performed=False,
                                          native_game_callback_verified=False), indent=2) + "\n")
-    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 70} stages; {args.output}")
+    print(f"PASS: {len(checks)} quest earning groups; {len(fixtures) + 70 + (46 if mp_contract else 0)} stages; {args.output}")
 
 
 if __name__ == "__main__":

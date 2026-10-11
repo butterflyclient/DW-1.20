@@ -4,6 +4,10 @@
 #include "replay_kill_event.h"
 #include "replay_objective_event.h"
 #include "replay_buy_item_event.h"
+#include "replay_mp_mission_earning.h"
+#include "replay_br_cp_mission_earning.h"
+#include "replay_match_completion.h"
+#include "replay_groundwar_mission_earning.h"
 #include <algorithm>
 #include <string_view>
 
@@ -180,7 +184,8 @@ namespace services
                 return weapon == replay_kill_context::M13 &&
                        event.hasModifier(ReplayKillModifier::Kingslayer);
             default:
-                return false;
+                return replay_mp_mission_earning::killProgress(id, event) != 0 ||
+                       replay_groundwar_mission_earning::killProgress(id, event) != 0;
             }
         }
 
@@ -214,6 +219,7 @@ namespace services
                         return mode == ReplayChallengeGameType::dom;
                     if (id == 1517)
                         return mode == ReplayChallengeGameType::hq;
+                    return replay_groundwar_mission_earning::captureProgress(id, objective);
                 }
                 // Shipped onplant calls the defuse event too. Both native names
                 // describe one completed bomb action for this combined criterion.
@@ -230,6 +236,17 @@ namespace services
             }
             if (event.at("name") == "kill" && completeParameters(values, 7))
                 return killMatches(id, values) ? uint64_t{1} : uint64_t{0};
+            if (name == "field_end" && completeParameters(values, 3))
+                return replay_mp_mission_earning::fieldProgress(id,
+                    std::array<uint64_t, 3>{number(values, "Param0"), number(values, "Param1"),
+                                             number(values, "Param2")});
+            if (name == "killstreak_end" && completeParameters(values, 7))
+            {
+                std::array<uint64_t, 7> packet{};
+                for (unsigned index = 0; index < packet.size(); ++index)
+                    packet[index] = number(values, ("Param" + std::to_string(index)).c_str());
+                return replay_mp_mission_earning::killstreakProgress(id, packet);
+            }
             return 0;
         }
 
@@ -256,7 +273,7 @@ namespace services
                 // establish an active first circle and earns no early kill.
                 case 50041: return kill.circleIndex() == 0;
                 case 50073: return kill.hasModifier(ReplayKillModifier::VictimLastStand);
-                default: return 0;
+                default: return replay_br_cp_mission_earning::killMatches(id, kill);
                 }
             }
             if (name == "buy_item" && completeParameters(values, 3))
@@ -421,10 +438,11 @@ namespace services
     {
         // Keep admission beside the earning rules. The achievement transport
         // must not maintain a separate list that silently drops a new family.
-        static constexpr std::array<std::string_view, 17> supported = {
+        static constexpr std::array<std::string_view, 21> supported = {
             "kill", "stim", "pickup", "driving", "alive_in_gas", "alive_not_downed",
             "revive", "gulag_end_match", "ping", "contract_start", "contract_end",
-            "use_item", "loadout", "capture", "plant", "defuse", "buy_item"};
+            "use_item", "loadout", "capture", "plant", "defuse", "buy_item",
+            "field_end", "killstreak_end", "end_match", "match_placement"};
         return std::find(supported.begin(), supported.end(), std::string_view(name)) != supported.end();
     }
 
@@ -478,8 +496,25 @@ namespace services
                 if (before >= row.target)
                     continue;
                 const auto oldRemainder = number(state, "timerRemainderMs");
-                const auto increment = category == 1 ? brProgress(identity, event, state)
-                    : mpProgress(identity, event);
+                uint64_t increment = 0;
+                if (event.at("name") == "end_match")
+                {
+                    if (category == 0 && context.firstEnd && context.nativeMatch &&
+                        completeParameters(values, 5))
+                        increment = ReplayMatchCompletion{{number(values, "Param0"),
+                            number(values, "Param1"), number(values, "Param2"),
+                            number(values, "Param3"), number(values, "Param4")}}.matches(identity);
+                }
+                else if (event.at("name") == "match_placement")
+                {
+                    if (category == 1 && context.firstPlacement && context.nativeMatch &&
+                        completeParameters(values, 3))
+                        increment = replay_br_cp_mission_earning::placementMatches(identity,
+                            {number(values, "Param0"), number(values, "Param1"), number(values, "Param2")});
+                }
+                else
+                    increment = category == 1 ? brProgress(identity, event, state)
+                        : mpProgress(identity, event);
                 if (!increment && oldRemainder == number(state, "timerRemainderMs"))
                     continue;
                 const auto total = before + std::min(increment, uint64_t{row.target} - before);

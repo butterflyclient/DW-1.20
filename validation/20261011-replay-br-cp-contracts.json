@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "evidence": [
+    {
+      "path": "data\\remaining-contracts-20261009\\native-challenge-scripts\\recovery-receipt.json",
+      "sha256": "21da25d0ceafe8b35d04f7e76e3596d27a2f1cd2082e12d6e6675877ba052555"
+    },
+    {
+      "path": "data\\remaining-contracts-20261009\\native-challenge-scripts\\scripts\\cp_mp\\challenges.gsc",
+      "sha256": "7911cb883f9e752e611bbe8e26296a30c33be503e7bc03bbb5385c33c38a7b2b"
+    },
+    {
+      "path": "data\\remaining-contracts-20261009\\native-challenge-scripts\\scripts\\cp_mp\\challenges.gscbin",
+      "sha256": "074bcfaf5cd6fe39c6fde4f02321b7db9ab90197f1eab7d43afbc47a938694f7"
+    },
+    {
+      "path": "data\\remaining-kill-modifiers-20261010\\challenge-parser-verified.json",
+      "sha256": "4d95f65466f134f13055ac0d53a00df9a81a6d53287762f12cc3775951ca6ebc"
+    }
+  ],
+  "implemented_stages": [
+    50017,
+    50018,
+    50025,
+    50032,
+    50039,
+    50046,
+    50053,
+    50060,
+    50067,
+    50074,
+    50081,
+    50088
+  ],
+  "remaining": {
+    "vehicle_assists": [
+      50013,
+      50045,
+      50080
+    ],
+    "occupied_vehicle_destruction": [
+      50020,
+      50056,
+      50087
+    ],
+    "coop": [
+      10057,
+      10058,
+      10059,
+      10060,
+      10061,
+      10062,
+      10063,
+      10064,
+      10065,
+      10066,
+      10067,
+      10068,
+      10069
+    ]
+  },
+  "limits": [
+    "Assist packets contain no vehicle-state field.",
+    "Vehicle explosion player-kill flags do not identify one distinct occupied vehicle destruction.",
+    "CP operations require verified public family eligibility, operation identity, owner and CP producers; cp_complete parser acceptance alone is insufficient.",
+    "Shipped usedkillstreak function is empty; killstreak_end must not count failed, cancelled or duplicate uses.",
+    "Decompiled producer flow is supporting context; packet field positions are verified original native parser execution."
+  ]
+}
