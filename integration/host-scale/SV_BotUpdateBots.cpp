@@ -1,5 +1,7 @@
 #include "sv_host_navigation.h"
 #include "sv_host_bot_equipment.h"
+
+extern "C" void SV_HostBot_UpdateTravelUrgency(void *, HostScale::UserCmd *, bool);
 #include "sv_host_bot_loot.h"
 #include <string.h>
 
@@ -37,6 +39,7 @@ namespace
         int32_t health;
         uint16_t target;
         bool valid;
+        Vec3 origin;
         EquipmentStamp equipment;
     };
 
@@ -121,11 +124,19 @@ namespace
     {
         const auto *entity = Field<Entity *>(client, 280);
         const uint16_t target = entity->sentient ? entity->sentient->targetHandle : 0;
+        const float x = entity->origin.x - previous.origin.x;
+        const float y = entity->origin.y - previous.origin.y;
+        const float z = entity->origin.z - previous.origin.z;
         if (!previous.valid || previous.client != client || previous.player != entity->client ||
             previous.health != entity->health || entity->health <= 0 || previous.target != target ||
             now <= previous.command.serverTime || now < previous.thoughtTime ||
             Field<uint32_t>(client,
                             1368 + 8988)) // Pending script-driven buttons must run immediately.
+            return false;
+        // A script teleport can follow an earlier phase change. Compare against
+        // the last full think, not the last replayed movement command.
+        if (x * x + y * y + z * z > 256.0f * 256.0f ||
+            SV_HostBot_InGulag(static_cast<uint8_t *>(client) + 1368))
             return false;
         if (target && target <= SVHS_ClientCount && target <= 200)
         {
@@ -180,6 +191,7 @@ extern "C" void SV_BotUpdateBots()
         if (SVHS_IsBotPlaying(client))
         {
             void *data = static_cast<uint8_t *>(client) + 1368;
+            bool reusedCommand = false;
             if (SV_HostBot_PrepareEquipment(data))
                 previous.valid = false;
             if (population > 20 && ReuseDecision(previous, client, slot, population, now))
@@ -189,13 +201,17 @@ extern "C" void SV_BotUpdateBots()
                 SV_HostNav_RefreshBotMovement(static_cast<uint8_t *>(client) + 1368, &command);
                 SV_HostBot_FaceLoot(data, &command);
                 ++reused;
+                reusedCommand = true;
             }
             else
             {
                 // Only high-population bot decisions own an approximate-query
                 // scope. Human commands, worker movement, scripts outside this
                 // call, and other threads retain their native search behavior.
-                const bool navigationScope = population > 20 && SV_HostNav_BeginBot();
+                // Gulag entry needs exact current-area resolution on every
+                // native think while its teleport and arena route settle.
+                const bool navigationScope =
+                    population > 20 && !SV_HostBot_InGulag(data) && SV_HostNav_BeginBot();
                 SVHS_BotThink(client, &command);
                 if (navigationScope)
                     SV_HostNav_EndBot();
@@ -207,11 +223,16 @@ extern "C" void SV_BotUpdateBots()
                 previous.player = entity->client;
                 previous.thoughtTime = now;
                 previous.health = entity->health;
+                previous.origin = entity->origin;
                 previous.target = entity->sentient ? entity->sentient->targetHandle : 0;
                 previous.equipment = Equipment(entity, client);
                 previous.valid = population > 20;
                 ++thought;
             }
+            // Travel intent belongs to every playing bot, including normal
+            // population full thoughts. The cached base command remains native
+            // so added sprint requests cannot become stale decision buttons.
+            SV_HostBot_UpdateTravelUrgency(data, &command, reusedCommand);
             SVHS_AdvanceBotPriority(int(slot));
             ++SVHS_ActiveBotCount;
         }

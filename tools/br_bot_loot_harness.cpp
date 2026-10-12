@@ -140,12 +140,13 @@ extern "C" __declspec(dllexport) int Test_Run()
     bot.look.endTime = 4000;
     CHECK(!SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 1);
     bot.look.type = 3;
-    CHECK(!SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 1);
+    CHECK(SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 2);
+    CHECK(bot.look.type == 3 && bot.look.endTime == 4000);
     bot.look.type = 2;
     bot.scriptFlags |= 8;
-    CHECK(!SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 1);
+    CHECK(!SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 2);
     bot.scriptFlags &= ~8u;
-    CHECK(SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 2);
+    CHECK(SV_HostBot_FaceLoot(&bot, &command) && directionUpdates == 3);
     CHECK(bot.look.type == 2 && bot.look.endTime == 4000);
     ++generations[4];
     CHECK(!SV_HostBot_GetLootGoal(&bot, &goal)); // Reused Scriptable cannot keep old goal.

@@ -241,6 +241,32 @@ def prepare(snapshot, replace_owned=False):
             calls = direct_calls(rows)
             assert calls[-1] == off_grid_calls[-1]
             funcs["SVHS_BotSteerPath"] = calls[-2]
+    urgency_proof = []
+    for identity, name, expected in (
+        ("fn_73a260c3d60086cd", "SVHS_BotUpdateSprinting", "1dbece54085c3edf383bf10234b342cc1e0913d36e78f700e23c63e90426a6a2"),
+        ("fn_db1023fd56f9ba8f", "SVHS_GetSprintLeft", "0c2240c0a7f37e76a7f1ffd05188bc2f9591e83c879b4a67fb43eeac8bfcf00e"),
+        ("fn_02ed9b94a06e53c3", "SVHS_UpdateSprintConsumer", "f2c575dfa3264723970cdf559d36dc7d7756441c4ad9e6e859b0679ab7de8f18"),
+        ("fn_3ccf96c2c47212df", "SVHS_PhysicsCanStartSprint", "3f8dbf6d24f1a4ded7cf75400ff9fe7ef27c3ac2ca842f5ba7f84237a988caa5"),
+        ("fn_77d89b4a25be0544", "SVHS_PhysicsSprintStateCheck", "4852f5f0e8b4f8d5d84a7cb6d0c2d70818f35d0e59ab7e8a677d597443fb9408"),
+    ):
+        body, rows = instructions(identity)
+        assert hashlib.sha256(body).hexdigest() == expected, name
+        urgency_proof.append(dict(identity=identity, role=name, bytes=len(body), sha256=expected))
+        if name == "SVHS_BotUpdateSprinting":
+            assert any(i.mnemonic == "or" and i.op_str == "qword ptr [r14], 2" for i in rows)
+            assert any(i.mnemonic == "cmp" and i.op_str == "dword ptr [rsi + 0x31c], 0" for i in rows)
+            funcs[name] = base + by_id[identity]["rva"]
+        elif name == "SVHS_GetSprintLeft":
+            target = direct_calls(rows)[-1]
+            raw_body, raw_rows = instructions(by_address[target]["id"])
+            assert hashlib.sha256(raw_body).hexdigest() == "76c102a0747e9b5083f1ca60d830bad1fc19aa1fe065bb093f4021cf39f87778"
+            urgency_proof.append(dict(identity=by_address[target]["id"], role="SVHS_SprintLeftRaw",
+                                      bytes=len(raw_body), sha256=hashlib.sha256(raw_body).hexdigest()))
+            assert any(i.mnemonic == "mov" and i.op_str == "rsi, rdx" for i in raw_rows)
+            funcs["SVHS_SprintLeftRaw"] = target
+        elif name == "SVHS_UpdateSprintConsumer":
+            assert any(i.mnemonic == "movabs" and i.op_str == "r13, 0x800000000000" for i in rows)
+            assert base + by_id["fn_3ccf96c2c47212df"]["rva"] in direct_calls(rows)
     think_prefix = pe.get_data(funcs["SVHS_BotThink"] - base, 750)
     assert hashlib.sha256(think_prefix).hexdigest() == "d0123e3e923dc409bf1548398f5aeaef4916aab3d72cbeb5a7ea452da8743322"
     tls_tail = pe.get_data(funcs["SVHS_BotThink"] - base + len(think_prefix), 32)
@@ -344,6 +370,8 @@ void SVHS_BotYawVectors(float, void *, void *);
 unsigned SVHS_BotPathToGoal(void *, const void *, float, const char *);
 unsigned SVHS_BotMovePathing(void *, void *);
 void SVHS_BotSteerPath(void *, void *, int);
+void SVHS_BotUpdateSprinting(void *, void *);
+int SVHS_SprintLeftRaw(const void *, const void *, int);
 extern uint32_t SVHS_BotTlsIndex;
 extern void *SVHS_GameStatics;
 extern int32_t SVHS_TacGraphCount;
@@ -440,7 +468,12 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
                   usercmd_bytes=264, queue_bytes=1600, queue_capacity=6, client_bytes=321192,
                   entity_bytes=1440, sentient_bytes=184, sentient_info_bytes=64,
                   team_bit_count=160, sight_capacity=272, client_capacity=200,
-                  equipment_bindings=equipment_proof, game_run_performed=False)
+                  equipment_bindings=equipment_proof,
+                  urgency=dict(native=urgency_proof, sprint_request=2,
+                               tactical_sprint_request=0x800000000000,
+                               physics_can_start_sprint_identity="fn_3ccf96c2c47212df",
+                               meters_and_timers_owned_by_native_physics=True),
+                  game_run_performed=False)
     (snapshot / "generated/host-scale-integration.json").write_text(json.dumps(result, indent=2) + "\n")
     for filename, module_name in (("prepare-bot-think-integration.py", "native_bot_think"),
                                   ("prepare-br-bot-loot-integration.py", "native_bot_loot")):

@@ -66,5 +66,6 @@ extern "C"
     // Native look request + native command encoding. The temporary request is
     // restored after the call; combat/script look priorities remain authoritative.
     bool SV_HostBot_FaceLoot(void *, HostScale::UserCmd *);
+    bool SV_HostBot_AllowSurvival(void *);
     bool SV_HostBot_NeedsRangedWeapon(void *);
 }

@@ -101,7 +101,8 @@ class Runner:
                    "SV_HostNav_GraphWork", "SV_HostNav_HasWork",
                    "DW_LocalBackend_GetAuthAddress", "SV_HostNav_RecordClosest",
                    "SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
-                   "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot")
+                   "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
+                   "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency")
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
@@ -109,7 +110,8 @@ class Runner:
                     hooks[self.base + self.report["symbols"][name]] = name
             hooks[self.base + self.report["symbols"]["Com_Optimized_IsEnabled"]] = "optimized-policy"
             for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
-                         "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot"):
+                         "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
+                         "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency"):
                 hooks[self.base + self.report["symbols"][name]] = name
             for name in ("memcpy", "memcmp", "memset", "__chkstk", "__security_check_cookie"):
                 if name in self.report["symbols"]:
@@ -118,7 +120,14 @@ class Runner:
                 hooks[self.base + self.report["symbols"]["SV_UserMoveWorkersMP_TryQueueClientThinkCmd"]] = "queue-bot"
         elif edited:
             obj = self.objects[routine]
-            section_addresses = {i + 1: 0x180000000 + i * 0x10000 for i in range(len(obj["sections"]))}
+            section_addresses = {}
+            section_base = 0x180000000
+            for section in obj["sections"]:
+                section_addresses[section["number"]] = section_base
+                # Large bot arrays exceed 64 KiB. Keep their COFF sections
+                # disjoint just as the real linker does, including zero data.
+                size = max(len(section["data"]), section.get("aux", {}).get("length", 0))
+                section_base += max(0x10000, (size + 0xffff) & ~0xffff)
             externals = dict(symbols)
             externals.update(self.entries)
             for name in (*helpers, "memcpy", "memcmp", "memset", "__chkstk", "_fltused", "SV_UserMoveWorkersMP_TryQueueClientThinkCmd"):
@@ -166,6 +175,8 @@ class Runner:
         put(symbols["SVHS_FrameDuration"], 50, "<i")
         put(symbols["SVHS_WorkersEnabled"], case.get("workers", 1), "<B")
         events, observed, queued, stats = [], [], [], []
+        scopes = []
+        urgency = []
         entities, sentients, info, ai, interface, vtable = (0x51000000, 0x52000000, 0x53000000,
                                                          0x54000000, 0x54100000, 0x54200000)
         clients, players, commands, queues = 0x55000000, 0x5A000000, 0x5B000000, 0x5C000000
@@ -325,7 +336,16 @@ class Runner:
             if kind.startswith("?Clock"):
                 returned(len(events) * 100); return
             if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
+                if kind != "SV_HostNav_RefreshBotMovement":
+                    scopes.append((kind, now))
                 returned(kind == "SV_HostNav_BeginBot"); return
+            if kind == "SV_HostBot_InGulag":
+                slot = (a - clients - 1368) // 321192
+                returned(bool(get(players + slot * 0x8000 + 22336, '<I') & 0x600)); return
+            if kind == "SV_HostBot_UpdateTravelUrgency":
+                assert get(b + 12, '<i') == now
+                if case.get('mode', 0):urgency.append(((a - clients - 1368) // 321192, now, bool(c & 255)))
+                returned(); return
             if kind in ("SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot"):
                 returned(); return
             if kind == "SVHS_TransientFileLoaded":
@@ -456,6 +476,9 @@ class Runner:
                     if frame == case.get("gulag_at"):
                         for i in range(count):
                             put(players + i * 0x8000 + 22336, 0x200, '<I')
+                    if frame == case.get("teleport_at"):
+                        for i in range(count):
+                            put(entities + i * 1440 + 304, struct.pack('<3f', 300., 0., 0.))
                     if frame == case.get("target_died_at"):
                         put(entities + 1440 + 440, 0, '<i')
                 vm.reg_write(UC_X86_REG_RSP, stack)
@@ -468,7 +491,7 @@ class Runner:
                             loaded=bool(get(symbols['SVHS_TileLoaded'] + word * 4, '<I') & mask),
                             all_setup=bool(get(symbols['SVHS_AllTilesSetup'], '<B')), events=events)
             if routine == "SV_BotUpdateBots":
-                return dict(events=events, observed=observed, stats=stats,
+                return dict(events=events, observed=observed, stats=stats, scopes=scopes, urgency=urgency,
                             active=get(symbols['SVHS_ActiveBotCount'], '<I'),
                             pings=bytes(vm.mem_read(symbols['SVHS_BotPingAnchor'] - 8, 512)).hex())
             if routine == "AICommon_UpdateSight":
@@ -559,6 +582,7 @@ def main():
                               (150, {"frame_ms":50}), (42, {"damage_at":5}),
                               (42, {"target_at":5}), (42, {"script_at":5}),
                               (42, {"equipment_at":5}), (42, {"gulag_at":5}),
+                              (42, {"teleport_at":5}), (42, {"gulag_at":3, "teleport_at":5}),
                               (42, {"target_died_at":5, "target":2}),
                               (42, {"rewind_at":5}), (42, {"loaded":False}),
                               (81, {'human_slot':0, 'bot_distance':800, 'target':2}),
@@ -578,15 +602,21 @@ def main():
             assert len(on['observed']) == len(original['observed']), ('movement tick lost', case)
             original_thinks = sum(e[0] == 'decision' for e in original['events'])
             thinks = sum(e[0] == 'decision' for e in on['events'])
+            assert len(on['urgency']) == original_thinks, ('Travel urgency skipped a playing bot command', case)
+            assert sum(not entry[2] for entry in on['urgency']) == thinks
             if population <= 20:
                 assert on['observed'] == original['observed'] and thinks == original_thinks, case
             elif not extra:
                 assert thinks < original_thinks / 2, (case, thinks, original_thinks)
             for trigger in ('damage_at', 'target_at', 'script_at', 'rewind_at',
-                            'equipment_at', 'gulag_at', 'target_died_at'):
+                            'equipment_at', 'gulag_at', 'target_died_at', 'teleport_at'):
                 if trigger in case:
                     instant = 10000 + case[trigger] * 16 - (1000 if trigger == 'rewind_at' else 0)
                     assert sum(e[0] == 'decision' and e[2] == instant for e in on['events']) == population, (case, trigger)
+            if 'gulag_at' in case:
+                instant = 10000 + case['gulag_at'] * 16
+                assert sum(e[0] == 'decision' and e[2] >= instant for e in on['events']) == population * (12 - case['gulag_at']), case
+                assert all(e[1] < instant for e in on['scopes']), ('Gulag used approximate navigation scope', case)
             scheduling.append(dict(population=population, mode=mode, extra=extra,
                                    original_decisions=original_thinks, scheduled_decisions=thinks,
                                    movement_commands=len(on['observed'])))

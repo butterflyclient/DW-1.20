@@ -1,6 +1,7 @@
 #include "sv_host_navigation.h"
 #include "sv_host_bot_loot.h"
 #include "sv_host_bot_equipment.h"
+#include "SV_HostBotEquipmentBindings.h"
 #include <intrin.h>
 
 namespace
@@ -17,7 +18,11 @@ namespace
         Nav2DQueryView *navigator;
         uint8_t opaque368[80];
         uint8_t *playerState;
-        uint8_t opaque456[80];
+        uint8_t opaque456[16];
+        Vec3 scriptGoalPosition;
+        uint8_t opaque484[32];
+        uint32_t scriptGoalType;
+        uint8_t opaque520[16];
         Vec3 nativeGoal;
         uint8_t opaque548[72];
         int32_t traversal;
@@ -31,6 +36,8 @@ namespace
 
     static_assert(offsetof(BotNavigationView, navigator) == 360);
     static_assert(offsetof(BotNavigationView, playerState) == 448);
+    static_assert(offsetof(BotNavigationView, scriptGoalPosition) == 472);
+    static_assert(offsetof(BotNavigationView, scriptGoalType) == 516);
     static_assert(offsetof(BotNavigationView, nativeGoal) == 536);
     static_assert(offsetof(BotNavigationView, traversal) == 620);
     static_assert(offsetof(BotNavigationView, noPathFoundTime) == 640);
@@ -48,6 +55,41 @@ namespace
     };
 
     MeshGoal s_goals[200]{};
+    struct UrgencyState
+    {
+        void *owner, *player;
+        uint64_t ownedButtons;
+        int32_t lastTime;
+    };
+    UrgencyState s_urgency[200]{};
+
+#pragma pack(push, 4)
+    struct SprintPlayerView
+    {
+        int32_t commandTime, frozenTime;
+        uint32_t opaque8;
+        int32_t movementType, movementTime;
+        uint64_t movementFlags, otherFlags;
+        uint8_t opaque36[590];
+        uint16_t groundEntity;
+        uint8_t opaque628[168];
+        int32_t sprintButtonUpRequired;
+        uint8_t opaque800[996];
+        uint64_t weaponFlags;
+        float adsFraction;
+    };
+#pragma pack(pop)
+    static_assert(offsetof(SprintPlayerView, movementType) == 12);
+    static_assert(offsetof(SprintPlayerView, movementFlags) == 20);
+    static_assert(offsetof(SprintPlayerView, otherFlags) == 28);
+    static_assert(offsetof(SprintPlayerView, groundEntity) == 626);
+    static_assert(offsetof(SprintPlayerView, sprintButtonUpRequired) == 796);
+    static_assert(offsetof(SprintPlayerView, weaponFlags) == 1796);
+    static_assert(offsetof(SprintPlayerView, adsFraction) == 1804);
+    static_assert(sizeof(SprintPlayerView) == 1808);
+    constexpr uint64_t SprintRequest = 2;
+    constexpr uint64_t TacticalSprintRequest = 0x800000000000ull;
+    constexpr uint64_t TravelInterruptButtons = 0x4233ddull;
     int32_t s_planTime = -1;
     unsigned s_plans, s_nextPlanSlot;
 
@@ -64,12 +106,31 @@ namespace
                (Field<uint8_t>(player, 24) & 1) || (Field<uint32_t>(player, 364) & 0xe0);
     }
 
+    bool MeshAreaReady(const Nav2DQueryView *nav)
+    {
+        return nav && nav->vtable &&
+               nav->vtable[45] == reinterpret_cast<uintptr_t>(&SVHS_Nav2DClosest) &&
+               nav->currentArea.reference && *nav->currentArea.reference && nav->currentArea.space;
+    }
+
     bool ChooseGoal(const BotNavigationView *bot, MeshGoal &state, Vec3 &goal)
     {
+        if (bot->scriptGoalType >= 2 && bot->scriptGoalType <= 6)
+        {
+            // Replan the exact native guard/objective/critical destination when
+            // its route is missing. An exterior patrol must never replace it.
+            state.target = 0;
+            goal = bot->scriptGoalPosition;
+            return __builtin_isfinite(goal.x) && __builtin_isfinite(goal.y) &&
+                   __builtin_isfinite(goal.z);
+        }
         // Combat belongs to the native awareness/target controller. A fallback
         // route must not hunt an unseen enemy across the entire map or circle
         // a nearby teammate. Prefer a useful, native usable loot destination.
-        if (SV_HostBot_GetLootGoal(const_cast<BotNavigationView *>(bot), &goal))
+        // Native type0/1 is none/hunt. Guard, camp, objective, critical gas
+        // escapes and tactical goals retain their script priority and route.
+        if (bot->scriptGoalType <= 1 &&
+            SV_HostBot_GetLootGoal(const_cast<BotNavigationView *>(bot), &goal))
         {
             state.target = 0;
             return true;
@@ -144,10 +205,8 @@ namespace
         auto *nav = bot->navigator;
         auto *entity = bot->entity;
         const unsigned slot = entity ? uint16_t(entity->number) : 200;
-        if (slot >= 200 || !bot->sentient || !(bot->scriptFlags & 0x1000000) || !nav ||
-            nav->vtable[45] != reinterpret_cast<uintptr_t>(&SVHS_Nav2DClosest) ||
-            !nav->currentArea.reference || !*nav->currentArea.reference ||
-            !nav->currentArea.space || !bot->playerState || entity->health <= 0 || bot->traversal ||
+        if (slot >= 200 || !bot->sentient || !(bot->scriptFlags & 0x1000000) ||
+            !MeshAreaReady(nav) || !bot->playerState || entity->health <= 0 || bot->traversal ||
             SV_HostBot_InGulag(bot) || Field<uint16_t>(bot->playerState, 626) == 2047 ||
             Locked(bot))
         {
@@ -181,11 +240,23 @@ namespace
         if (state.valid && path && DistanceSquared(bot->nativeGoal, state.goal) > 1.0f)
             state.valid = false; // A native combat/script route replaced our request.
         const bool owned = state.valid && state.owner == bot && state.navigator == nav;
-        if (path && !owned)
+        if (path && bot->scriptGoalType >= 2)
+        {
+            state.valid = false;
             return false;
+        }
+        Vec3 lootGoal{};
+        const bool localLoot = bot->scriptGoalType <= 1 && SV_HostBot_GetLootGoal(bot, &lootGoal);
+        if (path && !owned && (!localLoot ||
+            DistanceSquared(bot->nativeGoal, lootGoal) < 32.0f * 32.0f))
+            return false;
+        const bool newLootGoal = localLoot &&
+            (!state.valid || DistanceSquared(state.goal, lootGoal) >= 32.0f * 32.0f);
         const bool reached =
             state.valid && DistanceSquared(entity->origin, state.goal) < 96.0f * 96.0f;
-        const bool stuck = now - state.progressTime >= 1500;
+        const bool stuck = now - state.progressTime >= 750;
+        if (reached || stuck || newLootGoal)
+            state.nextPlan = now;
         bool targetGone = false;
         if (state.target && state.target <= SVHS_ClientCount && state.target <= 200)
         {
@@ -196,13 +267,13 @@ namespace
                 state.nextPlan = now;
         }
         if (allowPlan && now >= state.nextPlan &&
-            (!path || reached || stuck || !state.valid || targetGone) && s_plans < 2 &&
+            (!path || reached || stuck || !state.valid || targetGone || newLootGoal) && s_plans < 2 &&
             slot >= s_nextPlanSlot)
         {
             Vec3 goal{};
             ++s_plans;
             s_nextPlanSlot = slot + 1;
-            state.nextPlan = now + 1000 + int32_t((slot * 97) % 500);
+            state.nextPlan = now + 500 + int32_t((slot * 97) % 250);
             state.progressTime = now;
             if (stuck || state.failures || (reached && !state.target))
             {
@@ -275,11 +346,81 @@ namespace
     }
 } // namespace
 
+extern "C" void SV_HostBot_UpdateTravelUrgency(void *data, HostScale::UserCmd *command,
+                                               bool reusedCommand)
+{
+    using namespace HostScale;
+    auto *bot = static_cast<BotNavigationView *>(data);
+    const unsigned slot = bot && bot->entity ? uint16_t(bot->entity->number) : 200;
+    if (!command || slot >= 200)
+        return;
+    auto &state = s_urgency[slot];
+    const bool same = state.owner == bot && state.player == bot->playerState &&
+                      SVHS_LevelTime >= state.lastTime;
+    if (same && reusedCommand)
+        command->buttons &= ~state.ownedButtons;
+    state = {bot, bot->playerState, 0, SVHS_LevelTime};
+    const auto *player = reinterpret_cast<const SprintPlayerView *>(bot->playerState);
+    if (!Enabled() || !player || !bot->sentient || bot->entity->health <= 0 ||
+        bot->traversal || SV_HostBot_InGulag(bot) || Locked(bot) ||
+        uint32_t(player->movementType) > 1 || (player->otherFlags & 0x800) ||
+        player->groundEntity == 2047 || player->sprintButtonUpRequired ||
+        (player->weaponFlags & (1ull << 42)) || !__builtin_isfinite(player->adsFraction) ||
+        player->adsFraction > 0.0f ||
+        (command->buttons & TravelInterruptButtons) || Field<int8_t>(command, 156) < 64 ||
+        !MeshAreaReady(bot->navigator) || !SVHS_NavHasPath(bot->navigator) ||
+        SVHS_BotCanFire(bot) ||
+        DistanceSquared(bot->entity->origin, bot->nativeGoal) < 768.0f * 768.0f)
+        return;
+
+    // Reused commands bypass BotThink's TLS scope. These two original routines
+    // read the native weapon map/statics; restore the caller's exact TLS value.
+    auto *slots = reinterpret_cast<uintptr_t *>(__readgsqword(0x58));
+    auto &statics = *reinterpret_cast<void **>(slots[SVHS_BotTlsIndex] + 16);
+    void *previous = statics;
+    statics = SVHS_GameStatics;
+    auto *map = SVHBE_WeaponMap();
+    if (map && SVHS_SprintLeftRaw(map, player, command->serverTime) > 500)
+    {
+        const uint64_t original = command->buttons;
+        UserCmd decision = *command;
+        decision.buttons &= ~SprintRequest;
+        SVHS_BotUpdateSprinting(bot, &decision);
+        // Ordinary sprint is approved by the complete native bot policy. The
+        // real PM_UpdateSprint subsequently runs CanStartSprint and its meter
+        // test; this command request never modifies sprint timers or physics.
+        if (decision.buttons & SprintRequest)
+        {
+            command->buttons |= SprintRequest;
+            if (!(player->movementFlags & (1ull << 53)))
+                command->buttons |= TacticalSprintRequest;
+        }
+        state.ownedButtons = (command->buttons & ~original) & (SprintRequest | TacticalSprintRequest);
+    }
+    statics = previous;
+}
+
 extern "C" unsigned Bot_UpdateMove_OffPathGrid(void *data, HostScale::UserCmd *command)
 {
     using namespace HostScale;
     auto *bot = static_cast<BotNavigationView *>(data);
     const bool canFire = SVHS_BotCanFire(data);
+    if (Enabled() && SV_HostBot_InGulag(bot))
+    {
+        const unsigned slot = bot->entity ? uint16_t(bot->entity->number) : 200;
+        if (slot < 200)
+            s_goals[slot].valid = false; // An exterior fallback cannot own an arena route.
+        if (canFire || !bot->playerState || Locked(bot))
+            return 0;
+        // Without a current area and native path, blind strafe aims through
+        // arena walls. Preserve weapon, buttons and view while entry resolves.
+        if (!MeshAreaReady(bot->navigator) || !SVHS_NavHasPath(bot->navigator))
+        {
+            Field<uint16_t>(command, 156) = 0;
+            return 1;
+        }
+        return 0; // Let the native arena path controller steer a ready route.
+    }
     // Do not consume this movement stage before the native combat/melee
     // controller. This applies equally to bot and human opponents.
     if (!canFire && Enabled() && FollowMesh(bot, command, true))
@@ -308,7 +449,10 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
     const unsigned slot = entity ? uint16_t(entity->number) : 200;
     if (!Enabled() || slot >= 200)
         return;
-    if (SVHS_BotCanFire(bot) || SV_HostBot_InGulag(bot))
+    const bool gulag = SV_HostBot_InGulag(bot);
+    if (gulag)
+        s_goals[slot].valid = false;
+    if (SVHS_BotCanFire(bot))
         return;
     const auto &state = s_goals[slot];
     auto *nav = bot->navigator;
@@ -316,7 +460,8 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
                        state.navigator == nav;
     const bool nativePath = !owned && nav && bot->sentient && bot->playerState &&
                             entity->health > 0 && !bot->traversal && !Locked(bot) &&
-                            Field<uint16_t>(bot->playerState, 626) != 2047 && SVHS_NavHasPath(nav);
+                            Field<uint16_t>(bot->playerState, 626) != 2047 &&
+                            (!gulag || MeshAreaReady(nav)) && SVHS_NavHasPath(nav);
     // Refresh fallback-owned and native routes without choosing another goal.
     // Combat firing, airborne and locked/scripted movement retain their commands.
     if (owned || nativePath)

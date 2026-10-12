@@ -12,6 +12,7 @@ import subprocess
 import sys
 
 import pefile
+from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
 from unicorn.x86_const import *
 
@@ -26,8 +27,20 @@ class Runner:
     def __init__(self, snapshot, build):
         self.snapshot = snapshot
         self.proof = json.loads((snapshot / "generated/host-scale-integration.json").read_bytes())
-        self.original = pefile.PE(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe", fast_load=True)
+        original_path = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe")
+        assert hashlib.file_digest(original_path.open('rb'), 'sha256').hexdigest() == self.proof['image_sha256']
+        self.original = pefile.PE(str(original_path), fast_load=True)
         self.base = self.original.OPTIONAL_HEADER.ImageBase
+        catalog = json.loads((snapshot / 'generated/function-catalog.json').read_bytes())
+        goal_row = next(row for row in catalog['functions'] if row['id'] == 'fn_8e3f1a92f87cbed1')
+        goal_bytes = self.original.get_data(goal_row['rva'], 686)
+        goal_hash = '988c6a94990c66fcd7b50ebd32fd9297736e3cfae8567a6cb03fb65b8479da09'
+        assert hashlib.sha256(goal_bytes).hexdigest() == goal_hash
+        goal_instructions = list(Cs(CS_ARCH_X86, CS_MODE_64).disasm(goal_bytes, self.base + goal_row['rva']))
+        assert any(row.mnemonic == 'mov' and row.op_str == 'eax, dword ptr [rcx + 0x204]' for row in goal_instructions)
+        assert any(row.mnemonic == 'mov' and row.op_str == 'dword ptr [rbx + 0x204], ebp' for row in goal_instructions)
+        self.goal_type_proof = dict(function_id=goal_row['id'], original_rva=goal_row['rva'],
+            bytes=686, sha256=goal_hash, type_offset=516, script_position_offset=472, native_route_goal_offset=536)
         self.original_symbols = {r["name"]: self.base+r["original_rva"] for r in self.proof["bindings"]}
         self.original_entries = {r["symbol"]: self.base+r["original_rva"] for r in self.proof["replacements"]}
         self.report = None
@@ -70,7 +83,7 @@ class Runner:
             symbols = {k: mapped(v) for k,v in symbols.items()}
             entries = {k: self.base+self.report["symbols"][k] for k in entries}
             entries.update({k:self.base+v for k,v in self.report["symbols"].items()
-                            if k.startswith(("SV_HostNav_", "SV_HostScale_", "?RecordBotFrame"))})
+                            if k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "?RecordBotFrame"))})
         vm.symbols = symbols
         vm.entries = entries
         hooks = {symbols[r["name"]]:r["name"] for r in self.proof["bindings"] if r["kind"] == "function"}
@@ -80,7 +93,7 @@ class Runner:
                   "QueryPerformanceCounter":"qpc", "QueryPerformanceFrequency":"qpf",
                   "Sys_IsMainThread":"main-thread", "Cmd_AddCommandInternal":"register-command",
                   "SV_HostNav_PrintStatus":"print", "SV_HostBot_GetLootGoal":"loot-goal",
-                  "SV_HostBot_InGulag":"gulag"}
+                  "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map"}
         if edited and self.report:
             for name, alias in common.items():
                 if name in self.report["symbols"]:
@@ -133,7 +146,7 @@ class Runner:
                             raise AssertionError(kind)
                     if data:
                         vm.put(start,bytes(data))
-            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith(("SV_HostNav_", "SV_HostScale_", "?RecordBotFrame"))})
+            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "?RecordBotFrame"))})
         vm.hooks = hooks
         vm.mode,vm.population = mode,population
         vm.put(symbols["SVHS_LevelTime"],0,"<i")
@@ -265,6 +278,14 @@ class Machine:
         elif kind=="SVHS_NavFarthestClosest":
             self.uc.reg_write(UC_X86_REG_XMM0,struct.unpack('<I',struct.pack('<f',self.farthest))[0]);self.ret()
         elif kind == 'SVHS_BotCanFire':self.ret(getattr(self, 'can_fire', False))
+        elif kind in ('weapon-map', 'SVHBE_WeaponMap'):self.ret(0x5f000000)
+        elif kind == 'SVHS_SprintLeftRaw':
+            assert a == 0x5f000000 and b == 0x5b030000
+            self.ret(getattr(self, 'sprint_left', 0))
+        elif kind == 'SVHS_BotUpdateSprinting':
+            assert a == 0x5b000000
+            if getattr(self, 'approve_sprint', True):self.put(b, self.get(b, '<Q') | 2, '<Q')
+            self.ret()
         elif kind == 'loot-goal':
             goal = getattr(self, 'loot_goal', None)
             if goal is not None:self.put(b, struct.pack('<3f', *goal))
@@ -464,12 +485,13 @@ def nearest_collector(vm,case):
     return dict(events=vm.events,maximum=bytes(vm.uc.mem_read(collector+8,4)).hex(),count=vm.get(collector+24,'<i'))
 
 
-def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=()):
+def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=(), command_bytes=None,
+             goal_type=0, native_goal=None, existing_path=False, route_goal=None):
     bot, entity, sentient, player = 0x5b000000, 0x5b010000, 0x5b020000, 0x5b030000
     nav, vtable, command, area = 0x5b040000, 0x5b050000, 0x5b060000, 0x5b070000
     vm.put(bot, bytes(28152));vm.put(entity, bytes(1440));vm.put(sentient, bytes(184))
     vm.put(player, bytes(1024));vm.put(nav, bytes(1400));vm.put(vtable, bytes(512))
-    vm.put(command, bytes(264));vm.put(area, 0x5b071000, '<Q')
+    vm.put(command, command_bytes or bytes(264));vm.put(area, 0x5b071000, '<Q')
     vm.put(0x51400000, 0x51400100, '<Q'); vm.found = mode_case != 'unreachable'
     for at,value in ((bot,entity),(bot+8,sentient),(bot+360,nav),(bot+448,player),
                      (entity+336,player),(entity+344,sentient),(nav,vtable),
@@ -495,6 +517,15 @@ def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=()):
             vm.put(target_entity + 304, struct.pack('<3f', *xyz))
         vm.put(sentient + 72, 2 if target_handle is None else target_handle, '<H')
     vm.put(bot+640,1,'<i');vm.put(bot+28136,struct.pack('<3f',0.5,0.25,0.))
+    vm.put(bot+516,goal_type,'<I')
+    if native_goal is not None:
+        # The script setter owns position472; routeGoal536 may still belong to
+        # an older route. Critical repair must use the requested script position.
+        vm.put(bot+472,struct.pack('<3f',*native_goal))
+        vm.put(bot+536,struct.pack('<3f',*(route_goal if route_goal is not None else native_goal)))
+    if existing_path:
+        vm.path_exists = True
+        vm.put(bot+640,0,'<i')
     if mode_case in ('tactical', 'tactical-no-path'):
         vm.put(sentient+150,1,'<B')
         vm.path_exists = mode_case == 'tactical'
@@ -506,18 +537,141 @@ def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=()):
     return dict(result=result,movement=bytes(vm.uc.mem_read(command+156,2)).hex(),events=vm.events)
 
 
+def install_bot_tls(vm):
+    teb, slots, tls = 0x5d000000, 0x5d001000, 0x5d002000
+    for at in (teb, slots, tls):
+        vm.put(at, bytes(128))
+    vm.put(teb + 0x58, slots, '<Q'); vm.put(slots, tls, '<Q')
+    vm.uc.reg_write(UC_X86_REG_GS_BASE, teb)
+    vm.put(vm.symbols['SVHS_BotTlsIndex'], 0, '<I')
+    vm.put(vm.symbols['SVHS_GameStatics'], 0x5d003000, '<Q')
+    vm.put(tls + 16, 0x5d004000, '<Q')
+    return tls
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot",type=Path,required=True)
     parser.add_argument("--build",type=Path)
     parser.add_argument("--output",type=Path,required=True)
     args=parser.parse_args();runner=Runner(args.snapshot,args.build);total=0
+    urgency_cases = 0
+    for mode, population in ((0, 20), (1, 20), (2, 150)):
+        for denial in ('none', 'fire', 'ads-button', 'use', 'armor', 'ads-fraction', 'up-required',
+                       'downed', 'dead', 'airborne', 'locked', 'gulag', 'no-path', 'short',
+                       'no-meter', 'native-denied', 'tac-disabled'):
+            vm = runner.machine(True, mode, population)
+            mesh_bot(vm, 'normal'); tls = install_bot_tls(vm)
+            bot, entity, player, cmd = 0x5b000000, 0x5b010000, 0x5b030000, 0x5b060000
+            vm.put(cmd + 12, 1000, '<i'); vm.sprint_left = 1500
+            if denial == 'fire':vm.put(cmd, 1, '<Q')
+            elif denial == 'ads-button':vm.put(cmd, 0x200, '<Q')
+            elif denial == 'use':vm.put(cmd, 8, '<Q')
+            elif denial == 'armor':vm.put(player + 1796, 1 << 42, '<Q')
+            elif denial == 'ads-fraction':vm.put(player + 1804, 0.5, '<f')
+            elif denial == 'up-required':vm.put(player + 796, 1, '<i')
+            elif denial == 'downed':vm.put(player + 28, 0x800, '<Q')
+            elif denial == 'dead':vm.put(entity + 440, 0, '<i')
+            elif denial == 'airborne':vm.put(player + 626, 2047, '<H')
+            elif denial == 'locked':vm.put(player + 364, 0x20, '<I')
+            elif denial == 'gulag':vm.gulag = True
+            elif denial == 'no-path':vm.path_exists = False
+            elif denial == 'short':vm.put(bot + 536, struct.pack('<3f', 500., 0., 0.))
+            elif denial == 'no-meter':vm.sprint_left = 500
+            elif denial == 'native-denied':vm.approve_sprint = False
+            elif denial == 'tac-disabled':vm.put(player + 20, 1 << 53, '<Q')
+            before = bytes(vm.uc.mem_read(cmd, 264))
+            vm.call('SV_HostBot_UpdateTravelUrgency', bot, cmd, 0)
+            after = bytes(vm.uc.mem_read(cmd, 264))
+            expected = 0 if not mode or denial not in ('none', 'tac-disabled') else (
+                2 if denial == 'tac-disabled' else 2 | 0x800000000000)
+            assert vm.get(cmd, '<Q') == struct.unpack_from('<Q', before)[0] | expected, (mode, population, denial)
+            assert after[8:] == before[8:] and vm.get(tls + 16, '<Q') == 0x5d004000
+            if mode and denial == 'none':
+                # Reusing a command carrying only our additions must remove
+                # those additions before a newly arrived ADS or plate action.
+                vm.put(cmd, vm.get(cmd, '<Q') | 0x200, '<Q')
+                vm.call('SV_HostBot_UpdateTravelUrgency', bot, cmd, 1)
+                assert vm.get(cmd, '<Q') == 0x200
+            urgency_cases += 1
+    total += urgency_cases
+    for mode in (1, 2):
+        vm = runner.machine(True, mode); mesh_bot(vm, 'normal')
+        vm.put(vm.symbols['SVHS_LevelTime'], 1749, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert sum(e[0] == 'path-request' for e in vm.events) == 1
+        vm.put(vm.symbols['SVHS_LevelTime'], 1750, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        requests = [e[1] for e in vm.events if e[0] == 'path-request']
+        assert len(requests) == 2 and requests[1] != requests[0], '750ms stuck escape did not replan'
+        vm = runner.machine(True, mode); mesh_bot(vm, 'normal')
+        vm.put(0x5b010000 + 304, struct.pack('<3f', 700., 0., 0.))
+        for now in (1016, 1032):
+            vm.put(vm.symbols['SVHS_LevelTime'], now, '<i')
+            vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert sum(e[0] == 'path-request' for e in vm.events) == 2, 'Reached goal waited for the old route cooldown'
+        total += 2
     for case in ('normal','tactical','locked','airborne','no-area'):
         native=mesh_bot(runner.machine(False),case)
         off=mesh_bot(runner.machine(True,0),case)
         assert off==native,('off-grid baseline',case,off,native)
         if case!='normal':assert mesh_bot(runner.machine(True,1),case)==native
         total+=1
+    # Gulag cold entry must not replay an exterior patrol or blindly strafe.
+    # Only movement may change; the complete native command remains intact.
+    command = bytes((i * 31 + 7) & 255 for i in range(264))
+    for case in ('normal', 'tactical', 'locked', 'no-area'):
+        native_vm, off_vm = runner.machine(False), runner.machine(True, 0)
+        native_vm.gulag = off_vm.gulag = True
+        assert mesh_bot(native_vm, case, command_bytes=command) == mesh_bot(off_vm, case, command_bytes=command)
+        total += 1
+    for mode in (1, 2):
+        for case, firing in (('normal', False), ('no-area', False), ('tactical', False),
+                             ('locked', False), ('normal', True)):
+            vm = runner.machine(True, mode); vm.gulag = True; vm.can_fire = firing
+            result = mesh_bot(vm, case, command_bytes=command)
+            after = bytes(vm.uc.mem_read(0x5b060000, 264))
+            stopped = case in ('normal', 'no-area') and not firing
+            expected = command[:156] + bytes(2) + command[158:] if stopped else command
+            assert after == expected, ('Gulag command preservation', mode, case, firing)
+            assert result['result'] == int(stopped), (mode, case, firing)
+            assert not any(e[0] in ('path-request', 'follow-path', 'steer-path') for e in vm.events)
+            total += 1
+        vm = runner.machine(True, mode); vm.gulag = True
+        mesh_bot(vm, 'tactical', command_bytes=command)
+        tls = install_bot_tls(vm); before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == [('steer-path', 127)]
+        assert vm.get(tls + 16, '<Q') == 0x5d004000
+        # Readiness requires both live handle components, even with a path.
+        for offset in (1364, 1372):
+            previous = vm.get(0x5b040000 + offset, '<Q')
+            vm.put(0x5b040000 + offset, 0, '<Q'); before = len(vm.events)
+            vm.put(0x5b060000, command)
+            vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+            assert len(vm.events) == before and bytes(vm.uc.mem_read(0x5b060000, 264)) == command
+            assert vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000) == 1
+            assert bytes(vm.uc.mem_read(0x5b060000, 264)) == command[:156] + bytes(2) + command[158:]
+            vm.put(0x5b040000 + offset, previous, '<Q')
+            total += 1
+        vm.can_fire = True; before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert len(vm.events) == before
+        vm.can_fire = False; vm.put(0x5b030000 + 364, 0x20, '<I')
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert len(vm.events) == before
+        total += 3
+        # Entering Gulag releases only fallback ownership, retaining its native
+        # path. Leaving again must not revive the earlier exterior request.
+        vm = runner.machine(True, mode); mesh_bot(vm, 'normal'); install_bot_tls(vm)
+        vm.gulag = True; before = len(vm.events)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == [('steer-path', 127)]
+        vm.gulag = False; vm.path_exists = False; before = len(vm.events)
+        vm.put(0x5b060000, command)
+        vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
+        assert len(vm.events) == before and bytes(vm.uc.mem_read(0x5b060000, 264)) == command
+        total += 2
     for mode in (1,2):
         success=mesh_bot(runner.machine(True,mode),'normal')
         assert success['movement']=='5a23' and success['events'][-1]==('follow-path',)
@@ -611,6 +765,25 @@ def main():
         vm.loot_goal = (200., 100., 0.)
         route = mesh_bot(vm, 'normal')
         assert next(e[1] for e in route['events'] if e[0] == 'path-request') == vm.loot_goal
+        # Ordinary hunt type1 may choose a nearby native loot destination even
+        # with a different native hunt path. Critical type5 keeps its route or
+        # repairs that exact destination when the native path is absent.
+        vm = runner.machine(True, mode); vm.loot_goal = (200., 100., 0.)
+        route = mesh_bot(vm, 'normal', goal_type=1, native_goal=(900., 0., 0.), existing_path=True)
+        assert next(e[1] for e in route['events'] if e[0] == 'path-request') == vm.loot_goal
+        vm = runner.machine(True, mode); vm.loot_goal = (200., 100., 0.)
+        command = bytes((i * 17 + 11) & 255 for i in range(264))
+        critical = (1100., 240., 20.)
+        route = mesh_bot(vm, 'normal', goal_type=5, native_goal=critical,
+                         existing_path=True, command_bytes=command)
+        assert route['result'] == 0 and not any(e[0] == 'path-request' for e in route['events'])
+        assert bytes(vm.uc.mem_read(0x5b060000,264)) == command
+        vm = runner.machine(True, mode); vm.loot_goal = (200., 100., 0.)
+        route = mesh_bot(vm, 'normal', goal_type=5, native_goal=critical,
+                         route_goal=(-700., -200., 0.))
+        assert next(e[1] for e in route['events'] if e[0] == 'path-request') == critical
+        assert vm.get(0x5b000000+516,'<I') == 5
+        total += 3
         vm = runner.machine(True, mode)
         mesh_bot(vm, 'normal', targets=((700., 0., 0.),))
         first = next(e[1] for e in vm.events if e[0] == 'path-request')
@@ -836,6 +1009,7 @@ def main():
         for mode in (0,1):assert nearest_collector(runner.machine(True,mode),case)==original,(case,mode)
         total+=1
     receipt=dict(passed=True,cases=total,scope=__doc__,live_game_tested=False,
+        script_goal_type_proof=runner.goal_type_proof,
         linked_executable_sha256=runner.report["sha256"] if runner.report else None,
         graph_budget=2048,spatial_budget=512,occupied_slots_fairness=150,nearest_tree_work=work)
     args.output.write_text(json.dumps(receipt,indent=2)+"\n")

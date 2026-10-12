@@ -29,7 +29,7 @@ def digest(path):
 
 def require_current_sources(receipt):
     """Reject a frozen job superseded by edits to its authored source owners."""
-    for item in receipt["source_inputs"]:
+    for item in receipt["source_inputs"] + receipt.get("tool_inputs", []):
         path = inside(ROOT / item["source"])
         if digest(path) != item["source_sha256"]:
             raise ValueError(
@@ -94,6 +94,7 @@ def pipeline_lock():
 def load_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -257,16 +258,44 @@ def prepare():
             raise ValueError("Compiler base changed unexpectedly: " + item["path"])
     directory = inside(state / "jobs" / str(time.time_ns()))
     source = directory / "source"
-    shutil.copytree(base, source)
+    # Updater build products contain absolute CMake paths and old objects.
+    # Regenerate them from the current authored helper and frozen client inputs.
+    shutil.copytree(
+        base, source,
+        ignore=lambda folder, names: ["generated-updater"] if Path(folder) == base else [],
+    )
     source_inputs = []
+    tool_inputs = [
+        dict(source="tools/" + name, source_sha256=digest(ROOT / "tools" / name))
+        for name in (
+            "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
+            "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
+            "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
+            "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
+            "bot_style_paths.py",
+            "prepare-join-in-progress.py",
+            "prepare-dw-verifier.py",
+            "prepare-bot-rank-integration.py",
+            "dw_update_assets.py", "embed-update-helper.py",
+            "replay-update-client.cpp", "replay-update-assets.h",
+        )
+    ]
     overlays = dict(manifest["overlays"])
     for root in config["authored_source_roots"]:
         # Host replacements acquire their native bindings below. Other authored
         # modules keep the approved owner map; unrelated research prototypes
         # may share a filename but require a different generated binding set.
-        if root != "integration/host-scale":
-            continue
+        replay_additions = {
+            "DW_BotStyleSelection.h", "DW_BotStyleProfile.h", "DW_BotStyleWeapon.cpp",
+            "DW_BotRank.cpp",
+            "DW_ScriptMethods.cpp", "DW_BotStyleScripts.cpp", "DW_BotStyleZone.cpp",
+            "dw_update_assets_protocol.h",
+            "DW_MatchmakingAssignments.cpp",
+            "DW_JoinInProgress.cpp",
+        }
         for path in sorted(inside(ROOT / root).iterdir()):
+            if root != "integration/host-scale" and path.name not in replay_additions:
+                continue
             name = path.relative_to(ROOT).as_posix()
             if path.suffix not in (".cpp", ".h", ".lua") or name in overlays.values():
                 continue
@@ -326,6 +355,30 @@ def prepare():
         "dw_client_host", ROOT / "tools/prepare-host-scale-integration.py"
     )
     host.prepare(source, replace_owned=True)
+    styles = load_module("dw_bot_style_data", ROOT / "tools/prepare-bot-style-data.py")
+    styles.prepare(source)
+    ranks = load_module("dw_bot_rank", ROOT / "tools/prepare-bot-rank-integration.py")
+    ranks.prepare(source)
+    methods = load_module("dw_bot_style_methods", ROOT / "tools/prepare-script-method-integration.py")
+    methods.prepare(source)
+    scripts = load_module("dw_bot_style_scripts", ROOT / "tools/prepare-bot-style-scripts.py")
+    scripts.prepare(source)
+    zones = load_module("dw_bot_style_zones", ROOT / "tools/prepare-bot-style-zone.py")
+    zones.prepare(source)
+    verifier = load_module("dw_image_verifier", ROOT / "tools/prepare-dw-verifier.py")
+    verifier.prepare(source)
+    assignments = load_module("dw_matchmaking_assignments", ROOT / "tools/prepare-matchmaking-assignments.py")
+    assignments.prepare(source)
+    joining = load_module("dw_join_in_progress", ROOT / "tools/prepare-join-in-progress.py")
+    joining.prepare(source)
+    assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
+    assets.prepare(source)
+    helper_header = source / "generated-updater/DW_UpdateHelper.h"
+    subprocess.run([
+        sys.executable, "-B", str(ROOT / "tools/embed-update-helper.py"),
+        "--source-root", str(source / "src"), "--output", str(helper_header),
+    ], cwd=ROOT, check=True)
+    shutil.copyfile(helper_header, source / "src/DW_UpdateHelper.h")
     units = sync_cpp_revisions(source)
     recovery_path = source / "generated/manifest.json"
     recovery = read(recovery_path)
@@ -366,11 +419,16 @@ def prepare():
     for item in source_inputs:
         if Path(item["compiled_source"]).suffix in (".cpp", ".c"):
             cpp[item["compiled_source"]] = item["compiled_sha256"]
+    # The zone wrapper calls a generated, byte-proven copy of the complete
+    # native loader. It has one compiler-generated owner and no original map.
+    clone_source = source / "src/DW_BotStyleZone_Native.cpp"
+    cpp[clone_source.relative_to(source).as_posix()] = digest(clone_source)
     receipt = dict(
         schema=1,
         target=config["target"],
         snapshot=str(source),
         source_inputs=source_inputs,
+        tool_inputs=tool_inputs,
         cpp_sources=cpp,
         bindings=manifest["native_import_bindings"],
         baseline_executable_sha256=read(ROOT / "data/current-remote-deployment.json")[
@@ -387,6 +445,7 @@ def prepare():
             if path.is_file()
         ],
     )
+    require_current_sources(receipt)
     save(directory / "source-receipt.json", receipt)
     save(
         state / "latest-job.json",
@@ -396,7 +455,7 @@ def prepare():
     return directory
 
 
-def build(directory):
+def build(directory, publish_ready=True):
     directory = inside(directory)
     receipt = read(directory / "source-receipt.json")
     source = inside(receipt["snapshot"])
@@ -440,10 +499,10 @@ def build(directory):
     report_path = (
         directory / "builds" / ("build-workstation-" + job["id"]) / "build-report.json"
     )
-    verify(directory, report_path)
+    verify(directory, report_path, publish_ready=publish_ready)
 
 
-def verify(directory, report_path):
+def verify(directory, report_path, publish_ready=True):
     """Bind every gate to the freshly compiled image, never a revision alias."""
     config, state, _ = settings()
     report = read(report_path)
@@ -486,6 +545,15 @@ def verify(directory, report_path):
         ),
         ("test-executable-update-integration.py", [], "updater.json"),
         ("test-compiled-unlock-progression.py", [], "unlock.json"),
+        ("test-bot-style-selection.py", ["--snapshot", str(source)], "bot-styles.json"),
+        ("test-script-method-integration.py", ["--snapshot", str(source)], "script-methods.json"),
+        ("test-bot-style-weapon.py", ["--snapshot", str(source)], "bot-style-weapons.json"),
+        ("test-bot-rank.py", ["--snapshot", str(source)], "bot-ranks.json"),
+        ("test-bot-style-scripts.py", ["--snapshot", str(source)], "bot-style-scripts.json"),
+        ("test-bot-style-zone.py", ["--snapshot", str(source)], "bot-style-zone.json"),
+        ("test-matchmaking-assignments.py", ["--snapshot", str(source)], "matchmaking-assignments.json"),
+        ("test-join-in-progress.py", ["--snapshot", str(source)], "join-in-progress.json"),
+        ("test-dw-verifier.py", ["--snapshot", str(source)], "dw-verifier.json"),
     )
     proofs = []
     for checker, extra, name in checks:
@@ -519,6 +587,50 @@ def verify(directory, report_path):
     # A second editor can change source while compilation/linked checks run.
     # Catch that before publishing, not only at local deployment afterward.
     require_current_sources(read(directory / "source-receipt.json"))
+    local = dict(
+        passed=True, published=False, executable=str(compiled), sha256=report["sha256"],
+        fresh_cpp_units=len(actual), unresolved_symbols=0, source_root=str(source),
+        build_report=str(report_path), build_report_sha256=digest(report_path), proofs=proofs,
+        source_receipt=str(directory / "source-receipt.json"),
+        source_receipt_sha256=digest(directory / "source-receipt.json"),
+        game_runs_performed=False,
+    )
+    save(directory / "local-readiness.json", local)
+    if not publish_ready:
+        save(state / "latest-job.json", dict(directory=str(directory), prepared=True,
+                                             validated=True, passed=False, awaiting_publication=True))
+        print("PASS production compilation and local gates; live publication deferred", flush=True)
+        return local
+    return publish_validated(directory)
+
+
+def publish_validated(directory):
+    """Publish an unchanged, locally verified job after the server is ready."""
+    config, state, _ = settings()
+    directory = inside(directory)
+    local = read(directory / "local-readiness.json")
+    if not local["passed"] or local["unresolved_symbols"]:
+        raise ValueError("The production job has not passed local verification")
+    report_path = inside(local["build_report"])
+    receipt_path = inside(local["source_receipt"])
+    if (digest(report_path) != local["build_report_sha256"] or
+        digest(receipt_path) != local["source_receipt_sha256"]):
+        raise ValueError("Validated compilation or source receipt changed")
+    receipt = read(receipt_path)
+    require_current_sources(receipt)
+    report = read(report_path)
+    source = inside(report["source_root"])
+    compiled = inside(report["executable"])
+    actual = {unit["source"]: unit["source_sha256"] for unit in report["cpp"]}
+    if (actual != receipt["cpp_sources"] or report["unresolved_symbols"] or
+        report["sha256"] != local["sha256"] or digest(compiled) != local["sha256"]):
+        raise ValueError("Validated production source or image changed")
+    proofs = local["proofs"]
+    for proof in proofs:
+        if (digest(inside(proof["path"])) != proof["sha256"] or
+            digest(ROOT / "tools" / proof["checker"]) != proof["checker_sha256"] or
+            not read(proof["path"])["passed"]):
+            raise ValueError("Validated production proof or checker changed")
     from dw_publication import publish
 
     publication = publish(
@@ -564,6 +676,7 @@ def verify(directory, report_path):
         ),
     )
     print("PASS one production DW target, all exact-image gates:", artifact, flush=True)
+    return ready
 
 
 def running_games():
@@ -579,7 +692,7 @@ def running_games():
     return [int(value) for value in output.split()]
 
 
-def deploy():
+def deploy(reviewed_previous_build=None):
     config, state, _ = settings()
     latest = read(state / "latest-job.json")
     ready_path = inside(latest["readiness"])
@@ -621,12 +734,26 @@ def deploy():
     ini = target.with_suffix(".ini")
     ini_hash = digest(ini)
     before = digest(target)
+    retained_previous = None
     if before != ready["sha256"]:
         if running_games():
             raise RuntimeError("DW game is running; close it before deployment")
         if before != source["baseline_executable_sha256"]:
-            raise ValueError(
-                "Owner EXE changed since the build; preserve it and review"
+            if reviewed_previous_build is None:
+                raise ValueError(
+                    "Owner EXE changed since the build; preserve it and review"
+                )
+            previous_report = inside(reviewed_previous_build)
+            previous = read(previous_report)
+            previous_image = inside(previous["executable"])
+            if (previous["unresolved_symbols"] or previous["sha256"] != before
+                    or digest(previous_image) != before):
+                raise ValueError("Reviewed candidate does not match the owner EXE")
+            retained_previous = dict(
+                sha256=before, executable=str(previous_image),
+                build_report=str(previous_report),
+                build_report_sha256=digest(previous_report),
+                reason="Owner manually installed this retained DW candidate",
             )
         pending = game / (config["target"] + ".pending")
         with pending.open("xb") as stream:
@@ -659,6 +786,7 @@ def deploy():
         readiness=str(ready_path),
         readiness_sha256=digest(ready_path),
         public_updater=public_catalog,
+        retained_reviewed_previous=retained_previous,
     )
     save(state / "deployment.json", deployed)
     current_path = ROOT / "data/current-remote-deployment.json"

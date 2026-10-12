@@ -160,6 +160,13 @@ namespace
     }
 } // namespace
 
+extern "C" bool SV_HostBot_AllowSurvival(void *data)
+{
+    auto *bot = static_cast<BotLootView *>(data);
+    GameStaticsScope gameStatics;
+    return Enabled() && Eligible(bot) && !bot->sentient->targetHandle;
+}
+
 extern "C" void SV_HostBot_UpdateLoot(void *data, HostScale::UserCmd *command)
 {
     using namespace HostScale;
@@ -277,9 +284,9 @@ extern "C" bool SV_HostBot_FaceLoot(void *data, HostScale::UserCmd *command)
     HostScale::Vec3 goal{};
     if (!SV_HostBot_GetLootGoal(bot, &goal) || (goal.x == 0 && goal.y == 0 && goal.z == 0))
         return false;
-    // Priority 3 is the native CODE_SEEK look tier. A still-active request at
-    // this priority or above belongs to the original brain/scripts and wins.
-    if (bot->look.type >= 3 && bot->look.endTime >= SVHS_LevelTime)
+    // Like the native seek controller, replace an ordinary CODE_SEEK request
+    // at the same tier. Stronger combat/script requests remain authoritative.
+    if (bot->look.type > 3 && bot->look.endTime >= SVHS_LevelTime)
         return false;
 
     struct RestoreLook

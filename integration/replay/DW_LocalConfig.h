@@ -13,6 +13,7 @@ extern "C"
     const char *DW_LocalConfig_TestCommand();
     const char *DW_LocalConfig_TestEnabled();
     bool DW_LocalConfig_UnlockAll();
+    bool DW_LocalConfig_BypassUpdateRestart();
     unsigned DW_LocalConfig_Rank();
     bool DW_LocalConfig_ResetProgression();
 }

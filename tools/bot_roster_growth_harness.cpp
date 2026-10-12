@@ -42,6 +42,7 @@ extern "C"
     uint8_t DW_Bot_CustomizationPackages[1]{}, DW_Bot_CustomizationGroups[1]{};
     const char *DW_Bot_NameTable = "fixture";
     bool DW_LocalBackend_IsEnabled() { return true; }
+    bool DW_BotRank_Apply(unsigned) { return false; } // separate original/native rank fixture
     bool func_140CA2250() { return true; }
     const void *func_140CA2230(unsigned slot) { return &pool[slot]; }
     void *func_140CA2210(unsigned slot) { return &pool[slot]; }

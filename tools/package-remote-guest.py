@@ -32,7 +32,7 @@ else:
         raise RuntimeError("Backend and verified router address differ")
     endpoint = router["public_address"]
 
-ini = f"host={endpoint}\nplayer_name=\nunlock_all=0\nrank=0\n"
+ini = f"host={endpoint}\nplayer_name=\nunlock_all=0\nrank=0\nbypass_update_restart=0\n"
 launcher = (
     '@echo off\r\ncd /d "%~dp0"\r\nstart "" "%~dp0game_dx12_ship_replay_dw.exe"\r\n'
 )

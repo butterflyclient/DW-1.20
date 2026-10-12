@@ -17,6 +17,7 @@ def build(source_root, output):
     integration = project / "integration/replay"
     integration.mkdir(parents=True, exist_ok=True)
     files = [(ROOT / "tools/replay-update-client.cpp", project / "tools/replay-update-client.cpp")]
+    files.append((ROOT / "tools/replay-update-assets.h", project / "tools/replay-update-assets.h"))
     files += [
         (source_root / name, integration / name)
         for name in (
@@ -24,6 +25,9 @@ def build(source_root, output):
             "dw_local_trust.h",
             "dw_platform_protocol.h",
             "dw_update_protocol.h",
+            "dw_update_assets_protocol.h",
+            "DW_UpdateAssetManifest.h",
+            "DW_UpdateAssetPaths.h",
         )
     ]
     inputs = []
@@ -41,6 +45,7 @@ def build(source_root, output):
 project(replay_update_helper LANGUAGES CXX)
 add_executable(replay-update-client tools/replay-update-client.cpp integration/replay/DW_LocalPlatformCrypto.cpp)
 target_compile_features(replay-update-client PRIVATE cxx_std_20)
+target_include_directories(replay-update-client PRIVATE integration/replay)
 target_compile_definitions(replay-update-client PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_libraries(replay-update-client PRIVATE bcrypt winhttp)
 set_property(TARGET replay-update-client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

@@ -70,7 +70,7 @@ namespace
     using Ticks = unsigned long long(__stdcall *)();
     void *s_kernel;
     wchar_t s_exe[1024]{}, s_helper[1060]{}, s_directory[1024]{}, s_eventName[80]{};
-    // 0 unstarted, 1 checking, 10 current, 20 staged, 30 unknown, 40 failed.
+    // 0 unstarted, 1 checking, 10 current, 20 staged, 30 unknown, 40 failed, 50 bypassed.
     unsigned s_state = 0, s_reported = 0;
     bool s_restartRequested = false, s_restarting = false;
     void *s_apply = nullptr, *s_ready = nullptr;
@@ -200,6 +200,13 @@ namespace
 
     unsigned state()
     {
+        // Configuration is fixed for this process. Bypass only the embedded
+        // executable updater; publisher/data patch statuses remain native.
+        if (DW_LocalConfig_BypassUpdateRestart())
+        {
+            __atomic_store_n(&s_state, 50U, __ATOMIC_RELEASE);
+            return 50;
+        }
         unsigned current = __atomic_load_n(&s_state, __ATOMIC_ACQUIRE);
         if (!current && __atomic_compare_exchange_n(
                             &s_state, &current, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
@@ -230,6 +237,8 @@ extern "C" void DW_ExecutableUpdate_Frame()
             : current == 10 ? "DW_EXE_UPDATE current"
             : current == 20 ? "DW_EXE_UPDATE verified replacement staged; restart required"
             : current == 30 ? "DW_EXE_UPDATE unknown executable; no patch applied"
+            : current == 50 ? "DW_EXE_UPDATE bypass_update_restart=1; executable updater bypassed; "
+                              "publisher/data updates remain native"
                             : "DW_EXE_UPDATE failed; installed executable unchanged; inspect "
                               ".update/result.log");
     }

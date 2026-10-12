@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import struct
@@ -15,11 +16,14 @@ import unicorn.x86_const as reg
 def check_initial_update(pe, base, symbols, updater_state):
     """Execute the first frame with image-initialized state and mocked OS threads."""
     cases = []
-    for enabled, thread_succeeds in ((False, True), (True, True), (True, False)):
+    for enabled, thread_succeeds, bypass in (
+        (False, True, False), (True, True, False), (True, False, False),
+        (True, True, True), (True, False, True),
+    ):
         vm = Uc(UC_ARCH_X86, UC_MODE_64)
         arena = 0x100000000
         vm.mem_map(arena, 0x10000)
-        mapped, calls = set(), []
+        mapped, calls, stages = set(), [], []
 
         def page(address):
             start = address & ~4095
@@ -55,6 +59,8 @@ def check_initial_update(pe, base, symbols, updater_state):
         def boundary(vm, address, size, context):
             if address == symbols["DW_LocalBackend_IsEnabled"]:
                 returned(int(enabled))
+            elif address == symbols["DW_LocalConfig_BypassUpdateRestart"]:
+                returned(int(bypass))
             elif address == arena + 0x1000:
                 callback = vm.reg_read(reg.UC_X86_REG_R8)
                 assert base <= callback < base + pe.OPTIONAL_HEADER.SizeOfImage
@@ -68,6 +74,16 @@ def check_initial_update(pe, base, symbols, updater_state):
                 calls.append("close")
                 returned(1)
             elif address == symbols["DW_LocalPlatform_RecordStage"]:
+                pointer = vm.reg_read(reg.UC_X86_REG_RCX)
+                data = bytearray()
+                while True:
+                    page(pointer + len(data))
+                    value = bytes(vm.mem_read(pointer + len(data), 1))[0]
+                    if not value:
+                        break
+                    data.append(value)
+                    assert len(data) < 512
+                stages.append(data.decode())
                 returned(0)
 
         vm.hook_add(UC_HOOK_CODE, boundary)
@@ -77,11 +93,14 @@ def check_initial_update(pe, base, symbols, updater_state):
             vm.reg_write(reg.UC_X86_REG_RSP, stack)
             vm.emu_start(symbols["DW_ExecutableUpdate_Frame"], stop, count=10000)
             assert vm.reg_read(reg.UC_X86_REG_RIP) == stop
-        expected = ["thread", "close"] if enabled and thread_succeeds else ["thread"] if enabled else []
+        expected = [] if bypass or not enabled else ["thread", "close"] if thread_succeeds else ["thread"]
         assert calls == expected, (enabled, thread_succeeds, calls)
         state = struct.unpack("<I", vm.mem_read(updater_state, 4))[0]
-        assert state == (1 if enabled and thread_succeeds else 40 if enabled else 0)
+        assert state == (50 if enabled and bypass else 1 if enabled and thread_succeeds else 40 if enabled else 0)
+        if enabled and bypass:
+            assert any("bypass_update_restart=1" in stage for stage in stages)
         cases.append({"enabled": enabled, "thread_creation_succeeds": thread_succeeds,
+                      "bypass_update_restart": bypass, "bypass_logged": any("bypass_update_restart=1" in stage for stage in stages),
                       "compiled_initial_state": initial, "frames": 2, "worker_starts": calls.count("thread"), "final_state": state})
     return cases
 
@@ -97,6 +116,12 @@ def main():
     pe = pefile.PE(str(image), fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
     symbols = {name: base + rva for name, rva in report["symbols"].items()}
+    # The existing compiled-updater gate also executes the linked INI parser;
+    # configuration defaults and field preservation belong to this feature.
+    spec = importlib.util.spec_from_file_location("linked_local_config_tests", Path(__file__).with_name("test-local-config.py"))
+    local_config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(local_config)
+    local_config_checks = local_config.run_checks(pe, base, symbols)
     # Discover the compiled private state through its atomic instruction, rather
     # than assuming an RVA or depending on compiler-local symbol spelling.
     decoder = cs.Cs(cs.CS_ARCH_X86, cs.CS_MODE_64)
@@ -117,7 +142,7 @@ def main():
     checks = []
 
     for enabled in (False, True):
-        for state in (1, 10, 20, 30, 40):
+        for state, bypass in ((value, bypass) for value in (1, 10, 20, 30, 40, 50) for bypass in (False, True)):
             vm = Uc(UC_ARCH_X86, UC_MODE_64)
             arena = 0x100000000
             vm.mem_map(arena, 0x10000)
@@ -158,6 +183,17 @@ def main():
             def boundary(vm, address, size, context):
                 if address == symbols["DW_LocalBackend_IsEnabled"]:
                     returned(int(enabled))
+                elif address == symbols["DW_LocalConfig_BypassUpdateRestart"]:
+                    returned(int(bypass))
+                elif address == symbols["func_1420838B0"]:
+                    returned(0)
+                elif address == symbols["func_1413E9BE0"]:
+                    calls.append("success-label")
+                    returned(0)
+                elif address == symbols["Dvar_SetBool_Internal"]:
+                    assert vm.reg_read(reg.UC_X86_REG_RDX) & 255 == 1
+                    calls.append("native-restart-dvar")
+                    returned(0)
                 elif address == symbols["func_1416702D0"]:
                     calls.append("service")
                     returned(arena + 0x5000)
@@ -197,7 +233,7 @@ def main():
                 for native in range(5):
                     write(arena + 0x1000 + 165 + kind * 100, bytes([native]))
                     expected = native
-                    if enabled and kind == 0 and native not in (3, 4):
+                    if enabled and not bypass and kind == 0 and native not in (3, 4):
                         if state == 1:
                             expected = 0
                         elif state == 20 and native in (1, 2):
@@ -209,17 +245,23 @@ def main():
             write(arena + 0x3028, struct.pack("<Q", arena + 0x4000))
             write(arena + 0x1000 + 79, b"\x01")
             assert call("func_1410527B0", arena + 0x1000, 0) == 1
+            call("func_141B117B0", arena + 0x2000)
+            expected_lua = [] if enabled and not bypass and state == 20 else ["success-label", "native-restart-dvar"]
+            assert calls == expected_lua, (enabled, bypass, state, calls)
+            calls.clear()
             write(symbols["gl_14F05AC00"], b"\0")
             call("func_14165E530")
-            expected = [] if enabled and state == 20 else ["service", "account", "request"]
+            expected = [] if enabled and not bypass and state == 20 else ["service", "account", "request"]
             assert calls == expected
             checks.append(
                 {
                     "enabled": enabled,
                     "state": state,
+                    "bypass_update_restart": bypass,
                     "getter_cases": 10,
                     "native_prerequisite_passes": True,
                     "restart_route_correct": True,
+                    "native_data_restart_preserved": bypass,
                 }
             )
     args.output.write_text(
@@ -230,6 +272,7 @@ def main():
                 "game_sha256": report["sha256"],
                 "checks": checks,
                 "initial_update_checks": initial_checks,
+                "local_config_checks": local_config_checks,
                 "native_game_verified": False,
                 "modeled_boundaries": [
                     "DW filename selection",
@@ -242,7 +285,7 @@ def main():
         + "\n"
     )
     print(
-        "PASS: compiled initial updater scheduling, 100 linked patch-state cases, prerequisite fence and actual platform restart routing"
+        "PASS: compiled initial updater scheduling and bypass, 240 linked patch-state cases, native data restart routing and prerequisite fence"
     )
 
 

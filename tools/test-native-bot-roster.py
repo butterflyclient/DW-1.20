@@ -158,6 +158,7 @@ def main():
         "func_140CA2210",
         "func_141359F90",
         "func_141371450",
+        "DW_MatchmakingAssignments_PrepareLaunch",
         "func_14137D670",
         "func_14118CF60",
         "func_14118C070",
@@ -227,6 +228,10 @@ def main():
             returned(state["server_bot"])
         elif name == "func_141371450":
             returned(not state["server_bot"])
+        elif name == "DW_MatchmakingAssignments_PrepareLaunch":
+            assert a[0] == server_party and not state["server_bot"]
+            state["assignment_replays"] = state.get("assignment_replays", 0) + 1
+            returned()
         elif name == "func_14137D670":
             returned(server_party)
         elif name == "func_14118CF60":
@@ -384,7 +389,69 @@ def main():
     assert len(keys) == 12
     weapon_loot = {models[f"members.{row}.weaponSetup.0.weaponLootID"] for row in range(2, 14)}
     assert len(weapon_loot) > 1
-    assert all(models[f"members.{row}.weaponSetup.0.attachment.0.attachment"] for row in range(2, 14))
+    # A weapon/style with no positive native Gunsmith tradeoff legitimately
+    # remains stock. Validate the advertised selection rather than requiring
+    # a cosmetic attachment regardless of the weapon's actual capabilities.
+    source_root = Path(report["source_root"])
+    style_header = source_root / "src/DW_BotStyleData.h"
+    style_proof = json.loads((source_root / "generated/bot-style-data.json").read_bytes())
+    assert style_proof["passed"] and style_proof["image_sha256"] == report["input_sha256"]
+    assert hashlib.sha256(style_header.read_bytes()).hexdigest() == style_proof["generated_header_sha256"]
+    roster_units = [unit for unit in report["cpp"] if unit["source"] == "src/DW_BotRoster.cpp"]
+    assert len(roster_units) == 1
+    compiled_headers = {Path(item["path"]).resolve(): item["sha256"]
+                        for item in roster_units[0]["dependencies"]}
+    assert compiled_headers[style_header.resolve()] == style_proof["generated_header_sha256"]
+    style_text = style_header.read_text()
+    styles = json.loads("[" + style_text.split("StyleNames[] = {", 1)[1].split("};", 1)[0] + "]")
+    attachment_section = style_text.split("Attachment Attachments[] = {", 1)[1].split("};", 1)[0]
+    attachment_rows = re.findall(
+        r'\{"([^"]+)", "([^"]+)", (\d+), (\d+), (\d+), (\d+), (\d+), (\d+), \{([^{}]+)\}\}',
+        attachment_section,
+    )
+    attachments = [dict(reference=row[0], category=int(row[5]), blocked=int(row[6]),
+                        variant=int(row[7]), scores=[int(value) for value in row[8].split(",")])
+                   for row in attachment_rows]
+    weapon_section = style_text.split("Weapon Weapons[] = {", 1)[1].split("};", 1)[0]
+    weapon_rows = re.findall(r'\{"([^"]+)", "([^"]+)", "([^"]+)", (\d+), (\d+), (\d+)\}', weapon_section)
+    weapons = {int(row[5]): dict(reference=row[0], weapon_class=row[2], first=int(row[3]), count=int(row[4]))
+               for row in weapon_rows}
+    assert len(attachments) == style_proof["counts"]["attachments"]
+    assert len(weapons) == style_proof["counts"]["weapons"]
+    stock_selections = []
+    selected_attachment_total = 0
+    for row in range(2, 14):
+        style_name = models[f"members.{row}.botLoadoutStyle"]
+        style_index = styles.index(style_name)
+        for slot in range(2):
+            prefix = f"members.{row}.weaponSetup.{slot}"
+            weapon = weapons[models[prefix + ".weaponLootID"]]
+            assert (weapon["weapon_class"] == "weapon_pistol") == bool(slot)
+            candidates = attachments[weapon["first"]:weapon["first"] + weapon["count"]]
+            count = models[prefix + ".attachmentCount"]
+            assert 0 <= count <= 5
+            selected = []
+            for index in range(5):
+                reference = models[f"{prefix}.attachment.{index}.attachment"]
+                variant = models[f"{prefix}.attachment.{index}.variant"]
+                if index >= count:
+                    assert reference == "" and variant == 0
+                    continue
+                matches = [item for item in candidates if item["reference"] == reference and item["variant"] == variant]
+                assert len(matches) == 1, (row, slot, weapon["reference"], reference, variant)
+                attachment = matches[0]
+                assert attachment["scores"][style_index] > 0
+                for previous in selected:
+                    assert attachment["category"] != previous["category"]
+                    assert not attachment["blocked"] or attachment["blocked"] != previous["category"]
+                    assert not previous["blocked"] or previous["blocked"] != attachment["category"]
+                selected.append(attachment)
+            if not count:
+                assert not any(item["scores"][style_index] > 0 for item in candidates)
+                stock_selections.append(dict(row=row, slot=slot, weapon=weapon["reference"], style=style_name))
+            selected_attachment_total += count
+    assert selected_attachment_total > 0
+    checks.append("Both displayed weapon slots use compatible native Gunsmith attachments, positive style tradeoffs and exact variants; unsupported stock-only selections and cleared unused slots are preserved")
     snapshot_models = dict(models)
     state["eligible"] = False
     state["local"] = 1
@@ -443,7 +510,9 @@ def main():
         "BR spawn selection consumes all native bot records once, including teams beyond axis/allies, while preserving human records"
     )
     state["server_bot"] = False
+    prior_replays = state.get("assignment_replays", 0)
     assert run("func_1413707D0", 1) == 1 and run("func_141370860", 1) == 2
+    assert state["assignment_replays"] == prior_replays + 2
     state["enabled"] = False
     assert run("func_14118ADD0", party) == 2
     models.clear()
@@ -539,6 +608,9 @@ def main():
                 game_sha256=report["sha256"],
                 checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 bindings_header_sha256=hashlib.sha256(selected_header.read_bytes()).hexdigest(),
+                gunsmith_data_sha256=style_proof["generated_header_sha256"],
+                stock_weapon_style_selections=stock_selections,
+                selected_attachment_total=selected_attachment_total,
                 checks=checks,
                 native_game_verified=False,
             ),

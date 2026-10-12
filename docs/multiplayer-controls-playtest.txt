@@ -13,8 +13,12 @@ INI controls, read at full game startup:
   rank=0        Use saved progression and allow earned XP to continue.
   rank=1..55    Select that career rank's native XP threshold once when changed.
                 Keeping the same setting does not reset earned XP each launch.
+  bypass_update_restart=0  Check and install verified DW executable updates (default).
+  bypass_update_restart=1  Keep a custom executable and skip its update/restart
+                           enforcement. Backend publisher/data patches and
+                           ordinary native restart requests still run normally.
 
-Keep the normal defaults unlock_all=0 and rank=0 for the progression test.
+Keep the normal defaults unlock_all=0, rank=0 and bypass_update_restart=0 for the progression test.
 Player XP saves to %LOCALAPPDATA%\ReplayDW\player-progression.bin on that PC.
 Settings continue to use the player's native local Replay settings/profile.
 Restart after changing the INI; changing it while the game runs is not a reload.
@@ -102,7 +106,7 @@ Automatic matchmaking bot fill (20261011):
 These steps require owner playtesting; stock-Lua, linked-client and protocol
 fixtures are separate evidence and do not prove the rendered UI or gameplay.
 
-Current production release 20 (2026-10-11):
+Historical production release 20 (2026-10-11):
 - Installed main EXE: E:\IW8\Builds\1.20-replay\game_dx12_ship_replay_dw.exe
   SHA256: 25245ee0bf65e5607c62e0280a1acbcefd67996f0cedebc427a6b8b2ca1845e9
 - The existing INI and local profiles were preserved. com_optimized defaults to
@@ -130,3 +134,49 @@ Current production release 20 (2026-10-11):
   and game UI/gameplay were not run for this release.
 - Final combined evidence: validation/20261011-playlist-auto-fill-readiness.json.
   Earlier release 19 and private R5 notes above remain historical evidence.
+
+Combined bot, matchmaking, whisper and asset-update playtest:
+1. Use two separate BR Quads parties, both with Squad Fill off. Enable "Fill
+   lobby with bots" on the host only. Wait for the 30-second delay and gradual
+   15-second fill. Both humans must retain different teams/squads, without bot
+   teammates. The player count must reach the playlist limit; No Fill reserves
+   teammate places without subtracting players from the entire lobby.
+2. Migrate the host after the fill completes. The new host must retain the bot
+   roster and completed fill, with no second delay. A later explicit checkbox
+   change still applies. Test a human joining before native launch as well.
+3. Inspect bots in the pregame and match. Ranks vary toward the higher end.
+   MP primary/secondary weapons share the displayed bot's loadout profile.
+   Mobility, stability, recoil, range and balanced recipes use that weapon's
+   actual Gunsmith modifiers and compatible attachment categories.
+4. In BR, watch bots acquire firearms/ammo from nearby loot and open usable
+   containers. Check plate insertion after damage and movement away from gas.
+   Cold Gulag entry must not reuse exterior movement; test jail rocks/fists,
+   duel equipment and the transition back to ordinary BR movement.
+5. Send a whisper in both directions with the second player online. Check the
+   recipient's actual chat history, not only the sender's success status. An
+   unavailable recipient must report failure rather than silently acknowledge.
+6. Leave bypass_update_restart=0 for normal full-EXE updates. Setting it to 1
+   before launch skips the embedded EXE update check and its restart prompt.
+   Normal native publisher/data checks and manual restarts remain available.
+7. A new native bot-script overlay is packaged separately from shipped files.
+   The updater fetches its hash-bound FF/FP payloads with the full EXE. Existing
+   owned files are backed up with verified bytes and recovery.tsv under
+   <game EXE>.update/asset-backups/<target EXE SHA256>/ before replacement.
+   The same installation manifest stages all language/region companions at
+   native common-zone load, including a client updated by an older helper.
+   Regional companions belong in zone/worldwide, zone/japan, etc.; language
+   companions belong in zone/english, zone/french, etc. Check the native folder
+   rather than the zone root when confirming an installation. A current image
+   with missing companions must repair them before normal loading resumes.
+8. Join a running match from another party. Each newly admitted real player
+   reserves a connected bot's slot; native authenticated connection teardown
+   removes that bot. The playlist capacity stays unchanged. Repeating a join
+   must not remove another bot. A match already at its human limit rejects a
+   new player. Squad admission retains No Fill and native squad-ID limits.
+9. Watch bot travel after combat, toward loot and out of gas. Long clear routes
+   should use available sprint/tactical sprint, with quicker route changes
+   after blocked movement or a dead target. Aiming, fire, reload, plating,
+   Gulag, airborne states and native stamina checks retain movement control.
+
+These are owner playtest gates. Offline ABI, script/package, transport and
+updater transactions do not prove live navigation, remote UI or match stability.

@@ -14,6 +14,11 @@
 #include <string>
 #include <vector>
 #include "../integration/replay/dw_update_protocol.h"
+#if __has_include("../integration/replay/DW_UpdateAssetManifest.h")
+#include "../integration/replay/DW_UpdateAssetManifest.h"
+#define DW_UPDATE_FROZEN_ASSETS 1
+#endif
+#include "replay-update-assets.h"
 
 extern "C" bool DW_LocalPlatform_VerifyBytes(const void *, unsigned, const uint8_t *);
 extern "C" uint64_t DW_LocalPlatform_Time();
@@ -218,6 +223,8 @@ namespace
         return result;
     }
 
+    const update_assets::IO assetIO{read, write, hash, download};
+
     bool validPlan(const DWUpdateReply &reply)
     {
         const auto &p = reply.plan;
@@ -261,8 +268,14 @@ namespace
             return 30;
         if (p.status == 0)
         {
-            require(!std::memcmp(p.targetHash, p.baseHash, 32), "Invalid current-build response");
-            return 10;
+            require(!std::memcmp(p.targetHash, p.baseHash, 32) && p.targetSize == base.size(),
+                    "Invalid current-build response");
+            update_assets::Session assets(assetIO, exe, stage(exe), base, p.targetHash);
+            if (!assets.needed())
+                return 10;
+            assets.stage(host);
+            write(stage(exe) / "plan.bin", response);
+            return 20; // Missing owned files require the same clean-exit fence.
         }
         require(!p.baseSize && p.targetSize && p.targetSize <= DW_UPDATE_MAX_IMAGE &&
                     p.patchSize == p.targetSize && p.release &&
@@ -274,6 +287,8 @@ namespace
         require(target.size() > 2 && target[0] == 'M' && target[1] == 'Z' &&
                     matches(target, p.targetHash),
                 "Downloaded executable failed verification");
+        update_assets::Session assets(assetIO, exe, stage(exe), target, p.targetHash);
+        assets.stage(host);
         write(stage(exe) / "next.exe", target);
         write(stage(exe) / "plan.bin", response);
         return 20;
@@ -294,61 +309,70 @@ namespace
         DWUpdateReply reply{};
         std::memcpy(&reply, bytes.data(), sizeof(reply));
         const auto next = stage(exe) / "next.exe";
-        require(validPlan(reply) && reply.plan.status == 1 &&
+        require(validPlan(reply) && reply.plan.status <= 1 &&
                     matches(read(exe), reply.plan.baseHash) &&
-                    matches(read(next), reply.plan.targetHash),
+                    (reply.plan.status == 1 ? matches(read(next), reply.plan.targetHash)
+                                           : !std::memcmp(reply.plan.targetHash, reply.plan.baseHash, 32)),
                 "Staged update no longer verifies");
+        const auto target = read(reply.plan.status == 1 ? next : exe);
+        update_assets::Session assets(assetIO, exe, stage(exe), target, reply.plan.targetHash);
+        assets.verifyStage();
         Handle ready(OpenEventW(EVENT_MODIFY_STATE, FALSE, eventName.c_str()));
         require(ready.value && SetEvent(ready.value), "Cannot acknowledge the restart handoff");
         require(WaitForSingleObject(process.value, 86400000) == WAIT_OBJECT_0,
                 "Game did not exit before update expiry");
         require(validPlan(reply) && matches(read(exe), reply.plan.baseHash) &&
-                    matches(read(next), reply.plan.targetHash),
+                    (reply.plan.status == 0 || matches(read(next), reply.plan.targetHash)),
                 "Executable changed while waiting for the game to exit");
-        const auto backup = stage(exe) / (hex(reply.plan.baseHash) + L".backup.exe");
-        // ReplaceFile preserves file ACLs and the old bytes as a recovery copy.
-        // It is never followed by delete/move fallbacks that could lose the EXE.
-        bool replaced = false;
-        for (unsigned attempt = 0; attempt < 50; ++attempt)
+        assets.install(); // All original overlay bytes backed up before replacement.
+        if (reply.plan.status == 1)
         {
-            if (ReplaceFileW(exe.c_str(), next.c_str(), backup.c_str(), 0, nullptr, nullptr))
+            const auto backup = stage(exe) / (hex(reply.plan.baseHash) + L".backup.exe");
+            // ReplaceFile preserves file ACLs and the old bytes as a recovery copy.
+            // It is never followed by delete/move fallbacks that could lose the EXE.
+            bool replaced = false;
+            for (unsigned attempt = 0; attempt < 50; ++attempt)
             {
-                replaced = true;
-                break;
+                if (ReplaceFileW(exe.c_str(), next.c_str(), backup.c_str(), 0, nullptr, nullptr))
+                {
+                    replaced = true;
+                    break;
+                }
+                const auto error = GetLastError();
+                if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED)
+                    break;
+                Sleep(100);
             }
-            const auto error = GetLastError();
-            if (error != ERROR_SHARING_VIOLATION && error != ERROR_ACCESS_DENIED)
-                break;
-            Sleep(100);
-        }
-        if (!replaced)
-        {
-            // ReplaceFile documents failures that can leave the original under
-            // the backup name. Restore a missing launch path without replacing
-            // any existing file or consuming the recovery copy.
-            if (!fs::exists(exe) && fs::exists(backup) &&
-                matches(read(backup), reply.plan.baseHash))
+            if (!replaced)
             {
+                // ReplaceFile documents failures that can leave the original under
+                // the backup name. Restore a missing launch path without replacing
+                // any existing file or consuming the recovery copy.
+                if (!fs::exists(exe) && fs::exists(backup) &&
+                    matches(read(backup), reply.plan.baseHash))
+                {
+                    const auto rollback = stage(exe) / "rollback.exe";
+                    require(CopyFileW(backup.c_str(), rollback.c_str(), FALSE) != 0 &&
+                                MoveFileExW(rollback.c_str(), exe.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
+                            "Replacement failed; restore the retained backup EXE to the game folder");
+                }
+                throw std::runtime_error("Windows could not replace the EXE; installed image and "
+                                         "recovery files are retained");
+            }
+            if (!matches(read(exe), reply.plan.targetHash))
+            {
+                require(matches(read(backup), reply.plan.baseHash),
+                        "Installed image and recovery backup failed verification");
                 const auto rollback = stage(exe) / "rollback.exe";
                 require(CopyFileW(backup.c_str(), rollback.c_str(), FALSE) != 0 &&
-                            MoveFileExW(rollback.c_str(), exe.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
-                        "Replacement failed; restore the retained backup EXE to the game folder");
+                            ReplaceFileW(exe.c_str(), rollback.c_str(), nullptr, 0, nullptr, nullptr) !=
+                                0,
+                        "Final verification failed; restore the retained backup EXE");
+                throw std::runtime_error(
+                    "Final verification failed; restored the previous EXE without launching it");
             }
-            throw std::runtime_error("Windows could not replace the EXE; installed image and "
-                                     "recovery files are retained");
         }
-        if (!matches(read(exe), reply.plan.targetHash))
-        {
-            require(matches(read(backup), reply.plan.baseHash),
-                    "Installed image and recovery backup failed verification");
-            const auto rollback = stage(exe) / "rollback.exe";
-            require(CopyFileW(backup.c_str(), rollback.c_str(), FALSE) != 0 &&
-                        ReplaceFileW(exe.c_str(), rollback.c_str(), nullptr, 0, nullptr, nullptr) !=
-                            0,
-                    "Final verification failed; restore the retained backup EXE");
-            throw std::runtime_error(
-                "Final verification failed; restored the previous EXE without launching it");
-        }
+        assets.commit();
         std::wstring command = L"\"" + exe.wstring() + L"\"";
         STARTUPINFOW startup{sizeof(startup)};
         PROCESS_INFORMATION child{};
@@ -373,6 +397,12 @@ int wmain(int argc, wchar_t **argv)
     fs::path exe;
     try
     {
+        // Frozen game helpers retain their manifest. A standalone backend-tool
+        // build can still consume manifests from verified downloaded game EXEs.
+#if defined(DW_UPDATE_FROZEN_ASSETS)
+        require(!update_assets::manifest(assetIO, s_dwUpdateAssetManifest).empty(),
+                "Compiled owned asset manifest is unavailable");
+#endif
         require(argc >= 4, "Invalid updater arguments");
         exe = fs::absolute(argv[2]).lexically_normal();
         require(exe.extension() == L".exe" && fs::is_regular_file(exe),

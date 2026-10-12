@@ -11,6 +11,7 @@ extern "C"
     void DW_BotPolicy_BuildRoster(const void *, unsigned, unsigned);
     void DW_BotPolicy_ResetRoster();
     void DW_BotPolicy_CaptureRoster();
+    void DW_MatchmakingAssignments_PrepareLaunch(const void *);
     void DW_PlaylistUI_Frame();
     uint64_t DW_LobbyControls_StartMatchInternalNative(void *, const void *);
     bool DW_LobbyControls_ReadyToLaunchNative(const void *, const void *);
@@ -101,8 +102,10 @@ namespace
         s_commandBotCount = 0;
         s_requestPending = false;
         s_autoRequest = false;
+        s_autoWasHost = false;
         s_autoClockValid = false;
         s_autoWanted = false;
+        s_autoNeedsClear = false;
         // Keep request tokens unique across allocations in this process. Old
         // publication dvars can outlive the native lobby identity by a frame.
         s_autoArmAcknowledged = false;
@@ -147,6 +150,12 @@ namespace
 
     void QueueAuto(unsigned count, bool complete)
     {
+        // Accepted tokens belong to the lobby, including requests made by its
+        // previous host. Keep our process token above that published high-water
+        // mark; publication revisions alone do not acknowledge a request.
+        const int accepted = s_autoAck->current.integer;
+        if (accepted >= 0 && unsigned(accepted) > s_autoRequestId)
+            s_autoRequestId = unsigned(accepted);
         if (s_autoRequestId == 0x7FFFFFFFU)
             return;
         s_commandBotCount = int(count);
@@ -158,6 +167,55 @@ namespace
         ++s_autoRequestId;
         *reinterpret_cast<bool *>(replay_rva_0c27e4b0 + 79636) = true;
         *reinterpret_cast<unsigned *>(replay_rva_0c27e4b0 + 79640) = 0;
+    }
+
+    void AcquireAutoFill(const void *party)
+    {
+        s_autoWasHost = true;
+        s_autoClockValid = false;
+        s_autoArmAcknowledged = false;
+        s_requestPending = false;
+        s_autoRequest = false;
+        s_autoWanted = false;
+        if (!s_autoActive->current.enabled)
+            return;
+
+        // The new host's checkbox is a local preference until it acquires this
+        // lobby. Inherit the accepted active policy once, then ordinary later
+        // checkbox changes remain explicit host requests.
+        DvarValue on{};
+        on.enabled = true;
+        Dvar_SetVariant(s_autoFill, &on, 0);
+        s_autoWanted = true;
+        s_autoClockValid = true;
+        s_autoStarted = replay_rva_0148fce0();
+        const unsigned capacity = replay_rva_0118c7d0(party);
+        const unsigned humans = replay_rva_0118ab60(party, 1);
+        const int supplied = s_autoTarget->current.integer;
+        const int count = s_botCount->current.integer;
+        const bool complete = s_autoComplete->current.enabled && supplied >= 0 &&
+                              count == supplied && capacity <= 200 && humans <= capacity &&
+                              unsigned(supplied) <= capacity - humans;
+        s_autoNeedsClear = !complete;
+        s_filled = false;
+        if (complete)
+        {
+            // A completed fill already passed the backend's timing fence. Keep
+            // its count and roster; rebuild only if the native pool is missing.
+            s_autoStarted -= 45000;
+            s_autoArmAcknowledged = true;
+            s_filledCount = unsigned(count);
+            s_filledHumans = humans;
+            s_filledCapacity = capacity;
+            s_filled = NativeBots(party, capacity) == unsigned(count);
+        }
+        else
+        {
+            // Incomplete migration can restart the server's 30-second delay.
+            // Arm with zero and wait for this host's exact accepted token before
+            // applying a publication or growing the native pool.
+            QueueAuto(0, false);
+        }
     }
 
     void AutoFillFrame(const void *party)
@@ -220,6 +278,9 @@ namespace
         const unsigned progress = elapsed <= 30000 ? 0 : elapsed >= 45000 ? 15000 : elapsed - 30000;
         const unsigned desired = target * progress / 15000;
         const unsigned acknowledged = unsigned(s_botCount->current.integer);
+        if (s_autoComplete->current.enabled && elapsed >= 45000 && desired == acknowledged &&
+            acknowledged == target && !s_filled)
+            return; // Keep authoritative completion while rebuilding our native pool.
         const bool complete = elapsed >= 45000 && acknowledged == target && s_filled &&
                               s_filledHumans == humans && NativeBots(party, capacity) == target;
         if (desired != acknowledged || complete != s_autoComplete->current.enabled)
@@ -457,13 +518,6 @@ extern "C" void DW_LobbyControls_Frame()
     SyncLobby();
     if (!s_lobby)
         return;
-    if (!s_autoWasHost)
-    {
-        s_autoWasHost = true;
-        s_autoClockValid = false;
-        s_autoArmAcknowledged = false;
-        s_requestPending = false;
-    }
     if (s_requestPending)
     {
         const bool acknowledged = s_autoRequest
@@ -509,6 +563,11 @@ extern "C" void DW_LobbyControls_Frame()
         s_autoArmAcknowledged = false;
         return;
     }
+    if (!s_autoWasHost)
+        AcquireAutoFill(party);
+    // Parsed backend assignments can precede a remote UDP party member.
+    // Apply the current lobby's retained assignments before bot grouping.
+    DW_MatchmakingAssignments_PrepareLaunch(party);
     AutoFillFrame(party);
     if (s_autoWanted && !s_autoArmAcknowledged)
         return;
@@ -580,6 +639,7 @@ extern "C" void DW_LobbyControls_Frame()
         DW_BotPolicy_Prepare(party);
         replay_rva_00ca2110();
         replay_rva_0119a5a0(party);
+        DW_MatchmakingAssignments_PrepareLaunch(party);
         s_filled = true;
         s_filledCount = requested;
         s_filledHumans = humans;
@@ -644,12 +704,14 @@ extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
 // which bypasses the ordinary readiness predicate and countdown.
 extern "C" bool func_14119B0E0(void *party, const void *activeClient)
 {
+    DW_MatchmakingAssignments_PrepareLaunch(party);
     const bool nativeReady = DW_LobbyControls_ReadyToLaunchNative(party, activeClient);
     return nativeReady && !AutoFillPending(party);
 }
 
 extern "C" uint64_t func_14119E3D0(void *party, const void *activeClient)
 {
+    DW_MatchmakingAssignments_PrepareLaunch(party);
     return AutoFillPending(party) ? uint64_t{0}
                                  : DW_LobbyControls_StartMatchInternalNative(party, activeClient);
 }

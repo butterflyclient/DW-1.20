@@ -5,6 +5,10 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import collections
+import subprocess
+import sys
+import tempfile
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
@@ -24,6 +28,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--controls-source", type=Path,
+                        help="Compile/link only this controls owner into the offline VM")
+    parser.add_argument("--compiler-source", type=Path,
+                        help="Frozen compiler source and complete native headers for the focused owner")
     args = parser.parse_args()
     report = json.loads((args.build / "build-report.json").read_bytes())
     image = Path(report["executable"])
@@ -33,7 +41,7 @@ def main():
     verification = json.loads((args.build / "verification-report.json").read_bytes())
     assert verification["sha256"] == report["sha256"] and not verification["unresolved_symbols"]
     pe = pefile.PE(str(image), fast_load=True)
-    base, symbols = pe.OPTIONAL_HEADER.ImageBase, report["symbols"]
+    base, symbols = pe.OPTIONAL_HEADER.ImageBase, dict(report["symbols"])
     vm = Uc(UC_ARCH_X86, UC_MODE_64)
     stack, arena, halt = 0x10000000, 0x11000000, 0x12000000
     for address in (stack, arena, halt):
@@ -42,6 +50,8 @@ def main():
 
     def page(address):
         page = address & ~4095
+        if page in pages:
+            return
         assert base <= page < base + pe.OPTIONAL_HEADER.SizeOfImage
         if page not in pages:
             vm.mem_map(page, 4096)
@@ -80,6 +90,56 @@ def main():
         vm.reg_write(UC_X86_REG_RIP, read(rsp, "<Q"))
         vm.reg_write(UC_X86_REG_RSP, rsp + 8)
 
+    owner_proof = None
+    if args.controls_source:
+        assert args.compiler_source, "Focused compilation requires the frozen compiler/headers"
+        sys.path.insert(0, str(args.compiler_source / "tools"))
+        import coff
+        import build as compiler_linker
+        source_hash = hashlib.sha256(args.controls_source.read_bytes()).hexdigest()
+        with tempfile.TemporaryDirectory(prefix="lobby-owner-", dir=Path(__file__).resolve().parents[1] / "data") as folder:
+            obj_path = Path(folder) / "controls.obj"
+            subprocess.run([str(compiler_linker.LLVM / "clang++.exe"),
+                "--target=x86_64-pc-windows-msvc", "-std=c++20", "-O2", "-ffreestanding",
+                "-fno-stack-protector", "-fno-exceptions", "-fno-rtti", "-funwind-tables",
+                "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror",
+                "-I" + str(args.compiler_source / "src"), "-c", str(args.controls_source),
+                "-o", str(obj_path)], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            obj = coff.read(obj_path)
+            owner_proof = dict(source_sha256=source_hash, object_sha256=hashlib.sha256(obj_path.read_bytes()).hexdigest())
+        assert hashlib.sha256(args.controls_source.read_bytes()).hexdigest() == source_hash
+        at = (pe.OPTIONAL_HEADER.SizeOfImage + 65535) & -65536
+        start = at
+        for section in obj["sections"]:
+            section["rva"] = at
+            at = coff.align(at + len(section["data"]), 16)
+        vm.mem_map(base + start, coff.align(at - start, 4096))
+        pages.update(range(base + start, base + start + coff.align(at - start, 4096), 4096))
+        original = dict(symbols)
+        for symbol in obj["symbols"].values():
+            if symbol["section"] > 0 and symbol["storage"] == 2:
+                symbols[symbol["name"]] = obj["sections"][symbol["section"] - 1]["rva"] + symbol["value"]
+            elif symbol["section"] == 0 and symbol["name"].startswith("replay_rva_"):
+                rva = int(symbol["name"][11:], 16)
+                symbol["name"] = f"func_{0x140000000 + rva:X}" if symbol["name"] not in symbols else symbol["name"]
+                if rva == 0x0C27E4B0:
+                    symbol["name"] = "gl_14C27E4B0"
+        statistics = collections.Counter()
+        manifest = dict(image_base=base, replacements=[], optional=dict(SizeOfImage=at))
+        for section in obj["sections"]:
+            if section["data"]:
+                vm.mem_write(base + section["rva"], bytes(compiler_linker.relocate(
+                    obj, section, symbols, manifest, statistics, set())))
+        # Recovered SDK wrappers still call their original linked controls entry.
+        # Redirect those VM-only entries to the freshly linked owner object.
+        for name, rva in symbols.items():
+            if name in original and rva != original[name]:
+                address = base + original[name]
+                page(address); page(address + 11)
+                vm.mem_write(address, b"\x48\xb8" + struct.pack("<Q", base + rva) + b"\xff\xe0")
+        owner_proof.update(compiler_relocator_sha256=hashlib.sha256((args.compiler_source / "tools/build.py").read_bytes()).hexdigest(),
+                           relocation_counts=dict(statistics), vm_only=True, full_game_compiled=False)
+
     dvars = {}
     for i, name in enumerate(
         ("gl_14D386820", "gl_14D386948", "gl_14D386840", "gl_14C796328", "DVARBOOL_onlinegame")
@@ -109,7 +169,7 @@ def main():
         bots=0,
     )
     command = dict(callback=None, argc=2)
-    calls, registered, checks = [], {}, []
+    calls, registered, checks, pool_calls = [], {}, [], []
     lua = dict(top=2, locked=False, limits={}, now=10000)
     names = (
         "DW_LocalBackend_IsEnabled",
@@ -124,6 +184,7 @@ def main():
         "DW_BotPolicy_Prepare",
         "DW_BotPolicy_ResetRoster",
         "DW_BotPolicy_CaptureRoster",
+        "DW_MatchmakingAssignments_PrepareLaunch",
         "DW_PlaylistUI_Frame",
         "DW_LobbyControls_StartMatchInternalNative",
         "DW_LobbyControls_ReadyToLaunchNative",
@@ -254,10 +315,15 @@ def main():
         elif name == "replay_rva_0118e020":
             returned(int(values[1] < settings["humans"]))
         elif name == "replay_rva_00ca2070":
+            pool_calls.append("clear")
             settings.update(initialized=False, bots=0)
             returned()
         elif name == "DW_BotPolicy_BuildRoster":
+            pool_calls.append("build")
             assert values[:3] == [arena + 0x8000, settings["slots"], settings["requested"]]
+            returned()
+        elif name == "DW_MatchmakingAssignments_PrepareLaunch":
+            assert values[0] == arena + 0x8000
             returned()
         elif name == "Com_sprintf":
             format = string(values[2])
@@ -315,6 +381,8 @@ def main():
             registered[key] = pointer
             returned(pointer)
         elif name in ("DW_BotPolicy_ResetRoster", "DW_BotPolicy_CaptureRoster", "DW_PlaylistUI_Frame"):
+            if name != "DW_PlaylistUI_Frame":
+                pool_calls.append(name)
             returned()
         elif name == "DW_LobbyControls_ReadyToLaunchNative":
             returned(1)
@@ -656,6 +724,103 @@ def main():
     checks.append(
         "Linked 30/15-second automatic fill uses authenticated token ACKs, native pooled presence and authoritative No Fill target; both native launch entry points stay gated until completion and restore on disable"
     )
+
+    def no_auto_document():
+        body = b'{"test":1}\0'
+        vm.mem_write(arena + 0x6300, body)
+        command["submitted"] = None
+        run("func_140F77B40", arena + 0xC200, arena + 0xC900,
+            read(lobby_identity, "<Q"), base + symbols["gl_14C27E4B0"] + 131864,
+            arena + 0x6300, len(body), 123)
+        assert command["submitted"] == {"test": 1}
+
+    # A guest has no local checkbox preference for the old host's active fill.
+    # Takeover inherits that accepted policy, rather than publishing a disable.
+    settings.update(host=False, initialized=True, bots=49, humans=2, requested=49)
+    write(lobby_identity, 5, "<Q")
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    write(registered["replay_dw_autoFillBotsActive"] + 40, 1)
+    write(registered["replay_dw_autoFillBotsComplete"] + 40, 0)
+    write(registered["replay_dw_autoFillAck"] + 40, 127)
+    write(registered["replay_dw_autoFillBotTarget"] + 40, 148)
+    write(registered["replay_dw_botCount"] + 40, 49)
+    lua["now"] = 200000
+    before = len(pool_calls)
+    run("DW_LobbyControls_Frame")
+    assert read(registered["replay_dw_autoFillBots"] + 40) == 0 and len(pool_calls) == before
+    no_auto_document()
+    settings["host"] = True
+    run("DW_LobbyControls_Frame")
+    assert read(registered["replay_dw_autoFillBots"] + 40) == 1 and settings["bots"] == 49
+    assert auto_document(0) == 128
+    # A revision or a previous host's ACK cannot apply the new zero-count arm.
+    write(registered["replay_dw_autoFillRevision"] + 40, 999)
+    run("DW_LobbyControls_Frame")
+    assert auto_document(0) == 128 and settings["bots"] == 49
+    auto_ack(128, 0)
+    assert settings["bots"] == 0
+    no_auto_document()
+    lua["now"] = 229999
+    run("DW_LobbyControls_Frame")
+    assert settings["bots"] == 0
+    no_auto_document()
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    run("DW_LobbyControls_Frame")
+    assert auto_document(0, active=False) == 129
+    auto_ack(129, 0, active=False)
+    no_auto_document()
+    run("DW_LobbyControls_Frame")
+    assert read(registered["replay_dw_autoFillBots"] + 40) == 0
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    checks.append("Guest submits no automatic controls; incomplete takeover adopts active checkbox, arms with token 128 above ACK 127, honors acknowledged zero-count delay and accepts later explicit off token 129")
+
+    # Completed takeover needs neither a clear nor a fresh 45-second fill.
+    settings.update(host=False, initialized=True, bots=148, requested=148)
+    write(lobby_identity, 6, "<Q")
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    write(registered["replay_dw_autoFillBotsActive"] + 40, 1)
+    write(registered["replay_dw_autoFillBotsComplete"] + 40, 1)
+    write(registered["replay_dw_autoFillAck"] + 40, 200)
+    write(registered["replay_dw_botCount"] + 40, 148)
+    lua["now"] = 300000
+    run("DW_LobbyControls_Frame")
+    before = len(pool_calls)
+    settings["host"] = True
+    run("DW_LobbyControls_Frame")
+    # SyncLobby resets managed metadata for the new lobby; it must not rebuild
+    # or clear an already complete native pool during host acquisition.
+    assert pool_calls[before:] == ["DW_BotPolicy_ResetRoster"] and settings["bots"] == 148
+    no_auto_document()
+    assert read(registered["replay_dw_autoFillBots"] + 40) == 1
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 1
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    lua["now"] += 1000
+    run("DW_LobbyControls_Frame")
+    assert pool_calls[before:] == ["DW_BotPolicy_ResetRoster"]
+    no_auto_document()
+    checks.append("Completed authoritative takeover preserves the native pool and immediate launch eligibility without sending a new arm/clear or restarting fill")
+
+    # Missing local native data rebuilds through the existing roster lifecycle,
+    # without lowering the backend's completed count or losing completion.
+    settings["host"] = False
+    run("DW_LobbyControls_Frame")
+    settings.update(host=True, initialized=False, bots=0)
+    before = len(pool_calls)
+    run("DW_LobbyControls_Frame")
+    assert pool_calls[before:] == ["DW_BotPolicy_CaptureRoster", "clear", "build"]
+    assert settings["bots"] == 148
+    no_auto_document()
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    # A larger token published by the previous host is observed before a later
+    # explicit user edit, independently of our process's smaller local counter.
+    write(registered["replay_dw_autoFillAck"] + 40, 255)
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    run("DW_LobbyControls_Frame")
+    assert auto_document(0, active=False) == 256
+    auto_ack(256, 0, active=False)
+    checks.append("Completed takeover repairs a missing native pool through capture/clear/build without publishing incomplete state; later off stays monotonic above a newly observed accepted ACK")
+
     write(base + symbols["gl_151868880"], arena + 0x9000, "<Q")
     lua["now"] += 1000
     write(dvars["gl_14D386820"] + 40, 1)
@@ -723,6 +888,7 @@ def main():
                 passed=True,
                 game_sha256=report["sha256"],
                 checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                focused_owner=owner_proof,
                 checks=checks,
                 native_game_verified=False,
             ),

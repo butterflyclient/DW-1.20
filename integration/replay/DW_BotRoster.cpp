@@ -4,11 +4,14 @@
 #include "replay_dvar.h"
 #include "DW_BotBindings.h"
 #include "DW_BotNames.h"
+#include "DW_BotStyleSelection.h"
+#include "DW_BotStyleProfile.h"
 #include <initializer_list>
 
 extern "C"
 {
     bool DW_LocalBackend_IsEnabled();
+    void DW_MatchmakingAssignments_PrepareLaunch(const void *);
     void BG_GameStateInfo_ExpandBotData(const void *, void *);
     bool func_141187FA0();                       // Lobby_IsInLobby
     void *func_141187EE0();                      // Lobby_GetPartyData
@@ -68,11 +71,14 @@ namespace
         uint32_t modelIndex[3];
         uint8_t unknown64[12];
         uint8_t unknown76, team;
-        uint16_t skill, rank, unknown82;
+        uint16_t skill;
+        uint8_t opaque80[2];
+        uint16_t unknown82;
         uint8_t valid, inUse, client, pad;
     };
 
     static_assert(sizeof(BotRecord) == 88 && offsetof(BotRecord, team) == 77);
+    static_assert(offsetof(BotRecord, opaque80) == 80);
     static_assert(offsetof(BotRecord, valid) == 84 && offsetof(BotRecord, client) == 86);
     // Five visible characters, including the brackets. The engine's two-byte
     // color controls do not occupy visible tag characters; the complete text
@@ -400,8 +406,10 @@ namespace
         Int(model, "team", Team(assignments, index));
         Int(model, "squad", Squad(assignments, index));
         Int(model, "desiredTeam", Team(assignments, index));
-        Int(model, "rank", bot.rank);
-        Int(model, "baseRank", bot.rank);
+        const uint64_t profile = DWBotStyle::ProfileSeed(bot.nameIndex, bot.skill, bot.modelIndex);
+        const auto rank = DWBotStyle::SelectRank(profile);
+        Int(model, "rank", rank.index);
+        Int(model, "baseRank", rank.index);
         for (const auto *key : {"prestige",
                                 "microphoneState",
                                 "presencePlatform",
@@ -422,26 +430,17 @@ namespace
         // Real Replay base loot IDs. Every bot has an independent stock weapon
         // presentation; clear every old customization child when rows are reused
         // so the UI never falls back to a human's favorite weapon or attachments.
-        const unsigned choice = unsigned(bot.nameIndex) + bot.skill;
+        const auto style = DWBotStyle::SelectStyle(profile);
+        Text(model, "botLoadoutStyle", DWBotStyle::StyleNames[unsigned(style)]);
         const auto setup = func_141B0D390(model, "weaponSetup");
         for (unsigned slot = 0; slot < 2; ++slot)
         {
             const auto weapon = Row(setup, slot);
-            unsigned available = 0;
-            for (const auto &candidate : DWBotWeapons)
-                if (candidate.secondary == bool(slot))
-                    ++available;
-            unsigned ordinal = choice % available;
-            const DWBotWeapon *selected = nullptr;
-            for (const auto &candidate : DWBotWeapons)
-                if (candidate.secondary == bool(slot) && !ordinal--)
-                {
-                    selected = &candidate;
-                    break;
-                }
-            Int(weapon, "weaponLootID", int(selected->loot));
+            const auto *selected = DWBotStyle::WeaponForSlot(profile, slot);
+            const auto attachmentsSelected = DWBotStyle::Select(selected, profile, style);
+            Int(weapon, "weaponLootID", selected ? int(selected->baseLoot) : 0);
             Text(weapon, "cosmeticAttachment", "");
-            Text(weapon, "weaponCamo", DWBotCamos[(choice + slot) % (sizeof(DWBotCamos) / sizeof(*DWBotCamos))]);
+            Text(weapon, "weaponCamo", "");
             const auto stickers = func_141B0D390(weapon, "sticker");
             for (unsigned i = 0; i < 4; ++i)
                 func_141B0E280(Row(stickers, i), "");
@@ -450,10 +449,10 @@ namespace
             for (unsigned i = 0; i < 5; ++i)
             {
                 const auto attachment = Row(attachments, i);
-                Int(attachment, "variant", int(selected->variants[i]));
-                Text(attachment, "attachment", selected->attachments[i]);
+                Int(attachment, "variant", int(attachmentsSelected.variants[i]));
+                Text(attachment, "attachment", attachmentsSelected.references[i]);
             }
-            Int(weapon, "attachmentCount", 5);
+            Int(weapon, "attachmentCount", int(attachmentsSelected.count));
         }
         Int(model, "weaponCount", 2);
     }
@@ -686,6 +685,16 @@ extern "C" bool DW_BotPolicy_IsBattleRoyale()
     return DW_LocalBackend_IsEnabled() && s_squadSize && s_squadSize->current.integer > 0;
 }
 
+extern "C" bool DW_BotPolicy_ProfileSeed(unsigned client, uint64_t *seed)
+{
+    unsigned index = 0;
+    const auto *bot = ServerBot(client, index);
+    if (!bot || !seed)
+        return false;
+    *seed = DWBotStyle::ProfileSeed(bot->nameIndex, bot->skill, bot->modelIndex);
+    return true;
+}
+
 extern "C" void DW_BotPolicy_Prepare(const void *party)
 {
     Assignments assignments{};
@@ -752,9 +761,14 @@ extern "C" int func_1413707D0(unsigned client)
                    : Group(func_14137D670(),
                            index,
                            reinterpret_cast<const BotRecord *>(gl_14E183D00));
+    const bool br = DW_BotPolicy_IsBattleRoyale();
+    auto *party = br ? func_14137D670() : nullptr;
+    if (br)
+        DW_MatchmakingAssignments_PrepareLaunch(party);
     if (!func_141371450(client))
         return 0;
-    auto *party = func_14137D670();
+    if (!party)
+        party = func_14137D670();
     uint64_t xuid{};
     func_14118CF60(&xuid, party, client);
     if (xuid)
@@ -768,6 +782,9 @@ extern "C" int func_1413707D0(unsigned client)
 
 extern "C" int func_141370860(unsigned client)
 {
+    // Native ClientBegin calls this before CalculateRanks and its GSC thread.
+    // Bind the transported profile here; later native setrank calls retain it.
+    DW_BotRank_Apply(client);
     unsigned index = 0;
     if (const auto *bot = ServerBot(client, index);
         bot && s_squadSize && s_squadSize->current.integer > 0)
@@ -776,9 +793,14 @@ extern "C" int func_141370860(unsigned client)
             Group(func_14137D670(), index, reinterpret_cast<const BotRecord *>(gl_14E183D00));
         return group >= 0 ? group + 1 : bot->team;
     }
+    const bool br = DW_BotPolicy_IsBattleRoyale();
+    auto *party = br ? func_14137D670() : nullptr;
+    if (br)
+        DW_MatchmakingAssignments_PrepareLaunch(party);
     if (!func_141371450(client))
         return 0;
-    auto *party = func_14137D670();
+    if (!party)
+        party = func_14137D670();
     uint64_t xuid{};
     func_14118CF60(&xuid, party, client);
     if (xuid)

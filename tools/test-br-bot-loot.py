@@ -58,7 +58,8 @@ def main():
                          'at most four scans per frame', 'TLS context restored on every exit'])
     proof['checks'].extend(['temporary native look request reaches direction updater',
                            'previous look point time type and opaque field restored',
-                           'enemy target suppresses loot look', 'active script and code look preserved',
+                           'enemy target suppresses loot look', 'active stronger script look preserved',
+                           'native CODE_SEEK look can be replaced and is restored',
                            'script look lock suppresses override', 'loot look TLS restored'])
     proof['inputs'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in
                        (source, ROOT / 'integration/host-scale/SV_HostBot_Loot.cpp',

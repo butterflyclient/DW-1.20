@@ -15,6 +15,7 @@ import urllib.request
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from dw_update_assets import decode as decode_assets, extract as extract_assets
 
 ROOT = Path(__file__).resolve().parents[1]
 MAGIC = 0x3155505744594C50
@@ -48,6 +49,18 @@ def main():
     catalog = json.loads((args.publication / "full-image-catalog.json").read_bytes())
     image = args.publication / (catalog["latest"] + ".exe")
     assert sha(image) == catalog["latest"] and image.stat().st_size == catalog["target_size"]
+    asset_manifest = extract_assets(image.read_bytes())
+    assets = decode_assets(asset_manifest) if asset_manifest is not None else []
+    native_paths = {}
+    if assets:
+        asset_record = json.loads((args.publication / 'update-assets.json').read_bytes())
+        native_paths = asset_record['relative_paths']
+        assert set(native_paths) == {item['name'] for item in assets}
+        assert hashlib.sha256(asset_manifest).hexdigest() == catalog['assets']['manifest_sha256']
+        assert len(assets) == catalog['assets']['files']
+        for item in assets:
+            payload = args.publication / 'assets' / (item['sha256'] + '.bin')
+            assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
     trust = array(args.source_root / "dw_local_trust.h", "s_dwLocalPlatformPublicKey")
     magic, bits, exponent_size, modulus_size, prime1, prime2 = struct.unpack_from("<6I", trust)
     assert magic == 0x31415352 and bits == 2048 and prime1 == prime2 == 0
@@ -107,6 +120,9 @@ def main():
         assert result.returncode == 20, "Embedded helper must stage the full update"
         staged = Path(str(base) + ".update") / "next.exe"
         assert sha(staged) == catalog["latest"] and sha(base) == base_hash
+        for item in assets:
+            payload = Path(str(base) + '.update') / 'asset-staging' / catalog['latest'] / (item['sha256'] + '.bin')
+            assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
         checks.append("Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged")
         # These isolated bytes are no longer needed after verification. Reclaim
         # them before the current-version check to bound fixture disk usage.
@@ -115,6 +131,23 @@ def main():
         base.unlink()
         current = folder / "current-release.exe"
         shutil.copyfile(image, current)
+        if assets:
+            result = subprocess.run([str(runner), '--prepare', str(current), args.host],
+                                    cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=120)
+            assert result.returncode == 20 and sha(current) == catalog['latest']
+            assert not (Path(str(current) + '.update') / 'next.exe').exists()
+            assert not (folder / 'zone').exists(), 'Preparation modified loaded zone assets'
+            for item in assets:
+                payload = Path(str(current) + '.update') / 'asset-staging' / catalog['latest'] / (item['sha256'] + '.bin')
+                assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
+            checks.append('Current signed EXE separately stages missing owned assets without changing installed files or requiring an EXE replacement')
+            (folder / 'zone').mkdir()
+            for item in assets:
+                relative = Path(native_paths[item['name']])
+                assert not relative.is_absolute() and '..' not in relative.parts and len(relative.parts) <= 2
+                destination = folder / 'zone' / relative
+                destination.parent.mkdir(exist_ok=True)
+                shutil.copyfile(args.publication / 'assets' / (item['sha256'] + '.bin'), destination)
         result = subprocess.run([str(runner), "--prepare", str(current), args.host],
                                 cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=60)
         assert result.returncode == 10 and sha(current) == catalog["latest"]
@@ -125,6 +158,9 @@ def main():
                   tested_older_hashes=len(old - {catalog["latest"]}),
                   release_history_sha256=hashlib.sha256(history_bytes).hexdigest(),
                   helper_sha256=helper_hash, pinned_trust_sha256=hashlib.sha256(trust).hexdigest(),
+                  owned_asset_manifest_sha256=hashlib.sha256(asset_manifest).hexdigest() if assets else None,
+                  owned_asset_files=len(assets),
+                  native_asset_folders_verified=bool(assets),
                   checks=checks, game_runs_performed=False, installed_game_modified=False,
                   apply_or_relaunch_invoked=False, temporary_fixture_removed=True,
                   legacy_delta_only_clients_require_bootstrap=True)

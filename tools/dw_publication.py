@@ -74,7 +74,7 @@ def publish(image, report, source, updater, output):
     publisher = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(publisher)
     print(f"Publishing verified DW client as release {release}: {target}", flush=True)
-    publisher.publish(image, report, release, output, True, updater)
+    publisher.publish(image, report, release, output, True, updater, asset_source=source)
     hashes = set(remote["images"])
     hashes.update(remote["legacy"].get("patches", {}))
     hashes.add(catalog["latest"])
