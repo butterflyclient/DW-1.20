@@ -181,6 +181,9 @@ try:
             if split:
                 assert receive(third) == ended and receive(fourth) == ended
             checks.append("player-balanced 1v1" if split else "normal party grouping preserved")
+        from matchmaking_management_fixtures import exercise as exercise_management
+        exercise_management(clients, data, query, tokens, policy, ordinary,
+                            receive, documents, text, u32, u64, checks)
         policy_path.write_text(json.dumps({"available_maps": ["mp_donetsk"],
             "minimum_players": 1, "split_parties_for_team_balance": True}) + "\n")
         br = {**query, "team_balance": {"num_teams": 1, "lock_squad": True},

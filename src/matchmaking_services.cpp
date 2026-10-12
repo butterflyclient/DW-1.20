@@ -9,6 +9,7 @@
 #include <array>
 #include <chrono>
 #include <fstream>
+#include <map>
 #include <set>
 
 namespace services
@@ -118,9 +119,8 @@ namespace services
                 throw std::runtime_error("Invalid persisted lobby layout");
             if (state.contains("host_ready") && !state["host_ready"].is_boolean())
                 throw std::runtime_error("Invalid persisted host readiness");
-            if (state["backend_doc"].contains("tournament"))
-                matchmaking_store::validateWrite({"lobbies/" + path.filename().string(), state},
-                                                 id.titleId);
+            matchmaking_store::validateWrite({"lobbies/" + path.filename().string(), state},
+                                             id.titleId);
             std::set<uint64_t> members;
             for (const auto &user : state["members"])
                 if (!user.is_number_unsigned() || !user.get<uint64_t>() ||
@@ -186,7 +186,8 @@ namespace services
 
         bool lobbyCanWaitForStart(const Json &state)
         {
-            const auto phase = state.at("host_doc").at("game_state").value("state", std::string{});
+            const auto phase = state.at("host_doc").value("game_state", Json::object())
+                                   .value("state", std::string{});
             return !state.value("disbanded", false) &&
                    state.at("expires").get<uint64_t>() > now() &&
                    (phase.empty() || phase == "intermission") &&
@@ -464,6 +465,37 @@ namespace services
                                      uint64_t lobbyId)
         {
             auto index = currentLobbies(root, id);
+            size_t additions = 0;
+            for (const auto &user : members)
+                additions += !index["lobbies"].contains(std::to_string(user.get<uint64_t>()));
+            if (index["lobbies"].size() + additions > 4096)
+            {
+                // Reclaim only expired, disbanded or missing allocations when
+                // the bounded index needs room. A disconnected host may still
+                // migrate/reconnect, so its unexpired assignment is retained.
+                std::map<uint64_t, bool> retired;
+                for (auto entry = index["lobbies"].begin(); entry != index["lobbies"].end();)
+                {
+                    const auto previous = entry.value().get<uint64_t>();
+                    auto found = retired.find(previous);
+                    if (found == retired.end())
+                    {
+                        const auto path = root / "lobbies" / (std::to_string(previous) + ".json");
+                        bool stale = !std::filesystem::exists(path);
+                        if (!stale)
+                        {
+                            const auto lobby = loadLobby(path, id);
+                            stale = lobby.value("disbanded", false) ||
+                                    lobby.at("expires").get<uint64_t>() <= now();
+                        }
+                        found = retired.emplace(previous, stale).first;
+                    }
+                    if (found->second)
+                        entry = index["lobbies"].erase(entry);
+                    else
+                        ++entry;
+                }
+            }
             for (const auto &user : members)
                 index["lobbies"][std::to_string(user.get<uint64_t>())] = lobbyId;
             wire::require(index["lobbies"].size() <= 4096);
@@ -517,6 +549,28 @@ namespace services
         {
             // Older persisted documents predate reservation publication.
             return lobby.at("backend_doc").value("player_id_to_slots", Json::object());
+        }
+
+        std::optional<std::string> joiningTeam(const Json &lobby, const Json &query)
+        {
+            if (lobby.value("match_selection", Json::object())
+                    .value("split_parties_for_team_balance", false) ||
+                lobby.value("match_selection", Json::object()).value("squad_size", 0u))
+                return std::string{};
+            std::optional<std::string> anchor;
+            for (const auto &user : query.at("members"))
+            {
+                if (!member(lobby, user.get<uint64_t>()))
+                    continue;
+                for (const auto &team : lobby.at("backend_doc").at("team_balance").at("teams").items())
+                    if (std::find(team.value().begin(), team.value().end(), user) != team.value().end())
+                    {
+                        if (anchor && *anchor != team.key())
+                            return std::nullopt;
+                        anchor = team.key();
+                    }
+            }
+            return anchor.value_or(std::string{});
         }
 
         std::optional<std::string> joiningSquad(const Json &lobby, const Json &query, const Json &slots)
@@ -595,6 +649,10 @@ namespace services
 
         bool slotsAvailable(const Json &lobby, const Json &query)
         {
+            // An overlapping MP party joins its retained member's team. Never
+            // silently divide that party or move previously admitted humans.
+            if (!joiningTeam(lobby, query))
+                return false;
             auto members = lobby.at("members");
             auto slots = lobbySlots(lobby);
             const auto requested = requestedSlots(query);
@@ -1015,6 +1073,10 @@ namespace services
                     occupiedSlots(team.value(), reservations))
                     team = it;
             }
+            const auto teamAnchor = joiningTeam(lobby, query);
+            wire::require(teamAnchor.has_value());
+            if (!teamAnchor->empty())
+                team = teams.find(*teamAnchor);
             std::set<uint64_t> existing;
             for (const auto &user : lobby.at("members"))
                 existing.insert(user.get<uint64_t>());
@@ -1083,7 +1145,7 @@ namespace services
                         pending.push_back(user);
             }
             const auto assignments =
-                prepareLobbyAssignments(root, id, lobby.at("members"), lobbyId);
+                prepareLobbyAssignments(root, id, query.at("members"), lobbyId);
             const std::array<matchmaking_store::Write, 3> writes = {
                 matchmaking_store::Write{"lobbies/" + std::to_string(lobbyId) + ".json", lobby},
                 matchmaking_store::Write{"searches/" + std::to_string(mmId) + ".json",
@@ -1152,7 +1214,7 @@ namespace services
                      std::any_of(users.begin(), users.end(),
                                  [&](uint64_t user) { return member(candidate, user); })))
                     continue;
-                const auto state = host.at("game_state").value("state", std::string{});
+                const auto state = host.value("game_state", Json::object()).value("state", std::string{});
                 // Replay's accepted initial host snapshots use an empty state
                 // while waiting for players. They are open pre-game lobbies;
                 // the owner/session/capacity checks above still apply.
@@ -1221,7 +1283,11 @@ namespace services
                 if (!std::filesystem::exists(path))
                     continue;
                 auto lobby = loadLobby(path, id);
+                const auto index = currentLobbies(root, id);
+                const auto owner = std::to_string(lobby.at("owner").get<uint64_t>());
                 if ((!byLobby && !member(lobby, target.get<uint64_t>())) ||
+                    !index["lobbies"].contains(owner) ||
+                    index["lobbies"][owner] != lobby.at("id") ||
                     !hostSessionActive(lobby, id.titleId) || lobby.value("disbanded", false) ||
                     lobby.at("expires").get<uint64_t>() <= now())
                     continue;
@@ -1386,6 +1452,11 @@ namespace services
                 auto state = read(path, id);
                 if (state.value("expires", uint64_t{}) <= now())
                     return Reply{108, {}, "matchmaker-search-expired"};
+                const auto ownerSession = state.value("owner_session", std::string{});
+                if (state.value("active", false) && !ownerSession.empty() &&
+                    ownerSession != sessionFingerprint(id) &&
+                    lobby::sessionOnline(id.titleId, id.userId, ownerSession))
+                    return Reply{101, {}, "matchmaker-search-owner-session-denied"};
                 state["active"] = false;
                 const std::array<matchmaking_store::Write, 1> writes = {
                     matchmaking_store::Write{"searches/" + path.filename().string(), state}};
@@ -1411,6 +1482,12 @@ namespace services
                 if (lobby.at("owner") != id.userId)
                     return Reply{101, {}, "matchmaker-disband-owner-denied"};
                 const bool already = lobby.value("disbanded", false);
+                // Independent logins for one account may coexist. A newer
+                // credential cannot disrupt another still-live host session;
+                // disconnected historical records retain owner cleanup.
+                if (!already && hostSessionActive(lobby, id.titleId) &&
+                    lobby.at("owner_session") != sessionFingerprint(id))
+                    return Reply{101, {}, "matchmaker-disband-owner-session-denied"};
                 std::vector<matchmaking_store::Write> writes;
                 if (!already)
                 {
@@ -1579,6 +1656,11 @@ namespace services
                 }
                 else
                 {
+                    const auto assignments = currentLobbies(root, id);
+                    const auto key = std::to_string(id.userId);
+                    if (!assignments["lobbies"].contains(key) ||
+                        assignments["lobbies"][key] != lobbyId)
+                        return Reply{108, {}, "matchmaker-host-update-assignment-expired"};
                     if (!hostSessionActive(lobby, id.titleId) ||
                         lobby.at("owner_session") != sessionFingerprint(id))
                         return Reply{108, {}, "matchmaker-host-update-session-expired"};
@@ -1593,7 +1675,14 @@ namespace services
                     host["ruleset_payload"].is_object() && host.contains("team_balance") &&
                     host["team_balance"].is_object() &&
                     host["team_balance"].contains("can_change_teams") &&
-                    host["team_balance"]["can_change_teams"].is_boolean());
+                    host["team_balance"]["can_change_teams"].is_boolean() &&
+                    (!host.contains("game_state") ||
+                     (host["game_state"].is_object() &&
+                      (!host["game_state"].contains("state") ||
+                       host["game_state"]["state"].is_string()))) &&
+                    (!host.contains("lobby_open") || host["lobby_open"].is_boolean()) &&
+                    (!host.contains("lobby_open_for_pres_join") ||
+                     host["lobby_open_for_pres_join"].is_boolean()));
                 const auto revision = lobby.at("update_id").get<uint64_t>();
                 wire::Writer result;
                 result.boolean(update == revision);
@@ -1761,7 +1850,8 @@ namespace services
                     lobby["operator_bot_count"] = count;
                     host.erase("dw_bot_count");
                 }
-                const auto oldPhase = lobby["host_doc"]["game_state"].value("state", std::string{});
+                const auto oldPhase = lobby["host_doc"].value("game_state", Json::object())
+                                          .value("state", std::string{});
                 const auto newPhase = host.value("game_state", Json::object()).value("state", std::string{});
                 if ((lobby.value("operator_start_requested", false) ||
                      lobby.value("operator_bots_requested", false)) &&
@@ -1982,7 +2072,8 @@ namespace services
                         index["lobbies"][ownerKey] != lobbyId)
                         continue;
                     const auto label = "Match " + std::to_string(result["matches"].size() + 1);
-                    auto gameState = state["host_doc"]["game_state"].value("state", std::string{});
+                    auto gameState = state["host_doc"].value("game_state", Json::object())
+                                         .value("state", std::string{});
                     if (!state.value("host_ready", false))
                         gameState = "forming";
                     else if (gameState.empty())
@@ -2411,7 +2502,8 @@ namespace services
                state.at("expires").get<uint64_t>() > now() &&
                hostSessionActive(state, id.titleId) &&
                (!requireInGame ||
-                state.at("host_doc").at("game_state").value("state", std::string{}) == "in_game");
+                state.at("host_doc").value("game_state", Json::object())
+                    .value("state", std::string{}) == "in_game");
         if (!active || !allocatedSession(root, state, id))
             return std::nullopt;
         const auto &selection = state.at("match_selection");
@@ -2465,6 +2557,13 @@ namespace services
         if (!hostSessionActive(lobby, title) || lobby.value("disbanded", false) ||
             lobby.at("expires").get<uint64_t>() <= now() || !member(lobby, delivery.user))
             return false;
+        const auto index = currentLobbies(root, id);
+        for (const auto user : {delivery.user, lobby.at("owner").get<uint64_t>()})
+        {
+            const auto key = std::to_string(user);
+            if (!index["lobbies"].contains(key) || index["lobbies"][key] != delivery.lobbyId)
+                return false;
+        }
         if (delivery.searchId)
         {
             const auto key = std::to_string(delivery.user);
@@ -2483,7 +2582,6 @@ namespace services
             {
                 matchmaking_store::validateWrite(
                     {"searches/" + std::to_string(delivery.searchId) + ".json", search}, title);
-                const auto index = currentLobbies(root, id);
                 if (!index["lobbies"].contains(key) || index["lobbies"][key] != delivery.lobbyId ||
                     search.at("tournament_id") != delivery.tournamentId)
                     return false;

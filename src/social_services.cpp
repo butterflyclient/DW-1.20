@@ -914,6 +914,29 @@ namespace services
             return presenceRevisions[scope] = ++nextPresenceRevision;
         }
 
+        void reclaimPresenceRevisions()
+        {
+            // Keep watched offline revisions until subscribers leave: the final
+            // offline packet still needs its revision to pass delivery validation.
+            // Orphaned scopes need no tombstone. A later publication receives a
+            // fresh global revision, so queued packets cannot become valid again.
+            std::set<PresenceScope> watched;
+            for (const auto &[scope, users] : subscriptions)
+                for (const auto &user : users)
+                    if (user.at("accountType") == "uno")
+                    {
+                        const PresenceScope subject{std::get<0>(scope), std::get<1>(scope),
+                                                    user.at("userID").get<uint64_t>()};
+                        if (presenceRevisions.contains(subject))
+                            watched.insert(subject);
+                    }
+            for (auto it = presenceRevisions.begin(); it != presenceRevisions.end();)
+                if (!publishedOnline.contains(it->first) && !watched.contains(it->first))
+                    it = presenceRevisions.erase(it);
+                else
+                    ++it;
+        }
+
         std::vector<Delivery> presenceNotifications(uint32_t title,
                                                     const std::string &context,
                                                     uint64_t user,
@@ -980,6 +1003,8 @@ namespace services
                 auto changed = presenceOf(root, id, owner, context);
                 reply.deliveries =
                     presenceNotifications(id.titleId, context, id.userId, revision, changed);
+                if (!body.at("online").get<bool>())
+                    reclaimPresenceRevisions();
                 return reply;
             }
             if (r.operation == "get_users_presence")
@@ -1016,6 +1041,7 @@ namespace services
                     subscriptions.erase(scope);
                 else
                     subscriptions[scope] = std::move(result);
+                reclaimPresenceRevisions();
                 // Replay binds the 8048-byte unsubscribe response at 14C3A3230.
                 // Its vtable 1426A23A0 selects reader 142141090, which requires a
                 // JSON errorUsers array, even when every removal succeeded. Missing
@@ -1087,6 +1113,7 @@ namespace services
                                  std::make_move_iterator(recipients.begin()),
                                  std::make_move_iterator(recipients.end()));
         }
+        reclaimPresenceRevisions();
         return notifications;
     }
 

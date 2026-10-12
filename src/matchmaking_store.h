@@ -15,6 +15,8 @@ namespace matchmaking_store
     // before publishing any snapshot; incomplete commits roll forward.
     void initialize(const std::filesystem::path &directory);
     void recover(const std::filesystem::path &root, uint32_t title);
+    // Shared publication/recovery/read validation, including complete retained
+    // membership, primary reservations, teams/squads and committed bot capacity.
     void validateWrite(const Write &write, uint32_t title);
     void validatePendingJoins(const nlohmann::json &lobby);
     void commit(const std::filesystem::path &root, uint32_t title, std::span<const Write> writes);

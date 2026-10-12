@@ -7,12 +7,19 @@
 #include <algorithm>
 #include <charconv>
 #include <cstring>
+#include <set>
 
 namespace services
 {
     namespace
     {
         using Json = nlohmann::json;
+
+        // Access is serialized by the existing service-store mutex. A failed
+        // final-disconnect publication must be retried before another channel
+        // task can reuse that account's old membership generation.
+        std::set<std::pair<uint32_t, uint64_t>> pendingDisconnects;
+        constexpr size_t pendingDisconnectLimit = 65536;
 
         uint64_t now()
         {
@@ -180,6 +187,28 @@ namespace services
             proto::integer(out, 8, channel.at("revision"));
             return out;
         }
+
+        std::vector<Delivery> retryDisconnects(const std::filesystem::path &directory,
+                                               uint32_t title)
+        {
+            const auto begin = pendingDisconnects.lower_bound({title, 0});
+            const auto end = pendingDisconnects.upper_bound({title, UINT64_MAX});
+            if (begin == end)
+                return {};
+            const auto path = directory / "channels" / (std::to_string(title) + ".json");
+            auto state = channel_store::load(path, title);
+            std::vector<Delivery> deliveries;
+            bool changed = false;
+            for (auto &channel : state["channels"])
+                for (auto it = begin; it != end; ++it)
+                    changed = removeMember(channel, it->second, deliveries) || changed;
+            if (changed)
+                channel_store::save(path, title, state);
+            // All channel mutations pass this retry first, so these records
+            // still belong to the retired endpoint lifetime even after reconnect.
+            pendingDisconnects.erase(begin, end);
+            return deliveries;
+        }
     } // namespace
 
     void initializeChannels(const std::filesystem::path &directory)
@@ -224,16 +253,11 @@ namespace services
         const auto path = directory / "channels" / (std::to_string(title) + ".json");
         if (!std::filesystem::exists(path))
             return {};
-        auto state = channel_store::load(path, title);
-        std::vector<Delivery> deliveries;
-        bool changed = false;
-        for (auto &channel : state["channels"])
-        {
-            changed = removeMember(channel, user, deliveries) || changed;
-        }
-        if (changed)
-            channel_store::save(path, title, state);
-        return deliveries;
+        const auto key = std::make_pair(title, user);
+        wire::require(pendingDisconnects.contains(key) ||
+                      pendingDisconnects.size() < pendingDisconnectLimit);
+        pendingDisconnects.insert(key);
+        return retryDisconnects(directory, title);
     }
 
     bool channelDeliveryValid(const std::filesystem::path &directory,
@@ -242,6 +266,9 @@ namespace services
     {
         if (!delivery.channelId)
             return true;
+        if (pendingDisconnects.contains({title, delivery.user}) ||
+            pendingDisconnects.contains({title, delivery.channelMember}))
+            return false;
         const auto state =
             channel_store::load(directory / "channels" / (std::to_string(title) + ".json"), title);
         const auto key = delivery.channelCategory + ":" + std::to_string(delivery.channelId);
@@ -384,6 +411,7 @@ namespace services
         wire::require(channelId != UINT64_MAX &&
                       (task == 6 || task == 7 || task == 12 || channelId != 0));
         const auto path = directory / "channels" / (std::to_string(id.titleId) + ".json");
+        auto recovered = retryDisconnects(directory, id.titleId);
         auto state = channel_store::load(path, id.titleId);
         auto &channels = state["channels"];
         wire::require(channels.size() <= 4096);
@@ -391,6 +419,13 @@ namespace services
         const auto member = std::to_string(id.userId);
         bool changed = false;
         Reply reply{0, {}, "channel-category-unsubscribed", true, {}};
+        reply.deliveries = recovered;
+        const auto denied = [&](uint32_t error, const char *operation)
+        {
+            Reply result{error, {}, operation};
+            result.deliveries = std::move(recovered);
+            return result;
+        };
         for (auto &channel : channels)
         {
             wire::require(channel.is_object() && channel.at("members").is_object() &&
@@ -420,7 +455,7 @@ namespace services
             {
                 const auto key = query.first + ":" + std::to_string(query.second);
                 if (!channels.contains(key))
-                    return Reply{108, {}, "channel-not-found"};
+                    return denied(108, "channel-not-found");
                 // Native get-channel-infos response reads repeated field-1 objects
                 // using 0x142104C10 and bdChannelInfo's complete deserializer.
                 proto::bytes(reply.structure, 1, info(channels[key]));
@@ -451,14 +486,14 @@ namespace services
                 changed = true;
             }
             if (!channels.contains(key))
-                return Reply{108, {}, "channel-not-found"};
+                return denied(108, "channel-not-found");
             auto &channel = channels[key];
             auto &members = channel["members"];
             if (task == 3 || task == 4)
             {
                 if (!members.contains(member) ||
                     (task == 4 && !members.contains(std::to_string(user))))
-                    return Reply{101, {}, "channel-message-membership-denied"};
+                    return denied(101, "channel-message-membership-denied");
                 // Push IDs 22/23 both use the verified V2 channel message reader.
                 // No request body, member names or message bytes enter diagnostics.
                 wire::Writer push;
@@ -516,7 +551,7 @@ namespace services
             else
             {
                 if (!members.contains(member) && members.size() >= channel_store::memberLimit)
-                    return Reply{108, {}, "channel-full"};
+                    return denied(108, "channel-full");
                 const bool joined = !members.contains(member);
                 const bool renamed = !joined && members[member]["name"] != id.name;
                 const auto generation = joined ? channel_store::advance(channel)

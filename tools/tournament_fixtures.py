@@ -330,9 +330,22 @@ def exercise_results(
 
     def remove_peer(value):
         value["members"] = [user]
-        # Preserve a valid reservation layout so this case exercises tournament
-        # participation denial rather than rejection of corrupt lobby storage.
-        value["backend_doc"]["player_id_to_slots"].pop(str(peer_user), None)
+        # Retire the complete primary layout. This ordinary lobby is referenced
+        # by the tournament catalog; the case tests missing participation, not
+        # rejection of stale member keys or assignments in its stored snapshot.
+        value["host_doc"]["player_state"].pop(str(peer_user), None)
+        backend = value["backend_doc"]
+        for field in ("players", "player_id_to_mm_id", "player_id_to_service_level",
+                      "player_id_to_performance", "player_id_to_slots"):
+            backend.get(field, {}).pop(str(peer_user), None)
+        order = backend["listen_server"]["lobby_host_order"]
+        order[:] = [member for member in order if member != peer_user]
+        for field in ("teams", "squads"):
+            for group in backend["team_balance"][field].values():
+                group[:] = [member for member in group if member != peer_user]
+        if "pending_join_members" in value:
+            value["pending_join_members"] = [member for member in value["pending_join_members"]
+                                             if member != peer_user]
 
     for mutate, error in (
         (lambda value: value.update(expires=1), 108),

@@ -59,13 +59,15 @@ def exercise(directory, title, new_client, helpers, checks):
         assert 0 < revision <= row(channel)["revision"] and offset == len(packet)
         return revision
 
-    def info(connection, channel):
+    def info(connection, channel, error=0):
         query = structure(
             pb_bytes(
                 1, pb_text(1, category) + pb_integer(2, channel) + pb_integer(3, 0)
             )
         )
-        result = connection.task(198, 7, query, structured=True)
+        result = connection.task(198, 7, query, structured=True, error=error)
+        if error:
+            return result
         return dict(
             (tag, value) for tag, _, value in pb_fields(pb_fields(result)[0][2])
         )
@@ -134,6 +136,39 @@ def exercise(directory, title, new_client, helpers, checks):
         no_update(third)
         checks.append(
             "Independent simultaneous channel joins retain both member deltas instead of dropping an earlier join when another account advances the aggregate dataVersion"
+        )
+
+        # A final departure can fail its atomic save. Reconnecting before the
+        # next owner query must not revive the retired membership generation.
+        retired_generation = row(channel)["members"][str(peer_id)]["generation"]
+        before_failed_disconnect = path.read_bytes()
+        blocker = path.with_suffix(".json.pending")
+        blocker.mkdir()
+        try:
+            peer.close()
+            no_update(owner)
+            no_update(third)
+            assert path.read_bytes() == before_failed_disconnect
+            peer = type(peer)(auth_identity=peer.fixture_auth_identity)
+            clients[1] = (peer_id, peer)
+            assert info(peer, channel, error=102) == []
+            assert path.read_bytes() == before_failed_disconnect
+            no_update(owner)
+            no_update(third)
+        finally:
+            blocker.rmdir()
+        recovered = info(owner, channel)
+        assert recovered[3] == 2 and str(peer_id) not in row(channel)["members"]
+        receive(owner, peer_id, False, channel, 2)
+        receive(third, peer_id, False, channel, 2)
+        no_update(peer)
+        peer.task(198, 1, request(channel), structured=True)
+        assert row(channel)["members"][str(peer_id)]["generation"] > retired_generation
+        receive(owner, peer_id, True, channel, 3)
+        receive(third, peer_id, True, channel, 3)
+        no_update(owner)
+        checks.append(
+            "Failed final-disconnect publication emits no phantom leave; reconnect before reconciliation cannot reuse retired membership, blocked retries remain task errors, and recovered save publishes one departure followed by a fresh owned join generation"
         )
 
         state = json.loads(path.read_bytes())

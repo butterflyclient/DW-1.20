@@ -136,6 +136,11 @@ try:
             "only_join_existing_lobbies": False,
         },
     }
+    # This laboratory match needs exactly one remaining bot place after three
+    # humans join. Public capacity follows the native rule, not lobby_slots.max.
+    bindings = json.loads((data / "playlists/5800/native-dvar-names.json").read_bytes())
+    query["ruleset_payload"]["dvar_overrides"] = {
+        bindings.get("party_maxplayers", "party_maxplayers"): 4}
     search = strings(call(host, 18, text(json.dumps(query))))[0]
     kind, push = host.receive()
     assert kind == 2

@@ -206,7 +206,9 @@ def exercise(host, peer, directory, title, user, peer_user, query, helpers, chec
     path = root / "lobbies" / f"{lobby}.json"
     stored = json.loads(path.read_bytes())
     stored["backend_doc"]["team_balance"]["squads"] = {"0": [user, peer_user]}
-    stored["backend_doc"]["team_balance"]["squad_size"] = 2
+    # Two primary accounts each reserve one guest: this complete synthetic
+    # squad occupies four native places before the retirement snapshot.
+    stored["backend_doc"]["team_balance"]["squad_size"] = 4
     stored["backend_doc"]["player_id_to_performance"] = {
         str(user): 1,
         str(peer_user): 2,

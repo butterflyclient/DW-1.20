@@ -22,6 +22,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--platform-library', type=Path,
+                        default=ROOT / 'build/Release/iw8-dw-platform-client.dll',
+                        help='Verified Windows CNG helper from the selected backend source build')
     args = parser.parse_args()
     process_before = None
     if args.host == '162.243.115.160':
@@ -49,7 +52,7 @@ def main():
         reply = post('/platform/client/login', request)
         assert len(reply) == 512
         if os.name == 'nt':
-            library = ctypes.CDLL(str(ROOT / 'build/Release/iw8-dw-platform-client.dll'))
+            library = ctypes.CDLL(str(args.platform_library.resolve()))
             verify = library.DW_LocalPlatform_VerifyReply
             verify.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64)
             verify.restype = ctypes.c_bool
@@ -109,6 +112,8 @@ def main():
         assert process_before == process_after, 'Backend changed during public protocol checks'
         receipt['server_sha256'] = process_after['process_sha256']
         receipt['server_process_verified'] = process_after
+    if os.name == 'nt':
+        receipt['platform_library_sha256'] = hashlib.sha256(args.platform_library.read_bytes()).hexdigest()
     args.output.write_bytes((json.dumps(receipt, indent=2) + '\n').encode())
     print('PASS remote backend:', len(checks), 'focused authentication/transport checks')
 
