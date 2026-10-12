@@ -1,5 +1,6 @@
 #include "sv_host_navigation.h"
 #include "SV_BotThinkBindings.h"
+#include "DW_BotStyleProfile.h"
 #include <intrin.h>
 #include <xmmintrin.h>
 
@@ -49,22 +50,26 @@ namespace
         // The native combat pipeline still decides whether to shoot, melee,
         // throw a grenade, reload or wait for an ADS/weapon transition. Change
         // only the match preferences during this one serialized native call.
-        bool policy = Enabled() && DW_BotPolicy_IsBattleRoyale() &&
-                      !(Field<uint32_t>(info->entity->client, 22336) & 0x200) &&
-                      Field<uint32_t>(ps, 12) <= 1 && !Field<int32_t>(info, 620) &&
-                      !(info->scriptFlags & 0x1000) && !BT_IsSkydiving(ps) &&
-                      !(Field<uint32_t>(ps, 1796) & 0x400) &&
+        uint64_t profile = 0;
+        bool battleRoyale = false;
+        bool policy = Enabled() &&
+                      DW_BotPolicy_ProfileSeed(uint16_t(info->entity->number), &profile) &&
+                      Field<uint32_t>(ps, 12) <= 1 && !(Field<uint8_t>(info, 620) & 0x1F) &&
+                      !(info->scriptFlags & 0x1000) && !(Field<uint32_t>(ps, 1796) & 0x400) &&
                       Field<int32_t>(info, 28208) <= SVHS_LevelTime;
         const unsigned handle = info->sentient->targetHandle;
         policy = policy && handle && handle <= 2048 && BT_EntityInUse[handle - 1];
         if (policy)
         {
+            battleRoyale = DW_BotPolicy_IsBattleRoyale();
             auto *enemy = reinterpret_cast<Entity *>(BT_Entities + 1440 * (handle - 1));
             TeamFlags hostile{};
             SVHS_EnemyTeamFlags(&hostile, info->sentient->team);
             const unsigned team = enemy->sentient ? enemy->sentient->team : 160;
             policy = enemy->health > 0 && team < 160 &&
-                     (hostile.words[team >> 5] & (0x80000000u >> (team & 31))) && BT_CanFire(info);
+                     (hostile.words[team >> 5] & (0x80000000u >> (team & 31))) &&
+                     (!battleRoyale || !(Field<uint32_t>(info->entity->client, 22336) & 0x200)) &&
+                     !BT_IsSkydiving(ps);
         }
         if (!policy)
         {
@@ -83,10 +88,16 @@ namespace
         const bool alternate =
             !(Field<uint32_t>(ps, 1800) & 4) && (Field<uint32_t>(ps, 1796) & 0x8020000);
         const int fireType = BT_WeaponFireType(weapon, alternate);
-        if (fireType == 0 || fireType == 5) // Native FULLAUTO / BEAM.
-            match->burstType = 0;           // Native BOT_BURST_FIRE_TYPE_NONE.
+        if (BT_CanFire(info) && (fireType == 0 || fireType == 5)) // Native FULLAUTO / BEAM.
+            match->burstType = 0; // Native BOT_BURST_FIRE_TYPE_NONE.
         match->flags |= 2; // Request native Bot_ShouldADS, including its weapon/dual/hip checks.
         BT_Combat(info, command);
+        // Native combat may return before refreshing lastADS while waiting for
+        // aim, ammunition or a firing opportunity. Try its ADS eligibility after
+        // that decision, with the preference still active. Keep grenade/melee
+        // actions intact; final native Bot_ShouldPressADS still owns the button.
+        if (!(command->buttons & (0x1000 | 4)) && BT_ADSAllowed(info, info->player))
+            Field<int32_t>(info, 29208) = SVHS_LevelTime;
         match->flags = originalFlags;
         match->burstType = originalBurst;
     }
@@ -130,6 +141,19 @@ extern "C" void Bot_Think(void *client, HostScale::UserCmd *command)
     auto *info = reinterpret_cast<BotInfoView *>(static_cast<uint8_t *>(client) + 1368);
     const int slot = int(
         (reinterpret_cast<intptr_t>(client) - reinterpret_cast<intptr_t>(BT_ClientBase)) / 321192);
+    // A pooled bot command must never follow a reused client slot or stale
+    // entity/player pointer into a human's state. Revalidate before native think
+    // mutates the brain; command submission independently owns its same guard.
+    if (Enabled() &&
+        (!client || slot < 0 || slot >= 200 || unsigned(slot) >= SVHS_ClientCount ||
+         SVHS_Clients[slot] != client || Field<int32_t>(client, 214756) != 2 || !info->entity ||
+         Field<Entity *>(client, 280) != info->entity || info->entity->number != slot ||
+         info->entity->client != info->player || info->entity->sentient != info->sentient ||
+         !SVHS_IsBotEntity(info->entity) || !SVHS_IsBotPlaying(client)))
+    {
+        *command = {};
+        return;
+    }
     void *player = BT_PlayerState(slot);
     command->serverTime = command->commandTime = command->inputTime = 0;
     if (!info->entity)

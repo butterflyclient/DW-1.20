@@ -33,8 +33,9 @@ def main():
         (package / 'package-proof.json').write_text(json.dumps(proof) + '\n')
         record = prepare(snapshot)
         blob = (snapshot / 'generated/update-assets.bin').read_bytes()
-        assert decode(blob) == record['entries'] and len(record['entries']) == 60 and len(record['payloads']) == 4
-        checks.append('Native all-locale FF/FP list uses four hash-verified payloads and complete bundle identity')
+        assert proof['native_locale_codes']['supported_language_directories'] == {'eng': 'english'}
+        assert decode(blob) == record['entries'] and len(record['entries']) == 20 and len(record['payloads']) == 4
+        checks.append('English-only FF/FP list preserves native regional companions, four verified payloads and complete bundle identity')
         assert all(item['relative_path'] == record['relative_paths'][item['name']]
                    for item in proof['installation_manifest'])
         checks.append('Flat legacy-compatible manifest binds target-derived native folder rules in the signed helper')
@@ -52,7 +53,7 @@ def main():
         publisher = importlib.util.module_from_spec(spec); spec.loader.exec_module(publisher)
         full = root / 'full-publication'
         catalog = publisher.publish(image, report, 27, full, asset_source=snapshot)
-        assert catalog['latest'] == sha(image.read_bytes()) and catalog['assets']['files'] == 60
+        assert catalog['latest'] == sha(image.read_bytes()) and catalog['assets']['files'] == len(record['entries'])
         assert catalog['assets']['manifest_sha256'] == sha(blob) and len(catalog['assets']['payloads']) == 4
         assert len((full / 'full-image-catalog.json').read_bytes()) < 4096
         checks.append('Existing full-image publisher commits a bounded catalog binding exact target manifest and four owned payloads')

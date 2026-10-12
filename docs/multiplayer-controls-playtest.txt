@@ -162,11 +162,11 @@ Combined bot, matchmaking, whisper and asset-update playtest:
    The updater fetches its hash-bound FF/FP payloads with the full EXE. Existing
    owned files are backed up with verified bytes and recovery.tsv under
    <game EXE>.update/asset-backups/<target EXE SHA256>/ before replacement.
-   The same installation manifest stages all language/region companions at
+   The same installation manifest stages English and native region companions at
    native common-zone load, including a client updated by an older helper.
    Regional companions belong in zone/worldwide, zone/japan, etc.; language
-   companions belong in zone/english, zone/french, etc. Check the native folder
-   rather than the zone root when confirming an installation. A current image
+   companions belong in zone/english. Only English is distributed. Check the
+   native folder rather than the zone root when confirming an installation. A current image
    with missing companions must repair them before normal loading resumes.
 8. Join a running match from another party. Each newly admitted real player
    reserves a connected bot's slot; native authenticated connection teardown
@@ -180,3 +180,31 @@ Combined bot, matchmaking, whisper and asset-update playtest:
 
 These are owner playtest gates. Offline ABI, script/package, transport and
 updater transactions do not prove live navigation, remote UI or match stability.
+
+English client, bot input ownership and weapon-model checks (20261012):
+1. Existing testers keep their current INI and local profile. Replace the EXE
+   with the published game_dx12_ship_replay_dw.exe in the root game folder.
+   This client supports English game data and stages its owned FF/FP companions
+   into the native English/region folders. Do not move them into the zone root.
+2. In MP, inspect several different bots in third person and while spectating.
+   Weapons must have complete bodies and attachments, with normal arm poses.
+   Check that each bot keeps its own rank and weapon when entering the match.
+3. In BR, confirm bots retain the native starter pistol, jail equipment and
+   Gulag duel equipment. The MP loadout overlay must not replace those weapons.
+4. In MP and BR, watch a bot using a full-auto weapon engage an enemy: it should
+   try ADS and sustain fire while the native weapon rules permit it. Semi-auto,
+   reload, offhand, dual-wield and movement restrictions still apply. Watch its
+   next movement decision after a kill and sprint on a clear travel route.
+5. Join a running bot-filled match. The incoming human must receive no queued
+   bot input, weapon changes or rank changes from the reused player slot.
+6. The host can run noclip, noclip 1/on, or noclip 0/off. Other connected players
+   require the server's sv_cheats to be enabled. A guest changing only their
+   own local sv_cheats must not gain permission. Disable noclip before leaving.
+7. Finish a match and return to the frontend. A prior crash was in native string
+   reference handling during match-end streaming cleanup; its corrupting write
+   remains unidentified. If it recurs, retain the new crash dump and client log.
+
+The updater now contains only the verified download/install work and Windows
+cryptographic checks, with explicit installer version information. The active
+local Malwarebytes instance accepted its focused checks; other installations
+still need their own normal antivirus checks. Do not add antivirus exclusions.

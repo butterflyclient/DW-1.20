@@ -18,12 +18,11 @@ def build(source_root, output):
     integration.mkdir(parents=True, exist_ok=True)
     files = [(ROOT / "tools/replay-update-client.cpp", project / "tools/replay-update-client.cpp")]
     files.append((ROOT / "tools/replay-update-assets.h", project / "tools/replay-update-assets.h"))
+    files.append((ROOT / "tools/replay-update-client.rc", project / "tools/replay-update-client.rc"))
     files += [
         (source_root / name, integration / name)
         for name in (
-            "DW_LocalPlatformCrypto.cpp",
             "dw_local_trust.h",
-            "dw_platform_protocol.h",
             "dw_update_protocol.h",
             "dw_update_assets_protocol.h",
             "DW_UpdateAssetManifest.h",
@@ -42,8 +41,8 @@ def build(source_root, output):
         )
     (project / "CMakeLists.txt").write_text(
         """cmake_minimum_required(VERSION 3.24)
-project(replay_update_helper LANGUAGES CXX)
-add_executable(replay-update-client tools/replay-update-client.cpp integration/replay/DW_LocalPlatformCrypto.cpp)
+project(replay_update_helper LANGUAGES CXX RC)
+add_executable(replay-update-client tools/replay-update-client.cpp tools/replay-update-client.rc)
 target_compile_features(replay-update-client PRIVATE cxx_std_20)
 target_include_directories(replay-update-client PRIVATE integration/replay)
 target_compile_definitions(replay-update-client PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

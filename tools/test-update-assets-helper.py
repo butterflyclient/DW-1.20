@@ -38,10 +38,10 @@ def main():
         proof['empty_companion']['output_fastfile'] = copied[proof['empty_companion']['output_fastfile']]
         (package / 'package-proof.json').write_text(json.dumps(proof) + '\n')
         record = prepare(snapshot)
-        for filename in ('DW_LocalPlatformCrypto.cpp', 'dw_platform_protocol.h', 'dw_local_trust.h', 'dw_update_protocol.h'):
+        for filename in ('dw_local_trust.h', 'dw_update_protocol.h'):
             shutil.copyfile(args.frozen_source / filename, snapshot / 'src' / filename)
         shutil.copyfile(ROOT / 'integration/replay/dw_update_assets_protocol.h', snapshot / 'src/dw_update_assets_protocol.h')
-        # The real shipping crypto implementation uses an isolated fixture key.
+        # The shipping Windows CNG implementation uses an isolated fixture key.
         # No production private key, identity, authentication token or game data.
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         public = key.public_key().public_numbers()
@@ -60,6 +60,7 @@ def main():
         target_hash = hashlib.sha256(target_bytes).digest()
         payloads = {digest: Path(item['source']).read_bytes() for digest, item in record['payloads'].items()}
         corrupt = False
+        bad_plan = None
         requests = []
         class Server(http.server.BaseHTTPRequestHandler):
             def log_message(self, *unused): pass
@@ -71,10 +72,14 @@ def main():
                 magic, version, reserved, nonce, base = struct.unpack('<QII32s32s', request)
                 assert self.path == '/updates/v2/check' and version == 2 and reserved == 0
                 current = base == target_hash; now = int(time.time())
+                issued, expires = (now - 400, now - 1) if bad_plan == 'expired' else (now, now + 300)
+                signed_nonce = bytes([nonce[0] ^ 1]) + nonce[1:] if bad_plan == 'nonce' else nonce
                 plan = struct.pack('<QIIQQ32s32s32s32sQQQQ', magic, 2, 0 if current else 1,
-                    now, now + 300, nonce, base, target_hash, bytes(32) if current else target_hash,
+                    issued, expires, signed_nonce, base, target_hash, bytes(32) if current else target_hash,
                     0, len(target_bytes), 0 if current else len(target_bytes), 27)
                 signature = key.sign(plan, padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=32), hashes.SHA256())
+                if bad_plan == 'signature':
+                    signature = bytes([signature[0] ^ 1]) + signature[1:]
                 requests.append(('check', current)); self.respond(plan + signature)
             def do_GET(self):
                 if self.path == '/updates/v2/image/' + target_hash.hex():
@@ -92,8 +97,10 @@ def main():
             def run(image, expected):
                 result = subprocess.run([str(helper), '--prepare', str(image), '127.0.0.1'],
                     capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW, timeout=90)
-                assert result.returncode == expected, (result.returncode, expected, result.stdout, result.stderr,
-                    (Path(str(image) + '.update') / 'result.log').read_text())
+                if result.returncode != expected:
+                    log = Path(str(image) + '.update') / 'result.log'
+                    raise AssertionError((result.returncode, expected, result.stdout, result.stderr,
+                                          log.read_text() if log.exists() else 'No helper log created'))
             older = root / 'old.exe'; old_bytes = b'MZprevious signed-release fixture'; older.write_bytes(old_bytes)
             run(older, 20)
             assert older.read_bytes() == old_bytes and (Path(str(older) + '.update') / 'next.exe').read_bytes() == target_bytes
@@ -127,10 +134,20 @@ def main():
             assert failure.read_bytes() == old_bytes and not (Path(str(failure) + '.update') / 'next.exe').exists()
             assert not (failure.parent / 'zone').exists()
             checks.append('Corrupted asset under a valid signed EXE plan aborts staging and preserves original executable and zone files')
+            corrupt = False
+            for bad_plan in ('signature', 'nonce', 'expired'):
+                failure = root / ('untrusted-' + bad_plan) / 'game.exe'
+                failure.parent.mkdir(); failure.write_bytes(old_bytes); before = len(requests)
+                run(failure, 40)
+                assert failure.read_bytes() == old_bytes
+                assert not (Path(str(failure) + '.update') / 'next.exe').exists()
+                assert requests[before:] == [('check', False)]
+            checks.append('Windows CNG rejects invalid signatures, signed nonce mismatches and expired plans before downloading or changing files')
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=5)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(passed=True, checks=checks, compiled_shipping_crypto=True,
+        native_windows_cng=True, game_account_emulation_linked=False,
         fixture_signing_key_only=True, game_launched=False, production_identity_used=False,
         production_server_restarted=False, installed_game_modified=False, private_fixture_removed=True), indent=2) + '\n')
     print('PASS', len(checks), 'compiled signed helper asset download/current-version gates')

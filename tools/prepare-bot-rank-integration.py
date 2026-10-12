@@ -229,6 +229,7 @@ def prepare(snapshot, replace_owned=False):
                 "DW_BotStyleSelection.h",
                 "DW_BotStyleData.h",
                 "DW_BotStyleProfile.h",
+                "DW_BotBindings.h",
                 "sv_host_scale.h",
             )
         },

@@ -251,16 +251,19 @@ def main():
     package = json.loads((snapshot / "generated/bot-style-scripts/package-proof.json").read_bytes())
     header = (snapshot / "src/DW_BotStyleScriptPackage.h").read_text()
     names = [row["name"][:-3] for row in package["installation_manifest"] if row["name"].endswith(".ff")]
-    assert len(names) == 30 and len(set(names)) == 30
+    assert len(names) == 10 and len(set(names)) == 10
     policy = package["native_locale_codes"]
+    assert policy["supported_language_directories"] == {"eng": "english"}
+    assert len(policy["language_directories"]) == 21
     native_path_cases = native_path_matrix(policy)
-    assert package["native_folder_rules"] == policy["native_folder_rules"]
+    assert package["native_folder_rules"] == policy["installation_folder_rules"]
+    assert len(package["native_folder_rules"]) == 10
     assert receipt["native_path_policy"] == policy
-    assert len({row["relative_path"] for row in package["installation_manifest"]}) == 60
+    assert len({row["relative_path"] for row in package["installation_manifest"]}) == 20
     for row in package["installation_manifest"]:
         directory = row["relative_path"].rsplit("/", 1)[0] if "/" in row["relative_path"] else ""
         assert row["relative_path"] == (directory + "/" if directory else "") + row["name"]
-        assert not directory or directory in {*policy["region_directories"].values(), *policy["language_directories"].values()}
+        assert not directory or directory in {*policy["region_directories"].values(), *policy["supported_language_directories"].values()}
     assert all(header.count('"' + name + '"') == 1 + int(name == package["zone_name"]) for name in names)
     for name in ("prepare-bot-style-scripts.py", "prepare-bot-style-zone.py"):
         spec = importlib.util.spec_from_file_location(
@@ -345,7 +348,7 @@ def main():
             library.Test_Locale.argtypes = [ctypes.c_char_p] * 4
             locale_cases = 0
             for region, region_directory in policy["region_directories"].items():
-                for language, language_directory in policy["language_directories"].items():
+                for language, language_directory in policy["supported_language_directories"].items():
                     assert library.Test_Locale(*(value.encode() for value in
                         (region, language, region_directory, language_directory))) == 0, (region, language)
                     locale_cases += 1
@@ -361,7 +364,9 @@ def main():
         partial_write_and_move_failures_checked=True,
         original_request_unchanged_on_failure=True,
         inherited_hardlink_outputs_remain_unchanged=True,
-        all_60_owned_installation_files_staged=True,
+        all_owned_installation_files_staged=True,
+        owned_installation_file_count=len(package["installation_manifest"]),
+        supported_languages=policy["supported_languages"],
         embedded_names_match_updater_manifest=True,
         native_locale_folder_cases=locale_cases,
         native_locale_files_available_before_queueing=True,

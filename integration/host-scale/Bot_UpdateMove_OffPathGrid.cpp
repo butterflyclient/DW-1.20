@@ -2,6 +2,7 @@
 #include "sv_host_bot_loot.h"
 #include "sv_host_bot_equipment.h"
 #include "SV_HostBotEquipmentBindings.h"
+#include "DW_BotStyleProfile.h"
 #include <intrin.h>
 
 namespace
@@ -55,15 +56,18 @@ namespace
     };
 
     MeshGoal s_goals[200]{};
+
     struct UrgencyState
     {
         void *owner, *player;
         uint64_t ownedButtons;
         int32_t lastTime;
     };
+
     UrgencyState s_urgency[200]{};
 
 #pragma pack(push, 4)
+
     struct SprintPlayerView
     {
         int32_t commandTime, frozenTime;
@@ -78,6 +82,7 @@ namespace
         uint64_t weaponFlags;
         float adsFraction;
     };
+
 #pragma pack(pop)
     static_assert(offsetof(SprintPlayerView, movementType) == 12);
     static_assert(offsetof(SprintPlayerView, movementFlags) == 20);
@@ -90,6 +95,7 @@ namespace
     constexpr uint64_t SprintRequest = 2;
     constexpr uint64_t TacticalSprintRequest = 0x800000000000ull;
     constexpr uint64_t TravelInterruptButtons = 0x4233ddull;
+    constexpr float UrgentTravelDistance = 256.0f;
     int32_t s_planTime = -1;
     unsigned s_plans, s_nextPlanSlot;
 
@@ -97,6 +103,24 @@ namespace
     {
         const float x = a.x - b.x, y = a.y - b.y, z = a.z - b.z;
         return x * x + y * y + z * z;
+    }
+
+    bool CurrentMappedBot(const BotNavigationView *bot)
+    {
+        if (!bot || !bot->entity || !bot->playerState || !bot->sentient)
+            return false;
+        const unsigned slot = uint16_t(bot->entity->number);
+        if (slot >= 200 || slot >= SVHS_ClientCount)
+            return false;
+        void *client = SVHS_Clients[slot];
+        uint64_t profile = 0;
+        return client &&
+               static_cast<const uint8_t *>(client) + 1368 ==
+                   reinterpret_cast<const uint8_t *>(bot) &&
+               Field<int32_t>(client, 214756) == 2 && Field<Entity *>(client, 280) == bot->entity &&
+               bot->entity->client == bot->playerState && bot->entity->sentient == bot->sentient &&
+               SVHS_IsBotEntity(bot->entity) && SVHS_IsBotPlaying(client) &&
+               DW_BotPolicy_ProfileSeed(slot, &profile);
     }
 
     bool Locked(const BotNavigationView *bot)
@@ -247,11 +271,11 @@ namespace
         }
         Vec3 lootGoal{};
         const bool localLoot = bot->scriptGoalType <= 1 && SV_HostBot_GetLootGoal(bot, &lootGoal);
-        if (path && !owned && (!localLoot ||
-            DistanceSquared(bot->nativeGoal, lootGoal) < 32.0f * 32.0f))
+        if (path && !owned &&
+            (!localLoot || DistanceSquared(bot->nativeGoal, lootGoal) < 32.0f * 32.0f))
             return false;
-        const bool newLootGoal = localLoot &&
-            (!state.valid || DistanceSquared(state.goal, lootGoal) >= 32.0f * 32.0f);
+        const bool newLootGoal =
+            localLoot && (!state.valid || DistanceSquared(state.goal, lootGoal) >= 32.0f * 32.0f);
         const bool reached =
             state.valid && DistanceSquared(entity->origin, state.goal) < 96.0f * 96.0f;
         const bool stuck = now - state.progressTime >= 750;
@@ -267,8 +291,8 @@ namespace
                 state.nextPlan = now;
         }
         if (allowPlan && now >= state.nextPlan &&
-            (!path || reached || stuck || !state.valid || targetGone || newLootGoal) && s_plans < 2 &&
-            slot >= s_nextPlanSlot)
+            (!path || reached || stuck || !state.valid || targetGone || newLootGoal) &&
+            s_plans < 2 && slot >= s_nextPlanSlot)
         {
             Vec3 goal{};
             ++s_plans;
@@ -346,31 +370,32 @@ namespace
     }
 } // namespace
 
-extern "C" void SV_HostBot_UpdateTravelUrgency(void *data, HostScale::UserCmd *command,
+extern "C" void SV_HostBot_UpdateTravelUrgency(void *data,
+                                               HostScale::UserCmd *command,
                                                bool reusedCommand)
 {
     using namespace HostScale;
     auto *bot = static_cast<BotNavigationView *>(data);
     const unsigned slot = bot && bot->entity ? uint16_t(bot->entity->number) : 200;
-    if (!command || slot >= 200)
+    if (!command || slot >= 200 || !Enabled() || !CurrentMappedBot(bot))
         return;
     auto &state = s_urgency[slot];
-    const bool same = state.owner == bot && state.player == bot->playerState &&
-                      SVHS_LevelTime >= state.lastTime;
+    const bool same =
+        state.owner == bot && state.player == bot->playerState && SVHS_LevelTime >= state.lastTime;
     if (same && reusedCommand)
         command->buttons &= ~state.ownedButtons;
     state = {bot, bot->playerState, 0, SVHS_LevelTime};
     const auto *player = reinterpret_cast<const SprintPlayerView *>(bot->playerState);
-    if (!Enabled() || !player || !bot->sentient || bot->entity->health <= 0 ||
-        bot->traversal || SV_HostBot_InGulag(bot) || Locked(bot) ||
-        uint32_t(player->movementType) > 1 || (player->otherFlags & 0x800) ||
-        player->groundEntity == 2047 || player->sprintButtonUpRequired ||
-        (player->weaponFlags & (1ull << 42)) || !__builtin_isfinite(player->adsFraction) ||
-        player->adsFraction > 0.0f ||
+    if (!player || !bot->sentient || bot->entity->health <= 0 || bot->traversal ||
+        SV_HostBot_InGulag(bot) || Locked(bot) || uint32_t(player->movementType) > 1 ||
+        (player->otherFlags & 0x800) || player->groundEntity == 2047 ||
+        player->sprintButtonUpRequired || (player->weaponFlags & (1ull << 42)) ||
+        !__builtin_isfinite(player->adsFraction) || player->adsFraction > 0.0f ||
         (command->buttons & TravelInterruptButtons) || Field<int8_t>(command, 156) < 64 ||
         !MeshAreaReady(bot->navigator) || !SVHS_NavHasPath(bot->navigator) ||
         SVHS_BotCanFire(bot) ||
-        DistanceSquared(bot->entity->origin, bot->nativeGoal) < 768.0f * 768.0f)
+        DistanceSquared(bot->entity->origin, bot->nativeGoal) <
+            UrgentTravelDistance * UrgentTravelDistance)
         return;
 
     // Reused commands bypass BotThink's TLS scope. These two original routines
@@ -395,7 +420,8 @@ extern "C" void SV_HostBot_UpdateTravelUrgency(void *data, HostScale::UserCmd *c
             if (!(player->movementFlags & (1ull << 53)))
                 command->buttons |= TacticalSprintRequest;
         }
-        state.ownedButtons = (command->buttons & ~original) & (SprintRequest | TacticalSprintRequest);
+        state.ownedButtons =
+            (command->buttons & ~original) & (SprintRequest | TacticalSprintRequest);
     }
     statics = previous;
 }

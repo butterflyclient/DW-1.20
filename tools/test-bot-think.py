@@ -49,15 +49,31 @@ class Runner:
         assert hashlib.sha256(combat_code).hexdigest() == combat["original_sha256"]
         self.combat_calls = [int(i.op_str, 16) for i in Cs(CS_ARCH_X86, CS_MODE_64).disasm(combat_code, self.base + combat["original_rva"])
                              if i.mnemonic == "call"]
+        self.press_ads = next(r for r in self.proof["combat_policy_proofs"] if r["symbol"] == "Bot_ADSButtonEligibility")
+        press_code = self.pe.get_data(self.press_ads["original_rva"], self.press_ads["original_bytes"])
+        assert hashlib.sha256(press_code).hexdigest() == self.press_ads["original_sha256"]
+        self.ads_allowed = next(r for r in self.proof["combat_policy_proofs"] if r["symbol"] == "Bot_ShouldADS")
+        ads_code = self.pe.get_data(self.ads_allowed["original_rva"], self.ads_allowed["original_bytes"])
+        assert hashlib.sha256(ads_code).hexdigest() == self.ads_allowed["original_sha256"]
+        self.ads_calls = [int(i.op_str, 16) for i in Cs(CS_ARCH_X86, CS_MODE_64).disasm(ads_code, self.base + self.ads_allowed["original_rva"])
+                          if i.mnemonic == "call"]
+        assert len(self.ads_calls) == 12
         self.report = None
         self.build_path = build
         self.source = snapshot / self.proof["source"]
         assert hashlib.sha256(self.source.read_bytes()).hexdigest() == self.proof["source_sha256"]
+        for name, expected in self.proof["dependencies"].items():
+            assert hashlib.sha256((snapshot / "src" / name).read_bytes()).hexdigest() == expected, name
         if build:
             self.report = json.loads((build / "build-report.json").read_bytes())
             path = Path(self.report["executable"])
             assert hashlib.sha256(path.read_bytes()).hexdigest() == self.report["sha256"]
             assert self.report["unresolved_symbols"] == 0
+            compiled = [row for row in self.report["cpp"] if Path(row["source"]).name == "Bot_Think.cpp"]
+            assert len(compiled) == 1 and compiled[0]["source_sha256"] == self.proof["source_sha256"]
+            dependencies = {Path(row["path"]).name: row["sha256"] for row in compiled[0]["dependencies"]}
+            for name, expected in self.proof["dependencies"].items():
+                assert dependencies[name] == expected, name
             self.linked = pefile.PE(str(path), fast_load=True)
             assert self.linked.OPTIONAL_HEADER.ImageBase == self.base
             self.ranges = self.report["rva_map"]["ranges"]
@@ -114,9 +130,14 @@ class Runner:
         hooks[enabled] = "enabled"
         memcpy = 0x180e00020
         hooks[memcpy] = "memcpy"
+        memset = 0x180e00080
+        hooks[memset] = "memset"
         br_policy = 0x180e00040
         hooks[br_policy] = "br-policy"
+        mapped_profile = 0x180e00060
+        hooks[mapped_profile] = "mapped-profile"
         hooks[symbols["SVHS_EnemyTeamFlags"]] = "enemy-team-flags"
+        hooks[symbols["SVHS_IsBotEntity"]] = "current-native-bot"
         fire_entry = self.base + self.fire["original_rva"]
         if edited and self.report:
             fire_entry = mapped(fire_entry)
@@ -134,19 +155,30 @@ class Runner:
             for ordinal, name in combat_aliases.items():
                 address = self.combat_calls[ordinal]
                 hooks[mapped(address) if edited and self.report else address] = name
+            ads_aliases = {5: "NF_ads_dual", 6: "NF_ads_supported",
+                           1: "NF_ads_offhand_gesture",
+                           7: "NF_ads_action1", 8: "NF_ads_action2",
+                           9: "NF_ads_hip", 11: "NF_ads_hip_target"}
+            for ordinal, name in ads_aliases.items():
+                address = self.ads_calls[ordinal]
+                hooks[mapped(address) if edited and self.report else address] = name
         if edited and self.report:
             entry = self.base + self.report["symbols"]["Bot_Think"]
             for name, alias in (("?Enabled@HostScale@@YA_NXZ", "enabled"),
                                 ("Com_Optimized_IsEnabled", "enabled"), ("memcpy", "memcpy"),
+                                ("memset", "memset"),
                                 ("DW_BotPolicy_IsBattleRoyale", "br-policy")):
                 if name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = alias
+            if "DW_BotPolicy_ProfileSeed" in self.report["symbols"]:
+                hooks[self.base + self.report["symbols"]["DW_BotPolicy_ProfileSeed"]] = "mapped-profile"
         elif edited:
             obj = self.object
             section_addresses = {i + 1: 0x180000000 + i * 0x10000 for i in range(len(obj["sections"]))}
             externals = dict(symbols)
-            externals.update({"?Enabled@HostScale@@YA_NXZ": enabled, "memcpy": memcpy, "_fltused": 0x180e00100,
-                              "DW_BotPolicy_IsBattleRoyale": br_policy})
+            externals.update({"?Enabled@HostScale@@YA_NXZ": enabled, "memcpy": memcpy, "memset": memset, "_fltused": 0x180e00100,
+                              "DW_BotPolicy_IsBattleRoyale": br_policy,
+                              "DW_BotPolicy_ProfileSeed": mapped_profile})
             addresses = {i: section_addresses[s["section"]] + s["value"] if s["section"] > 0
                          else externals[s["name"]] if s["section"] == 0 else s["value"]
                          for i, s in obj["symbols"].items()}
@@ -177,10 +209,13 @@ class Runner:
                               (nav, 1400), (vtable, 400), (area, 16)):
             put(address, bytes(size))
         put(client + 1368, 0 if case.get("no_entity") else ent, "<Q")
-        put(bot + 8, sentient, "<Q"); put(bot + 360, nav if case.get("navigator", True) else 0, "<Q")
-        put(bot + 448, player, "<Q"); put(bot + 456, last, "<Q")
+        put(client + 280, ent + 1440 if case.get("stale_entity") else ent, "<Q")
+        put(client + 214756, case.get("client_type", 2), "<i")
+        put(client + 8, case.get("connection_state", 5), "<B")
+        put(bot + 8, sentient + 184 if case.get("stale_sentient") else sentient, "<Q"); put(bot + 360, nav if case.get("navigator", True) else 0, "<Q")
+        put(bot + 448, player + 8 if case.get("stale_player") else player, "<Q"); put(bot + 456, last, "<Q")
         put(bot + 464, case.get("bot_flags", 0), "<I")
-        put(bot + 8984, 0x1000000 if case.get("mesh", False) else 0, "<I")
+        put(bot + 8984, case.get("script_flags", 0) | (0x1000000 if case.get("mesh", False) else 0), "<I")
         put(client + 10355, int(case.get("mesh", False)), "<B")
         put(client + 1988, case.get("traversal", 0), "<i")
         put(client + 30568, case.get("radar_time", 10000), "<i")
@@ -194,18 +229,22 @@ class Runner:
         put(bot + 27872, case.get("semi_delay", 0), "<i")
         put(bot + 27884, case.get("offhand_delay", 0), "<i")
         put(bot + 32516, case.get("ads_delay", 0.0), "<f")
+        put(bot + 29224, case.get("ads_recent_shot", 0), "<i")
         put(player + 1796, case.get("weapon_flags", 0), "<I")
         put(player + 1804, case.get("ads_fraction", 1.0), "<f")
         put(player + 1872, 1, "<I")
         put(player + 12072, case.get("skydive", 0), "<B")
         put(player + 24016, case.get("client_flags", 0), "<I")
+        put(player + 21368, case.get("session_state", 2), "<i")
+        put(player + 21372, 0, "<i")
+        put(player + 448, case.get("player_slot", 3), "<i")
         put(player + 22336, case.get("gulag_phase", 0), "<I")
         put(player + 20, case.get("pm_flags", 0), "<I")
         put(player + 144, 1, "<h")
         if case.get("remote"):
             put(player + 20, 0x10000000, "<I")
             put(ent + 1440 + 8, 4, "<H"); put(ent + 1440 + 492, 0x80, "<B")
-        put(ent, 3, "<h"); put(ent + 336, player, "<Q"); put(ent + 344, sentient, "<Q")
+        put(ent, case.get("entity_number", 3), "<h"); put(ent + 336, player, "<Q"); put(ent + 344, sentient, "<Q")
         put(ent + 440, case.get("health", 100), "<i"); put(ent + 304, struct.pack("<fff", 2000.0, 0.0, 0.0))
         put(sentient, ent, "<Q"); put(sentient + 16, case.get("team", 1), "<I")
         put(nav, vtable, "<Q"); put(vtable + 45 * 8, symbols["SVHS_Nav2DClosest"] if case.get("nav_type", True) else 0, "<Q")
@@ -216,6 +255,11 @@ class Runner:
         cmd = bytearray(rng.randbytes(264)); struct.pack_into("<Q", cmd, 0, case.get("last_buttons", 0xC8))
         put(last, bytes(cmd)); put(command, b"\xa5" * 264)
         put(symbols["BT_ClientBase"], client - 3 * 321192, "<Q")
+        put(symbols["SVHS_ClientCount"], case.get("client_count", 200), "<I")
+        put(symbols["SVHS_Clients"], bytes(200 * 8))
+        # Replay's BT_ClientBase alias is the first pointer in this same table.
+        put(symbols["SVHS_Clients"], client - 3 * 321192, "<Q")
+        put(symbols["SVHS_Clients"] + 3 * 8, client + 8 if case.get("stale_slot") else client, "<Q")
         put(symbols["BT_Entities"], ent, "<Q")
         put(symbols["SVHS_LevelTime"], 10000, "<i")
         for name in ("BT_PausedDvar", "BT_DisableRepulsorsDvar", "BT_RadarDvar"):
@@ -245,7 +289,7 @@ class Runner:
         for address in range(stack - 0x20000, stack + 0x1000, 4096):
             page(address)
         page(stop); put(stack, stop, "<Q")
-        vm.reg_write(UC_X86_REG_RSP, stack); vm.reg_write(UC_X86_REG_RCX, client); vm.reg_write(UC_X86_REG_RDX, command)
+        vm.reg_write(UC_X86_REG_RSP, stack); vm.reg_write(UC_X86_REG_RCX, 0 if case.get("null_client") else client); vm.reg_write(UC_X86_REG_RDX, command)
         events, arguments = [], []
         def returned(value=0, floating=None):
             sp = vm.reg_read(UC_X86_REG_RSP)
@@ -262,12 +306,33 @@ class Runner:
                 returned(int(case.get("enabled", True))); return
             if name == "memcpy":
                 put(a, bytes(vm.mem_read(b, c))); returned(a); return
+            if name == "memset":
+                put(a, bytes([b & 255]) * c); returned(a); return
+            if name == "current-native-bot":
+                assert a == ent
+                returned(int(case.get("native_bot", True))); return
             if name == "br-policy":
                 returned(int(case.get("br_policy", False))); return
+            if name == "mapped-profile":
+                if case.get("mapped_profile", True):
+                    put(b, 120, "<Q")
+                returned(int(case.get("mapped_profile", True))); return
             if name == "enemy-team-flags":
                 put(a, bytes(20) if case.get("friendly") else b"\xff" * 20); returned(); return
             if name and name.startswith("NF_"):
-                if name == "NF_weaponstate":
+                if name == "NF_ads_dual":
+                    returned(int(case.get("native_dual", False)))
+                elif name == "NF_ads_offhand_gesture":
+                    returned(int(case.get("offhand_gesture", False)))
+                elif name == "NF_ads_supported":
+                    returned(int(case.get("ads_allowed", True)))
+                elif name in ("NF_ads_action1", "NF_ads_action2"):
+                    returned(int(case.get("ads_action_blocked", False)))
+                elif name == "NF_ads_hip":
+                    returned(0)
+                elif name == "NF_ads_hip_target":
+                    returned(int(case.get("ads_hip_restricted", False)))
+                elif name == "NF_weaponstate":
                     returned(case.get("weapon_state", 0))
                 elif name == "NF_clip":
                     returned(30)
@@ -371,7 +436,13 @@ class Runner:
             if name == "BT_IsRanged":
                 returned(int(not case.get("melee", False))); return
             if name == "BT_ADSAllowed" and case.get("native_fire"):
-                returned(int(case.get("ads_allowed", True) and not case.get("native_dual") and bool(get(bot + 32484, "<I") & 2))); return
+                # Execute native preference and restrictions, modeling only its
+                # weapon/action leaf facts. The complete 434-byte body is pinned.
+                return
+            if name == "BT_PressADS" and case.get("native_fire"):
+                # Execute the complete original 57-byte emission gate. Its
+                # offhand gesture leaf is modeled; its disable bit is real.
+                return
             mapping = {"BT_PressADS": "ads", "BT_CanHoldBreath": "breath", "BT_VariableZoom": "zoom",
                        "BT_InADS": "in_ads", "BT_IsSkydiving": "sky", "BT_DualWield": "dual",
                        "BT_GesturePlaying": "gesture", "BT_CanFire": "fire", "BT_ADSDesire": "ads_desire",
@@ -381,11 +452,16 @@ class Runner:
         def unmapped(machine, access, address, size, value, context):
             page(address); page(address + size - 1); return True
         vm.hook_add(UC_HOOK_MEM_UNMAPPED, unmapped)
+        before_state = [bytes(vm.mem_read(address, size)) for address, size in
+                        ((client, 36000), (ent, 1440 * 4), (player, 25000))]
         vm.emu_start(entry, stop, count=1000000)
         assert vm.reg_read(UC_X86_REG_RIP) == stop
         return dict(command=bytes(vm.mem_read(command, 264)).hex(), client=bytes(vm.mem_read(client, 36000)).hex(),
                     events=events, arguments=arguments, statics=get(0x56800000 + 16, "<Q"),
-                    tactical=bytes(vm.mem_read(sentient + 148, 6)).hex())
+                    tactical=bytes(vm.mem_read(sentient + 148, 6)).hex(),
+                    entity_player_and_bot_state_unchanged=before_state ==
+                    [bytes(vm.mem_read(address, size)) for address, size in
+                     ((client, 36000), (ent, 1440 * 4), (player, 25000))])
 
 
 def main():
@@ -405,7 +481,7 @@ def main():
                  dict(node=False), dict(mesh=True, tac=False, area_value=False),
                  dict(mesh=True, tac=False, nav_type=False), dict(mesh=True, tac=False, navigator=False),
                  dict(mesh=True, tac=False, area_handle=False), dict(mesh=True, tac=False, area_space=False),
-                 dict(no_entity=True), dict(team=0), dict(team=153),
+                 dict(no_entity=True, enabled=False), dict(team=0), dict(team=153),
                  dict(paused=True), dict(local_paused=True), dict(health=0), dict(archive=500), dict(pm_flags=0x8000),
                  dict(client_flags=4), dict(client_flags=0x404, weapon=0), dict(skydive=2),
                  dict(ads=True, breath=True), dict(ads=True, breath=True, ads_fraction=0.5),
@@ -432,7 +508,7 @@ def main():
         ("semi-auto cadence", {"fire_type": 1, "burst_type": 0, "semi_delay": 20000}, False, True),
         ("offhand delay", {"offhand_delay": 20000}, False, True),
         ("disallowed weapon state", {"weapon_state": 12}, False, True),
-        ("blocked sight", {"fire": False}, False, False),
+        ("aiming without a firing opportunity", {"fire": False}, False, True),
         ("dead target", {"enemy_health": 0}, False, False),
         ("friendly target", {"friendly": True}, False, False),
         ("grenade class", {"grenade": True}, False, False),
@@ -443,11 +519,22 @@ def main():
         ("skydive", {"sky": True, "skydive": 2}, False, False),
         ("ADS unsupported", {"ads_allowed": False}, True, False),
         ("native ADS transition wait", {"match_flags": 0x14, "ads_fraction": 0.5, "ads_delay": 100.0}, False, True),
-        ("empty ammunition", {"no_ammo": True}, False, False),
-        ("native aim wait", {"aim_wait": True}, False, False),
+        ("empty ammunition", {"no_ammo": True}, False, True),
+        ("native aim wait", {"aim_wait": True}, False, True),
         ("native grenade action", {"grenade_action": True}, False, False),
         ("BR policy disabled", {"enabled": False}, False, False),
-        ("outside BR", {"br_policy": False}, False, False),
+        ("MP full-auto and ADS", {"br_policy": False}, True, True),
+        ("MP semi-auto cadence", {"br_policy": False, "fire_type": 1, "burst_type": 0, "semi_delay": 20000}, False, True),
+        ("MP blocked fire retains ADS attempt", {"br_policy": False, "fire": False}, False, True),
+        ("unmapped native bot", {"mapped_profile": False}, False, False),
+        ("native ADS emission disabled", {"weapon_flags": 0x20}, True, False),
+        ("native offhand gesture blocks ADS", {"offhand_gesture": True}, True, False),
+        ("native action blocks ADS", {"ads_action_blocked": True}, True, False),
+        ("native target hip restriction", {"ads_hip_restricted": True, "ads_recent_shot": 9950}, True, False),
+        ("native traversal", {"traversal": 1}, False, False),
+        ("native upper traversal flags", {"traversal": 0x20}, True, True),
+        ("script combat disabled", {"script_flags": 0x1000}, False, False),
+        ("MP extra info retains native ADS", {"br_policy": False, "gulag_phase": 0x200}, True, True),
     ]
     for label, options, shooting, aiming in policy_cases:
         case = dict(native_fire=True, br_policy=True, acquire=True, fire=True, ads=True)
@@ -468,11 +555,29 @@ def main():
             assert native["command"] == edited["command"]
         if label == "native dual wield":
             assert buttons & 0x20000, "Native second-hand fire command was lost"
-        if label in ("BR policy disabled", "outside BR"):
+        if label in ("BR policy disabled", "unmapped native bot"):
             assert native == edited, (label, "policy changed baseline")
+    guard_cases = [dict(client_type=0), dict(client_type=1), dict(native_bot=False),
+                   dict(stale_player=True), dict(stale_entity=True), dict(stale_slot=True),
+                   dict(entity_number=4), dict(client_count=3), dict(stale_sentient=True),
+                   dict(no_entity=True), dict(null_client=True), dict(connection_state=4),
+                   dict(session_state=1), dict(player_slot=4)]
+    for options in guard_cases:
+        case = dict(native_fire=True, br_policy=True, acquire=True, fire=True, ads=True)
+        case.update(options)
+        result = runner.run(True, case)
+        assert result["command"] == bytes(264).hex(), (options, "Stale command was not cleared")
+        assert not result["events"], (options, "Native brain ran on an invalid current owner", result["events"])
+        assert result["statics"] == 0
+        assert result["entity_player_and_bot_state_unchanged"], options
     report = dict(schema=1, baseline_cases=len(baselines), mesh_continuation_cases=1,
+                  current_bot_identity_guard_cases=len(guard_cases),
                   native_fire_policy_cases=len(policy_cases),
                   native_fire_body_sha256=runner.fire["original_sha256"],
+                  native_ads_emission_body_sha256=runner.press_ads["original_sha256"],
+                  native_ads_emission_instructions_executed=True,
+                  native_ads_eligibility_body_sha256=runner.ads_allowed["original_sha256"],
+                  native_ads_eligibility_instructions_executed=True,
                   native_body_sha256=runner.proof["original_sha256"],
                   source_sha256=hashlib.sha256(runner.source.read_bytes()).hexdigest(),
                   build_report=str(runner.build_path / "build-report.json") if runner.build_path else None,

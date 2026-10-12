@@ -144,6 +144,25 @@ def main():
             write(address + 84, 1, "<B")
             write(address + 85, int(i >= 2), "<B")
             write(address + 86, 44 + i - 2, "<B")
+    # The profile boundary reads the actual native client table/count. These
+    # allocations model current server ownership independently of bot pool rows.
+    native_clients, native_entities, native_players = 0x17000000, 0x1C000000, 0x1D000000
+    for address, size in ((native_clients, 200 * 321192), (native_entities, 200 * 1440),
+                          (native_players, 200 * 64496)):
+        vm.mem_map(address, (size + 4095) & ~4095)
+    count_symbol = symbols.get("DW_Bot_ClientCount", symbols["SVHS_ClientCount"])
+    clients_symbol = symbols.get("DW_Bot_Clients", symbols["SVHS_Clients"])
+    write(base + count_symbol, 200, "<I")
+    for slot in range(200):
+        current_client = native_clients + slot * 321192
+        current_entity = native_entities + slot * 1440
+        current_player = native_players + slot * 64496
+        write(base + clients_symbol + slot * 8, current_client, "<Q")
+        write(current_client + 280, current_entity, "<Q")
+        write(current_client + 214756, 2, "<i")
+        write(current_entity, slot, "<h")
+        write(current_entity + 336, current_player, "<Q")
+        write(current_player + 448, slot, "<i")
     names = [
         "DW_LocalBackend_IsEnabled",
         "func_141187FA0",
@@ -190,6 +209,8 @@ def main():
         "Dvar_GenerateChecksum",
         "Com_Printf",
     ]
+    if "DW_BotRank_Apply" in symbols:
+        names.append("DW_BotRank_Apply")
     boundaries = {base + symbols[name]: name for name in names}
     boundaries[base + symbols["sub_1421CCEF0"]] = "stack_probe"
 
@@ -224,6 +245,8 @@ def main():
             returned(state["eligible"])
         elif name in ("func_140CA2230", "func_140CA2210"):
             returned(pool + 88 * a[0])
+        elif name == "DW_BotRank_Apply":
+            returned(0)  # Actual rank handoff has its own full native/compiled gate.
         elif name == "func_141359F90":
             returned(state["server_bot"])
         elif name == "func_141371450":
@@ -510,6 +533,7 @@ def main():
         "BR spawn selection consumes all native bot records once, including teams beyond axis/allies, while preserving human records"
     )
     state["server_bot"] = False
+    write(native_clients + 321192 + 214756, 0, "<i")
     prior_replays = state.get("assignment_replays", 0)
     assert run("func_1413707D0", 1) == 1 and run("func_141370860", 1) == 2
     assert state["assignment_replays"] == prior_replays + 2

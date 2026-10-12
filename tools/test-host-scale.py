@@ -33,12 +33,30 @@ class Runner:
         self.report = None
         if build:
             self.report = json.loads((build / "build-report.json").read_bytes())
+            assert Path(self.report['source_root']).resolve() == snapshot.resolve()
+            assert self.report['input_sha256'] == self.proof['image_sha256']
             path = Path(self.report["executable"])
             assert hashlib.sha256(path.read_bytes()).hexdigest() == self.report["sha256"]
             assert self.report["unresolved_symbols"] == 0
             self.linked = pefile.PE(str(path), fast_load=True)
             self.ranges = self.report["rva_map"]["ranges"]
             self.starts = [r["begin"] for r in self.ranges]
+            for replacement in self.proof['replacements']:
+                rows = [r for r in self.report['cpp'] if Path(r['source']).as_posix() == replacement['source']]
+                assert len(rows) == 1, ('Missing/duplicate linked host unit', replacement['source'])
+                row = rows[0]
+                assert row['source_sha256'] == replacement['source_sha256'] == hashlib.sha256(
+                    (snapshot / replacement['source']).read_bytes()).hexdigest()
+                assert hashlib.sha256(Path(row['object']).read_bytes()).hexdigest() == row['object_sha256']
+                for dependency in row['dependencies']:
+                    assert hashlib.sha256(Path(dependency['path']).read_bytes()).hexdigest() == dependency['sha256']
+                assert self.report['symbols'][replacement['symbol']] == self.report['symbols'][replacement['identity']]
+            for binding in self.proof['bindings']:
+                assert self.report['symbols'][binding['name']] == self.report['symbols'][binding['identity']]
+            profile = [r for r in self.report['cpp'] if Path(r['source']).as_posix() == 'src/DW_BotRoster.cpp']
+            assert len(profile) == 1
+            assert profile[0]['source_sha256'] == hashlib.sha256((snapshot / 'src/DW_BotRoster.cpp').read_bytes()).hexdigest()
+            assert 'DW_BotPolicy_ProfileSeed' in self.report['symbols']
         else:
             sys.path.insert(0, str(snapshot / "tools"))
             from coff import read as read_coff
@@ -103,12 +121,19 @@ class Runner:
                    "SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
                    "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
                    "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency")
+        helpers += ("DW_LocalBackend_IsEnabled", "SV_HostBot_StampQueuedCommand",
+                    "DW_BotPolicy_ProfileSeed")
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
                 if (name.startswith("?Record") or name.startswith("?Clock")) and name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
             hooks[self.base + self.report["symbols"]["Com_Optimized_IsEnabled"]] = "optimized-policy"
+            # The scheduling fixture models profile ownership in both object
+            # and linked modes. Executing the real roster lookup here would
+            # contradict its disabled-backend boundary and unseeded BotRecords.
+            for name in ("DW_LocalBackend_IsEnabled", "SV_HostBot_StampQueuedCommand", "DW_BotPolicy_ProfileSeed"):
+                hooks[self.base + self.report["symbols"][name]] = name
             for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
                          "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
                          "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency"):
@@ -177,6 +202,7 @@ class Runner:
         events, observed, queued, stats = [], [], [], []
         scopes = []
         urgency = []
+        profile_queries = []
         entities, sentients, info, ai, interface, vtable = (0x51000000, 0x52000000, 0x53000000,
                                                          0x54000000, 0x54100000, 0x54200000)
         clients, players, commands, queues = 0x55000000, 0x5A000000, 0x5B000000, 0x5C000000
@@ -330,6 +356,18 @@ class Runner:
                 returned(case.get("mode", 0) != 0); return
             if kind == "?Population@HostScale@@YAIXZ":
                 returned(case.get("population", 20)); return
+            if kind == "DW_BotPolicy_ProfileSeed":
+                assert 0 <= a < min(count, case.get('population', 20), 200)
+                client = get(symbols['SVHS_Clients'] + a * 8, '<Q')
+                entity = get(client + 280, '<Q'); player = get(entity + 336, '<Q')
+                assert client == clients + a * 321192 and entity == entities + a * 1440
+                assert get(client + 214756, '<i') == 2 and get(client + 8, '<B') >= 5
+                assert get(entity, '<h') == a and get(player + 448, '<i') == a
+                assert get(player + 21368, '<i') == 2 and get(player + 21372, '<i') == 0
+                mapped_profile = bool(case.get('mapped_profile', True))
+                profile_queries.append((a, now, mapped_profile))
+                if mapped_profile: put(b, 120, '<Q')
+                returned(mapped_profile); return
             if kind.startswith("?Record"):
                 stats.append((kind, a & 0xffffffff, b & 0xffffffff, c & 0xffffffff))
                 returned(); return
@@ -404,6 +442,10 @@ class Runner:
                 put(a, b''.join(rows)); returned(); return
             if kind == "SVHS_IsBotEntity":
                 returned(case.get("bot", True)); return
+            if kind == "DW_LocalBackend_IsEnabled":
+                returned(0); return
+            if kind == "SV_HostBot_StampQueuedCommand":
+                returned(); return
             if kind in ("fov", "fov-z"):
                 returned(floating=0.5 if kind == "fov" else 0.7); return
             if kind == "SVHS_CanSeeEntity":
@@ -492,6 +534,7 @@ class Runner:
                             all_setup=bool(get(symbols['SVHS_AllTilesSetup'], '<B')), events=events)
             if routine == "SV_BotUpdateBots":
                 return dict(events=events, observed=observed, stats=stats, scopes=scopes, urgency=urgency,
+                            profile_queries=profile_queries,
                             active=get(symbols['SVHS_ActiveBotCount'], '<I'),
                             pings=bytes(vm.mem_read(symbols['SVHS_BotPingAnchor'] - 8, 512)).hex())
             if routine == "AICommon_UpdateSight":
@@ -588,7 +631,10 @@ def main():
                               (81, {'human_slot':0, 'bot_distance':800, 'target':2}),
                               (150, {'human_slot':0, 'bot_distance':8000, 'enemy_distance':8000, 'target':2}),
                               (150, {'human_slot':0, 'bot_distance':100, 'target':2}),
-                              (150, {'human_slot':0, 'bot_distance':8000, 'target':1})):
+                              (150, {'human_slot':0, 'bot_distance':8000, 'target':1}),
+                              (150, {'human_slot':0, 'bot_distance':800}),
+                              (150, {'human_slot':0, 'bot_distance':8000}),
+                              (150, {'human_slot':0, 'bot_distance':8000, 'enemy_distance':8000, 'target':2, 'mapped_profile':False})):
         case = dict(population=population, count=population, frames=12, **extra)
         original = runner.run('SV_BotUpdateBots', False, case)
         off = runner.run('SV_BotUpdateBots', True, {**case, 'mode':0})
@@ -608,6 +654,11 @@ def main():
                 assert on['observed'] == original['observed'] and thinks == original_thinks, case
             elif not extra:
                 assert thinks < original_thinks / 2, (case, thinks, original_thinks)
+            elif case.get('mapped_profile', True) and case.get('target'):
+                assert on['profile_queries'] and all(q[2] for q in on['profile_queries']), ('Mapped profile boundary missing', case)
+                assert thinks == original_thinks, ('Mapped combat must think every server frame', case)
+            elif case.get('human_slot') == 0 and case.get('bot_distance') == 800:
+                assert thinks == original_thinks, ('Nearby human acquisition must think every server frame', case)
             for trigger in ('damage_at', 'target_at', 'script_at', 'rewind_at',
                             'equipment_at', 'gulag_at', 'target_died_at', 'teleport_at'):
                 if trigger in case:
@@ -619,16 +670,19 @@ def main():
                 assert all(e[1] < instant for e in on['scopes']), ('Gulag used approximate navigation scope', case)
             scheduling.append(dict(population=population, mode=mode, extra=extra,
                                    original_decisions=original_thinks, scheduled_decisions=thinks,
+                                   modeled_profile_queries=len(on['profile_queries']),
+                                   mapped_profile_results=sum(q[2] for q in on['profile_queries']),
                                    movement_commands=len(on['observed'])))
             total += 1
     for mode in (1, 2):
         human_cases = {
             (row['extra'].get('bot_distance'), row['extra'].get('target')): row['scheduled_decisions']
-            for row in scheduling if row['mode'] == mode and row['population'] == 150
+            for row in scheduling if row['mode'] == mode and row['population'] == 150 and row['extra'].get('mapped_profile', True)
             and row['extra'].get('human_slot') == 0
         }
-        assert 0 < human_cases[8000, 2] < human_cases[100, 2], 'Nearby combat lost priority'
+        assert 0 < human_cases[8000, 2] == human_cases[100, 2], 'Mapped distant combat lost frame priority'
         assert human_cases[8000, 1] == human_cases[100, 2], 'Distant human target lost priority'
+        assert human_cases[800, None] > human_cases[8000, None], 'Nearby human acquisition lost priority'
     print('PASS bot decision cadence and command continuity', total, flush=True)
     for tile in (0, 31, 32, 560, 1023):
         for worlds, models in ((0, 0), (31, 31), (3, 0), (1, 0), (0, 1), (16, 31), (31, 16)):
@@ -655,6 +709,7 @@ def main():
                    linked_executable_sha256=runner.report["sha256"] if runner.report else None,
                    modeled_150_client_visibility_evaluations=reductions,
                    modeled_bot_decision_cadence=scheduling,
+                   profile_lookup_boundary='Modeled current native slot ownership plus per-case profile mapping; consistent in COFF and linked modes. Real roster profile validation has separate owner tests.',
                    scope=__doc__, live_game_tested=False)
     args.output.write_text(json.dumps(receipt, indent=2) + "\n")
     print("PASS", total, "native/compiled instruction cases; no game launched")

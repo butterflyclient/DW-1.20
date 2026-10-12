@@ -1,5 +1,6 @@
 #include "DW_BotStyleProfile.h"
 #include "DW_BotStyleSelection.h"
+#include "DW_BotBindings.h"
 #include "DW_ScriptMethodBindings.h"
 #include "SV_HostBotLootBindings.h"
 #include "sv_host_bot_equipment.h"
@@ -81,18 +82,90 @@ namespace
     bool FullName(const DWBotStyle::Weapon &weapon, const DWBotStyle::Selection &selection,
                   char *output, unsigned capacity)
     {
+        using namespace DWBotStyle;
+        const unsigned weaponIndex = unsigned(&weapon - Weapons);
+        if (weaponIndex >= sizeof(Weapons) / sizeof(*Weapons))
+            return false;
+        const auto tokenId = [](const char *reference) -> unsigned {
+            for (unsigned i = 0; i < sizeof(RecipeReferences) / sizeof(*RecipeReferences); ++i)
+                if (Same(reference, RecipeReferences[i]))
+                    return i + 1;
+            return 0;
+        };
+        // A stock firearm is assembled from mandatory receiver/front/back/mag
+        // parts. Optional Gunsmith choices replace those parts through the
+        // stock combo table; a bare asset plus five choices is incomplete.
+        uint16_t pending[128]{}, filtered[30]{};
+        unsigned pendingCount = 0, filteredCount = 0;
+        const auto &recipe = WeaponRecipes[weaponIndex];
+        for (unsigned i = 0; i < recipe.count; ++i)
+            pending[pendingCount++] = recipe.defaults[i];
+        for (unsigned i = 0; i < selection.count; ++i)
+        {
+            const unsigned token = tokenId(selection.references[i]);
+            if (!token)
+                return false;
+            pending[pendingCount++] = uint16_t(token);
+            const auto addition = WeaponRecipeTokens[weaponIndex][token - 1].addition;
+            if (addition)
+                pending[pendingCount++] = addition;
+        }
+        // Source-faithful WEAPON.FilterAttachments: discard duplicates; on the
+        // first conflict remove the old token and process the replacement next.
+        for (unsigned at = 0; at < pendingCount; ++at)
+        {
+            const unsigned incoming = pending[at];
+            bool keep = true;
+            for (unsigned previous = 0; previous < filteredCount; ++previous)
+            {
+                if (incoming == filtered[previous])
+                {
+                    keep = false;
+                    break;
+                }
+                const unsigned replacement = RecipeConflicts[incoming - 1][filtered[previous] - 1];
+                if (replacement)
+                {
+                    if (pendingCount == sizeof(pending) / sizeof(*pending))
+                        return false;
+                    for (unsigned i = previous + 1; i < filteredCount; ++i)
+                        filtered[i - 1] = filtered[i];
+                    --filteredCount;
+                    for (unsigned i = pendingCount; i > at + 1; --i)
+                        pending[i] = pending[i - 1];
+                    pending[at + 1] = uint16_t(replacement);
+                    ++pendingCount;
+                    keep = false;
+                    break;
+                }
+            }
+            if (keep)
+            {
+                if (filteredCount == sizeof(filtered) / sizeof(*filtered))
+                    return false;
+                filtered[filteredCount++] = uint16_t(incoming);
+            }
+        }
         unsigned length = 0;
         if (!Append(output, capacity, length, weapon.nativeAsset))
             return false;
-        for (unsigned i = 0; i < selection.count; ++i)
+        for (unsigned i = 0; i < filteredCount; ++i)
         {
+            const unsigned token = filtered[i] - 1;
+            const char *resolved = WeaponRecipeTokens[weaponIndex][token].resolved;
+            if (!*resolved || Same(resolved, "none"))
+                continue;
+            unsigned variant = 0;
+            for (unsigned choice = 0; choice < selection.count; ++choice)
+                if (Same(RecipeReferences[token], selection.references[choice]))
+                    variant = selection.variants[choice];
             if (!Append(output, capacity, length, "+") ||
-                !Append(output, capacity, length, selection.resolvedReferences[i]))
+                !Append(output, capacity, length, resolved))
                 return false;
-            if (selection.variants[i])
+            if (variant)
             {
                 char digits[4]{};
-                unsigned value = selection.variants[i], count = 0;
+                unsigned value = variant, count = 0;
                 do
                 {
                     digits[count++] = char('0' + value % 10);
@@ -126,8 +199,8 @@ extern "C" void DW_BotStyleWeaponMethod(void *context, uint64_t self)
     {
         auto *entity = static_cast<HostScale::Entity *>(SM_GetEntity(self));
         uint64_t profile = 0;
-        if (entity && entity->client &&
-            DW_BotPolicy_ProfileSeed(uint16_t(entity->number), &profile))
+        if (DWBot_IsCurrentEntity(uint32_t(self), entity) &&
+            DW_BotPolicy_ProfileSeed(uint32_t(self), &profile))
         {
             const int slot = SM_GetInt(context, 1);
             const bool br = DW_BotPolicy_IsBattleRoyale();

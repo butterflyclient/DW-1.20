@@ -188,6 +188,9 @@ def main():
                         expected,
                     )
                     cases += 1
+            library.Test_Ownership.argtypes = [ctypes.c_uint]
+            for scenario in range(10):
+                assert library.Test_Ownership(scenario) == 0, scenario
             for seed in range(200):
                 assert library.Test_PreScript(seed) == 0
         finally:
@@ -200,6 +203,7 @@ def main():
         target=proof["target"],
         original_instruction_comparison_cases=cases,
         pre_script_profile_cases=200,
+        current_owner_cases=10,
         only_rank_prestige_fields_written=True,
         client_begin=proof["client_begin"],
         pre_script_call=proof["pre_script_call"],

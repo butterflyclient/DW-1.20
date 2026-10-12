@@ -74,7 +74,7 @@ int wmain(int argc, wchar_t **argv)
         const auto image = read(imagePath, 1024 * 1024);
         const auto identity = hash(image);
         const auto entries = manifest(backend, image);
-        require(entries.size() == 60, "Fixture complete native locale list");
+        require(entries.size() == 20, "Fixture English and native regional companion list");
         for (const auto &entry : entries)
         {
             auto future = entry;
@@ -142,7 +142,7 @@ int wmain(int argc, wchar_t **argv)
                 if (test == 0)
                 {
                     const auto backups = game / "game.exe.update/asset-backups" / hex(identity.data());
-                    require(std::distance(fs::directory_iterator(backups), fs::directory_iterator{}) == 61, "Fixture original backups or recovery journal missing");
+                    require(std::distance(fs::directory_iterator(backups), fs::directory_iterator{}) == entries.size() + 1, "Fixture original backups or recovery journal missing");
                     session.rollback();
                     for (const auto &entry : entries) require(read(game / "zone" / nativeRelativePath(entry), MAXDWORD) == original, "Explicit rollback failed");
                 }

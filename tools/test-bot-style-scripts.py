@@ -133,7 +133,8 @@ def main():
     empty = package["empty_companion"]["native_reader"]["manifest"]
     assert empty["complete"] and empty["success"] and empty["top_level_index"] == 0
     manifest = package["installation_manifest"]
-    assert len(manifest) == 60
+    assert package["native_locale_codes"]["supported_language_directories"] == {"eng": "english"}
+    assert len(manifest) == 20
     assert all(
         Path(row["source"]).is_relative_to(snapshot / "generated/bot-style-scripts")
         for row in manifest

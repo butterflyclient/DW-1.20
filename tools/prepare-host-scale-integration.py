@@ -29,6 +29,7 @@ REPLACEMENTS = (
     ("fn_6d3e9047613805c4", "Bot_UpdateMove_OffPathGrid", "5aff2a15b5d8055f1ceab91a6b75fd44ffca1695a9fb9be9f8060325dde37c7a"),
     ("fn_e25d88059e9ad6af", "Sentient_NearestTacPoint", "4916e26e5374b2e6ed5f791c81c424de9e1459c8507eb296e0b9de948254b9a6"),
     ("fn_80990981f58ec6f4", "G_Glass_PieceStateChanged", "395b4f1a084f34fadd59d5948602b574fa7cbcc84ff18860834a0fc6e45aedf9"),
+    ("fn_98ca31595956f57c", "SV_UserMoveWorkersMP_ExecuteClientThinkCmd", "9f9d0353baa265bd17bcba30ff9626f198d565ec042d51481082f20829c426f7"),
 )
 
 
@@ -292,6 +293,21 @@ def prepare(snapshot, replace_owned=False):
     globals_["SVHS_GlassWeakenDvar"] = rip(rax_loads[4:5], "mov", "rax,")
     assert rip(glass, "mov", "eax, dword ptr [rip") == globals_["SVHS_LevelTime"]
     globals_["SVHS_GlassDestroyedString"] = rip(glass, "mov", "edx, dword ptr [rip")
+    worker = decoded["SV_UserMoveWorkersMP_ExecuteClientThinkCmd"]
+    worker_calls = direct_calls(worker)
+    assert len(worker_calls) == 6
+    funcs.update(zip(("SVHS_TimingStartWorker", "SVHS_CurrentThreadContext",
+                      "SVHS_ClientThinkInternal", "SVHS_AddWorker_again",
+                      "SVHS_TimingEndWorker"), worker_calls[:-1]))
+    assert funcs.pop("SVHS_AddWorker_again") == funcs["SVHS_AddWorker"]
+    assert rip(worker, "add", "rbp, qword ptr [rip") == globals_["SVHS_ThinkQueues"]
+    assert rip(worker, "mov", "eax, dword ptr [rip") == globals_["SVHS_BotTlsIndex"]
+    globals_["SVHS_InWorkerContext"] = base + one([
+        instruction.operands[1].mem.disp for instruction in worker
+        if instruction.mnemonic == "lea" and
+        instruction.op_str.startswith("rsi, [r8 +")])
+    assert any(instruction.mnemonic == "mov" and
+               instruction.op_str == "r12d, 0x10" for instruction in worker)
     header = '''#pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -322,6 +338,11 @@ void SVHS_AddWorker(unsigned, const void *);
 void SVHS_FinishClientThinkCmds();
 void SVHS_WaitWorkerType(unsigned);
 void SVHS_Sleep(unsigned);
+void SVHS_TimingStartWorker();
+void SVHS_TimingEndWorker();
+unsigned SVHS_CurrentThreadContext();
+void SVHS_ClientThinkInternal(void *, const void *);
+extern uint32_t SVHS_InWorkerContext[28];
 extern uint32_t SVHS_BotSystemAllocated, SVHS_LevelClientsAllocated, SVHS_ActiveBotCount;
 extern void *SVHS_ServerGlobals;
 extern uint8_t SVHS_BotPingAnchor[];
@@ -469,6 +490,19 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
                   entity_bytes=1440, sentient_bytes=184, sentient_info_bytes=64,
                   team_bit_count=160, sight_capacity=272, client_capacity=200,
                   equipment_bindings=equipment_proof,
+                  command_ownership=dict(
+                      worker_identity="fn_98ca31595956f57c",
+                      bot_info_offset=1368, bot_info_entity_offset=0,
+                      bot_info_sentient_offset=8, bot_info_player_offset=448,
+                      client_entity_offset=280, client_type_offset=214756,
+                      player_client_number_offset=448,
+                      player_connection_offset=21368, player_session_offset=21372,
+                      native_bot_entity_identity=by_address[funcs["SVHS_IsBotEntity"]]["id"],
+                      header="src/sv_bot_command_ownership.h",
+                      header_sha256=hashlib.sha256(
+                          (snapshot / "src/sv_bot_command_ownership.h").read_bytes()).hexdigest(),
+                      bot_only_sidecar=True, native_queue_storage_unchanged=True,
+                      consume_time_validation=True),
                   urgency=dict(native=urgency_proof, sprint_request=2,
                                tactical_sprint_request=0x800000000000,
                                physics_can_start_sprint_identity="fn_3ccf96c2c47212df",

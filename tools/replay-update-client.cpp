@@ -14,14 +14,12 @@
 #include <string>
 #include <vector>
 #include "../integration/replay/dw_update_protocol.h"
+#include "../integration/replay/dw_local_trust.h"
 #if __has_include("../integration/replay/DW_UpdateAssetManifest.h")
 #include "../integration/replay/DW_UpdateAssetManifest.h"
 #define DW_UPDATE_FROZEN_ASSETS 1
 #endif
 #include "replay-update-assets.h"
-
-extern "C" bool DW_LocalPlatform_VerifyBytes(const void *, unsigned, const uint8_t *);
-extern "C" uint64_t DW_LocalPlatform_Time();
 
 namespace
 {
@@ -225,14 +223,42 @@ namespace
 
     const update_assets::IO assetIO{read, write, hash, download};
 
+    bool verifyPlanSignature(const DWUpdateReply &reply)
+    {
+        // The updater needs only the pinned public key and Windows CNG. Do not
+        // link game account/license emulation or dynamically resolve crypto APIs.
+        const auto digest = hash({reinterpret_cast<const uint8_t *>(&reply.plan),
+                                  sizeof(reply.plan)});
+        BCRYPT_ALG_HANDLE algorithm = nullptr;
+        BCRYPT_KEY_HANDLE key = nullptr;
+        if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_RSA_ALGORITHM, nullptr, 0) < 0)
+            return false;
+        BCRYPT_PSS_PADDING_INFO padding{BCRYPT_SHA256_ALGORITHM, 32};
+        const bool valid =
+            BCryptImportKeyPair(algorithm, nullptr, BCRYPT_RSAPUBLIC_BLOB, &key,
+                                const_cast<PUCHAR>(s_dwLocalPlatformPublicKey),
+                                sizeof(s_dwLocalPlatformPublicKey), 0) >= 0 &&
+            BCryptVerifySignature(key, &padding, const_cast<PUCHAR>(digest.data()),
+                                  static_cast<ULONG>(digest.size()),
+                                  const_cast<PUCHAR>(reply.signature), sizeof(reply.signature),
+                                  BCRYPT_PAD_PSS) >= 0;
+        if (key)
+            BCryptDestroyKey(key);
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+        return valid;
+    }
+
     bool validPlan(const DWUpdateReply &reply)
     {
         const auto &p = reply.plan;
-        const auto now = DW_LocalPlatform_Time();
+        FILETIME time{};
+        GetSystemTimeAsFileTime(&time);
+        const uint64_t ticks = (uint64_t(time.dwHighDateTime) << 32) | time.dwLowDateTime;
+        const auto now = ticks / 10000000ULL - 11644473600ULL;
         return p.magic == DW_UPDATE_MAGIC && p.version == 2 && p.status <= 2 &&
                p.issued <= now + 30 && p.expires > now && p.expires > p.issued &&
                p.expires - p.issued <= 86400 &&
-               DW_LocalPlatform_VerifyBytes(&p, sizeof(p), reply.signature);
+               verifyPlanSignature(reply);
     }
 
     fs::path stage(const fs::path &exe)

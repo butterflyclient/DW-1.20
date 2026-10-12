@@ -6,6 +6,11 @@ namespace
 {
     BotRecord pool[200]{};
     bool humans[200]{};
+    bool nativeBot = false, nativeDW = true;
+    unsigned nativeBotCalls = 0;
+    DWBotNativeClient profileClient{};
+    HostScale::Entity profileEntity{};
+    uint8_t profilePlayer[64496]{};
     uint8_t party[100000]{};
     bool Equal(const BotRecord &a, const BotRecord &b)
     {
@@ -41,7 +46,9 @@ extern "C"
     int DW_Bot_CustomizationEnabled = 0;
     uint8_t DW_Bot_CustomizationPackages[1]{}, DW_Bot_CustomizationGroups[1]{};
     const char *DW_Bot_NameTable = "fixture";
-    bool DW_LocalBackend_IsEnabled() { return true; }
+    uint32_t DW_Bot_ClientCount = 0;
+    DWBotNativeClient *DW_Bot_Clients[200]{};
+    bool DW_LocalBackend_IsEnabled() { return nativeDW; }
     bool DW_BotRank_Apply(unsigned) { return false; } // separate original/native rank fixture
     bool func_140CA2250() { return true; }
     const void *func_140CA2230(unsigned slot) { return &pool[slot]; }
@@ -58,7 +65,7 @@ extern "C"
     bool func_14118E0E0(const void *, unsigned) { return false; }
     bool func_140CA1C80() { return true; }
     bool func_140CA2270(unsigned slot) { return pool[slot].valid; }
-    bool func_141359F90(unsigned) { return false; }
+    bool func_141359F90(unsigned) { ++nativeBotCalls; return nativeBot; }
     bool func_141371450(unsigned) { return false; }
     void *func_14137D670() { return party; }
     void *func_14118CF60(uint64_t *out, const void *, unsigned slot) { *out = slot; return out; }
@@ -157,5 +164,51 @@ extern "C" __declspec(dllexport) int Test_Run()
     NativeSelection(6000);
     DW_BotPolicy_BuildRoster(party, 152, 2);
     CHECK(pool[1].skill == 6000 && pool[2].skill == 6001);
+    return 0;
+}
+
+extern "C" __declspec(dllexport) unsigned Test_ProfileOwnership(unsigned scenario)
+{
+    nativeDW = true;
+    nativeBot = true;
+    nativeBotCalls = 0;
+    profileEntity = {};
+    profileEntity.number = 7;
+    profileEntity.client = profilePlayer;
+    HostScale::Field<int32_t>(profilePlayer, 448) = 7;
+    profileClient.entity = &profileEntity;
+    profileClient.clientType = 2;
+    DW_Bot_ClientCount = 8;
+    DW_Bot_Clients[7] = &profileClient;
+    auto *record = reinterpret_cast<BotRecord *>(gl_14E183D00);
+    *record = {};
+    record->valid = record->inUse = 1;
+    record->client = 7;
+    record->nameIndex = 100;
+    record->skill = 3;
+    switch (scenario)
+    {
+    case 1: DW_Bot_ClientCount = 7; break;
+    case 2: DW_Bot_ClientCount = 201; break;
+    case 3: DW_Bot_Clients[7] = nullptr; break;
+    case 4: profileClient.clientType = 0; break;
+    case 5: profileClient.entity = nullptr; break;
+    case 6: profileEntity.number = 8; break;
+    case 7: profileEntity.client = nullptr; break;
+    case 8: HostScale::Field<int32_t>(profilePlayer, 448) = 8; break;
+    case 9: nativeBot = false; break;
+    case 10: record->valid = 0; break;
+    case 11: record->inUse = 0; break;
+    case 12: record->client = 8; break;
+    case 13: nativeDW = false; break;
+    }
+    uint64_t seed = 0xdeadbeef;
+    const bool found = DW_BotPolicy_ProfileSeed(7, &seed);
+    if (found != (scenario == 0)) return 1;
+    if (scenario && seed != 0xdeadbeef) return 2;
+    const bool called = scenario == 0 || (scenario >= 9 && scenario <= 12);
+    if (nativeBotCalls != unsigned(called)) return 3;
+    nativeDW = true;
+    nativeBot = false;
     return 0;
 }

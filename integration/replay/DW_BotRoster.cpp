@@ -327,7 +327,10 @@ namespace
 
     const BotRecord *ServerBot(unsigned client, unsigned &index)
     {
-        if (!DW_LocalBackend_IsEnabled() || client >= 200 || !func_141359F90(client))
+        const auto *nativeClient = DW_LocalBackend_IsEnabled()
+            ? DWBot_CurrentNativeClient(client) : nullptr;
+        if (!nativeClient || !DWBot_IsCurrentEntity(client, nativeClient->entity) ||
+            !func_141359F90(client))
             return nullptr;
         const auto *pool = reinterpret_cast<const BotRecord *>(gl_14E183D00);
         for (index = 0; index < 200; ++index)

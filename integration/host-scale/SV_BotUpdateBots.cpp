@@ -1,5 +1,6 @@
 #include "sv_host_navigation.h"
 #include "sv_host_bot_equipment.h"
+#include "DW_BotStyleProfile.h"
 
 extern "C" void SV_HostBot_UpdateTravelUrgency(void *, HostScale::UserCmd *, bool);
 #include "sv_host_bot_loot.h"
@@ -72,6 +73,9 @@ namespace
 
     unsigned DecisionInterval(const Entity *entity, uint16_t target, unsigned population)
     {
+        uint64_t profile = 0;
+        const bool responsive = DW_BotPolicy_ProfileSeed(uint16_t(entity->number), &profile);
+        const unsigned frame = SVHS_FrameDuration > 0 ? unsigned(SVHS_FrameDuration) : 16;
         // Close bot-vs-bot combat needs the same prompt melee, aim and weapon
         // decisions as combat against a human. Distance to spectators alone
         // must not determine the responsiveness of an acquired opponent.
@@ -82,6 +86,8 @@ namespace
                 client ? Field<Entity *>(const_cast<void *>(client), 280) : nullptr;
             if (enemy && enemy->health > 0)
             {
+                if (responsive)
+                    return frame; // Aim/fire decisions advance with every movement tick.
                 const float x = enemy->origin.x - entity->origin.x;
                 const float y = enemy->origin.y - entity->origin.y;
                 const float z = enemy->origin.z - entity->origin.z;
@@ -97,7 +103,7 @@ namespace
         {
             const auto &observer = s_observers[i];
             if (target && target == observer.targetHandle)
-                return 32; // Preserve prompt decisions against a human opponent.
+                return responsive ? frame : 32;
             const float x = entity->origin.x - observer.origin.x;
             const float y = entity->origin.y - observer.origin.y;
             const float z = entity->origin.z - observer.origin.z;
@@ -108,7 +114,9 @@ namespace
         if (target && distanceSquared < 256.0f * 256.0f)
             return 32;
         if (!target && distanceSquared < 512.0f * 512.0f)
-            return 64;
+            return responsive ? frame : 64;
+        if (responsive && !target && distanceSquared < 2048.0f * 2048.0f)
+            return frame; // Detect a nearby human promptly, with native sight/aim checks.
 
         unsigned interval = target             ? (population > 100 ? 96 : 64)
                             : population > 100 ? 192

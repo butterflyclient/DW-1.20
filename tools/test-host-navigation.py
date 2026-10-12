@@ -93,7 +93,8 @@ class Runner:
                   "QueryPerformanceCounter":"qpc", "QueryPerformanceFrequency":"qpf",
                   "Sys_IsMainThread":"main-thread", "Cmd_AddCommandInternal":"register-command",
                   "SV_HostNav_PrintStatus":"print", "SV_HostBot_GetLootGoal":"loot-goal",
-                  "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map"}
+                  "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map",
+                  "DW_BotPolicy_ProfileSeed":"mapped-profile"}
         if edited and self.report:
             for name, alias in common.items():
                 if name in self.report["symbols"]:
@@ -236,7 +237,10 @@ class Machine:
         elif kind=="SVHS_Navigator":self.ret(0x51100000)
         elif kind=="SVHS_ScriptGetVector":self.put(c,struct.pack("<fff",*self.request));self.ret()
         elif kind=="SVHS_ScriptAddVector":self.output=bytes(self.uc.mem_read(b,12));self.ret()
-        elif kind=="SVHS_IsBotEntity":self.ret(self.bot)
+        elif kind=="SVHS_IsBotEntity":self.ret(getattr(self, 'bot', True))
+        elif kind=="SVHS_IsBotPlaying":self.ret(getattr(self, 'playing_bot', True))
+        elif kind=="mapped-profile":
+            self.put(b, 120, '<Q');self.ret(getattr(self, 'mapped_profile', True))
         elif kind in ("SVHS_Nav2DClosest","other-navigator"):
             self.put(c,struct.pack("<fff",91.,92.,93.));self.events.append(("native",));self.ret()
         elif kind=="SVHS_NavClosestArea":
@@ -559,10 +563,17 @@ def main():
     for mode, population in ((0, 20), (1, 20), (2, 150)):
         for denial in ('none', 'fire', 'ads-button', 'use', 'armor', 'ads-fraction', 'up-required',
                        'downed', 'dead', 'airborne', 'locked', 'gulag', 'no-path', 'short',
-                       'no-meter', 'native-denied', 'tac-disabled'):
+                       'no-meter', 'native-denied', 'tac-disabled', 'medium-route',
+                       'boundary-route', 'human', 'unmapped', 'stale-slot', 'stale-player',
+                       'stale-sentient', 'native-not-playing'):
             vm = runner.machine(True, mode, population)
             mesh_bot(vm, 'normal'); tls = install_bot_tls(vm)
             bot, entity, player, cmd = 0x5b000000, 0x5b010000, 0x5b030000, 0x5b060000
+            client = bot - 1368
+            vm.put(client, bytes(1368)); vm.put(client + 280, entity, '<Q')
+            vm.put(client + 214756, 2, '<i')
+            vm.put(vm.symbols['SVHS_Clients'], client, '<Q')
+            vm.put(vm.symbols['SVHS_ClientCount'], 1, '<I')
             vm.put(cmd + 12, 1000, '<i'); vm.sprint_left = 1500
             if denial == 'fire':vm.put(cmd, 1, '<Q')
             elif denial == 'ads-button':vm.put(cmd, 0x200, '<Q')
@@ -576,14 +587,22 @@ def main():
             elif denial == 'locked':vm.put(player + 364, 0x20, '<I')
             elif denial == 'gulag':vm.gulag = True
             elif denial == 'no-path':vm.path_exists = False
-            elif denial == 'short':vm.put(bot + 536, struct.pack('<3f', 500., 0., 0.))
+            elif denial == 'short':vm.put(bot + 536, struct.pack('<3f', 255., 0., 0.))
+            elif denial == 'medium-route':vm.put(bot + 536, struct.pack('<3f', 500., 0., 0.))
+            elif denial == 'boundary-route':vm.put(bot + 536, struct.pack('<3f', 256., 0., 0.))
+            elif denial == 'human':vm.put(client + 214756, 1, '<i')
+            elif denial == 'unmapped':vm.mapped_profile = False
+            elif denial == 'stale-slot':vm.put(vm.symbols['SVHS_Clients'], client + 8, '<Q')
+            elif denial == 'stale-player':vm.put(bot + 448, player + 8, '<Q')
+            elif denial == 'stale-sentient':vm.put(bot + 8, 0x5b020008, '<Q')
+            elif denial == 'native-not-playing':vm.playing_bot = False
             elif denial == 'no-meter':vm.sprint_left = 500
             elif denial == 'native-denied':vm.approve_sprint = False
             elif denial == 'tac-disabled':vm.put(player + 20, 1 << 53, '<Q')
             before = bytes(vm.uc.mem_read(cmd, 264))
             vm.call('SV_HostBot_UpdateTravelUrgency', bot, cmd, 0)
             after = bytes(vm.uc.mem_read(cmd, 264))
-            expected = 0 if not mode or denial not in ('none', 'tac-disabled') else (
+            expected = 0 if not mode or denial not in ('none', 'tac-disabled', 'medium-route', 'boundary-route') else (
                 2 if denial == 'tac-disabled' else 2 | 0x800000000000)
             assert vm.get(cmd, '<Q') == struct.unpack_from('<Q', before)[0] | expected, (mode, population, denial)
             assert after[8:] == before[8:] and vm.get(tls + 16, '<Q') == 0x5d004000

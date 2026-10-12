@@ -1,4 +1,5 @@
 #include "DW_BotStyleSelection.h"
+#include "DW_BotBindings.h"
 #include "DW_ScriptMethodBindings.h"
 #include "sv_host_bot_equipment.h"
 #include <assert.h>
@@ -13,6 +14,8 @@ extern "C"
 {
     void *SVHS_Clients[200]{};
     uint32_t SVHS_ClientCount = 200;
+    uint32_t DW_Bot_ClientCount = 200;
+    DWBotNativeClient *DW_Bot_Clients[200]{};
 }
 
 namespace
@@ -22,7 +25,7 @@ namespace
         HostScale::BotWeapon original{}, candidate{}, returned{};
         HostScale::Entity entity{};
         uint8_t player[22340]{};
-        uint8_t nativeClient[2000]{};
+        uint8_t nativeClient[321192]{};
         alignas(2) uint8_t weaponTable[70596]{};
         uint64_t self = 33, profile = 1;
         unsigned params = 2, adds = 0, parses = 0, validations = 0;
@@ -47,6 +50,12 @@ namespace
             entity.number = 33;
             entity.health = 100;
             entity.client = player;
+            HostScale::Field<int32_t>(player, 448) = 33;
+            auto *owner = reinterpret_cast<DWBotNativeClient *>(nativeClient);
+            owner->entity = &entity;
+            owner->clientType = 2;
+            DW_Bot_ClientCount = 200;
+            DW_Bot_Clients[33] = owner;
             *reinterpret_cast<uint16_t *>(weaponTable + 70594) = 0;
         }
     } *current;
@@ -85,24 +94,13 @@ namespace
         // callback's parsed native tokens rather than reproducing FullName.
         const auto selected =
             DWBotStyle::Select(weapon, fixture.profile, DWBotStyle::SelectStyle(fixture.profile));
-        const auto first = fixture.name.find('+');
-        assert(fixture.name.substr(0, first) == weapon->nativeAsset);
-        unsigned ordinal = 0;
-        for (size_t at = first; at != std::string::npos;)
-        {
-            const auto end = fixture.name.find('+', at + 1);
-            const auto token =
-                fixture.name.substr(at + 1, end == std::string::npos ? end : end - at - 1);
-            const auto split = token.find('|');
-            assert(ordinal < selected.count);
-            assert(token.substr(0, split) == selected.resolvedReferences[ordinal]);
-            const unsigned variant =
-                split == std::string::npos ? 0 : unsigned(std::stoul(token.substr(split + 1)));
-            assert(variant == selected.variants[ordinal]);
-            ++ordinal;
-            at = end;
-        }
-        assert(ordinal == selected.count);
+        assert(fixture.name.substr(0, fixture.name.find('+')) == weapon->nativeAsset);
+        // The Python gate compares the complete native recipe against the
+        // original stock Lua/table rules, including mandatory parts and combos.
+        printf("RECIPE\t%s\t", weapon->reference);
+        for (unsigned i = 0; i < selected.count; ++i)
+            printf("%s%s|%u", i ? "," : "", selected.references[i], selected.variants[i]);
+        printf("\t%s\n", fixture.name.c_str());
     }
 } // namespace
 
@@ -322,6 +320,17 @@ int main()
         Original(fixture);
         ++preserved;
     }
+    // BR loadout construction never substitutes an MP profile weapon. Its
+    // native starter is kept before pickups; slot -1 remains pickup styling.
+    for (int slot = 0; slot < 2; ++slot)
+    {
+        Fixture fixture;
+        fixture.br = true;
+        fixture.slot = slot;
+        Run(fixture);
+        Original(fixture);
+        ++preserved;
+    }
     unsigned capacityCases = 0;
     for (unsigned scenario = 0; scenario < 6; ++scenario)
     {
@@ -353,6 +362,39 @@ int main()
             Original(fixture);
         ++capacityCases;
     }
+    unsigned ownershipCases = 0;
+    for (unsigned scenario = 0; scenario < 10; ++scenario)
+    {
+        Fixture fixture;
+        fixture.slot = 0;
+        switch (scenario)
+        {
+        case 0: DW_Bot_ClientCount = 33; break;
+        case 1: DW_Bot_ClientCount = 201; break;
+        case 2: DW_Bot_Clients[33] = nullptr; break;
+        case 3: DW_Bot_Clients[33]->clientType = 0; break;
+        case 4: DW_Bot_Clients[33]->entity = nullptr; break;
+        case 5: fixture.entity.number = 34; break;
+        case 6: fixture.entity.client = nullptr; break;
+        case 7: HostScale::Field<int32_t>(fixture.player, 448) = 34; break;
+        case 8: fixture.self = 32; break;
+        case 9: fixture.entity.health = 0; break;
+        }
+        Run(fixture);
+        if (scenario == 9)
+        {
+            // MP class construction is permitted before spawn/while dead.
+            assert(fixture.parses == 1 && fixture.validations == 1 && fixture.adds == 1);
+            assert(!memcmp(&fixture.returned, &fixture.candidate, sizeof(fixture.candidate)));
+        }
+        else
+        {
+            Original(fixture);
+            assert(fixture.parses == 0 && fixture.validations == 0);
+        }
+        ++ownershipCases;
+    }
+    assert(ownershipCases == 10);
     unsigned survivalCases = 0;
     for (unsigned scenario = 0; scenario < 12; ++scenario)
     {

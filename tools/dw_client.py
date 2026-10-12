@@ -270,13 +270,15 @@ def prepare():
         for name in (
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
+            "prepare-bot-profile-ownership.py",
+            "prepare-noclip-integration.py",
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "bot_style_paths.py",
             "prepare-join-in-progress.py",
             "prepare-dw-verifier.py",
             "prepare-bot-rank-integration.py",
-            "dw_update_assets.py", "embed-update-helper.py",
+            "dw_update_assets.py", "embed-update-helper.py", "replay-update-client.rc",
             "replay-update-client.cpp", "replay-update-assets.h",
         )
     ]
@@ -292,6 +294,7 @@ def prepare():
             "dw_update_assets_protocol.h",
             "DW_MatchmakingAssignments.cpp",
             "DW_JoinInProgress.cpp",
+            "DW_Noclip.cpp", "DW_Noclip.h",
         }
         for path in sorted(inside(ROOT / root).iterdir()):
             if root != "integration/host-scale" and path.name not in replay_additions:
@@ -371,6 +374,8 @@ def prepare():
     assignments.prepare(source)
     joining = load_module("dw_join_in_progress", ROOT / "tools/prepare-join-in-progress.py")
     joining.prepare(source)
+    noclip = load_module("dw_noclip", ROOT / "tools/prepare-noclip-integration.py")
+    noclip.prepare(source)
     assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
     assets.prepare(source)
     helper_header = source / "generated-updater/DW_UpdateHelper.h"
@@ -423,6 +428,8 @@ def prepare():
     # native loader. It has one compiler-generated owner and no original map.
     clone_source = source / "src/DW_BotStyleZone_Native.cpp"
     cpp[clone_source.relative_to(source).as_posix()] = digest(clone_source)
+    noclip_clone = source / "src/DW_Noclip_Native.cpp"
+    cpp[noclip_clone.relative_to(source).as_posix()] = digest(noclip_clone)
     receipt = dict(
         schema=1,
         target=config["target"],
@@ -526,6 +533,7 @@ def verify(directory, report_path, publish_ready=True):
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
         ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
+        ("test-host-command-ownership.py", ["--snapshot", str(source)], "host-command-ownership.json"),
         ("test-bot-behavior.py", ["--snapshot", str(source)], "bot-behavior.json"),
         ("test-lobby-controls.py", [], "controls.json"),
         (
@@ -554,6 +562,7 @@ def verify(directory, report_path, publish_ready=True):
         ("test-matchmaking-assignments.py", ["--snapshot", str(source)], "matchmaking-assignments.json"),
         ("test-join-in-progress.py", ["--snapshot", str(source)], "join-in-progress.json"),
         ("test-dw-verifier.py", ["--snapshot", str(source)], "dw-verifier.json"),
+        ("test-noclip.py", ["--snapshot", str(source)], "noclip.json"),
     )
     proofs = []
     for checker, extra, name in checks:

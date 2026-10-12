@@ -44,8 +44,11 @@ launcher = (
 readme = rf"""REPLAY DW CLIENT TEST
 
 New players: extract the package into the compatible 1.20 Replay root folder.
-Existing players: replace the EXE, launcher, READ_ME and owned zone files,
-keeping your own INI. The zone entries add only the named DW script overlay;
+Existing players: close the game and replace only the EXE, keeping your own INI.
+The EXE embeds its owned FF/FP files and stages them in the native folders.
+The updater also repairs missing owned files. No manual fastfile copy is needed.
+This client supports the English game data. Regional companions remain native.
+The included zone entries add only the named DW script overlay;
 they do not replace shipped game fastfiles.
 The EXE and INI must stay together. Keep normal game assets/dependencies.
 Remove the optional XInput9_1_0.dll Replay proxy; this EXE needs no proxy.

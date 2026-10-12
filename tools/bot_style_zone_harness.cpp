@@ -323,12 +323,12 @@ extern "C"
                                           {"after", 9, 10, 11, 12}};
         DW_BotStyleZone_LoadFastfiles(stock, 3, 3, true);
         CHECK(nativeCalls == 1 && seenCount == 4 && seenFlags == 3 && seenServer && frees == 1 &&
-              writes == 60 && moves == 60);
+              writes == 2 * package.installationNameCount && moves == writes);
         unsigned existing = 0;
         for (const auto &file : files)
             if (file.exists)
                 ++existing;
-        CHECK(existing == 60 && package.installationNameCount == 30);
+        CHECK(existing == writes && package.installationNameCount == 10);
         CHECK(!nativeMissing);
         CHECK(equal(captured[0].name, "before") && equal(captured[1].name, package.zoneName) &&
               equal(captured[2].name, "common_base_mp") && equal(captured[3].name, "after"));
@@ -400,6 +400,6 @@ extern "C"
         regionDirectory = regionFolder; languageDirectory = languageFolder;
         DWBotStyleFastfileInfo stock[] = {{"common_base_mp", 0x8008123, 7, 88, 0}};
         DW_BotStyleZone_LoadFastfiles(stock, 1, 0, false);
-        return seenCount == 2 && writes == 60 && !nativeMissing ? 0 : 1;
+        return seenCount == 2 && writes == 2 * package.installationNameCount && !nativeMissing ? 0 : 1;
     }
 }

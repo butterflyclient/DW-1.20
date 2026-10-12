@@ -1031,7 +1031,7 @@ def compile_package(snapshot, binding):
     zone = "dw_bot_styles_mp_" + bundle_hash[:16]
     installation = []
     prefixes = sorted(
-        set(["techsets", "srv", *locale["regions"], *locale["languages"]])
+        set(["techsets", "srv", *locale["regions"], *locale["supported_languages"]])
     )
     for name, source, companion in [(zone, ff, False)] + [
         (prefix + "_" + zone, empty_file, True) for prefix in prefixes
@@ -1055,7 +1055,7 @@ def compile_package(snapshot, binding):
     proof["zone_name"] = zone
     proof["resource_bundle_sha256"] = bundle_hash
     proof["native_locale_codes"] = locale
-    proof["native_folder_rules"] = locale["native_folder_rules"]
+    proof["native_folder_rules"] = locale["installation_folder_rules"]
     proof["installation_manifest"] = installation
     write_private(OUT / "package-proof.json", json.dumps(proof, indent=2) + "\n")
     return packed, patch, empty_packed, empty_patch, proof
@@ -1102,7 +1102,9 @@ namespace DWBotStyleScripts
         + "\n"
     )
     names = [row["name"][:-3] for row in proof["installation_manifest"] if row["name"].endswith(".ff")]
-    if len(names) != 30 or len(set(names)) != 30 or any(
+    expected_names = 1 + len(set(["techsets", "srv", *proof["native_locale_codes"]["regions"],
+                                *proof["native_locale_codes"]["supported_languages"]]))
+    if len(names) != expected_names or len(set(names)) != expected_names or any(
         row["name"][:-3] not in names for row in proof["installation_manifest"]):
         raise ValueError("Embedded installation names do not cover the native manifest")
     header += "inline const char *const InstallationNames[] = {\n" + "\n".join(

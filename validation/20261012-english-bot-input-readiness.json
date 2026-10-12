@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "passed": true,
+  "release": 27,
+  "target": "game_dx12_ship_replay_dw.exe",
+  "sha256": "d0992da11e40f0fb20b594e2545fe0b441270177f6365f5423d7cebe79c4eabf",
+  "bytes": 101889536,
+  "fresh_cpp_units": 125,
+  "unresolved_symbols": 0,
+  "game_runs_performed": false,
+  "owner_ini_preserved": true,
+  "source_receipt_sha256": "a9d308657ff34b23e4e0173e9a48ff38f392b857f45bc901ce66b8073212f30c",
+  "build_report_sha256": "4636fb0058827145b8b55d9a67b776823c5946caa3bcdf79e823254649cd270c",
+  "gates": [
+    {
+      "checker": "test-host-scale.py",
+      "checker_sha256": "fda285886c8c00be901e8329c4ca5df35eea970ea02ec894495359614d82169e",
+      "receipt_sha256": "c8bf25b4a26ec254e9cbd7d0176fcf9349218d3841d7d82c6a7aee17617ffe1a"
+    },
+    {
+      "checker": "test-host-navigation.py",
+      "checker_sha256": "87cf846e0da52f6140b4ebfef39efc285865fe53447cda693e42ad4d63f7cd2e",
+      "receipt_sha256": "f60a3df8e9923d1ce997374f30f24ed53915b11dcda38e57935f5489e102183a"
+    },
+    {
+      "checker": "test-host-safety.py",
+      "checker_sha256": "f4dfd1af01bde316673f4c7d024b18e1fd73561d2a1f30104126970fe41c8c31",
+      "receipt_sha256": "06f13d93dc65d45e0b9305854556f01cc8ec095134167a41e2ff70d09c0dbdce"
+    },
+    {
+      "checker": "test-host-command-ownership.py",
+      "checker_sha256": "83057030d90c41250bbffc81dabfc8c5cbb2277674e79c99f505f124879776b7",
+      "receipt_sha256": "de7f1cbe47ea130dd07a5f085bf623528bca1369179621ef48c0a859362ed38b"
+    },
+    {
+      "checker": "test-bot-behavior.py",
+      "checker_sha256": "8ff1bff375a032db28e64f3a2d10369a3b43644d013beea74c3a3fc69035be0c",
+      "receipt_sha256": "f8cfecd4f2152b058534116ed33a7cdd23527f1d0511981853d6e518afae58d3"
+    },
+    {
+      "checker": "test-lobby-controls.py",
+      "checker_sha256": "fc19d4f0350fa5aee80c8b9b5abc3fa40867b9c8f156a4fc929cdef732e27772",
+      "receipt_sha256": "23880a0442775ab500d2d267704edc27d31213f678c7043122a8ea7fa1742b9f"
+    },
+    {
+      "checker": "test-native-bot-roster.py",
+      "checker_sha256": "15ecd6c8897deb1f66ee4122803cef5c4531025e4565b894af590fe77d98f1ba",
+      "receipt_sha256": "0cb2eaccfb24d2685b91c4522d9d7efe4a6170395452f7cdc6f3e89cdd58605f"
+    },
+    {
+      "checker": "test-playlist-ui-native.py",
+      "checker_sha256": "71609370ab8d7c32e3da7adc9494699638266e03a2769daa191e1bc47f7dc1f6",
+      "receipt_sha256": "a7bb7cbba066d1e29bf17911af78d04b61fc70d1347442004346adbb9350bf4e"
+    },
+    {
+      "checker": "test-lobby-native-clones.py",
+      "checker_sha256": "c66632e3fedcf0a38f4b228c02b3d1d240ac69365948ca0efab365c905a6f8e5",
+      "receipt_sha256": "adfae1b2259601278e5296e831e35fb4a2b9cfad9c09be64aaa5367c080055f8"
+    },
+    {
+      "checker": "test-executable-update-integration.py",
+      "checker_sha256": "1a13195ad3570953cb1c5673d96a0800af6caee0a3c064ef7235090205db7705",
+      "receipt_sha256": "1c4c315c85cc9d8d336b96a585af627fac11d9cbb52d0511689b13a5a1c8f07e"
+    },
+    {
+      "checker": "test-compiled-unlock-progression.py",
+      "checker_sha256": "ede002adecfaa7ab13d0fd4ca50170d380c6ae51d5c45c3b1f34b10e6ece7dbf",
+      "receipt_sha256": "b5bac30e753732d0be261578bad01f40ffa39d013ab438846e3318ddf4abd293"
+    },
+    {
+      "checker": "test-bot-style-selection.py",
+      "checker_sha256": "84ac5a8a83a0145fb9b9d635d3b9d7849cae5e73c795a52226792355c36c9693",
+      "receipt_sha256": "0ee31225d68ea36eaed7cbf81dc001025c012560133b18e7a62cb7a452068170"
+    },
+    {
+      "checker": "test-script-method-integration.py",
+      "checker_sha256": "eac7d95e1575a9da19f6ff83fac18f5e4cb5f5152829590d8e38eee482b03e9e",
+      "receipt_sha256": "25a3ec44b11b7478a0cac03609d7d6fd16caa738bc4931c82191ff8466936b0a"
+    },
+    {
+      "checker": "test-bot-style-weapon.py",
+      "checker_sha256": "9e6d0c5424274972008a11d92d9a344d55351a29966cc485cd1d01c0389ed573",
+      "receipt_sha256": "104f9babe274ab7240f1ef1e20e3ab85d6e584f9e8705bbbe33544e55ca39d73"
+    },
+    {
+      "checker": "test-bot-rank.py",
+      "checker_sha256": "a19248f77f4b33294d35b6a1fdefcaed95483b2b44b33e85166ebb220576b9a6",
+      "receipt_sha256": "37facb84223eb8bcf3fc454760e14e2a1af19da7d11d8b2246067e3282a4a3f6"
+    },
+    {
+      "checker": "test-bot-style-scripts.py",
+      "checker_sha256": "77d7a761406e74ad93b2ce07adc806feeab14a9e3b05eda57cb056427ea9d8ab",
+      "receipt_sha256": "afcc1ab7cbe99c69759c2f81653eb0e1d806e299da782845dd83608de7859ba4"
+    },
+    {
+      "checker": "test-bot-style-zone.py",
+      "checker_sha256": "9eb47602011dc052a4f4508f938d3b537c9391b655a91412765280fd1407416a",
+      "receipt_sha256": "f142ffa2209e6e1928e944e5a1238396161a0145eb80f071bcb21db983b8fd11"
+    },
+    {
+      "checker": "test-matchmaking-assignments.py",
+      "checker_sha256": "c939d2eab569a35095f30ca969f7d103625588f6595542a01a93b91da57d9e3f",
+      "receipt_sha256": "9df341a983d678aff0ccfb8ac7f9f837919dc100fdcc7fdbacb1af9d0e93997d"
+    },
+    {
+      "checker": "test-join-in-progress.py",
+      "checker_sha256": "c49e594e6053da44be63adbec26cb58052fe2911440e8d0ed359e48227271dae",
+      "receipt_sha256": "aaa79d99d3d6ecac65f41680ebdb901d7100100fa06730ee900554e3cbf5fb7a"
+    },
+    {
+      "checker": "test-dw-verifier.py",
+      "checker_sha256": "41af739ab147a3b3c47b15d3870ec9b51a211b81fea95a9b335616038c15525c",
+      "receipt_sha256": "94d351cd788f7c9f9c4310e915994b1aaefbf1f5a60a07c9c0e7eb739fa31202"
+    },
+    {
+      "checker": "test-noclip.py",
+      "checker_sha256": "03e689773d3980b93758388e0b72afaee4b59165c787354aef81b3c0c9d9a132",
+      "receipt_sha256": "0c0e1394272a16d0523f16fe830ccc3ce0cc1fabe34368763b4f21ad466a2d73"
+    }
+  ],
+  "publication": {
+    "host": "162.243.115.160",
+    "tested_older_hashes": 26,
+    "helper_sha256": "a1d6993f4451f80e4ddba121339be0db39694d7723627c7034fe20eade80447c",
+    "owned_asset_files": 20,
+    "owned_asset_manifest_sha256": "06c3c94cdc2b356d29aab43fe1b6fadd3b03563f927b4a870403a87e1b108520",
+    "actual_embedded_helper_staging_verified": true,
+    "apply_or_relaunch_invoked": false
+  },
+  "changes": [
+    "English-only companion delivery with native regional paths",
+    "Complete mandatory weapon recipes before optional Gunsmith attachments",
+    "Current native client/entity profile ownership",
+    "Mapped MP and BR full-auto/ADS policy and faster combat/travel cadence",
+    "Queued bot commands cannot follow a slot into a human client",
+    "Server-authoritative host or sv_cheats noclip",
+    "Updater direct Windows CNG verification and installer metadata"
+  ],
+  "limitations": [
+    "Live match/rendering gates remain owner tests",
+    "Reported native match-end string-reference corruption remains undiagnosed",
+    "alt_killcam is excluded from this release and still in development"
+  ]
+}

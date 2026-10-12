@@ -1,5 +1,6 @@
 #include "DW_BotRankBindings.h"
 #include "DW_BotStyleSelection.h"
+#include "DW_BotBindings.h"
 #include "sv_host_scale.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -7,6 +8,9 @@
 
 static HostScale::Entity entities[200];
 static unsigned char clientState[22200];
+static DWBotNativeClient nativeClient;
+extern "C" uint32_t DW_Bot_ClientCount = 8;
+extern "C" DWBotNativeClient *DW_Bot_Clients[200]{};
 extern "C" HostScale::Entity *RK_Entities = entities;
 static int arguments[2];
 static unsigned count, error, trace;
@@ -73,6 +77,12 @@ extern "C" __declspec(dllexport) void Test_Case(unsigned cls,
     memset(entities, 0, sizeof(entities));
     memset(clientState, 0, sizeof(clientState));
     entities[7].client = hasClient ? clientState : nullptr;
+    entities[7].number = 7;
+    HostScale::Field<int32_t>(clientState, 448) = 7;
+    nativeClient.entity = &entities[7];
+    nativeClient.clientType = 2;
+    DW_Bot_ClientCount = 8;
+    DW_Bot_Clients[7] = &nativeClient;
     *reinterpret_cast<uint16_t *>(clientState + RK_RankOffset) = 91;
     *reinterpret_cast<uint16_t *>(clientState + RK_PrestigeOffset) = 9;
     count = argc;
@@ -108,6 +118,12 @@ extern "C" __declspec(dllexport) unsigned Test_PreScript(uint64_t seed)
     memset(entities, 0, sizeof(entities));
     memset(clientState, 0x5A, sizeof(clientState));
     entities[7].client = clientState;
+    entities[7].number = 7;
+    HostScale::Field<int32_t>(clientState, 448) = 7;
+    nativeClient.entity = &entities[7];
+    nativeClient.clientType = 2;
+    DW_Bot_ClientCount = 8;
+    DW_Bot_Clients[7] = &nativeClient;
     profile = seed;
     mapped = true;
     if (!DW_BotRank_Apply(7) || DW_BotRank_Apply(200) || DW_BotRank_Apply(6))
@@ -117,7 +133,33 @@ extern "C" __declspec(dllexport) unsigned Test_PreScript(uint64_t seed)
         *reinterpret_cast<uint16_t *>(clientState + RK_PrestigeOffset) != 0)
         return 2;
     for (unsigned i = 0; i < sizeof(clientState); ++i)
-        if ((i < RK_RankOffset || i >= RK_PrestigeOffset + 2) && clientState[i] != 0x5A)
+        if ((i < RK_RankOffset || i >= RK_PrestigeOffset + 2) &&
+            clientState[i] != (i >= 448 && i < 452 ? uint8_t(i == 448 ? 7 : 0) : 0x5A))
             return 3;
+    return 0;
+}
+
+extern "C" __declspec(dllexport) unsigned Test_Ownership(unsigned scenario)
+{
+    if (Test_PreScript(12345)) return 1;
+    *reinterpret_cast<uint16_t *>(clientState + RK_RankOffset) = 91;
+    *reinterpret_cast<uint16_t *>(clientState + RK_PrestigeOffset) = 9;
+    switch (scenario)
+    {
+    case 0: DW_Bot_ClientCount = 7; break;
+    case 1: DW_Bot_ClientCount = 201; break;
+    case 2: DW_Bot_Clients[7] = nullptr; break;
+    case 3: nativeClient.clientType = 0; break;
+    case 4: nativeClient.entity = &entities[6]; break;
+    case 5: entities[7].number = 6; break;
+    case 6: entities[7].client = nullptr; break;
+    case 7: HostScale::Field<int32_t>(clientState, 448) = 6; break;
+    case 8: mapped = false; break;
+    case 9: break; // Dead/pre-spawn native bot retains rank profile ownership.
+    }
+    const bool applied = DW_BotRank_Apply(7);
+    if (applied != (scenario == 9)) return 2;
+    if (scenario != 9 && (*reinterpret_cast<uint16_t *>(clientState + RK_RankOffset) != 91 ||
+        *reinterpret_cast<uint16_t *>(clientState + RK_PrestigeOffset) != 9)) return 3;
     return 0;
 }

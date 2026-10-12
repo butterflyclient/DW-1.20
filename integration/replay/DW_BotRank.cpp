@@ -1,6 +1,7 @@
 #include "DW_BotRankBindings.h"
 #include "DW_BotStyleProfile.h"
 #include "DW_BotStyleSelection.h"
+#include "DW_BotBindings.h"
 #include "sv_host_scale.h"
 #include <stddef.h>
 
@@ -21,7 +22,7 @@ namespace
     bool Apply(HostScale::Entity *entity, unsigned client)
     {
         uint64_t profile = 0;
-        if (!entity || !entity->client || client >= 200 ||
+        if (!DWBot_IsCurrentEntity(client, entity) ||
             !DW_BotPolicy_ProfileSeed(client, &profile))
             return false;
         const auto selected = DWBotStyle::SelectRank(profile);

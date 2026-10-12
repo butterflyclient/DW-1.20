@@ -3,6 +3,7 @@ import argparse
 import collections
 import csv
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -60,7 +61,9 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
                         "slot": 13, "acc": 14, "dam": 15, "rng": 16, "rof": 17,
                         "mob": 18, "ctl": 19, "modifierStart": 21, "modifierEnd": 28}.items():
         assert attachment_schema[key] == column, (key, attachment_schema)
-    for path in ("ui/utils/attachmentutils.lua.2113.lua", "ui/utils/gunsmithutils.lua.2161.lua",
+    assert re.search(r"defaultAttachments\s*=\s*9", csv_lua.split("CSV.MPWeapons = {", 1)[1].split("\n}", 1)[0])
+    assert 'file = "mp/attachmentCombos.csv"' in csv_lua
+    for path in ("ui/utils/weaponutils.lua.2242.lua", "ui/utils/attachmentutils.lua.2113.lua", "ui/utils/gunsmithutils.lua.2161.lua",
                  "ui/widgets/gunsmithdetailsmodlist.lua.2425.lua"):
         read(lua / path)
     localized = {}
@@ -86,6 +89,10 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
     columns = {reference: i for i, reference in enumerate(mapping[0])}
     map_rows = {row[0]: row for row in mapping[1:]}
     classes = {row[1]: row for row in table("mp/weaponclasstable.csv.*.csv")}
+    combos = table("mp/attachmentcombos.csv.*.csv")
+    assert combos[0][0] == "no" and all(len(row) == len(combos[0]) for row in combos)
+    recipe_refs = combos[0][1:]
+    assert [row[0] for row in combos[1:]] == recipe_refs
     weapon_loot = collections.defaultdict(list)
     base_loot = {}
     for row in table("loot/weapon_ids.csv.*.csv"):
@@ -135,12 +142,22 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
                 compatible[item[1]] = dict(attachment, generic_ref=item[1], loot=int(value),
                                            variant=int((item[7] if len(item) > 7 else "") or "0"))
         assert weapon in base_loot, weapon
+        defaults = row[9].split()
+        assert all(ref in recipe_refs for ref in defaults), (weapon, defaults)
+        recipes = []
+        for ref in recipe_refs:
+            resolved = resolve(ref, weapon, row[1])
+            addition = attachments.get(resolved, {}).get("slot", "")
+            assert not addition or addition in recipe_refs, (weapon, ref, addition)
+            recipes.append(dict(resolved=resolved, addition=addition))
         weapons.append(dict(reference=weapon, native_asset=row[5], weapon_class=row[1], base_loot=base_loot[weapon],
+                            defaults=defaults, recipes=recipes,
                             attachments=list(compatible.values()), loot=weapon_loot[weapon]))
     ranks = [(int(row[0]), int(row[14])) for row in table("mp/ranktable.csv.*.csv") if row[0].isdigit()]
     assert [index for index, _ in ranks] == list(range(155))
     assert all(display == index + 1 for index, display in ranks)
     return dict(weapons=weapons, modifiers=modifier_labels, ranks=ranks,
+                recipe_refs=recipe_refs, combos=combos,
                 sources=sources, unresolved=unresolved, attachment_table_rows=len(attachments))
 
 
@@ -197,6 +214,24 @@ def render(catalog):
     lines.extend("    {%u, %u}," % row for row in sorted(loot_rows))
     lines.extend(["};", "inline constexpr Rank Ranks[] = {"])
     lines.extend("    {%u, %u}," % row for row in catalog["ranks"])
+    lines.extend(["};", "// Stock WEAPON.GetWeaponModelName / FilterAttachments recipe metadata.",
+                  "struct RecipeToken { const char *resolved; uint16_t addition; };",
+                  "struct WeaponRecipe { uint16_t defaults[16]; uint8_t count; };",
+                  "inline constexpr const char *RecipeReferences[] = {" + ", ".join(map(quoted, catalog["recipe_refs"])) + "};",
+                  "inline constexpr WeaponRecipe WeaponRecipes[] = {"])
+    recipe_ids = {ref: i + 1 for i, ref in enumerate(catalog["recipe_refs"])}
+    for weapon in catalog["weapons"]:
+        assert len(weapon["defaults"]) <= 16
+        lines.append("    {{%s}, %u}," % (", ".join(str(recipe_ids[ref]) for ref in weapon["defaults"]), len(weapon["defaults"])))
+    lines.extend(["};", "inline constexpr RecipeToken WeaponRecipeTokens[][" + str(len(recipe_ids)) + "] = {"])
+    for weapon in catalog["weapons"]:
+        lines.append("    {" + ", ".join("{%s, %u}" % (quoted(token["resolved"]), recipe_ids.get(token["addition"], 0)) for token in weapon["recipes"]) + "},")
+    # Zero means no conflict; each nonzero cell is the generic replacement ID.
+    # The stock 'no' cell replaces the existing entry with the incoming ref.
+    lines.extend(["};", "inline constexpr uint16_t RecipeConflicts[][" + str(len(recipe_ids)) + "] = {"])
+    for row in catalog["combos"][1:]:
+        assert all(not value or value == "no" or value in recipe_ids for value in row[1:])
+        lines.append("    {" + ",".join(str(recipe_ids[row[0]] if value == "no" else recipe_ids.get(value, 0)) for value in row[1:]) + "},")
     lines.extend(["};", "}", ""])
     return "\n".join(lines), dict(weapons=len(weapon_rows), attachments=len(attachment_rows),
                                   modifiers=len(modifier_rows), loot=len(loot_rows), ranks=len(catalog["ranks"]))
@@ -226,7 +261,13 @@ def prepare(snapshot):
                  generated_header_sha256=hashlib.sha256(header.encode()).hexdigest(),
                  selector_sha256=hashlib.sha256(selector.read_bytes()).hexdigest(),
                  generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                 complete_recipe_consumer="Stock WEAPON.GetWeaponModelName + FilterAttachments: default parts, additions, generic combo replacements, weapon/class resolution",
                  game_launched=False, native_runtime_verified=False)
+    ownership_spec = importlib.util.spec_from_file_location(
+        "bot_profile_ownership", ROOT / "tools/prepare-bot-profile-ownership.py")
+    ownership_module = importlib.util.module_from_spec(ownership_spec)
+    ownership_spec.loader.exec_module(ownership_module)
+    proof["profile_ownership"] = ownership_module.configure(snapshot)
     (snapshot / "generated/bot-style-data.json").write_text(json.dumps(proof, indent=2) + "\n")
     return proof
 

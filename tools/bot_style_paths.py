@@ -74,13 +74,28 @@ def derive(snapshot):
         languages[string(code - pe.OPTIONAL_HEADER.ImageBase)] = string(name - pe.OPTIONAL_HEADER.ImageBase)
     if len(languages) != 21:
         raise ValueError("Native language codes are duplicated")
+    # Retain the complete target ABI as evidence. Only English is delivered;
+    # regional companions are independent of the selected language.
+    supported_languages = {"eng": languages["eng"]}
+    if supported_languages != {"eng": "english"}:
+        raise ValueError("Native English language identity changed")
     rule_directories = {code + "_": directory for code, directory in {**regions, **languages}.items()}
     rule_directories.update({"": "", "srv_": "", "techsets_": ""})
     rules = [dict(name_prefix=prefix, directory=directory)
              for prefix, directory in sorted(rule_directories.items())]
+    installation_directories = {
+        code + "_": directory
+        for code, directory in {**regions, **supported_languages}.items()
+    }
+    installation_directories.update({"": "", "srv_": "", "techsets_": ""})
+    installation_rules = [dict(name_prefix=prefix, directory=directory)
+                          for prefix, directory in sorted(installation_directories.items())]
     return dict(regions=list(regions), languages=list(languages), region_directories=regions,
                 language_directories=languages, native=proof, image_sha256=IMAGE_SHA,
                 native_folder_rules=rules,
+                supported_languages=list(supported_languages),
+                supported_language_directories=supported_languages,
+                installation_folder_rules=installation_rules,
                 language_table_sha256=sha(table), language_record_bytes=24,
                 language_name_offset=0, language_code_offset=8,
                 folder_ids=dict(zone=0, localized=1, regional=7),
