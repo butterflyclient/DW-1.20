@@ -7,6 +7,68 @@ ROOT = Path(__file__).resolve().parents[1]
 LLVM = Path("C:/Program Files/LLVM/bin")
 
 
+def exercise_mp_class_refresh(module):
+    """Run the inserted bytecode, retaining separate cache and grant roots."""
+    edit = module.mp_class_refresh_edit()
+    stock = module.exported("1827.gscbin", 0x5CF8)
+    functions = {int(e["function_at"], 16): e["name"].get("string", e["name"].get("id"))
+                 for e in stock[2] if "function_at" in e}
+    references = {r.operand: functions[r.target] for r in edit.references}
+    assert edit.source == b"" and len(references) == 2
+    cases = 0
+    for receiver in ("managed", "managed_dead", "human", "generic", "br", "pre_bind"):
+        for cached in (False, True):
+            original = dict(primary="stock-primary", secondary="stock-secondary", other=17)
+            grant = original
+            fields = {0x9C56: original if cached else None}
+            stack, calls, pc = [], [], 0
+            while pc < len(edit.new):
+                op = edit.new[pc]; pc += 1
+                if op == 0x3A: stack.append("self")
+                elif op == 0x7E:
+                    assert struct.unpack_from("<H", edit.new, pc)[0] == 0x8789; pc += 2
+                    assert stack.pop() == "self"
+                    stack.append(receiver in ("managed", "managed_dead"))
+                elif op == 0x72:
+                    delta = struct.unpack_from("<h", edit.new, pc)[0]; pc += 2
+                    if not stack.pop(): pc += delta
+                elif op == 0x15: stack.append("marker")
+                elif op == 0x3E: stack.append(grant)
+                elif op == 0x16: stack.append(edit.new[pc]); pc += 1
+                elif op == 0x1A: stack.append(None)
+                elif op == 0x98:
+                    target = references[pc]; pc += 3
+                    assert stack.pop() is grant
+                    if target == "loadout_copyclassstruct":
+                        assert stack.pop() == "marker"
+                        fresh = dict(grant, primary="profile-primary", secondary="profile-secondary")
+                        stack.append(fresh); calls.append("clone-and-reconstruct")
+                    else:
+                        assert target == "0x9c55"
+                        assert stack.pop() is None and stack.pop() == 1 and stack.pop() == "marker"
+                        calls.append(("native-preload", grant["primary"], grant["secondary"]))
+                        fields[0x9C56] = grant; stack.append(None)
+                elif op == 0x24: grant = stack.pop()
+                elif op == 0x58: stack.pop()
+                elif op == 0x36: stack.append("self-object")
+                elif op == 0x25:
+                    assert stack.pop() == "self-object"
+                    token = struct.unpack_from("<I", edit.new, pc)[0]; pc += 4
+                    assert token == 0x9C56; fields[token] = None
+                else: raise AssertionError((hex(op), pc))
+            assert not stack
+            assert original == dict(primary="stock-primary", secondary="stock-secondary", other=17)
+            if receiver in ("managed", "managed_dead"):
+                assert grant is not original and grant["other"] == 17
+                assert calls == ["clone-and-reconstruct", ("native-preload", "profile-primary", "profile-secondary")]
+                assert fields[0x9C56] is None
+            else:
+                assert grant is original and not calls
+                assert fields[0x9C56] is (original if cached else None)
+            cases += 1
+    return cases
+
+
 def exercise_survival(module):
     """Execute the actual inserted opcodes; model only native/script callees."""
     gas, armor = module.survival_edits()
@@ -122,6 +184,7 @@ def main():
     assert binding == proof["method_binding"]
     module.load_tools(snapshot)
     policy_execution = exercise_survival(module)
+    mp_class_execution = exercise_mp_class_refresh(module)
     native = module.inspect_native(snapshot)
     assert native == proof["native"]
     package = json.loads(Path(proof["package_proof"]).read_bytes())
@@ -157,6 +220,13 @@ def main():
             assert len(result["function_edits"]) == 2 and len(result["source_insertions"]) == 2
             assert len(result["inserted_references"]) == 3
             assert result["survival_policy"]["cooldown_ms"] == 500
+        if result["mp_class_refresh"]:
+            assert result["mp_class_refresh"]["method_id"] == 0x8789
+            assert len(result["function_edits"]) == 2
+            assert len(result["inserted_references"]) == 2
+            text = Path(fresh["path"]).read_text()
+            assert "loadout_copyclassstruct( var_6 )" in text
+            assert "preloadandqueueclassstruct( var_6, undefined, 1 )" in text
         assert (
             hashlib.sha256(Path(result["output_path"]).read_bytes()).hexdigest()
             == result["output_sha256"]
@@ -240,7 +310,8 @@ def main():
         original_code_source_import_export_reconstruction=True,
         game_run_performed=False,
         survival_fragment_execution=policy_execution,
-        both_custom_method_contracts_verified=True,
+        all_three_custom_method_contracts_verified=True,
+        mp_class_refresh_fragment_cases=mp_class_execution,
         fresh_decompile_all_assets=True,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

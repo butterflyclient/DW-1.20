@@ -204,7 +204,9 @@ MenuBuilder.BuildRegisteredType = function(kind, options)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)
     elseif name == "playlistpromotedbutton" or name == "playlistfeaturedbutton" or
-        name == "brpromotedbutton" then
+        name == "brpromotedbutton" or name == "brfeaturebutton" then
+        -- Warzone featured tiles use BRFeatureButton, not BRPromotedButton.
+        -- Its cached-name subscription writes GamemodeName without Localize.
         repairPlaylistTitle(widget)
     end
     return widget

@@ -254,3 +254,20 @@ extern "C" void DW_BotSurvivalAllowedMethod(void *context, uint64_t self)
     }
     SM_AddBool(context, allowed ? 1 : 0);
 }
+
+// Class preload can run synchronously inside ConnectBot, before its caller
+// marks TC_BOT and binds the roster record. Only the later managed MP receiver
+// may rebuild that cached class; keep worker/input ownership equally strict.
+extern "C" void DW_BotMPClassReadyMethod(void *context, uint64_t self)
+{
+    bool allowed = false;
+    if (!((self >> 32) & 0xff) && uint32_t(self) < 200 &&
+        SM_GetNumParam(context) == 0 && !DW_BotPolicy_IsBattleRoyale())
+    {
+        auto *entity = static_cast<HostScale::Entity *>(SM_GetEntity(self));
+        uint64_t profile = 0;
+        allowed = DWBot_IsCurrentEntity(uint32_t(self), entity) &&
+                  DW_BotPolicy_ProfileSeed(uint32_t(self), &profile);
+    }
+    SM_AddBool(context, allowed ? 1 : 0);
+}

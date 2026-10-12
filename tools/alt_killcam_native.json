@@ -1,0 +1,452 @@
+{
+  "entity": {
+    "id": "fn_a94487eac6e47b53",
+    "bytes": 37,
+    "sha256": "155aa3a9a7e39c7c7b479e9bbc68a6a63d2a9433f1b42d6bc838e5d15e893b7f"
+  },
+  "fov": {
+    "id": "fn_47ae1a3ff35c5b8f",
+    "bytes": 55,
+    "sha256": "3ca1c54f3753b5509a79305dce0c4eafafbc920371bfde1a722f5be1d0b56021"
+  },
+  "predict": {
+    "id": "fn_5f868b01ce9aa2aa",
+    "bytes": 1002,
+    "sha256": "9ec4a32704455f39cd0fca5bffc9c717f275fcc67dd058ff6f1d17ad5e809fff",
+    "unwind": [
+      {
+        "begin": 24819264,
+        "end": 24820266,
+        "unwind_rva": 42748352,
+        "bytes": "011c0c001c640c001c540b001c340a001c3218f016e014d012c01070"
+      }
+    ]
+  },
+  "calc": {
+    "id": "fn_65d1d8779cb95b7b",
+    "bytes": 2508,
+    "sha256": "4a19daab066327c98273ae95c7d3a7b9120cdc4ebbaa75a545c97c1b5f5d74d4",
+    "unwind": [
+      {
+        "begin": 24880656,
+        "end": 24880710,
+        "unwind_rva": 42754456,
+        "bytes": "192c0b001e6421001e3420001e01180013f011e00fc00d700c50000058ce1c0290000000"
+      },
+      {
+        "begin": 24880710,
+        "end": 24880932,
+        "unwind_rva": 42754492,
+        "bytes": "210c04000c780a0005680b0010a67b0146a67b0198618c02"
+      },
+      {
+        "begin": 24880932,
+        "end": 24880944,
+        "unwind_rva": 42754516,
+        "bytes": "2100000010a67b0146a67b0198618c02"
+      },
+      {
+        "begin": 24880944,
+        "end": 24883124,
+        "unwind_rva": 42754532,
+        "bytes": "2108020008d41f0024a77b0130a77b01d4618c02"
+      },
+      {
+        "begin": 24883124,
+        "end": 24883164,
+        "unwind_rva": 42754552,
+        "bytes": "2100000024a77b0130a77b01d4618c02"
+      }
+    ]
+  },
+  "anim": {
+    "id": "fn_1109cc6ff7afc70d",
+    "bytes": 1289,
+    "sha256": "80e44480c1ac1ab909558ee3a2bc8c77f3881864d75f59a563279d8e8e0c8f4c",
+    "unwind": [
+      {
+        "begin": 24347280,
+        "end": 24347521,
+        "unwind_rva": 42709568,
+        "bytes": "192609001434a70014019e000df00be009d007700660000058ce1c02d0040000"
+      },
+      {
+        "begin": 24347521,
+        "end": 24348512,
+        "unwind_rva": 42709600,
+        "bytes": "2118060018684e0010c4a6000854a500908273018183730140b28b02"
+      },
+      {
+        "begin": 24348512,
+        "end": 24348569,
+        "unwind_rva": 42709628,
+        "bytes": "21000000908273018183730140b28b02"
+      }
+    ]
+  },
+  "weapon": {
+    "id": "fn_298e7ecd2d696615",
+    "bytes": 1222,
+    "sha256": "47c73cb6b835310b003d5ce2e8b8527229f0924444cf2d9fcec3de1e82c1530a",
+    "unwind": [
+      {
+        "begin": 24289216,
+        "end": 24289827,
+        "unwind_rva": 42709208,
+        "bytes": "19320d002474290024642800243427002401200018f016e014d012c01050000058ce1c02c8000000"
+      },
+      {
+        "begin": 24289827,
+        "end": 24290393,
+        "unwind_rva": 42709248,
+        "bytes": "2119060019880d0010780e0008680f00c09f720123a27201d8b08b02"
+      },
+      {
+        "begin": 24290393,
+        "end": 24290438,
+        "unwind_rva": 42709276,
+        "bytes": "21000000c09f720123a27201d8b08b02"
+      }
+    ]
+  },
+  "lerp": {
+    "id": "fn_0c46f482b11184b5",
+    "bytes": 1416,
+    "sha256": "f54a158f33f828ba59e85f9e61d7be0abda6d8d6a1d957d0f347d8fac39e256c",
+    "unwind": [
+      {
+        "begin": 24894800,
+        "end": 24895002,
+        "unwind_rva": 42753740,
+        "bytes": "192d0b001f742b001f342a001f01220013f011e00fd00dc00b50000058ce1c02e0000000"
+      },
+      {
+        "begin": 24895002,
+        "end": 24895082,
+        "unwind_rva": 42753776,
+        "bytes": "2115040015a80f000998100050dd7b011ade7b01cc5e8c02"
+      },
+      {
+        "begin": 24895082,
+        "end": 24895326,
+        "unwind_rva": 42753800,
+        "bytes": "21080200086429001ade7b016ade7b01f05e8c02"
+      },
+      {
+        "begin": 24895326,
+        "end": 24895952,
+        "unwind_rva": 42753820,
+        "bytes": "210000001ade7b016ade7b01f05e8c02"
+      },
+      {
+        "begin": 24895952,
+        "end": 24896216,
+        "unwind_rva": 42753836,
+        "bytes": "2100000050dd7b011ade7b01cc5e8c02"
+      }
+    ]
+  },
+  "render": {
+    "id": "fn_2543d366c8280bbd",
+    "bytes": 312,
+    "sha256": "a38bf07f5e046eeb90a83229613cd0f6d0b03aa6a8bc99852645ac51f7e7ed07",
+    "unwind": [
+      {
+        "begin": 22721600,
+        "end": 22721912,
+        "unwind_rva": 42575336,
+        "bytes": "192107000f341b000f011400087007600650000058ce1c0290000000"
+      }
+    ]
+  },
+  "AK_UpdateObjectCamera": {
+    "id": "fn_a592eef7a4f3b3d7",
+    "bytes": 720,
+    "sha256": "62bd00c55a013cdd43f99dd5fe85c9112e7f25983739042dff7c850aa296ec83"
+  },
+  "AK_SetLodOrigin": {
+    "id": "fn_32223d1730eead7e",
+    "bytes": 297,
+    "sha256": "66a3b3df0e6b15d7d69a6400557f935a3c36ac25fef8bcb9e63f06776438b65e"
+  },
+  "AK_DefaultFeatures": {
+    "id": "fn_5ee15db876c977a4",
+    "bytes": 54,
+    "sha256": "d06d5cb19a3339a8001799eb7981408d221f9ab0fbabd89a1307171fc011475f"
+  },
+  "AK_NextView": {
+    "id": "fn_53b30f64324567d3",
+    "bytes": 51,
+    "sha256": "21c5648c0dd068e552efa12b9e8da7511f57f694b273ad4f16351a5d5954075d"
+  },
+  "AK_RenderNative": {
+    "id": "fn_4764d9fa3d29058d",
+    "bytes": 3017,
+    "sha256": "98cd56036103fe48bafbb5807838e5106330225b9d7c81948c03305f4027f949"
+  },
+  "AK_EndList": {
+    "id": "fn_3e538490d0500bf7",
+    "bytes": 101,
+    "sha256": "1b9031f13331e66bd083ad2acd659b649b316f7455f838a50f6edc2481c67c05"
+  },
+  "AK_EndBatch": {
+    "id": "fn_ce96af3d57754024",
+    "bytes": 1111,
+    "sha256": "963fe0867a1bdc97541835260fc56a76e6718a0f301f193ce9bc43dea98ade95"
+  },
+  "AK_BeginBatch": {
+    "id": "fn_4b2e52000c960efd",
+    "bytes": 1162,
+    "sha256": "b108c7ce383eea2b5764e822c6d63db562a65c0c243888cc7c69bcba0a2cbff6"
+  },
+  "AK_MarkScene": {
+    "id": "fn_aa1c0987dc48b147",
+    "bytes": 49,
+    "sha256": "39d1c8d66772a0c88e7543378f4e30699e694f200c35328e218dd5ccf28b707f"
+  },
+  "AK_ResetScene": {
+    "id": "fn_34d8346da4121dff",
+    "bytes": 274,
+    "sha256": "fa877d70a8eb14858f6cd63c89abc56e0148e69d5aa0b1f23de52f6a11b1944f"
+  },
+  "AK_ClearSceneView": {
+    "id": "fn_9ae2ab06d7864148",
+    "bytes": 250,
+    "sha256": "4db3debc909c66ee893a69b5870da9e65d906268aaba8ad919e5b68fc1afa834"
+  },
+  "AK_IsMainThread": {
+    "id": "fn_38cdef73be2576bf",
+    "bytes": 24,
+    "sha256": "ce8f642e5fd3cb92abb65b9baf41451c7fcd788f028f2d3903c66e29d1425c51"
+  },
+  "scene_model_add": {
+    "id": "fn_a6c9ed5e53187ec7",
+    "bytes": 2460,
+    "sha256": "1fb2ca07cc654ef80bfe158abd692b933296d08ba5c07fac7b61a81f0130a6ee"
+  },
+  "scene_object_add": {
+    "id": "fn_a18a5cf046d7039d",
+    "bytes": 1682,
+    "sha256": "ebae01fc6a4295c2b72dbd45cbb3e72d1ab228f70ce3b11bb6f194c9a7dc3350"
+  },
+  "mp_scene": {
+    "id": "fn_16e28d0184fe43a1",
+    "bytes": 9899,
+    "sha256": "710fe43b2e1b0cde9e807bf56aceae79efde1a0e07f698022bc0b9beb00472c6"
+  },
+  "snapshot": {
+    "id": "fn_8bca42ff45632245",
+    "bytes": 4370,
+    "sha256": "89deac7e44fb1f4e05daab3a5924015848867ffafad751c3830e5bfcc7cbf56b"
+  },
+  "cache_post": {
+    "id": "fn_6fa096ebd5828686",
+    "bytes": 98,
+    "sha256": "62148566e40c6dfa42bead156a19cd0a9d2209c3e9d8716723a1dd4aeaa7e3b4"
+  },
+  "shadow_entities": {
+    "id": "fn_02ec56d4583b1def",
+    "bytes": 489,
+    "sha256": "caebc4c7bfa251797eadb14bbb9b2a7d3f801cfc39c791c39438c18ea3501a9d"
+  },
+  "AK_RealTime": {
+    "id": "fn_ae92f0a64777c8fe",
+    "bytes": 204,
+    "sha256": "7f51576db40c54ec516bf9860a140fc4ff4048c8f86cde93291606a0c825329f",
+    "derived_from": {
+      "role": "render",
+      "direct_call_ordinal": 1
+    }
+  },
+  "AK_TextureAtlasTime": {
+    "id": "fn_fc633b20a6004d0a",
+    "bytes": 7,
+    "sha256": "9ac4b4763339c54081e7ebefb6cc6f3bf05a10ae133b56832a04115ce090c71e",
+    "derived_from": {
+      "role": "render",
+      "direct_call_ordinal": 2
+    }
+  },
+  "AK_IsPipView": {
+    "id": "fn_d96d725fbeb8a54f",
+    "bytes": 14,
+    "sha256": "7c6604cd382fa03e05c771b4cd0d0c2dc07336370ebeb58bfe7c5167be274fd8",
+    "derived_from": {
+      "role": "render",
+      "direct_call_ordinal": 4
+    }
+  },
+  "AK_Exposure": {
+    "id": "fn_d990de9b099d6c15",
+    "bytes": 33,
+    "sha256": "261a05dd03874b0814481d284c315b3053624d050fa4628c761a58fe41a31530",
+    "derived_from": {
+      "role": "render",
+      "direct_call_ordinal": 5
+    }
+  },
+  "AK_SceneFrame": {
+    "id": "fn_9635c9b0794af1d9",
+    "bytes": 7,
+    "sha256": "95c4721d0e82709b33918b69aa1aca196609715fb824b34bff49f5a331b0ba7f",
+    "derived_from": {
+      "role": "render",
+      "direct_call_ordinal": 6
+    }
+  },
+  "AK_SyncRenderThread": {
+    "id": "fn_d23df2628f988bf5",
+    "bytes": 46,
+    "sha256": "af32f7bbb15d149abb90771763804f4b90a71b9485c38992524f870afb8cd1ea"
+  },
+  "scene_flush": {
+    "id": "fn_582c398c7852cb2c",
+    "bytes": 192,
+    "sha256": "2fc47cdd4d31e72a83c3abc2f63bb3e5ea3e62bda142d409377fdeaab9b23111"
+  },
+  "scene_end_delayed": {
+    "id": "fn_bf18dd2c1820443f",
+    "bytes": 33,
+    "sha256": "8679b86d0063f4bfb0b6d9c4ad8ffbdc7fa12a6d51f2130685947b9bea1eb8db"
+  },
+  "viewmodel_add": {
+    "id": "fn_c9f29099323dcbe4",
+    "bytes": 6760,
+    "sha256": "12f4c7cc55573f24e673958f47627fc83e734901b71257364c5e59c699dbc068"
+  },
+  "refdef_copy": {
+    "id": "fn_016f6431af4fbb85",
+    "bytes": 1890,
+    "sha256": "700d0cd509acbf5d906d0431b6de2c954135dd7d1037eda92c438dbb0e9f0111"
+  },
+  "killcam_transition": {
+    "id": "fn_58864418c2f9d0ca",
+    "bytes": 3104,
+    "sha256": "497705c2c26fbdfbd614556c5c92fa53f043892e6310d9b303386e1e70fece42",
+    "instruction_bytes": 3054,
+    "embedded_tail_hex": "669013297b01c92a7b01c0287b01b1287b01292b7b01f12a7b01000505050505050102050305050505050505040405040404"
+  },
+  "AK_GameMode": {
+    "id": "fn_67b41d286d510b4e",
+    "bytes": 8,
+    "sha256": "8c3039f832ec53f5e1fca48ec8c3f436d4aafe7749957a7d331e098e8df13f86"
+  },
+  "mode_name": {
+    "id": "fn_9a9b39d95896f69d",
+    "bytes": 19,
+    "sha256": "0350c64281825d1ceabc51f92ab346a2f467b89b0fc8d4435c0de31c138adcb2"
+  },
+  "cg_base_constructor": {
+    "id": "fn_09b7e274c0cac56e",
+    "bytes": 625,
+    "sha256": "e60e9893e3615576ea5518d031aab95f43d6bff0836e799b8eb89a4a754f3ed6"
+  },
+  "viewmodel_scene": {
+    "id": "fn_098b2e360d3bff10",
+    "bytes": 394,
+    "sha256": "6b69199916aa8a0e7fafa56195ce6013393a873a7a07c82d9a939bb48b53e239"
+  },
+  "viewmodel_submit": {
+    "id": "fn_6bf0fa72e639f9a3",
+    "bytes": 477,
+    "sha256": "b389c3df0e00d9c3c293462b6b2863a2a88a994db142b8ee45de5842fe8bfbf4"
+  },
+  "streaming": {
+    "id": "fn_d67c19bb830eebf1",
+    "bytes": 245,
+    "sha256": "f8abe3eebc741dfbc3abab83d7823cb13aebfb7630f51b198e1d335fdd8e016f",
+    "unwind": [
+      {
+        "begin": 20750032,
+        "end": 20750122,
+        "unwind_rva": 42499292,
+        "bytes": "0106020006320270"
+      },
+      {
+        "begin": 20750122,
+        "end": 20750261,
+        "unwind_rva": 42499300,
+        "bytes": "2105020005340600d09e3c012a9f3c01dc7c8802"
+      },
+      {
+        "begin": 20750261,
+        "end": 20750277,
+        "unwind_rva": 42499320,
+        "bytes": "21000000d09e3c012a9f3c01dc7c8802"
+      }
+    ]
+  },
+  "stream_end_frame": {
+    "id": "fn_9b99880a15e8dcca",
+    "bytes": 636,
+    "sha256": "8065dd7c23cd280955cf6c9a45b563d9dbfa06ef85338f2d1f8c96fd5f7d7415",
+    "unwind": [
+      {
+        "begin": 20737232,
+        "end": 20737868,
+        "unwind_rva": 42500016,
+        "bytes": "010f06000f6408000f3406000f320b70"
+      }
+    ]
+  },
+  "stream_static_view": {
+    "id": "fn_d18b64cf5e05d517",
+    "bytes": 81,
+    "sha256": "073ecc44067507faf87eb85c4f75b75aef900eea7111d7ca1ec7d84eb8a138ca",
+    "unwind": [
+      {
+        "begin": 20753360,
+        "end": 20753441,
+        "unwind_rva": 42502516,
+        "bytes": "010a04000a3406000a320670"
+      }
+    ]
+  },
+  "stream_append_view": {
+    "id": "fn_03630e2146129ea1",
+    "bytes": 703,
+    "sha256": "9fe4225a2abeda8c59539c336e578bc05ec7c5623ca6ff9619cda7935c88c11c",
+    "unwind": [
+      {
+        "begin": 20752608,
+        "end": 20752687,
+        "unwind_rva": 42502536,
+        "bytes": "191e06000f01130008f006700560045058ce1c0260000000"
+      },
+      {
+        "begin": 20752687,
+        "end": 20753285,
+        "unwind_rva": 42502560,
+        "bytes": "211a08001a7807000d68080008e4120004341a00e0a83c012fa93c0188898802"
+      },
+      {
+        "begin": 20753285,
+        "end": 20753311,
+        "unwind_rva": 42502592,
+        "bytes": "21000000e0a83c012fa93c0188898802"
+      }
+    ]
+  },
+  "AK_WaitWorkerType": {
+    "id": "fn_beb6f4e4f878d8dc",
+    "bytes": 7,
+    "sha256": "6a2a5ddf44985fec0059be379d89cc135c7e43f569ffc1a7672dcfd45206199e",
+    "derived_from": {
+      "role": "streaming",
+      "direct_call_ordinal": 0
+    }
+  },
+  "third_person": {
+    "id": "fn_97bc7303a09bc2b8",
+    "bytes": 446,
+    "sha256": "e1ef7ba01d3ab473db9f89d02d95da69fbc0f21e2029db706c507d0601184160",
+    "unwind": [
+      {
+        "begin": 24908576,
+        "end": 24909022,
+        "unwind_rva": 42754344,
+        "bytes": "0114080014640800145407001434060014321070"
+      }
+    ]
+  }
+}

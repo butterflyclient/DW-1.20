@@ -177,6 +177,7 @@ def main():
         preservation_cases=22,
         survival_predicate_cases=12,
         current_owner_cases=10,
+        mp_class_readiness_cases=12,
         managed_weapon_capacity_cases=6,
         complete_stock_recipe_cases=recipe_cases,
         linked_image_sha256=linked_hash,

@@ -62,6 +62,14 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
                         "mob": 18, "ctl": 19, "modifierStart": 21, "modifierEnd": 28}.items():
         assert attachment_schema[key] == column, (key, attachment_schema)
     assert re.search(r"defaultAttachments\s*=\s*9", csv_lua.split("CSV.MPWeapons = {", 1)[1].split("\n}", 1)[0])
+    weapon_schema = dict((key, int(value)) for key, value in re.findall(
+        r"(\w+)\s*=\s*(\d+)", csv_lua.split("CSV.MPWeapons = {", 1)[1].split("\n}", 1)[0]))
+    assert weapon_schema["displayOrder"] == 41
+    menu = read(lua / "ui/widgets/weaponselect.lua.2736.lua").decode("utf-8")
+    menu_condition = re.findall(
+        r"if (tonumber\((\w+)\.displayOrder\) and tonumber\(\2\.displayOrder\) >= 0) then",
+        menu)
+    assert len(menu_condition) == 1, "Stock base-weapon menu eligibility changed"
     assert 'file = "mp/attachmentCombos.csv"' in csv_lua
     for path in ("ui/utils/weaponutils.lua.2242.lua", "ui/utils/attachmentutils.lua.2113.lua", "ui/utils/gunsmithutils.lua.2161.lua",
                  "ui/widgets/gunsmithdetailsmodlist.lua.2425.lua"):
@@ -111,12 +119,21 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
                     return row[column]
         return generic
 
-    weapons, unresolved = [], []
+    weapons, unresolved, hidden_weapons = [], [], []
     for row in table("mp/statstable.csv.*.csv"):
         weapon = row[4]
         id_pattern = "loot/" + weapon + "_attachment_ids.csv.*.csv"
         progression_pattern = "mp/gunsmith/" + weapon.removeprefix("iw8_") + "_progression.csv.*.csv"
         if not weapon or not list(tables.glob(id_pattern)) or not list(tables.glob(progression_pattern)):
+            continue
+        order = row[weapon_schema["displayOrder"]]
+        try:
+            visible = float(order) >= 0
+        except ValueError:
+            visible = False
+        if not visible:
+            hidden_weapons.append(dict(reference=weapon, native_asset=row[5],
+                                       display_order=order))
             continue
         allowed = set(classes[row[1]][16].split("|")) - set(row[12].split("|"))
         ids = {int(item[0]): item for item in table(id_pattern) if item[0].isdigit()}
@@ -158,6 +175,7 @@ def read_catalog(tables=TABLES, lua=LUA, localize_root=LOCALIZE):
     assert all(display == index + 1 for index, display in ranks)
     return dict(weapons=weapons, modifiers=modifier_labels, ranks=ranks,
                 recipe_refs=recipe_refs, combos=combos,
+                hidden_weapons=hidden_weapons, weapon_menu_condition=menu_condition[0][0],
                 sources=sources, unresolved=unresolved, attachment_table_rows=len(attachments))
 
 
@@ -255,6 +273,8 @@ def prepare(snapshot):
     (snapshot / "src/DW_BotStyleData.h").write_bytes(header.encode("utf-8"))
     proof = dict(schema=1, image_sha256=TARGET, passed=True, counts=counts,
                  source_inputs=catalog["sources"], excluded_unresolved=catalog["unresolved"],
+                 excluded_hidden_base_weapons=catalog["hidden_weapons"],
+                 base_weapon_eligibility=catalog["weapon_menu_condition"],
                  style_policy=STYLES, signed_modifier_units="Gunsmith pro/con icon counts; not gameplay percentages",
                  generic_reference_consumer="Frontend attachment setup",
                  resolved_reference_consumer="Native GScr_Weapon_ReadAttachments internalName",

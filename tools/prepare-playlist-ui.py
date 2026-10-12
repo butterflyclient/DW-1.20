@@ -12,7 +12,11 @@ def prepare(snapshot, output, source=None):
     snapshot = snapshot.resolve(strict=True)
     if not snapshot.is_relative_to(ROOT / "data"):
         raise ValueError("Playlist UI compilation requires a private DW source snapshot")
-    if (snapshot.parent / "client-readiness.json").exists():
+    if any(path.exists() for path in (
+        snapshot.parent / "client-readiness.json", snapshot.parent / "readiness.json",
+        snapshot.parent / "local-readiness.json", snapshot.parent / "source-receipt.json",
+        snapshot / "source-receipt.json",
+    )):
         raise ValueError("Never regenerate a sealed completed client snapshot")
     destination = snapshot / "src/DW_PlaylistUI_Source.h"
     frozen_lua = snapshot / "src/DW_PlaylistUI.lua"
@@ -36,6 +40,10 @@ def prepare(snapshot, output, source=None):
                    generated_header=str(destination), header_sha256=hashlib.sha256(header).hexdigest(),
                    main_preference="replay_dw_autoFillBots", localize_key="PLAYLIST/BRSOLOSTIM_NAME2",
                    localize_fallback="BR Stimulus Solos", game_runs_performed=False)
+    receipt["cached_title_consumers"] = ["PlaylistPromotedButton", "PlaylistFeaturedButton",
+                                          "BRPromotedButton", "BRFeatureButton"]
+    receipt["cached_title_model"] = "name"
+    receipt["warzone_featured_title_element"] = "GamemodeName"
     receipt["frozen_lua"] = str(frozen_lua)
     receipt["generator_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     output.parent.mkdir(parents=True, exist_ok=True)

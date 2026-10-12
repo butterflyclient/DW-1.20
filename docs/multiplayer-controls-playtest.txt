@@ -182,6 +182,9 @@ These are owner playtest gates. Offline ABI, script/package, transport and
 updater transactions do not prove live navigation, remote UI or match stability.
 
 English client, bot input ownership and weapon-model checks (20261012):
+The third Warzone featured playlist should display BR STIMULUS SOLOS. Hover
+another entry and return to it; cached-title updates must not restore the raw
+PLAYLIST/BRSOLOSTIM_NAME2 key.
 1. Existing testers keep their current INI and local profile. Replace the EXE
    with the published game_dx12_ship_replay_dw.exe in the root game folder.
    This client supports English game data and stages its owned FF/FP companions
@@ -189,6 +192,10 @@ English client, bot input ownership and weapon-model checks (20261012):
 2. In MP, inspect several different bots in third person and while spectating.
    Weapons must have complete bodies and attachments, with normal arm poses.
    Check that each bot keeps its own rank and weapon when entering the match.
+   In Quick Play, check both the first spawn and a later respawn against the
+   same bot's frontend weapon. The post-connect class refresh must preload its
+   customized weapon before the native grant. Bot selection uses the 48 base
+   weapons displayed by the stock menu, excluding its three hidden prototypes.
 3. In BR, confirm bots retain the native starter pistol, jail equipment and
    Gulag duel equipment. The MP loadout overlay must not replace those weapons.
 4. In MP and BR, watch a bot using a full-auto weapon engage an enemy: it should
@@ -208,3 +215,32 @@ The updater now contains only the verified download/install work and Windows
 cryptographic checks, with explicit installer version information. The active
 local Malwarebytes instance accepted its focused checks; other installations
 still need their own normal antivirus checks. Do not add antivirus exclusions.
+
+Client-local alternate killcam playtest (when present in the published EXE):
+1. In your game console, use alt_killcam 1 to enable it, or alt_killcam 0 for
+   the ordinary killcam. This archived integer defaults to 0. Each player's
+   own game configuration saves their choice; host sv_cheats is not required.
+2. Have one client enable it and the other leave it off. Die to a grenade or
+   another object that normally has a following killcam. The enabled client
+   should see the recorded killer in first person in the main view and the
+   object's actual following camera in the upper-right inset, below the header
+   and victim label. The inset occupies one quarter of the screen's width and
+   height, clear of the lower perks, weapon and player-card overlays. The other
+   client keeps its ordinary killcam. A normal firearm kill keeps the ordinary
+   player view.
+3. Toggle it off during that killcam, then skip the killcam, respawn and finish
+   the match. Check that the inset disappears and the normal camera returns.
+   If changing display size, check that the next inset has the correct image,
+   placement and aspect ratio, without a stale image from the previous view.
+4. Repeat several grenade killcams through the moment the grenade leaves the
+   recorded player's hand. The extra object render must not register another
+   streaming client. Check the transition, skip, respawn and return to the menu.
+5. Watch the throw, explosion and remainder of the replay. The main camera must
+   remain in first person without a blended grenade image. Once the grenade is
+   destroyed, the inset retains its last valid image until the killcam ends.
+   Native camera cuts isolate temporal reuse during the two-camera portion;
+   normal camera history resumes when the game returns to a single view.
+
+The focused checks cover native camera/body preservation, client preferences,
+paired view identities, CPU renderer synchronization and owned texture cleanup.
+Rendered GPU output still requires this owner playtest.

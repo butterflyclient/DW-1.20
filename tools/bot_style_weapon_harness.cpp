@@ -10,6 +10,7 @@
 
 extern "C" void DW_BotStyleWeaponMethod(void *, uint64_t);
 extern "C" void DW_BotSurvivalAllowedMethod(void *, uint64_t);
+extern "C" void DW_BotMPClassReadyMethod(void *, uint64_t);
 extern "C"
 {
     void *SVHS_Clients[200]{};
@@ -396,6 +397,32 @@ int main()
     }
     assert(ownershipCases == 10);
     unsigned survivalCases = 0;
+    unsigned mpClassCases = 0;
+    for (unsigned scenario = 0; scenario < 12; ++scenario)
+    {
+        Fixture fixture;
+        current = &fixture;
+        fixture.params = 0;
+        switch (scenario)
+        {
+        case 1: fixture.entity.health = 0; break; // pre-spawn managed MP allowed
+        case 2: DW_Bot_Clients[33]->clientType = 0; break; // human
+        case 3: fixture.bot = false; break; // generic bot without managed profile
+        case 4: fixture.br = true; break; // native starter and Gulag excluded
+        case 5: fixture.self |= uint64_t(10) << 32; break;
+        case 6: DW_Bot_ClientCount = 33; break;
+        case 7: fixture.bot = false; break; // pending pool binding
+        case 8: HostScale::Field<int32_t>(fixture.player, 448) = 0; break;
+        case 9: DW_Bot_Clients[33]->entity = nullptr; break;
+        case 10: fixture.params = 1; break;
+        case 11: fixture.entityPresent = false; break;
+        }
+        DW_BotMPClassReadyMethod(context, fixture.self);
+        assert(fixture.boolAdds == 1 && !fixture.adds && !fixture.parses);
+        assert(fixture.returnedBool == (scenario < 2 ? 1 : 0));
+        ++mpClassCases;
+    }
+    assert(mpClassCases == 12);
     for (unsigned scenario = 0; scenario < 12; ++scenario)
     {
         Fixture fixture;
@@ -428,10 +455,12 @@ int main()
     }
     printf(
         "PASS: %u callback weapon recipes match lobby profile data; %u full Weapon60/alternate "
-        "preservation gates; %u survival predicate ABI/gates; %u managed-table capacity gates. "
+        "preservation gates; %u survival predicate ABI/gates; %u managed-table capacity gates; "
+        "%u managed MP class readiness gates. "
         "Native parsing/resources modeled.\n",
         profiles,
         preserved,
         survivalCases,
-        capacityCases);
+        capacityCases,
+        mpClassCases);
 }

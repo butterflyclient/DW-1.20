@@ -46,7 +46,16 @@ def save(path, value):
         stream.write("\n")
         stream.flush()
         os.fsync(stream.fileno())
-    os.replace(temporary, path)
+    # Windows readers and scanners can briefly deny replacement of a receipt.
+    # Keep the closed, durable temporary file and retry only that atomic rename.
+    for attempt in range(6):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def inside(path):
@@ -111,6 +120,12 @@ def frame_source(path):
         )
     if text.count("    SV_HostScale_Frame();") != 1:
         raise ValueError("Host frame must run exactly once")
+    if "    DW_AltKillcam_Init();" not in text:
+        text = 'extern "C" void DW_AltKillcam_Init();\n' + text.replace(
+            marker, "    DW_AltKillcam_Init();\n" + marker
+        )
+    if text.count("    DW_AltKillcam_Init();") != 1:
+        raise ValueError("Local killcam registration must run exactly once")
     return text.encode("utf-8")
 
 
@@ -269,9 +284,15 @@ def prepare():
         dict(source="tools/" + name, source_sha256=digest(ROOT / "tools" / name))
         for name in (
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
+            "test-playlist-ui.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
             "prepare-bot-profile-ownership.py",
             "prepare-noclip-integration.py",
+            "prepare-alt-killcam-integration.py", "prepare-alt-killcam-render.py",
+            "alt_killcam_native.json", "alt_killcam_render_native.json",
+            "replay_owned_clone.py", "alt_killcam_render_reference.cpp",
+            "alt_killcam_harness.cpp", "alt_killcam_render_harness.cpp",
+            "test-alt-killcam.py", "test-alt-killcam-render.py",
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "bot_style_paths.py",
@@ -295,6 +316,8 @@ def prepare():
             "DW_MatchmakingAssignments.cpp",
             "DW_JoinInProgress.cpp",
             "DW_Noclip.cpp", "DW_Noclip.h",
+            "DW_AltKillcam.cpp", "DW_AltKillcam.h",
+            "DW_AltKillcamRender.cpp", "DW_AltKillcamRender.h",
         }
         for path in sorted(inside(ROOT / root).iterdir()):
             if root != "integration/host-scale" and path.name not in replay_additions:
@@ -376,6 +399,10 @@ def prepare():
     joining.prepare(source)
     noclip = load_module("dw_noclip", ROOT / "tools/prepare-noclip-integration.py")
     noclip.prepare(source)
+    killcam = load_module("dw_alt_killcam", ROOT / "tools/prepare-alt-killcam-integration.py")
+    killcam.prepare(source)
+    killcam_render = load_module("dw_alt_killcam_render", ROOT / "tools/prepare-alt-killcam-render.py")
+    killcam_render.prepare(source)
     assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
     assets.prepare(source)
     helper_header = source / "generated-updater/DW_UpdateHelper.h"
@@ -430,6 +457,9 @@ def prepare():
     cpp[clone_source.relative_to(source).as_posix()] = digest(clone_source)
     noclip_clone = source / "src/DW_Noclip_Native.cpp"
     cpp[noclip_clone.relative_to(source).as_posix()] = digest(noclip_clone)
+    for name in ("DW_AltKillcam_Native.cpp", "DW_AltKillcamRender_Native.cpp"):
+        clone = source / "src" / name
+        cpp[clone.relative_to(source).as_posix()] = digest(clone)
     receipt = dict(
         schema=1,
         target=config["target"],
@@ -546,6 +576,7 @@ def verify(directory, report_path, publish_ready=True):
             ["--lua-source", str(source / "src/DW_PlaylistUI.lua")],
             "playlist.json",
         ),
+        ("test-playlist-ui.py", ["--snapshot", str(source)], "playlist-ui-behavior.json"),
         (
             "test-lobby-native-clones.py",
             ["--preparation", str(directory / "lobby-native-clones.json")],
@@ -563,10 +594,38 @@ def verify(directory, report_path, publish_ready=True):
         ("test-join-in-progress.py", ["--snapshot", str(source)], "join-in-progress.json"),
         ("test-dw-verifier.py", ["--snapshot", str(source)], "dw-verifier.json"),
         ("test-noclip.py", ["--snapshot", str(source)], "noclip.json"),
+        ("test-alt-killcam.py", ["--snapshot", str(source)], "alt-killcam.json"),
+        ("test-alt-killcam-render.py", ["--snapshot", str(source)], "alt-killcam-render.json"),
     )
+    identity = dict(
+        source_receipt_sha256=digest(directory / "source-receipt.json"),
+        build_report_sha256=digest(report_path),
+        executable_sha256=report["sha256"],
+    )
+    progress_path = directory / "verification-progress.json"
+    completed = []
+    if progress_path.exists():
+        progress = read(progress_path)
+        if any(progress.get(key) != value for key, value in identity.items()):
+            raise ValueError("Validation progress belongs to different compiler inputs")
+        completed = progress["proofs"]
+        if len(completed) > len(checks):
+            raise ValueError("Validation progress has extra checks")
     proofs = []
-    for checker, extra, name in checks:
+    for index, (checker, extra, name) in enumerate(checks):
         output = directory / name
+        if index < len(completed):
+            proof = completed[index]
+            if (
+                proof["checker"] != checker
+                or Path(proof["path"]) != output
+                or digest(output) != proof["sha256"]
+                or digest(tools / checker) != proof["checker_sha256"]
+                or not read(output)["passed"]
+            ):
+                raise ValueError("Completed validation check changed: " + checker)
+            proofs.append(proof)
+            continue
         subprocess.run(
             [
                 sys.executable,
@@ -592,6 +651,7 @@ def verify(directory, report_path, publish_ready=True):
                 checker_sha256=digest(tools / checker),
             )
         )
+        save(progress_path, dict(**identity, proofs=proofs))
     compiled = Path(report["executable"])
     # A second editor can change source while compilation/linked checks run.
     # Catch that before publishing, not only at local deployment afterward.

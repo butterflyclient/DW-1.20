@@ -84,6 +84,8 @@ def verify(pe, report):
         write(moved(0xC26A708 + mode * 12), mode + 10)
 
     calls, draws, placements, captures = [], [], [], []
+    integer_registrations = {}
+    registration_depth = 0
     main_thread, argc, argv = True, 1, ["com_debugStates"]
     screen_mode = None
     screen_events = []
@@ -163,6 +165,7 @@ def verify(pe, report):
     write(arena+0x6280+0x30,arena+0x6300,"<Q")
 
     def on_code(uc, address, size, _):
+        nonlocal registration_depth
         if address in (symbols.get("Sys_UpdateGameWindowTitle"), symbols.get("DW_LocalBackend_Frame")):
             # Window hashing/Win32 and the live backend's network/platform
             # calls have separate validation. This VM checks the overlay and
@@ -190,9 +193,21 @@ def verify(pe, report):
             machine.mem_write(args[1], path + b"\0")
             ret(len(path))
         elif name == "Dvar_RegisterInt":
-            assert string(args[0]) == "com_optimized" and args[1:4] == [1, 0, 2]
-            write(arena + 0x7080 + 29, 5, "<B")
-            ret(arena + 0x7080)
+            option = string(args[0])
+            policies = {"com_optimized": ([1, 0, 2], 0, arena + 0x7080)}
+            if "DW_AltKillcam_Init" in symbols:
+                policies["alt_killcam"] = ([0, 0, 1], 1, arena + 0x7100)
+            assert option in policies and option not in integer_registrations
+            bounds, flags, pointer = policies[option]
+            assert registration_depth == 1
+            assert args[1:4] == bounds and args[4] & 0xffffffff == flags
+            integer_registrations[option] = dict(default=bounds[0], minimum=bounds[1],
+                                                 maximum=bounds[2], flags=flags)
+            write(pointer + 29, 5, "<B")
+            # This overlay VM keeps optimization application off, as before;
+            # its native dvar setters have their own compiled policy gate.
+            write(pointer + 40, 0)
+            ret(pointer)
         elif name == "SV_HostScale_Frame":
             ret(0)  # Independently verified host-scale registration boundary.
         elif name == "SV_HostScale_GetSimulationFPS":
@@ -201,6 +216,8 @@ def verify(pe, report):
         elif name == "Sys_IsMainThread":
             ret(main_thread)
         elif name in ("Dvar_BeginPermanentRegistration", "Dvar_EndPermanentRegistration"):
+            registration_depth += 1 if name == "Dvar_BeginPermanentRegistration" else -1
+            assert registration_depth in (0, 1)
             ret()
         elif name == "Dvar_RegisterString":
             assert string(args[0]) == "com_frontEndCamera" and string(args[1]) == ""
@@ -286,6 +303,11 @@ def verify(pe, report):
     if report.get("optimized"):
         command("1")
     run("ScrPlace_EndFrame")
+    expected_integer_options = {"com_optimized"} if report.get("optimized") else set()
+    if "DW_AltKillcam_Init" in symbols:
+        expected_integer_options.add("alt_killcam")
+    assert set(integer_registrations) == expected_integer_options
+    assert registration_depth == 0
     expected_commands = {'com_debugStates'}
     if report.get('frontend_freecam'): expected_commands.add('toggle_frontend_freecam')
     if report.get('frontend_probe') and 'Com_FrontEndScene_RegisterCommands' in report['symbols']:
@@ -405,6 +427,8 @@ def verify(pe, report):
         geometry = struct.unpack("<27f", machine.mem_read(symbols["scrPlaceFull"],108))
         assert geometry[14:18] == (0,0,float(viewport[0]),float(viewport[1]))
     return dict(cases=23, refresh_frames=20, capture_frames=captures[1:4],
+                integer_registrations=integer_registrations,
+                integer_registration_once=True, permanent_registration_balanced=True,
                 automatic_startup=True,
                 common_screen_submission=True, game_modes_tested=[0,1,2],
                 stalled_frame_drawn=True,

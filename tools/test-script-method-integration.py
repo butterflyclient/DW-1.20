@@ -40,6 +40,10 @@ class Harness:
             if not edited or not report
             else base + report["symbols"]["DW_BotSurvivalAllowedMethod"]
         )
+        self.mp_class = (
+            stop + 96 if not edited or not report
+            else base + report["symbols"]["DW_BotMPClassReadyMethod"]
+        )
         self.vm = Uc(UC_ARCH_X86, UC_MODE_64)
         self.pages = set()
         self.trace = []
@@ -97,6 +101,7 @@ class Harness:
             **self.aliases,
             "DW_BotStyleWeaponMethod": self.callback,
             "DW_BotSurvivalAllowedMethod": self.survival,
+            "DW_BotMPClassReadyMethod": self.mp_class,
         }
         addresses = {
             i: (
@@ -271,6 +276,7 @@ def run_checks():
         )
         assert edited.u64(edited.u64(ctx + 3224) + 1927 * 8) == edited.callback
         assert edited.u64(edited.u64(ctx + 3224) + 1928 * 8) == edited.survival
+        assert edited.u64(edited.u64(ctx + 3224) + 1929 * 8) == edited.mp_class
         checks.append(f"registration-{seed}")
     for early in range(19):
         original, edited = Harness(False), Harness(True)
@@ -308,11 +314,10 @@ def run_checks():
             captured = []
 
             def reached(vm, address, size, data):
-                if address == (
-                    edited.callback
-                    if registry["argument_count"] == 2
-                    else edited.survival
-                ):
+                expected_callback = {"DW_BotStyleWeaponMethod": edited.callback,
+                                     "DW_BotSurvivalAllowedMethod": edited.survival,
+                                     "DW_BotMPClassReadyMethod": edited.mp_class}
+                if address == expected_callback[registry["callback_symbol"]]:
                     captured.append(
                         (vm.reg_read(UC_X86_REG_RCX), vm.reg_read(UC_X86_REG_RDX))
                     )

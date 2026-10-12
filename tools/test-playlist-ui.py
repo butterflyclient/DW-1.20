@@ -17,9 +17,42 @@ ORIGINAL = Path(r"E:\replay-compiler\evidence\workstation-luafile-decompiled-all
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--snapshot", type=Path)
+    parser.add_argument("--build", type=Path)
     args = parser.parse_args()
+    snapshot = args.snapshot.resolve(strict=True) if args.snapshot else None
+    if snapshot:
+        assert snapshot.is_relative_to(ROOT / "data")
+    source = (snapshot / "src/DW_PlaylistUI.lua" if snapshot else
+              ROOT / "integration/replay/DW_PlaylistUI.lua")
+    cpp_source = (snapshot / "src/DW_PlaylistUI.cpp" if snapshot else
+                  ROOT / "integration/replay/DW_PlaylistUI.cpp")
+    linked = None
+    if args.build:
+        assert snapshot is not None, "A linked consumer gate requires its frozen snapshot"
+        build = args.build.resolve(strict=True)
+        report_path = build / "build-report.json" if build.is_dir() else build
+        report = json.loads(report_path.read_bytes())
+        image = Path(report["executable"])
+        if not image.is_absolute(): image = report_path.parent / image
+        assert hashlib.sha256(image.read_bytes()).hexdigest() == report["sha256"]
+        assert report["unresolved_symbols"] == 0 and report["symbols"]["DW_PlaylistUI_Frame"] > 0
+        rows = [r for r in report["cpp"] if Path(r["source"]).name == "DW_PlaylistUI.cpp"]
+        assert len(rows) == 1
+        row = rows[0]
+        cpp_hash = hashlib.sha256(cpp_source.read_bytes()).hexdigest()
+        assert row["source_sha256"] == cpp_hash
+        assert hashlib.sha256(Path(row["object"]).read_bytes()).hexdigest() == row["object_sha256"]
+        assert hashlib.sha256(Path(row["compiler"]["path"]).read_bytes()).hexdigest() == row["compiler"]["sha256"]
+        dependencies = {Path(d["path"]).name: d["sha256"] for d in row["dependencies"]}
+        assert dependencies["DW_PlaylistUI.cpp"] == cpp_hash
+        header_hash = hashlib.sha256((snapshot / "src/DW_PlaylistUI_Source.h").read_bytes()).hexdigest()
+        assert dependencies["DW_PlaylistUI_Source.h"] == header_hash, "Build did not compile the supplied Lua header"
+        linked = dict(image_sha256=report["sha256"], cpp_source_sha256=cpp_hash,
+                      object_sha256=row["object_sha256"], header_sha256=header_hash,
+                      lua_source_sha256=hashlib.sha256(source.read_bytes()).hexdigest())
     vm = LuaRuntime(unpack_returned_tuples=True)
-    cpp = (ROOT / "integration/replay/DW_PlaylistUI.cpp").read_text()
+    cpp = cpp_source.read_text()
     begin = cpp.index('constexpr char probe[] =')
     literal = cpp[begin:cpp.index('double installed =', begin)]
     vm.globals().PollSource = ''.join(json.loads(value) for value in re.findall(r'"(?:[^"\\]|\\.)*"', literal))
@@ -148,18 +181,24 @@ def main():
     original("frontend/mp/brplaymenubuttons.lua.395.lua", "BRPlayButtonsModule")
     original("frontend/playlistlist.lua.742.lua", "PlaylistListModule")
     original("utils/onboarding.lua.2213.lua", "OnboardingModule")
-    for relative, kind, field, scope in (
-        ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton", "Name", "21"),
-        ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton", "Name", "21"),
-        ("frontend/mp/brpromotedbutton.lua.401.lua", "BRPromotedButton", "GamemodeName", "15"),
+    for relative, kind, field, scope, label_index, callback_index in (
+        ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton", "Name", "21", "8", "9"),
+        ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton", "Name", "21", "8", "9"),
+        ("frontend/mp/brpromotedbutton.lua.401.lua", "BRPromotedButton", "GamemodeName", "15", "8", "9"),
+        ("frontend/mp/brfeaturebutton.lua.390.lua", "BRFeatureButton", "GamemodeName", "14", "6", "7"),
     ):
         path = ORIGINAL / relative
         raw = path.read_text(encoding="utf-8-sig")
         inputs[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
-        begin = raw.index("\tlocal function var_" + scope + "_9()")
-        end = raw.index("\n\tvar_" + scope + "_8:SubscribeToModelThroughElement", begin)
+        begin = raw.index("\tlocal function var_" + scope + "_" + callback_index + "()")
+        end = raw.index("\n\tvar_" + scope + "_" + label_index + ":SubscribeToModelThroughElement", begin)
+        def variables(text):
+            return (text.replace("var_21_8", "var_21_" + label_index)
+                        .replace("var_21_9", "var_21_" + callback_index)
+                        .replace("var_21", "var_" + scope)
+                        .replace("widget.Name", "widget." + field))
         vm.execute(
-            '''MenuBuilder.registerType(..., function()
+            variables('''MenuBuilder.registerType(..., function()
                 local widget=MakeNode()
                 widget.modelName="PLAYLIST/BRSOLOSTIM_NAME2"
                 local var_21_0=widget
@@ -169,12 +208,24 @@ def main():
                 function widget:GetDataSource()
                     return {name={GetValue=function() return widget.modelName end}}
                 end
-            '''.replace("var_21", "var_" + scope).replace("widget.Name", "widget." + field) + raw[begin:end] + '''
+            ''') + raw[begin:end] + variables('''
                 widget.RefreshModel=var_21_9
                 var_21_9()
                 return widget
-            end)'''.replace("var_21", "var_" + scope), kind
+            end)'''), kind
         )
+    playlist_utils = ORIGINAL / "utils/playlistutils.lua.2219.lua"
+    raw = playlist_utils.read_text(encoding="utf-8-sig")
+    featured = raw[raw.index("function PlaylistUtils.SetupFeaturedButtons("):
+                   raw.index("function PlaylistUtils.SetupPromotedButtons(")]
+    assert 'MenuBuilder.BuildRegisteredType("BRFeatureButton"' in featured
+    inputs[str(playlist_utils)] = hashlib.sha256(playlist_utils.read_bytes()).hexdigest()
+    vm.execute('''PlaylistUtils={MAX_FEATURED_GAMEMODE_BUTTONS=3,ButtonType={FEATURED=1}}
+        PlaylistUtils.InitializePlaylistButton=function(widget,data,controller)
+            widget.modelName=data.name:GetValue(controller)
+            widget.RefreshModel()
+        end
+    ''' + featured)
     vm.execute(r'''
         MenuBuilder.registerType("PlaylistMenu", function()
             local menu=MakeNode()
@@ -197,7 +248,18 @@ def main():
         LockTable(Engine)
         LockTable(Dvar)
     ''')
-    source = ROOT / "integration/replay/DW_PlaylistUI.lua"
+    serialized = None
+    if snapshot:
+        frozen = snapshot / "src/DW_PlaylistUI.lua"
+        header = snapshot / "src/DW_PlaylistUI_Source.h"
+        data, embedded = frozen.read_bytes(), header.read_bytes()
+        assert data == source.read_bytes()
+        prefix, suffix = b'R"REPLAYDW_UI(', b')REPLAYDW_UI";\n'
+        assert embedded.count(prefix) == 1 and embedded.endswith(suffix)
+        assert embedded.split(prefix, 1)[1][:-len(suffix)] == data
+        serialized = dict(frozen_lua_sha256=hashlib.sha256(data).hexdigest(),
+                          generated_header_sha256=hashlib.sha256(embedded).hexdigest(),
+                          exact_embedded_lua=True)
     assert vm.execute(source.read_text()) == 1
     checks = vm.execute(r'''
         local options={controllerIndex=0}
@@ -273,7 +335,7 @@ def main():
         assert(Engine.CBBHFCGDIC("PLAYLIST/BRSOLOSTIM_NAME2")=="Localized native title")
         assert(Engine.CBBHFCGDIC("UNRELATED_KEY")=="UNRELATED_KEY")
         results[#results+1]="Only the confirmed missing playlist title gets a fallback; native translations and unrelated keys remain authoritative"
-        for _,kind in ipairs({"PlaylistPromotedButton","PlaylistFeaturedButton","BRPromotedButton"}) do
+        for _,kind in ipairs({"PlaylistPromotedButton","PlaylistFeaturedButton","BRPromotedButton","BRFeatureButton"}) do
             local widget=MenuBuilder.BuildRegisteredType(kind,options)
             local label=widget.Name or widget.GamemodeName
             assert(label:getText()=="BR STIMULUS SOLOS")
@@ -290,7 +352,31 @@ def main():
             widget.RefreshModel()
             assert(label:getText()=="PLAYLIST/UNRELATED_KEY")
         end
-        results[#results+1]="Original promoted/featured model callbacks repair the missing title at construction and on later updates without calling Localize or rewriting unrelated/localized names"
+        results[#results+1]="Original MP and BR promoted/featured callbacks repair cached initial names and later model updates without Localize; BRFeatureButton uses its actual GamemodeName callback"
+        local panel=MakeNode()
+        panel.featuredButtonWidgets={}
+        function panel:InsertIntoButtonList(widget,list,kind)
+            assert(kind==PlaylistUtils.ButtonType.FEATURED)
+            table.insert(list,widget);self:addElement(widget)
+        end
+        function panel:AddButtonTooltipData() end
+        local names={"BR QUADS","BR SOLOS","PLAYLIST/BRSOLOSTIM_NAME2"}
+        local category={index={GetValue=function() return nil end},playlists={}}
+        function category.playlists:GetCountValue() return #names end
+        function category.playlists:GetDataSourceAtIndex(index)
+            return {name={GetValue=function() return names[index+1] end},
+                    playlistIndex={GetValue=function() return index end}}
+        end
+        CONDITIONS.IsMagmaGameMode=function() return true end
+        PlaylistUtils.SetupFeaturedButtons(panel,0,category)
+        assert(#panel.featuredButtonWidgets==3)
+        assert(panel.featuredButtonWidgets[3].GamemodeName:getText()=="BR STIMULUS SOLOS")
+        assert(panel.featuredButtonWidgets[1].GamemodeName:getText()=="BR QUADS")
+        assert(panel.featuredButtonWidgets[2].GamemodeName:getText()=="BR SOLOS")
+        panel.featuredButtonWidgets[3].modelName="@PLAYLIST/BRSOLOSTIM_NAME2"
+        panel.featuredButtonWidgets[3].RefreshModel()
+        assert(panel.featuredButtonWidgets[3].GamemodeName:getText()=="BR STIMULUS SOLOS")
+        results[#results+1]="Original Warzone SetupFeaturedButtons selects BRFeatureButton and the third tile repairs cached and subsequent names while neighboring titles stay unchanged"
         assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==true)
         assert(Onboarding.MagmaVideo.WasCompleted(nil,0)==true)
         assert(Onboarding.WARZONE_INTRODUCTION.WasCompleted(nil,0)==true)
@@ -326,6 +412,8 @@ def main():
     items.append("Repeated installation is idempotent and creates no sealed global/module fields")
     receipt = dict(passed=True,checks=items,source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                    original_lua_inputs=inputs,lua_version=vm.eval("_VERSION"),
+                   serialized_source=serialized,
+                   linked_build=linked,
                    modeled_boundaries="Native rendering/input/model APIs; original builder, checkbox and list Lua execute",
                    game_runs_performed=False,rendered_ui_verified=False)
     args.output.parent.mkdir(parents=True,exist_ok=True)

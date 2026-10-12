@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "created_utc": "2026-10-12T08:31:43.528527+00:00",
+  "target": "game_dx12_ship_replay_dw.exe",
+  "branch": "main",
+  "repository": "https://github.com/butterflyclient/DW-1.20",
+  "release": 28,
+  "executable_sha256": "fd1913635fb32bd254d1faa4d4b5f4c861b240b22b8ca4059e88c8710a0ec9a5",
+  "executable_bytes": 102999040,
+  "compiled_cpp_units": 129,
+  "unresolved_symbols": 0,
+  "linked_gate_count": 24,
+  "checks": [
+    {
+      "checker": "test-host-scale.py",
+      "evidence_sha256": "234ace84a2cd4b40a98ba424449cdac145526034ed43bdb4a62db9f6b98f1fd3",
+      "checker_sha256": "fda285886c8c00be901e8329c4ca5df35eea970ea02ec894495359614d82169e"
+    },
+    {
+      "checker": "test-host-navigation.py",
+      "evidence_sha256": "292cf6f7f31a9e5a5d97b5e706942ea66548a5902e4904ffc4f779fefdf0ccbe",
+      "checker_sha256": "87cf846e0da52f6140b4ebfef39efc285865fe53447cda693e42ad4d63f7cd2e"
+    },
+    {
+      "checker": "test-host-safety.py",
+      "evidence_sha256": "b68ba867948499d7878b93d354a2d02d8ae42d1eb9fcdfe9f23e0c030e25ff32",
+      "checker_sha256": "f4dfd1af01bde316673f4c7d024b18e1fd73561d2a1f30104126970fe41c8c31"
+    },
+    {
+      "checker": "test-host-command-ownership.py",
+      "evidence_sha256": "e962848c833433c5bf3d3c1799660510d9f7a63a01093076a8283f3743a933db",
+      "checker_sha256": "83057030d90c41250bbffc81dabfc8c5cbb2277674e79c99f505f124879776b7"
+    },
+    {
+      "checker": "test-bot-behavior.py",
+      "evidence_sha256": "aa072e4148e490f28928737369ee72e6a96547a9b2f1d2c2a56cb7c09842e1d1",
+      "checker_sha256": "8ff1bff375a032db28e64f3a2d10369a3b43644d013beea74c3a3fc69035be0c"
+    },
+    {
+      "checker": "test-lobby-controls.py",
+      "evidence_sha256": "6e1ecdfe9d4fc1311a42202d4d0b1c7b4c1b1fba485d65e24472b206d10b01bb",
+      "checker_sha256": "fc19d4f0350fa5aee80c8b9b5abc3fa40867b9c8f156a4fc929cdef732e27772"
+    },
+    {
+      "checker": "test-native-bot-roster.py",
+      "evidence_sha256": "c8888f6e09ab261862b47eebb8be5913acee36066be80f022bae36192e3f5872",
+      "checker_sha256": "15ecd6c8897deb1f66ee4122803cef5c4531025e4565b894af590fe77d98f1ba"
+    },
+    {
+      "checker": "test-playlist-ui-native.py",
+      "evidence_sha256": "5ce6d1203bb098566ced62903331006a35f4268870e759bcee5c9d211ee7f4f0",
+      "checker_sha256": "71609370ab8d7c32e3da7adc9494699638266e03a2769daa191e1bc47f7dc1f6"
+    },
+    {
+      "checker": "test-playlist-ui.py",
+      "evidence_sha256": "082693c83edffabfd606e8c36462a6e05a156ac924447f1e2e74d2f63ed54e34",
+      "checker_sha256": "4dc9e0d8c9f75d5cc1b50a71464364c5abe8c360b731799b78fc38d7b3e969ed"
+    },
+    {
+      "checker": "test-lobby-native-clones.py",
+      "evidence_sha256": "6ff955fe068bf970c11da94485b602c1691088cb158387ed12f0050ce93b9753",
+      "checker_sha256": "c66632e3fedcf0a38f4b228c02b3d1d240ac69365948ca0efab365c905a6f8e5"
+    },
+    {
+      "checker": "test-executable-update-integration.py",
+      "evidence_sha256": "cdc573fdf2903704f8d51aa8f4b661f0fdc40ad5acfabb4443ac89f2c0ff318b",
+      "checker_sha256": "1a13195ad3570953cb1c5673d96a0800af6caee0a3c064ef7235090205db7705"
+    },
+    {
+      "checker": "test-compiled-unlock-progression.py",
+      "evidence_sha256": "b9fecc3c3820fdb1622affb7479d994538ea1af092a3a7acb18b57ec0dd32717",
+      "checker_sha256": "ede002adecfaa7ab13d0fd4ca50170d380c6ae51d5c45c3b1f34b10e6ece7dbf"
+    },
+    {
+      "checker": "test-bot-style-selection.py",
+      "evidence_sha256": "c7c08fb4eab9914a94b37166c377cc53c86cbda04ff6f1e25c4f2f3e47cc65c8",
+      "checker_sha256": "e6661785e42c774d77c029042c45ba0758273945db4550b4617489c588b7c02d"
+    },
+    {
+      "checker": "test-script-method-integration.py",
+      "evidence_sha256": "1f3367c5407efca499c247806ceae5cbfc3e72bbe50efe8040580d16ef4fd2e5",
+      "checker_sha256": "272357343fbb20ec969dfcb4904bada697fbde5be9d98a1ace5c9fafb817d5fa"
+    },
+    {
+      "checker": "test-bot-style-weapon.py",
+      "evidence_sha256": "837e097b10ff257891b6859a79a587a7556ee4227605e21442e241930f6305ac",
+      "checker_sha256": "3b1fc85a9fa2fdf53f08de737a1a53c9a2fd8a90bf3647350b5446a2aa1e8ec7"
+    },
+    {
+      "checker": "test-bot-rank.py",
+      "evidence_sha256": "b36fe6f9135c1c49d30f50c684913f377fb1a1c4f96f8d8e1fa4b999eec7e6c1",
+      "checker_sha256": "a19248f77f4b33294d35b6a1fdefcaed95483b2b44b33e85166ebb220576b9a6"
+    },
+    {
+      "checker": "test-bot-style-scripts.py",
+      "evidence_sha256": "a671eef1ce36f30e61dc5c9955a13969102ba9355f7e8ef137e11b118df684e1",
+      "checker_sha256": "40558564ace671f4d3eb735c5bfe9819e690a80e09e89b1d56bef6f0266b2ebf"
+    },
+    {
+      "checker": "test-bot-style-zone.py",
+      "evidence_sha256": "e47214b820379c0093791e539cd4430a406f1dbb2e4096b9c6ed0cbdc685804d",
+      "checker_sha256": "9eb47602011dc052a4f4508f938d3b537c9391b655a91412765280fd1407416a"
+    },
+    {
+      "checker": "test-matchmaking-assignments.py",
+      "evidence_sha256": "d791af954952682ea4fc91c84aead64ad59fafe3120f00902134c6c2b7e36374",
+      "checker_sha256": "c939d2eab569a35095f30ca969f7d103625588f6595542a01a93b91da57d9e3f"
+    },
+    {
+      "checker": "test-join-in-progress.py",
+      "evidence_sha256": "584f8e3846b85b5cd309fe697ef7dc2e1b09de161dded9819fac2ed218c3bf93",
+      "checker_sha256": "c49e594e6053da44be63adbec26cb58052fe2911440e8d0ed359e48227271dae"
+    },
+    {
+      "checker": "test-dw-verifier.py",
+      "evidence_sha256": "462bfc279b5521a0a8944aa26a36f4c9886397af81b67d1b2d42a26b752f15f5",
+      "checker_sha256": "41af739ab147a3b3c47b15d3870ec9b51a211b81fea95a9b335616038c15525c"
+    },
+    {
+      "checker": "test-noclip.py",
+      "evidence_sha256": "8d10e2772d64dcdc530fbd897cacee6de50672d6cc3efe2bb4ed7691cb6132ef",
+      "checker_sha256": "03e689773d3980b93758388e0b72afaee4b59165c787354aef81b3c0c9d9a132"
+    },
+    {
+      "checker": "test-alt-killcam.py",
+      "evidence_sha256": "1c48331588ea94a76d26c6a0d9321c67637a51fc7d326af9d7254fb6680fbadd",
+      "checker_sha256": "6066afe8d33e58724d890bd1f88eaff6c72d427f3b3e412e494a174d2f38747d"
+    },
+    {
+      "checker": "test-alt-killcam-render.py",
+      "evidence_sha256": "b2111fb00b17ff3cb47c92adf9ebbf12703964530ad175078fc242bef6c73480",
+      "checker_sha256": "e419c55cd41c741130223561450e8b2c6a9d4db58f2b664fcaac9c189eb65d9c"
+    }
+  ],
+  "killcam_frontend_cases": {
+    "cases": 234,
+    "active_pair_cases": 54,
+    "failure_cases": 19,
+    "origin_cases": 100,
+    "streaming_scope_cases": 8,
+    "third_person_cases": 4,
+    "retained_cases": 10,
+    "replay_boundary_cases": 16,
+    "camera_cut_cases": 12,
+    "inset_cases": 6
+  },
+  "complete_native_camera_clones": 8,
+  "linked_streaming_scope_executed": true,
+  "render_policy_cases": 29,
+  "original_compositor_comparisons": 192,
+  "linked_compositor_comparisons": 192,
+  "linked_active_capture_composite_pairs": 12,
+  "features": {
+    "alt_killcam": {
+      "default": 0,
+      "range": [
+        0,
+        1
+      ],
+      "archived_per_client": true,
+      "inset": "upper-right, below header and victim label; quarter viewport width and height",
+      "main_camera": "Preserved complete native killer first-person path and third-person state",
+      "object_destroyed": "Retain last valid capture until native replay session ends",
+      "temporal_history": "Scoped native camera cuts during both paired submissions; native single-view flag restored"
+    },
+    "quick_play_bots": "Post-connect private cached-class refresh and native asset preload before grant",
+    "bot_base_weapon_catalog": {
+      "count": 48,
+      "stock_display_order_eligibility": true,
+      "excluded_hidden": [
+        "iw8_sm_charlie9",
+        "iw8_sm_victor",
+        "iw8_ar_galima"
+      ]
+    },
+    "playlist_title": {
+      "key": "PLAYLIST/BRSOLOSTIM_NAME2",
+      "display": "BR STIMULUS SOLOS",
+      "actual_widget": "BRFeatureButton"
+    },
+    "com_optimized_default": 1
+  },
+  "deployment": {
+    "installed_hash_verified": true,
+    "owner_ini_preserved": true,
+    "owned_asset_files": 20,
+    "full_executable_auto_update_published": true,
+    "signed_published_plans_and_embedded_helper_staging_verified": true
+  },
+  "build_provenance": {
+    "compiler_job": "70f3047e22534cdf",
+    "validation_job": "1791793612467955400",
+    "native_cpp_inputs_unchanged_during_checker_repairs": true,
+    "checker_repairs": [
+      "Release completed emulator callback hooks",
+      "Reuse already-parsed PE exception table"
+    ],
+    "runner_repairs": [
+      "Bounded atomic receipt replacement retry",
+      "Hash-bound validation checkpoints"
+    ]
+  },
+  "game_runs_performed": false,
+  "gpu_output_tested": false,
+  "limitations": [
+    "Owner visual playtest remains required",
+    "Native temporal history cuts may reduce temporal AA smoothing during paired killcam views",
+    "Independent temporal texture ownership is not claimed",
+    "Earlier release26 native string-reference cleanup crash has no confirmed corrupting-write diagnosis"
+  ],
+  "owner_checklist": "docs/multiplayer-controls-playtest.txt"
+}

@@ -42,6 +42,7 @@ OUT = None
 IMAGE_HASH = "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
 METHOD_ID = 0x8787
 SURVIVAL_METHOD_ID = 0x8788
+MP_CLASS_METHOD_ID = 0x8789
 ORIGINAL_HASHES = {
     "1827.gscbin": "b6ede9e3437161cd6eafa3de808d69a1d9e724e4f04b93d8a71fecf53ea28be2",
     "scripts/mp/bots/bots_gametype_br.gsc.gscbin": "e3abf284c279a21d6567dc93cc47f1e9d927ec92924af0cc1f6043e4dc62a58a",
@@ -295,6 +296,36 @@ def survival_edits():
     return fragment(False), fragment(True)
 
 
+def mp_class_refresh_edit():
+    stock = exported("1827.gscbin", 0x5CF8)
+    start = int(stock[3]["function_at"], 16)
+    # Both the preloaded and freshly built branches converge here before
+    # assigning self.classstruct and invoking the original grant pipeline.
+    if stock[1][start + 0x79:start + 0x7F] != bytes.fromhex("3e18022e0000"):
+        raise ValueError("Stock MP cached/preloaded class convergence changed")
+    functions = {e["name"].get("string", e["name"].get("id")): int(e["function_at"], 16)
+                 for e in stock[2] if "function_at" in e}
+    code, refs = bytearray(bytes.fromhex("3a7e") + struct.pack("<H", MP_CLASS_METHOD_ID)), []
+    code.extend(b"\x72\0\0")
+    def local(token):
+        code.extend(b"\x98\0\0\0")
+        refs.append(Reference(len(code) - 3, 3, functions[token], 2, "local"))
+    # Stock copy creates a fresh struct and runs its complete class validation
+    # and final-weapon reconstruction. Never mutate a shared cached root.
+    code.extend(bytes.fromhex("153e"))
+    local("loadout_copyclassstruct")
+    code.extend(bytes.fromhex("24"))
+    # Existing helper consumes the refreshed fullnames, requests native weapon
+    # assets, and skips redundant customization via its stock third argument.
+    code.extend(bytes.fromhex("1516011a3e"))
+    local("0x9c55")
+    code.extend(bytes.fromhex("583625569c0000"))
+    struct.pack_into("<h", code, 5, len(code) - 7)
+    return Edit(0x79, b"", bytes(code),
+                "Post-bind managed MP class clone, reconstruction and native weapon preload before grant",
+                function_token=0x5CF8, references=tuple(refs))
+
+
 def plans(method_id):
     direct = b"\x3a\x80" + struct.pack("<H", method_id)
     primary, secondary, acquired = b"\x5c", b"\x16\x01", b"\x51\x01"
@@ -323,6 +354,7 @@ def plans(method_id):
             "1827.gscbin",
             0x7DD5,
             (
+                mp_class_refresh_edit(),
                 Edit(
                     0x0E,
                     b"",
@@ -691,6 +723,9 @@ def transform(plan, method_id, bound=False):
         source_insertions=source_insertions,
         inserted_references=inserted_references,
         inserted_survival_method_id=SURVIVAL_METHOD_ID if any(e.function_token == 0x2039 for e in edits) else None,
+        mp_class_refresh=dict(method_id=MP_CLASS_METHOD_ID, grant_token=0x5CF8,
+                              fresh_stock_clone=True, native_preload_before_grant=True)
+                         if any(e.function_token == 0x5CF8 for e in edits) else None,
         function_count=len(functions),
         inserted_method_id=method_id,
         method_bound=bound,
@@ -820,7 +855,7 @@ def method_binding(snapshot):
         or bounds.get("extended_count") != 1927 + len(registry)
         or bounds.get("extended_end") != 0x8000 + 1927 + len(registry)
         or registered_ids != list(range(0x8787, 0x8787 + len(registry)))
-        or len(registry) != 2
+        or len(registry) != 3
     ):
         raise ValueError(
             "Custom method array bounds do not include the expected registered ID"
@@ -839,6 +874,12 @@ def method_binding(snapshot):
         survival[0].get("result") != "bool" or survival[0].get("opcode") != 0x7E or
         survival[0].get("callback_symbol") != "DW_BotSurvivalAllowedMethod"):
         raise ValueError("Survival method requires the coherent zero-argument scalar bool registry")
+    mp_class = [r for r in registry if r.get("id") == MP_CLASS_METHOD_ID]
+    if (len(mp_class) != 1 or mp_class[0].get("name") != "dw_bot_mp_class_ready" or
+        mp_class[0].get("argument_count") != 0 or mp_class[0].get("receiver") != "entity" or
+        mp_class[0].get("result") != "bool" or mp_class[0].get("opcode") != 0x7E or
+        mp_class[0].get("callback_symbol") != "DW_BotMPClassReadyMethod"):
+        raise ValueError("MP class readiness requires the exact zero-argument scalar bool registry")
     owner = snapshot / receipt["source"]
     if sha(owner.read_bytes()) != receipt["source_sha256"]:
         raise ValueError(

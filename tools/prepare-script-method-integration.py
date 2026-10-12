@@ -531,6 +531,16 @@ def derive(exe, catalog, output):
                 callback_symbol="DW_BotSurvivalAllowedMethod",
                 opcode=survival_opcode,
             ),
+            dict(
+                id=constants[3204] + 2,
+                name="dw_bot_mp_class_ready",
+                type=0,
+                argument_count=0,
+                receiver="entity",
+                result="bool",
+                callback_symbol="DW_BotMPClassReadyMethod",
+                opcode=survival_opcode,
+            ),
         ],
         limitations=[
             "Private draft, callback provided by parent; not installed in source units",
