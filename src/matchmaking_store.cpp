@@ -285,9 +285,11 @@ namespace matchmaking_store
             for (const auto *key : {"operator_start_requested", "operator_bots_requested"})
                 if (state.contains(key))
                     require(state[key].is_boolean());
+            // A committed request can reach zero when humans replace its last
+            // bot. Keep that state valid through migration and round transitions;
+            // authenticated new manual requests still require a positive count.
             if (state.contains("operator_bot_count"))
                 require(state["operator_bot_count"].is_number_unsigned() &&
-                        (state["operator_bot_count"].get<uint64_t>() > 0 || state.value("auto_fill_bots", false)) &&
                         state["operator_bot_count"].get<uint64_t>() < 200 &&
                         state.value("operator_bots_requested", false));
             for (const auto *key : {"auto_fill_bots", "auto_fill_complete"})

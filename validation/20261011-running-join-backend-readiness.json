@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "source_root": "E:/DW/IW8",
+  "branch": "main",
+  "ready": true,
+  "production_deployed": false,
+  "game_runs_performed": false,
+  "windows_sha256": "c480c9c14f2a18d249c2ebaf9ddec91b20417ad3009b4260267e2361b3b6bea4",
+  "linux_sha256": "872ff675f415cfb8fcd1fe88bb3cef853047fd66ca2c63409e0cb1c69dfe14c4",
+  "staged_linux_release": "/opt/replay-dw/releases/20261011-combined-872ff675f415",
+  "source_archive_sha256": "b5923671bcdde771f245f185fbc2717e5a13aa0715650a4c61681325989839b7",
+  "protocol_groups_each": 315,
+  "team_policy_groups_each": 27,
+  "auto_fill_groups_each": 4,
+  "whisper_asset_route_groups_each": 7,
+  "native_receiver_packets_windows": 2,
+  "source_sha256": {
+    "src/channel_services.cpp": "3dc12443888c8c6066af5be09b43db0536435b3126c016e255eca992c6414b74",
+    "src/lobby.cpp": "6c9b764511ecf01d2d4b5877d3b1eb20433ab03527c3fb091372a39b5621f49a",
+    "src/matchmaking_services.cpp": "6129c839adacb6471d7533dffc063405f62bab0d802d1e2310f5c36502089448",
+    "src/matchmaking_store.cpp": "bde172ede5ab0a416e8d9951e00ffbfdb00c260c360ef67148bb2608ccb5a983",
+    "src/platform.cpp": "d716992adac9e7c9f756ce5a587a2cdebfec48f4e21879dc25b6ffd2aecc92a4",
+    "src/platform.h": "44243f2c151e577b1e9a5b0ef534cd8c29f16dd51fc6df3703b31857d3cbe895",
+    "src/server.cpp": "f3379a3fd118be33780585fb746a55154f9cdf5a3de705bc4a5933a69f164ced",
+    "tools/test-auto-fill-bots.py": "cecf439c572a2661425286b6c500457b130cc8a218f6cfc0f8ed6083511bfecb",
+    "tools/test-lobby.py": "7a23df1608066338f75591b57966d6f7e102702b04db37237f7524eda5f2a516",
+    "tools/test-matchmaking-team-policy.py": "b0b607119c63383abe07427228bdd7b968e21cd20860ed4ba319c19273ef1a68",
+    "tools/public_matchmaking_fixtures.py": "7adb6896d104e1e213cff9c1782087f1cb0c14bcf0560e7ec1dced1ae5de53f6",
+    "tools/test-whisper-native.py": "4851d760dd067540c405662a8c4f7b6ea057b650dcb5f8a51e478e8213ceafd2",
+    "tools/test-whisper-transport.py": "2b4f984c8ac0948234d7044d8f8d1d20370f3c18e626398117fcc18e1422fe25",
+    "tools/test-whisper-update-routes.py": "991667336bab0c391f4db94a230e2202857ee1cf3e2b9b77f851f6396b60e1cf",
+    "tools/whisper_service_harness.cpp": "065b350806827bbfa2bae453c069bca478694329609e3364ccd167c22ee00c77",
+    "tools/whisper_transport_harness.cpp": "1f359e8c83b754c8e100465af8afbde7c34dea70b7ea54df40a2514d5a382264"
+  },
+  "private_readiness": "data\\combined-backend-20261011-1791764831632296900\\readiness.json",
+  "private_readiness_sha256": "9df64907bfe3bd38026fccb5091a517f3d870554265eceb04573cf57d866166a",
+  "changes": [
+    "Whisper acknowledgement requires a successful serialized recipient write.",
+    "No Fill reserves teammate positions without subtracting whole-lobby player capacity.",
+    "Running authenticated joins replace committed bots once per new real slot.",
+    "Zero committed bots persist through migration and round transitions.",
+    "Immutable hash-addressed native overlay payloads are served for verified client updates."
+  ],
+  "limitations": [
+    "Native game connection and chat UI remain owner playtests.",
+    "Squad placement retains the target native squad-ID limit and No Fill reservations.",
+    "Backend admission reserves membership; native authenticated DirectConnect performs eviction."
+  ]
+}

@@ -228,6 +228,7 @@ try:
             self.outgoing = self.incoming = 1
             self.mail_notifications = []
             self.progression_notifications = []
+            self.instant_notifications = []
             hello = struct.pack("<5I", 200, 200, 210, 220, 1024 * 1024) + os.urandom(8)
             send_fragments(self.s, hello)
             ack = read_frame(self.s)
@@ -321,7 +322,9 @@ try:
             assert plain[5 + size :] == bytes(len(plain) - 5 - size)
             return plain[4], plain[5 : 5 + size]
 
-        def receive(self):
+        def receive(self, take_instant=True):
+            if take_instant and self.instant_notifications:
+                return self.instant_notifications.pop(0)
             # Native onNewMail is asynchronous and may precede a later task's
             # result. Keep its exact bare event for the dedicated mail checks;
             # all other unsolicited records retain their existing strict order.
@@ -355,6 +358,16 @@ try:
                 ),
             )
             kind, data = self.receive()
+            # A native self-instant message can arrive before its own task
+            # acknowledgement now that recipient writes determine success.
+            # Retain this exact Push21 for the dedicated message assertion;
+            # other service/push ordering contracts stay strict.
+            instant_count = 0
+            while service == 6 and task == 14 and kind == 2 and data.startswith(u32(21)):
+                instant_count += 1
+                assert instant_count <= 64, "Unexpected native instant-message flood"
+                self.instant_notifications.append((kind, data))
+                kind, data = self.receive(take_instant=False)
             assert kind == 1
             assert (
                 data[0] == 10

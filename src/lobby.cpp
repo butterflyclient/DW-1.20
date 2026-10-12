@@ -64,7 +64,12 @@ namespace lobby
         };
 
         std::map<std::pair<uint32_t, uint64_t>, std::map<std::string, OnlineSession>> onlineUsers;
-        void route(uint32_t title, const services::Delivery &delivery);
+        struct DeliveryOutcome
+        {
+            unsigned targets = 0, written = 0, unavailable = 0, writeFailed = 0;
+        };
+
+        DeliveryOutcome route(uint32_t title, const services::Delivery &delivery);
         void startPublicationUpdates();
 
         struct PushLease
@@ -170,10 +175,11 @@ namespace lobby
             return targets;
         }
 
-        void deliver(uint32_t title,
+        DeliveryOutcome deliver(uint32_t title,
                      const services::Delivery &delivery,
                      const std::vector<std::shared_ptr<PushEndpoint>> &targets)
         {
+            DeliveryOutcome outcome{static_cast<unsigned>(targets.size())};
             for (const auto &endpoint : targets)
             {
                 std::lock_guard lock(endpoint->mutex);
@@ -197,7 +203,7 @@ namespace lobby
                         continue;
                 }
                 if (!services::deliveryValid(title, delivery))
-                    return;
+                    return outcome;
                 const PushEndpoint::ChannelMember channelMember = {
                     delivery.channelCategory, delivery.channelId, delivery.channelMember};
                 const auto channelGeneration = std::make_pair(delivery.channelMemberGeneration,
@@ -227,6 +233,7 @@ namespace lobby
                         {
                             if (!endpoint->writer(delivery.channelJoinPayload))
                             {
+                                ++outcome.writeFailed;
                                 endpoint->writer = {};
                                 continue;
                             }
@@ -235,8 +242,14 @@ namespace lobby
                                 endpoint->channelJoins.erase(endpoint->channelJoins.begin());
                             endpoint->channelJoins[channelMember] = channelGeneration;
                         }
-                        if (!endpoint->writer(delivery.payload))
+                        const bool written = endpoint->writer(delivery.payload);
+                        if (written)
+                            ++outcome.written;
+                        if (!written)
+                        {
+                            ++outcome.writeFailed;
                             endpoint->writer = {};
+                        }
                         else if (delivery.channelEvent == 24)
                         {
                             if (endpoint->channelJoins.size() >= 8192 &&
@@ -266,13 +279,17 @@ namespace lobby
                             endpoint->lastTournamentHash = delivery.tournamentStateHash;
                         }
                     }
+                    else
+                        ++outcome.unavailable;
                 }
                 catch (...)
                 {
+                    ++outcome.writeFailed;
                     endpoint->writer = {};
                     ++failures;
                 }
             }
+            return outcome;
         }
 
         // Matchmaking notifications become ready separately from the request's remote
@@ -448,14 +465,37 @@ namespace lobby
             static Updates updates;
         }
 
-        void route(uint32_t title, const services::Delivery &delivery)
+        DeliveryOutcome route(uint32_t title, const services::Delivery &delivery)
         {
             if (!delivery.delayMs)
             {
-                deliver(title, delivery, targetsFor(title, delivery.user));
-                return;
+                return deliver(title, delivery, targetsFor(title, delivery.user));
             }
             deliveryQueue().add(title, delivery);
+            return {};
+        }
+
+        void publishInstantMessage(uint32_t title, services::Reply &reply)
+        {
+            if (reply.error)
+                return;
+            // Presence can change after the producer's online check. Complete
+            // the serialized recipient packet write before acknowledging this
+            // native instant-message task. Other asynchronous pushes retain
+            // their existing publication order and delayed queue semantics.
+            wire::require(reply.deliveries.size() == 1 && !reply.deliveries[0].delayMs &&
+                          !reply.deliveries[0].channelId);
+            const auto outcome = route(title, reply.deliveries[0]);
+            reply.deliveries.clear();
+            reply.detail += " push_targets=" + std::to_string(outcome.targets) +
+                            " push_written=" + std::to_string(outcome.written) +
+                            " push_unavailable=" + std::to_string(outcome.unavailable) +
+                            " push_write_failed=" + std::to_string(outcome.writeFailed);
+            if (!outcome.written)
+            {
+                reply.error = 108;
+                reply.operation = "instant-message-recipient-unavailable";
+            }
         }
 
         Bytes frame(const IO &io, bool keepalive = true)
@@ -820,6 +860,8 @@ namespace lobby
                 stage = "task-dispatch service=" + std::to_string(service) +
                         " task=" + std::to_string(task);
                 auto reply = services::dispatch(identity, service, task, reader);
+                if (service == 6 && task == 14)
+                    publishInstantMessage(identity.titleId, reply);
                 auto response = services::taskReply(transaction++, task, reply);
                 if (response.size() + 64 > maxReceive)
                 {

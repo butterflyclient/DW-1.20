@@ -17,6 +17,7 @@
 #include <vector>
 #include "platform.h"
 #include "executable_updates.h"
+#include "../integration/replay/dw_update_assets_protocol.h"
 #include "../integration/replay/dw_client_identity.h"
 #include "platform_resources.h"
 #include "lobby.h"
@@ -444,11 +445,12 @@ namespace
             }
         }
         else if (path.starts_with("/updates/v1/patch/") ||
-                 path.starts_with("/updates/v2/image/"))
+                 path.starts_with("/updates/v2/image/") || path.starts_with("/updates/v2/asset/"))
         {
             const bool fullImage = path.starts_with("/updates/v2/image/");
+            const bool asset = path.starts_with("/updates/v2/asset/");
             const auto digest = path.substr(std::strlen(
-                fullImage ? "/updates/v2/image/" : "/updates/v1/patch/"));
+                fullImage ? "/updates/v2/image/" : asset ? "/updates/v2/asset/" : "/updates/v1/patch/"));
             if (method != "GET" || length || rangeHeader || !executable_updates::digestName(digest))
             {
                 reply(socket, 400, "{\"error\":\"invalid_update_payload_request\"}");
@@ -456,11 +458,12 @@ namespace
             }
             // Immutable, content-addressed blobs. Stream bounded chunks instead
             // of allocating a full EXE-sized response per connected player.
-            const auto filePath = fullImage ? platform::executableImagePath(digest)
+            const auto filePath = asset ? platform::executableAssetPath(digest)
+                                       : fullImage ? platform::executableImagePath(digest)
                                            : platform::executablePatchPath(digest);
             std::ifstream file(filePath, std::ios::binary | std::ios::ate);
             if (!file || file.tellg() <= 0 ||
-                static_cast<uint64_t>(file.tellg()) > DW_UPDATE_MAX_IMAGE)
+                static_cast<uint64_t>(file.tellg()) > (asset ? DW_UPDATE_ASSET_MAX_BYTES : DW_UPDATE_MAX_IMAGE))
             {
                 reply(socket, 404, "{\"error\":\"update_payload_unavailable\"}");
                 return;

@@ -1372,6 +1372,13 @@ namespace platform
         return identityDirectory / "updates" / "images" / (digest + ".exe");
     }
 
+    std::filesystem::path executableAssetPath(const std::string &digest)
+    {
+        if (!executable_updates::digestName(digest))
+            throw std::runtime_error("Invalid owned update asset identity");
+        return identityDirectory / "updates" / "assets" / (digest + ".bin");
+    }
+
     std::string executableUpdate(const std::string &bytes)
     {
         if (bytes.size() != sizeof(DWUpdateRequest))

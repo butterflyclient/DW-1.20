@@ -194,9 +194,11 @@ try:
         docs = documents(created[32:])
         assert docs[1]["team_balance"]["squad_size"] == 3
         assert docs[1]["team_balance"]["squads"] == {"0": [host.user, peer.user]}
-        assert len(docs[1]["team_balance"]["teams"]) == 50
+        # The protected third position of this two-player No Fill party needs
+        # one extra group while the playlist still admits all 150 players.
+        assert len(docs[1]["team_balance"]["teams"]) == 51
         assert docs[1]["team_balance"]["teams"]["0"] == [host.user, peer.user]
-        assert docs[1]["ruleset_payload"]["dvar_overrides"][names["party_teamCount"]] == 50
+        assert docs[1]["ruleset_payload"]["dvar_overrides"][names["party_teamCount"]] == 51
         assert docs[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_squadSize"] == 3
         assert int(docs[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_reservedSquads"], 16) == 1
         assert docs[1]["ruleset_payload"]["dvar_overrides"][guard] == 0
@@ -223,7 +225,7 @@ try:
         for client in clients:
             assert receive(client) == (2, u32(2002) + u64(lobby) + u64(0))
         checks.append("Verdansk BR uses its published squad size, preserves each party in one squad, and disables MP partition splitting")
-        checks.append("BR publishes all fifty combat groups, preserves capacity and native bindings, carries No Fill bot reservations, and matches clients with stale MP team counts")
+        checks.append("BR publishes 51 combat groups for 150 players plus protected No Fill positions, preserves native bindings, and matches clients with stale MP team counts")
         squad_binding = names["online_matchmaking_update_party_team_squad_assignments"]
         assert docs[1]["ruleset_payload"]["dvar_overrides"][squad_binding] == 1
         for host_locked, joining_locked in ((True, False), (False, True), (False, False)):

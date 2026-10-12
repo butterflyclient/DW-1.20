@@ -202,3 +202,162 @@ def exercise(
     checks.append(
         "native in_game lobbies honor join-in-progress policy and retain the same assigned game instead of spawning a second match"
     )
+
+    # Full two-player running match: a real newcomer replaces the committed
+    # bot through the same public admission transaction and native publications.
+    lobby, initial = created(progress)
+    fill = copy.deepcopy(initial[0])
+    fill["dw_bot_count"] = 1
+    assert host.task(145, 15, u64(lobby) + u64(initial[1]["update_id"])
+                     + text(json.dumps(fill))) == boolean(True)
+    current = strings(host.receive()[1][23:])
+    playing = copy.deepcopy(current[0])
+    playing["game_state"] = {"state": "in_game"}
+    assert host.task(145, 15, u64(lobby) + u64(current[1]["update_id"])
+                     + text(json.dumps(playing))) == boolean(True)
+    current = strings(host.receive()[1][23:])
+    stale_host = copy.deepcopy(current)
+    path = root / "lobbies" / f"{lobby}.json"
+    before = json.loads(path.read_bytes())
+    assert before["maximum_members"] == 2 and before["operator_bot_count"] == 1
+    mm = start(peer, progress_join)
+    packet = peer.receive()[1]
+    assert packet.startswith(u32(2001) + u64(mm) + u64(lobby))
+    joined = strings(packet[23:])
+    assert strings(host.receive()[1][23:]) == joined
+    committed = json.loads(path.read_bytes())
+    assert committed["maximum_members"] == 2 and committed["operator_bot_count"] == 0
+    assert set(committed["members"]) == {user, peer_user}
+    assert joined[1]["ruleset_payload"]["dvar_overrides"]["replay_dw_botCount"] == 0
+    assert joined[1]["dtls"] == before["backend_doc"]["dtls"]
+    # A stale host snapshot cannot drop the new primary or undo replacement.
+    unchanged = path.read_bytes()
+    assert host.task(145, 15, u64(lobby) + u64(stale_host[1]["update_id"])
+                     + text(json.dumps(stale_host[0]))) == boolean(False)
+    assert path.read_bytes() == unchanged
+    # Repeat admission at an all-human full cap: same lobby, zero new humans,
+    # zero additional bot removals. Existing reservations cannot be changed.
+    retry_mm = start(peer, progress_join)
+    assert peer.receive()[1].startswith(u32(2001) + u64(retry_mm) + u64(lobby))
+    current = strings(host.receive()[1][23:])
+    committed = json.loads(path.read_bytes())
+    assert committed["maximum_members"] == 2 and committed["operator_bot_count"] == 0
+    assert len(committed["members"]) == 2
+    over = copy.deepcopy(progress_join)
+    over["player_id_to_slots"][str(peer_user)] = 1
+    unchanged_reject(lobby, over)
+    presence = copy.deepcopy(over)
+    presence["lobby_id_to_presence_join"] = lobby
+    unchanged_reject(lobby, presence)
+    duplicate = copy.deepcopy(progress_join)
+    duplicate["members"] *= 2
+    duplicate["tokens"] *= 2
+    unchanged_reject(lobby, duplicate, 106)
+    checks.append("running admission replaces one committed bot, retains capacity/DTLS, rejects guest overflow and duplicate identities, and retries without another removal")
+    # Authenticate a live handoff after replacement; the successor keeps the
+    # reduced committed roster and existing humans, including the old host.
+    handoff = copy.deepcopy(current[0])
+    handoff["player_state"] = {str(user): 2, str(peer_user): 2}
+    handoff["dw_migration_target"] = peer_user
+    assert host.task(145, 15, u64(lobby) + u64(current[1]["update_id"])
+                     + text(json.dumps(handoff))) == boolean(True)
+    current = strings(host.receive()[1][23:])
+    assert strings(peer.receive()[1][23:]) == current
+    successor = copy.deepcopy(current[0])
+    successor["listen_server"] = {"host_player_id": peer_user,
+                                 "host_address": player_info["listen_server"]["local_address"]}
+    assert peer.task(145, 15, u64(lobby) + u64(current[1]["update_id"])
+                     + text(json.dumps(successor))) == boolean(True)
+    migrated = strings(peer.receive()[1][23:])
+    assert strings(host.receive()[1][23:]) == migrated
+    committed = json.loads(path.read_bytes())
+    assert committed["owner"] == peer_user and committed["operator_bot_count"] == 0
+    assert set(committed["members"]) == {user, peer_user} and committed["maximum_members"] == 2
+    def peer_publish(document, revision):
+        assert peer.task(145, 15, u64(lobby) + u64(revision)
+                         + text(json.dumps(document))) == boolean(True)
+        packet = peer.receive()[1]
+        if str(user) in document["player_state"]:
+            assert host.receive() == (2, packet)
+        return strings(packet[23:])
+    current = migrated
+    # Zero remains a committed roster while the host enters countdown, then
+    # the ordinary intermission path clears the request for the next round.
+    for phase in ("countdown", "intermission"):
+        transition = copy.deepcopy(current[0])
+        transition["game_state"] = {"state": phase}
+        current = peer_publish(transition, current[1]["update_id"])
+        saved = json.loads(path.read_bytes())
+        if phase == "countdown":
+            assert saved["operator_bot_count"] == 0 and saved["operator_bots_requested"] is True
+        else:
+            assert "operator_bot_count" not in saved and "operator_bots_requested" not in saved
+    invalid = copy.deepcopy(current[0])
+    invalid["dw_bot_count"] = 0
+    unchanged = path.read_bytes()
+    peer.task(145, 15, u64(lobby) + u64(current[1]["update_id"])
+              + text(json.dumps(invalid)), error=106)
+    assert path.read_bytes() == unchanged
+    # Retire the old host's owned fixture membership, fill the resulting slot
+    # in the next round, and authenticate that same real player joining again.
+    retire = copy.deepcopy(current[0])
+    retire["player_state"] = {str(peer_user): 2}
+    current = peer_publish(retire, current[1]["update_id"])
+    refill = copy.deepcopy(current[0])
+    refill["dw_bot_count"] = 1
+    current = peer_publish(refill, current[1]["update_id"])
+    assert json.loads(path.read_bytes())["operator_bot_count"] == 1
+    transition = copy.deepcopy(current[0])
+    transition["game_state"] = {"state": "in_game"}
+    current = peer_publish(transition, current[1]["update_id"])
+    rejoin = copy.deepcopy(progress_join)
+    rejoin["members"] = [user]
+    rejoin["tokens"] = [host_token]
+    rejoin["player_id_to_slots"] = {str(user): 0}
+    mm = start(host, rejoin)
+    assert host.receive()[1].startswith(u32(2001) + u64(mm) + u64(lobby))
+    current = strings(peer.receive()[1][23:])
+    saved = json.loads(path.read_bytes())
+    assert saved["operator_bot_count"] == 0 and saved["maximum_members"] == 2
+    assert set(saved["members"]) == {user, peer_user}
+    checks.append("last manual bot zero survives migration/countdown, clears on intermission, rejects a new zero request, and replaces a fresh next-round bot without raising capacity")
+    peer.task(145, 10, u64(lobby))
+    assert host.receive() == peer.receive() == (2, u32(2002) + u64(lobby) + u64(0))
+    checks.append("stale host publication cannot undo running admission; authenticated host migration retains the reduced roster without refilling bots")
+
+    lobby, current = created(progress)
+    path = root / "lobbies" / f"{lobby}.json"
+    def publish(document):
+        assert host.task(145, 15, u64(lobby) + u64(current[1]["update_id"])
+                         + text(json.dumps(document))) == boolean(True)
+        return strings(host.receive()[1][23:])
+    arm = copy.deepcopy(current[0])
+    arm.update(dw_auto_fill_bots=True, dw_auto_fill_complete=False,
+               dw_auto_fill_request=1, dw_bot_count=0)
+    current = publish(arm)
+    # Only this disposable fixture clock is aged; real backend data is untouched.
+    saved = json.loads(path.read_bytes())
+    saved["auto_fill_started_ms"] = 1
+    path.write_text(json.dumps(saved))
+    for request, complete in ((2, False), (3, True)):
+        arm = copy.deepcopy(current[0])
+        arm.update(dw_auto_fill_bots=True, dw_auto_fill_complete=complete,
+                   dw_auto_fill_request=request, dw_bot_count=1)
+        current = publish(arm)
+    playing = copy.deepcopy(current[0])
+    playing["game_state"] = {"state": "in_game"}
+    current = publish(playing)
+    before = json.loads(path.read_bytes())
+    mm = start(peer, progress_join)
+    assert peer.receive()[1].startswith(u32(2001) + u64(mm) + u64(lobby))
+    current = strings(host.receive()[1][23:])
+    after = json.loads(path.read_bytes())
+    rules = current[1]["ruleset_payload"]["dvar_overrides"]
+    assert after["operator_bot_count"] == after["auto_fill_target"] == 0
+    assert after["maximum_members"] == 2 and after["auto_fill_complete"] is True
+    assert after["auto_fill_request"] == before["auto_fill_request"] == 3
+    assert after["auto_fill_started_ms"] == before["auto_fill_started_ms"] == 1
+    assert rules["replay_dw_botCount"] == rules["replay_dw_autoFillBotTarget"] == 0
+    assert rules["replay_dw_autoFillBotsComplete"] == 1
+    disband(lobby, True)
+    checks.append("completed automatic fill running join lowers committed bot count and target together while preserving completion, request token, clock and capacity")

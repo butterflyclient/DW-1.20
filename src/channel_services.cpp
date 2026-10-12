@@ -27,6 +27,23 @@ namespace services
         {
             auto detail = " recipient=" + std::to_string(recipient) +
                           " message_bytes=" + std::to_string(message.size());
+            // Original Replay SendMessageToChat (140F3D9D0) sends CHAT:,
+            // text, then NUL. OnlineMgr compares the five-byte header and
+            // OnDWInstantMessage (140F3A9F0) reads text after those five bytes.
+            // Classify the native route without logging private text or
+            // changing opaque messaging bytes used by invitations and games.
+            if (message.size() >= 5 && std::memcmp(message.data(), "CHAT:", 5) == 0)
+            {
+                const bool terminated = message.size() > 5 && message.back() == 0;
+                const auto bodyEnd = terminated ? message.end() - 1 : message.end();
+                // The native sender copies text into 500 bytes before adding
+                // CHAT:; the complete packet is at most five plus 500 bytes.
+                const bool valid = terminated && message.size() > 6 && message.size() <= 505 &&
+                                   std::find(message.begin() + 5, bodyEnd, uint8_t{}) == bodyEnd;
+                return detail + " message_kind=chat_whisper chat_layout=" +
+                       (valid ? "valid" : "invalid") + " chat_body_bytes=" +
+                       std::to_string(message.size() - 5 - (terminated ? 1 : 0));
+            }
             // Original Replay SendDWInvite / OnDWInstantMessage use the
             // five-byte INV:\0 header, followed by the one-byte message type.
             // Keep opaque application bytes intact. Log no body or session keys.

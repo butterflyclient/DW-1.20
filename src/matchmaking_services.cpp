@@ -212,6 +212,33 @@ namespace services
                 std::chrono::system_clock::now().time_since_epoch()).count());
         }
 
+        unsigned nativeSquadLimit(unsigned squadSize)
+        {
+            // Replay carries ordinary squad indices in six bits. Solos use
+            // combat teams directly; their native bot roster has 152 entries.
+            return squadSize == 1 ? 152 : 63;
+        }
+
+        uint64_t reservedSquadPlaces(const Json &state)
+        {
+            const auto squadSize = state.value("match_selection", Json::object()).value("squad_size", 0u);
+            if (!squadSize)
+                return 0;
+            const auto &backend = state.at("backend_doc");
+            const auto slots = backend.value("player_id_to_slots", Json::object());
+            const auto fill = state.value("squad_fill", Json::object());
+            uint64_t reserved = 0;
+            for (const auto &squad : backend.at("team_balance").at("squads").items())
+            {
+                const auto occupied = occupiedSlots(squad.value(), slots);
+                wire::require(std::stoul(squad.key()) < nativeSquadLimit(squadSize) &&
+                              occupied <= squadSize);
+                if (occupied && !fill.value(squad.key(), false))
+                    reserved += squadSize - occupied;
+            }
+            return reserved;
+        }
+
         uint64_t autoFillTarget(const Json &state)
         {
             const auto capacity = state.at("maximum_members").get<uint64_t>();
@@ -219,30 +246,25 @@ namespace services
             const auto slots = backend.value("player_id_to_slots", Json::object());
             const auto humans = occupiedSlots(state.at("members"), slots);
             wire::require(humans <= capacity);
-            uint64_t reserved = 0;
             const auto squadSize = state.value("match_selection", Json::object()).value("squad_size", 0u);
-            if (squadSize)
-            {
-                const auto fill = state.value("squad_fill", Json::object());
-                for (const auto &squad : backend.at("team_balance").at("squads").items())
-                    if (!fill.value(squad.key(), false))
-                    {
-                        const auto group = std::stoul(squad.key());
-                        wire::require(group < 200 && group * squadSize < capacity);
-                        const auto groupSlots = std::min<uint64_t>(squadSize, capacity - group * squadSize);
-                        const auto occupied = occupiedSlots(squad.value(), slots);
-                        wire::require(occupied <= groupSlots);
-                        reserved += groupSlots - occupied;
-                    }
-            }
-            wire::require(reserved <= capacity - humans);
-            return capacity - humans - reserved;
+            if (!squadSize)
+                return capacity - humans;
+            const auto reserved = reservedSquadPlaces(state);
+            const auto groupCapacity = uint64_t(nativeSquadLimit(squadSize)) * squadSize;
+            wire::require(humans + reserved <= groupCapacity);
+            // A No Fill party reserves team positions, not total player slots.
+            // Allocate additional bot squads while retaining the playlist cap.
+            return std::min(capacity - humans, groupCapacity - humans - reserved);
         }
 
         void refreshAutoFill(Json &state, bool restart = false)
         {
             if (!state.value("auto_fill_bots", false))
                 return;
+            const auto phase =
+                state.at("host_doc").value("game_state", Json::object()).value("state", std::string{});
+            if (!restart && !phase.empty() && phase != "intermission")
+                return; // Running matches retain their already committed roster.
             const auto target = autoFillTarget(state);
             if (restart)
             {
@@ -281,8 +303,10 @@ namespace services
                 // groups which native bots may occupy later.
                 auto &teams = backendDocument["team_balance"]["teams"];
                 teams = backendDocument["team_balance"]["squads"];
-                const auto groups =
-                    (lobby.at("maximum_members").get<unsigned>() + squadSize - 1) / squadSize;
+                const auto capacity = lobby.at("maximum_members").get<uint64_t>();
+                const auto reservedPlaces = reservedSquadPlaces(lobby);
+                const auto groups = std::min<uint64_t>(nativeSquadLimit(squadSize),
+                    (capacity + reservedPlaces + squadSize - 1) / squadSize);
                 wire::require(groups > 0 && groups <= 200);
                 for (unsigned i = 0; i < groups; ++i)
                     if (!teams.contains(std::to_string(i)))
@@ -292,7 +316,7 @@ namespace services
                     groups;
                 const auto fill = lobby.value("squad_fill", Json::object());
                 for (const auto &entry : backendDocument["team_balance"]["squads"].items())
-                    if (!fill.value(entry.key(), false))
+                    if (!entry.value().empty() && !fill.value(entry.key(), false))
                     {
                         const unsigned group = unsigned(std::stoul(entry.key()));
                         wire::require(group < 200);
@@ -495,51 +519,134 @@ namespace services
             return lobby.at("backend_doc").value("player_id_to_slots", Json::object());
         }
 
+        std::optional<std::string> joiningSquad(const Json &lobby, const Json &query, const Json &slots)
+        {
+            const auto squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+            if (!squadSize)
+                return std::string{};
+            if (occupiedSlots(query.at("members"), slots) > squadSize)
+                return std::nullopt;
+            const auto &squads = lobby.at("backend_doc").at("team_balance").at("squads");
+            Json additions = Json::array();
+            std::optional<std::string> anchor;
+            bool splitAnchors = false;
+            for (const auto &user : query.at("members"))
+            {
+                if (!member(lobby, user.get<uint64_t>()))
+                {
+                    additions.push_back(user);
+                    continue;
+                }
+                for (const auto &squad : squads.items())
+                    if (std::find(squad.value().begin(), squad.value().end(), user) != squad.value().end())
+                    {
+                        splitAnchors |= anchor && *anchor != squad.key();
+                        anchor = squad.key();
+                    }
+            }
+            if (additions.empty())
+                return std::string{}; // Retry retains every existing assignment.
+            const auto needed = occupiedSlots(additions, slots);
+            if (splitAnchors)
+                return std::nullopt; // Never move humans to merge an existing party.
+            if (anchor)
+                return occupiedSlots(squads.at(*anchor), slots) + needed <= squadSize ? anchor
+                                                                                      : std::nullopt;
+            const auto fill = lobby.value("squad_fill", Json::object());
+            if (!query.value("team_balance", Json::object()).value("lock_squad", false))
+                for (const auto &squad : squads.items())
+                    if (fill.value(squad.key(), false) &&
+                        occupiedSlots(squad.value(), slots) + needed <= squadSize)
+                        return squad.key();
+            for (unsigned group = 0; group < nativeSquadLimit(squadSize); ++group)
+            {
+                const auto key = std::to_string(group);
+                if (!squads.contains(key) || squads.at(key).empty())
+                    return key;
+            }
+            return std::nullopt;
+        }
+
+        bool runningMatch(const Json &lobby)
+        {
+            const auto phase =
+                lobby.at("host_doc").value("game_state", Json::object()).value("state", std::string{});
+            return phase == "in_game";
+        }
+
+        void replaceRunningBots(Json &lobby, uint64_t previousHumans)
+        {
+            if (!runningMatch(lobby))
+                return;
+            const auto humans = occupiedSlots(lobby.at("members"), lobbySlots(lobby));
+            wire::require(humans >= previousHumans &&
+                          humans <= lobby.at("maximum_members").get<uint64_t>());
+            if (!lobby.contains("operator_bot_count"))
+                return; // Ordinary running lobbies have no committed bot request.
+            const auto bots = lobby.at("operator_bot_count").get<uint64_t>();
+            const auto removed = std::min(bots, humans - previousHumans);
+            lobby["operator_bot_count"] = bots - removed;
+            // Completion, request token and timer remain committed. Host
+            // migration must not refill the bots displaced by joining humans.
+            if (lobby.value("auto_fill_bots", false))
+                lobby["auto_fill_target"] = bots - removed;
+            wire::require(bots - removed <= lobby.at("maximum_members").get<uint64_t>() - humans);
+        }
+
         bool slotsAvailable(const Json &lobby, const Json &query)
         {
             auto members = lobby.at("members");
             auto slots = lobbySlots(lobby);
             const auto requested = requestedSlots(query);
             for (const auto &entry : requested.items())
+            {
+                // A retry cannot alter an already admitted primary's guest
+                // reservation or free another real player's occupied slot.
+                if (runningMatch(lobby) && member(lobby, std::stoull(entry.key())) &&
+                    slots.value(entry.key(), uint64_t{0}) != entry.value().get<uint64_t>())
+                    return false;
                 slots[entry.key()] = entry.value();
+            }
             for (const auto &user : query.at("members"))
                 if (!member(lobby, user.get<uint64_t>()))
                     members.push_back(user);
             const auto occupied = occupiedSlots(members, slots);
             const auto capacity = lobby.value("maximum_members", uint64_t{200});
-            // A queued native bot count remains fixed for this round. Preserve
-            // its slots while admitting real primaries and their guest slots.
-            const auto bots = lobby.value("operator_bots_requested", false)
-                                  ? lobby.value("operator_bot_count", uint64_t{0}) : uint64_t{0};
+            // Running admission is bounded by real players and authenticated
+            // guest reservations. Bots yield one slot per newly admitted human.
+            const auto bots = lobby.value("operator_bot_count", uint64_t{0});
             if (occupied > capacity)
                 return false;
-            if (lobby.value("auto_fill_bots", false))
+            if (lobby.value("auto_fill_bots", false) || runningMatch(lobby))
             {
-                const auto squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
+                const auto squadSize =
+                    lobby.value("match_selection", Json::object()).value("squad_size", 0u);
                 if (squadSize)
                 {
-                    const auto &squads = lobby.at("backend_doc").at("team_balance").at("squads");
-                    const auto fill = lobby.value("squad_fill", Json::object());
-                    Json additions = Json::array();
+                    const auto destination = joiningSquad(lobby, query, slots);
+                    if (!destination)
+                        return false;
+                    if (destination->empty() || !runningMatch(lobby))
+                        return true;
+                    // Preview the actual assignment. A protected squad may
+                    // accept its own authenticated party, never an outsider.
+                    auto joined = lobby;
+                    joined["members"] = members;
+                    joined["backend_doc"]["player_id_to_slots"] = slots;
+                    auto &squad = joined["backend_doc"]["team_balance"]["squads"][*destination];
+                    if (squad.is_null() || squad.empty())
+                    {
+                        squad = Json::array();
+                        joined["squad_fill"][*destination] =
+                            !query.value("team_balance", Json::object()).value("lock_squad", false);
+                    }
                     for (const auto &user : query.at("members"))
                         if (!member(lobby, user.get<uint64_t>()))
-                            additions.push_back(user);
-                    const auto needed = occupiedSlots(additions, slots);
-                    if (!needed)
-                        return true;
-                    if (!query.value("team_balance", Json::object()).value("lock_squad", false))
-                        for (const auto &squad : squads.items())
-                            if (fill.value(squad.key(), false) &&
-                                occupiedSlots(squad.value(), slots) + needed <= squadSize)
-                                return true;
-                    // NoFill reserves teammates' places, including against a
-                    // joining party that would otherwise spill beyond teamCount.
-                    const auto groups = (capacity + squadSize - 1) / squadSize;
-                    for (uint64_t group = 0; group < groups; ++group)
-                        if (!squads.contains(std::to_string(group)) &&
-                            needed <= std::min<uint64_t>(squadSize, capacity - group * squadSize))
-                            return true;
-                    return false;
+                            squad.push_back(user);
+                    const auto added = occupied - occupiedSlots(lobby.at("members"), lobbySlots(lobby));
+                    const auto remainingBots = bots - std::min(bots, added);
+                    return occupied + reservedSquadPlaces(joined) + remainingBots <=
+                           uint64_t(nativeSquadLimit(squadSize)) * squadSize;
                 }
                 return true;
             }
@@ -871,6 +978,11 @@ namespace services
                             Json lobby,
                             const char *operation)
         {
+            // Recheck the complete party at the mutation boundary, including
+            // presence joins and retries, before any membership publication.
+            if (!slotsAvailable(lobby, query))
+                return {108, {}, "matchmaker-join-capacity-unavailable"};
+            const auto previousHumans = occupiedSlots(lobby.at("members"), lobbySlots(lobby));
             const auto root = directory / "matchmaking" / std::to_string(id.titleId);
             uint64_t mmId = 0;
             do
@@ -909,43 +1021,23 @@ namespace services
             const auto squadSize = lobby.value("match_selection", Json::object()).value("squad_size", 0u);
             if (squadSize)
             {
-                auto &squads = backend["team_balance"]["squads"];
-                wire::require(squads.is_object());
-                Json additions = Json::array();
-                for (const auto &user : query.at("members"))
-                    if (!existing.contains(user.get<uint64_t>()))
-                        additions.push_back(user);
-                if (!additions.empty())
+                const auto destination = joiningSquad(lobby, query, reservations);
+                wire::require(destination.has_value());
+                if (!destination->empty())
                 {
-                    // Preserve the authenticated joining party as a unit. Never
-                    // assign each primary to a separate default size-one squad.
-                    wire::require(occupiedSlots(additions, reservations) <= squadSize);
-                    const bool locked = query.value("team_balance", Json::object())
-                                            .value("lock_squad", false);
-                    auto &fill = lobby["squad_fill"];
-                    if (fill.is_null())
-                        fill = Json::object(); // Older squads remain reserved.
-                    std::string destination;
-                    if (!locked)
-                        for (const auto &squad : squads.items())
-                            if (fill.value(squad.key(), false) &&
-                                occupiedSlots(squad.value(), reservations) +
-                                    occupiedSlots(additions, reservations) <= squadSize)
-                            {
-                                destination = squad.key();
-                                break;
-                            }
-                    if (destination.empty())
+                    auto &squad = backend["team_balance"]["squads"][*destination];
+                    if (squad.is_null() || squad.empty())
                     {
-                        unsigned next = 0;
-                        while (squads.contains(std::to_string(next)))
-                            wire::require(++next < 200);
-                        destination = std::to_string(next);
-                        squads[destination] = Json::array();
-                        fill[destination] = !locked;
+                        squad = Json::array();
+                        auto &fill = lobby["squad_fill"];
+                        if (fill.is_null())
+                            fill = Json::object(); // Older squads remain reserved.
+                        fill[*destination] =
+                            !query.value("team_balance", Json::object()).value("lock_squad", false);
                     }
-                    for (const auto &user : additions)
-                        squads[destination].push_back(user);
+                    for (const auto &user : query.at("members"))
+                        if (!existing.contains(user.get<uint64_t>()))
+                            squad.push_back(user);
                 }
             }
             for (const auto user : users)
@@ -975,6 +1067,7 @@ namespace services
                 }
                 backend["player_id_to_mm_id"][key] = mmId;
             }
+            replaceRunningBots(lobby, previousHumans);
             refreshAutoFill(lobby);
             wire::require(lobby["host_doc"].dump().size() < 16384 && backend.dump().size() < 16384);
             const auto lobbyId = lobby.at("id").get<uint64_t>();
@@ -1055,26 +1148,28 @@ namespace services
                     !host.value("lobby_open", false) || !hostSessionActive(candidate, id.titleId) ||
                     !platformAllowed(candidate.value("query_constraints", Json::object())) ||
                     !slotsAvailable(candidate, query) ||
-                    std::any_of(users.begin(),
-                                users.end(),
-                                [&](uint64_t user)
-                                {
-                                    return member(candidate, user);
-                                }))
+                    (!runningMatch(candidate) &&
+                     std::any_of(users.begin(), users.end(),
+                                 [&](uint64_t user) { return member(candidate, user); })))
                     continue;
                 const auto state = host.at("game_state").value("state", std::string{});
                 // Replay's accepted initial host snapshots use an empty state
                 // while waiting for players. They are open pre-game lobbies;
                 // the owner/session/capacity checks above still apply.
                 if (!state.empty() && state != "intermission" &&
-                    !(inProgress && state == "in_game"))
+                    !(runningMatch(candidate) &&
+                      (inProgress || std::all_of(users.begin(), users.end(),
+                                                [&](uint64_t user) { return member(candidate, user); }))))
                     continue;
                 candidates.push_back(std::move(candidate));
             }
             std::sort(candidates.begin(),
                       candidates.end(),
-                      [](const Json &a, const Json &b)
+                      [&](const Json &a, const Json &b)
                       {
+                          const bool aMember = member(a, id.userId), bMember = member(b, id.userId);
+                          if (aMember != bMember)
+                              return aMember;
                           const auto aSlots = occupiedSlots(a.at("members"), lobbySlots(a));
                           const auto bSlots = occupiedSlots(b.at("members"), lobbySlots(b));
                           if (aSlots != bSlots)
@@ -1561,7 +1656,8 @@ namespace services
                 if (lobby.value("auto_fill_bots", false) && !lobby.value("auto_fill_complete", false))
                     wire::require(submittedPhase.empty() || submittedPhase == "intermission");
                 auto writes = reconcileMembers(root, id, lobby, host);
-                refreshAutoFill(lobby, migration && lobbyWaitingForStart(lobby));
+                refreshAutoFill(lobby, migration && lobbyWaitingForStart(lobby) &&
+                                      !lobby.value("auto_fill_complete", false));
                 if (lobby.value("auto_fill_bots", false) && !lobby.value("auto_fill_complete", false))
                     wire::require(submittedPhase.empty() || submittedPhase == "intermission");
                 if (host.contains("dw_auto_fill_bots"))
