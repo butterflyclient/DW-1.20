@@ -6,14 +6,19 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-deployment = json.loads((ROOT / "data/deployment.json").read_text())
+deployment = json.loads((ROOT / "data/dw-client/deployment.json").read_text())
+readiness = json.loads(Path(deployment["readiness"]).read_bytes())
+report = json.loads(Path(readiness["build_report"]).read_bytes())
+if (not readiness["passed"] or report["unresolved_symbols"]
+        or readiness["sha256"] != deployment["sha256"]):
+    raise RuntimeError("The sole DW production target is not ready for distribution")
 image = Path(deployment["executable"])
 digest = hashlib.sha256(image.read_bytes()).hexdigest()
 if digest != deployment["sha256"]:
     raise RuntimeError("Deployed game image changed")
 if not any(
     Path(item["source"]).name == "DW_LocalIdentity.cpp"
-    for item in deployment["platform_sources"]
+    for item in report["cpp"]
 ):
     raise RuntimeError(
         "Deployed image does not contain automatic local identity support"
@@ -38,8 +43,10 @@ launcher = (
 )
 readme = rf"""REPLAY DW CLIENT TEST
 
-New players: extract all four files into the compatible 1.20 Replay root folder.
-Existing players: replace the EXE, launcher and READ_ME, keeping your own INI.
+New players: extract the package into the compatible 1.20 Replay root folder.
+Existing players: replace the EXE, launcher, READ_ME and owned zone files,
+keeping your own INI. The zone entries add only the named DW script overlay;
+they do not replace shipped game fastfiles.
 The EXE and INI must stay together. Keep normal game assets/dependencies.
 Remove the optional XInput9_1_0.dll Replay proxy; this EXE needs no proxy.
 Close any old game instance before replacing the EXE and INI.
@@ -72,8 +79,11 @@ INI rank=0 restores saved progress. Values 1..55 select that career rank once
 when the value changes, then earned XP continues normally. Restart after edits.
 Earned item ownership persists. Lowering rank or disabling unlock_all does not
 erase inventory items already granted by the backend.
-com_optimized defaults to 0. Set the dvar to 1 for optimizations preserving the
-3D scene's appearance, or 2 for the experimental aggressive visual/CPU profile.
+com_optimized defaults to 1 for optimizations preserving the 3D scene's look.
+Set it to 0 to disable them, or 2 for the aggressive visual/CPU experiment.
+bypass_update_restart=0 enables normal verified full-EXE and owned-file updates.
+Set it to 1 to keep a custom EXE and skip its update/restart enforcement; native
+publisher/data updates and manual restarts remain available.
 No backend signing keys, access keys or player identities are in this package.
 This is the current multiplayer test build, not a completed DW replacement.
 
@@ -85,15 +95,34 @@ files = {
     "READ_ME.txt": readme.encode("ascii"),
 }
 archive = ROOT / "data/Replay-DW-Client-Test.zip"
+source = Path(readiness["source_root"])
+assets = json.loads((source / "generated/update-assets.json").read_bytes())
+from dw_update_assets import extract, sha
+if sha(extract(image.read_bytes())) != assets["manifest_sha256"]:
+    raise RuntimeError("Client image does not bind its owned asset inventory")
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as package:
     package.write(image, image.name)
     for name, data in files.items():
         package.writestr(name, data)
+    for entry in assets["entries"]:
+        relative = Path(assets["relative_paths"][entry["name"]])
+        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) > 2:
+            raise RuntimeError("Owned asset escaped its native zone folders")
+        payload = Path(assets["payloads"][entry["sha256"]]["source"]).resolve()
+        if not payload.is_relative_to(source / "generated/bot-style-scripts"):
+            raise RuntimeError("Owned package input escaped its frozen source")
+        data = payload.read_bytes()
+        if sha(data) != entry["sha256"] or len(data) != entry["size"]:
+            raise RuntimeError("Owned package payload changed")
+        package.writestr("zone/" + relative.as_posix(), data)
 receipt = {
     "schema": 2,
     "archive": str(archive),
     "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
     "game_sha256": digest,
+    "release": deployment["public_updater"]["release"],
+    "owned_native_assets": len(assets["entries"]),
+    "owned_manifest_sha256": assets["manifest_sha256"],
     "public_address": endpoint,
     "universal_client": True,
     "player_provisioning_required": False,
