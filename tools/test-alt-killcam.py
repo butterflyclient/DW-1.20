@@ -731,8 +731,9 @@ def main():
             submission_cases += 1
     harness = json.loads(runs[0].stdout.splitlines()[-1])
     assert predicate_cases == 48 and submission_cases == 48
-    expected_cpu = dict(cases=234, active_pair_cases=54, failure_cases=19, origin_cases=100,
-                        streaming_scope_cases=8, third_person_cases=4, retained_cases=10,
+    expected_cpu = dict(cases=236, active_pair_cases=54, failure_cases=19, origin_cases=100,
+                        streaming_scope_cases=8, third_person_cases=4, continuation_cases=10,
+                        uncaptured_cases=2,
                         replay_boundary_cases=16, camera_cut_cases=12, inset_cases=6)
     assert harness == expected_cpu, harness
     assert len(receipt["clones"]) == 8

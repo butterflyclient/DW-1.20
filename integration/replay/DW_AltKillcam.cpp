@@ -58,6 +58,7 @@ namespace
         int32_t startTime, client;
         uint64_t lastObjectToken;
         bool active;
+        bool hasObjectPose;
     };
 
     ReplaySession s_replay[2];
@@ -120,7 +121,7 @@ namespace
         if (!replay.active && !live)
             return false;
         if (!replay.active)
-            replay = {cg, state.startTime, client, 0, true};
+            replay = {cg, state.startTime, client, 0, true, false};
         *result = {cg, snapshot, refdef, local, type, live};
         return true;
     }
@@ -151,25 +152,44 @@ namespace
         return local < 2 && AK_IsMainThread() && s_ownerScope[local];
     }
 
-    void CopyCamera(DWAltKillcamRefdef *destination, const DWAltKillcamRefdef *source)
+    void CopyCameraView(DWAltKillcamRefdefView *destination, const DWAltKillcamRefdefView *source)
     {
         uint32_t origin[3];
         for (uint32_t i = 0; i < 3; ++i)
         {
-            const auto *address = &source->view.encodedOrigin[i];
-            const uint32_t value = source->view.originKey ^
+            const auto *address = &source->encodedOrigin[i];
+            const uint32_t value = source->originKey ^
                                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(address));
             origin[i] = *address ^ (value * (value + 2));
         }
         memcpy(destination, source, sizeof(*destination));
-        destination->view.originKey += destination->view.originSeed;
+        destination->originKey += destination->originSeed;
         for (uint32_t i = 0; i < 3; ++i)
         {
-            auto *address = &destination->view.encodedOrigin[i];
-            const uint32_t value = destination->view.originKey ^
+            auto *address = &destination->encodedOrigin[i];
+            const uint32_t value = destination->originKey ^
                                    static_cast<uint32_t>(reinterpret_cast<uintptr_t>(address));
             *address = origin[i] ^ (value * (value + 2));
         }
+    }
+
+    void CopyCamera(DWAltKillcamRefdef *destination, const DWAltKillcamRefdef *source)
+    {
+        memcpy(destination, source, sizeof(*destination));
+        CopyCameraView(&destination->view, &source->view);
+    }
+
+    void ContinueObjectCamera(DWAltKillcamRefdef *destination, const Camera &camera)
+    {
+        const auto &last = s_objectCamera[camera.local].refdef;
+        // Keep the final camera pose, not its pixels or an expired frame's
+        // renderer inputs. Time, viewport, effects and other frame data come
+        // from the current replay; no destroyed entity is accessed here.
+        CopyCamera(destination, camera.refdef);
+        CopyCameraView(&destination->view, &last.view);
+        memcpy(destination->viewOffset, last.viewOffset, sizeof(destination->viewOffset));
+        memcpy(destination->previousViewOffset, last.viewOffset,
+               sizeof(destination->previousViewOffset));
     }
 
     struct Scene
@@ -466,6 +486,7 @@ extern "C" void DW_AltKillcam_LerpView(uint32_t local)
     object.type = camera.type;
     memcpy(object.angles, static_cast<uint8_t *>(camera.globals) + 29856, sizeof(object.angles));
     object.valid = true;
+    s_replay[local].hasObjectPose = true;
     CopyCamera(camera.refdef, &mainCamera);
     memcpy(static_cast<uint8_t *>(camera.globals) + 29856, angles, sizeof(angles));
 }
@@ -482,7 +503,8 @@ extern "C" void DW_AltKillcam_RenderScene(uint32_t local,
     Camera camera;
     if (s_busy || drawType < 1 || drawType > 3 || !GetCamera(local, &camera) ||
         refdef != camera.refdef || AK_ViewCount < 0 || AK_ViewCount > 4 ||
-        (camera.liveObject && (!PendingCamera(camera) || !SaveScene())))
+        (camera.liveObject && !PendingCamera(camera)) ||
+        (s_replay[local].hasObjectPose && !SaveScene()))
     {
         if (local < 2)
         {
@@ -502,20 +524,20 @@ extern "C" void DW_AltKillcam_RenderScene(uint32_t local,
         width / 4,
         height / 4,
     };
-    if (!camera.liveObject)
+    if (!s_replay[local].hasObjectPose)
     {
         ReserveView(camera);
-        if (!s_replay[local].lastObjectToken ||
-            !DW_AltKillcamRender_Stamp(AK_Backend, local, DWAltKillcamBatch::RetainedKiller,
-                                      s_replay[local].lastObjectToken, &inset))
-            Disarm(local);
+        Disarm(local);
         RenderReserved(camera, drawType, 0);
         s_busy = false;
         return;
     }
     DWAltKillcamRefdef mainCamera, objectCamera;
     CopyCamera(&mainCamera, refdef);
-    CopyCamera(&objectCamera, &s_objectCamera[local].refdef);
+    if (camera.liveObject)
+        CopyCamera(&objectCamera, &s_objectCamera[local].refdef);
+    else
+        ContinueObjectCamera(&objectCamera, camera);
     uint64_t token = ++s_token;
     if (!token)
         token = ++s_token;

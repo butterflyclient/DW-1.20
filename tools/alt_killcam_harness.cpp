@@ -29,6 +29,10 @@ static int streamingWaits;
 static uint32_t thirdPersonReturn = 1;
 static bool expectCameraCut;
 static int retainedStamps;
+static int32_t submittedObjectTime;
+static uint32_t submittedObjectFrameTag;
+static uint8_t submittedObjectSceneTag;
+static int32_t submittedObjectViewport[4];
 
 #define REQUIRE(x)                                                                                 \
     do                                                                                             \
@@ -248,6 +252,10 @@ extern "C"
         if (f->viewportType == 1 || failObject)
         {
             capturedObject = true;
+            submittedObjectTime = r->time;
+            submittedObjectFrameTag = r->unknown3228;
+            submittedObjectSceneTag = AK_SceneObjects[0].unknown0[0];
+            std::memcpy(submittedObjectViewport, r->displayViewport, sizeof(submittedObjectViewport));
             REQUIRE((draw == 1 || failObject) && Origin(r) == 701);
             REQUIRE(AK_SceneObjectCount == 1 && AK_SceneObjectIndex[17] == 0);
             REQUIRE(AK_SceneObjectIndex[2048] == 0xffff && AK_SceneObjectIndex[2049] == 0xffff);
@@ -575,15 +583,14 @@ int main()
             gameMode = 3;
             break;
         }
-        expectCameraCut = false;
+        expectCameraCut = invalid == 2 || invalid == 6 || invalid == 13;
         DW_AltKillcam_RenderScene(0, Ref(0), 3);
         if (invalid == 2 || invalid == 6 || invalid == 13)
         {
-            // A session already started by native Lerp owns the killer view
-            // through transient object loss, even before its first capture.
-            // Without a retained token there is one normal native submission.
-            REQUIRE(originalCounts[5] == 0 && extraRenders == 1 && capturedMain &&
-                    !capturedObject && retainedStamps == 0 && AK_ViewCount == 1);
+            // A valid pose sampled before destruction can render the current
+            // scene even if the object disappears before its first capture.
+            REQUIRE(originalCounts[5] == 0 && extraRenders == 2 && capturedMain &&
+                    capturedObject && retainedStamps == 0 && AK_ViewCount == 2);
         }
         else
             REQUIRE(originalCounts[5] == 1 && extraRenders == 0);
@@ -649,7 +656,8 @@ int main()
     REQUIRE(cameraUpdates == 0 && interpolations == 1 && originalCounts[5] == 1 &&
             extraRenders == 0);
     ++cases;
-    int thirdPersonCases = 0, retainedCases = 0, replayBoundaryCases = 0;
+    int thirdPersonCases = 0, continuationCases = 0, replayBoundaryCases = 0;
+    int uncapturedCases = 0;
     int cameraCutCases = 0, insetCases = 0;
     for (int enabled = 0; enabled < 2; ++enabled)
         for (uint32_t result = 0; result < 2; ++result)
@@ -679,6 +687,11 @@ int main()
             case 3: Field<int32_t>(globals[l], 533740) = 2047; break;
             }
             ++Field<int32_t>(globals[l], 26020);
+            Ref(l)->time = 888;
+            Ref(l)->unknown3228 = 0x10203040;
+            Ref(l)->displayViewport[2] = 1280;
+            Ref(l)->displayViewport[3] = 720;
+            objects[0].unknown0[0] = 41;
             DW_AltKillcam_Predict(l);
             REQUIRE(!insideEntity[0] && !insideFov[0] && !OwnerView(l));
             DW_AltKillcam_LerpView(l);
@@ -687,14 +700,31 @@ int main()
             const DWAltKillcamThirdPersonState expected{0, 0x12344321U, 0, 0};
             REQUIRE(!std::memcmp(globals[l] + 311392, &expected, sizeof(expected)));
             trace.clear(); AK_ViewCount = 0; AK_Backend = backends[0];
-            expectCameraCut = false; capturedMain = capturedObject = false;
+            expectCameraCut = true; capturedMain = capturedObject = false;
             DW_AltKillcam_RenderScene(l, Ref(l), 3);
-            REQUIRE(trace == "NTR" && extraRenders == 3 && AK_ViewCount == 1);
-            REQUIRE(capturedMain && !capturedObject && retainedStamps == 1);
-            REQUIRE(streamingUpdates == 2 && streamingWaits == 1);
-            REQUIRE(s_replay[l].lastObjectToken == token && !s_busy && disarms == 0);
+            REQUIRE(trace == "NOVMXLREDCBVMXLNKR" && extraRenders == 4 && AK_ViewCount == 2);
+            REQUIRE(capturedMain && capturedObject && retainedStamps == 0);
+            REQUIRE(streamingUpdates == 2 && streamingWaits == 2);
+            REQUIRE(s_replay[l].lastObjectToken > token && !s_busy && disarms == 0);
+            REQUIRE(submittedObjectTime == 888 && submittedObjectFrameTag == 0x10203040);
+            REQUIRE(submittedObjectSceneTag == 41);
+            REQUIRE(!std::memcmp(submittedObjectViewport, Ref(l)->displayViewport,
+                                 sizeof(submittedObjectViewport)));
             REQUIRE(Ref(l)->playerTeleported == 0);
-            ++retainedCases;
+            const uint64_t continuedToken = s_replay[l].lastObjectToken;
+            ++Field<int32_t>(globals[l], 26020);
+            Ref(l)->time = 999;
+            Ref(l)->unknown3228 = 0x50607080;
+            objects[0].unknown0[0] = 42;
+            DW_AltKillcam_LerpView(l);
+            trace.clear(); AK_ViewCount = 0; AK_Backend = backends[0];
+            DW_AltKillcam_RenderScene(l, Ref(l), 3);
+            REQUIRE(extraRenders == 6 && s_replay[l].lastObjectToken > continuedToken);
+            REQUIRE(submittedObjectTime == 999 && submittedObjectFrameTag == 0x50607080);
+            REQUIRE(submittedObjectSceneTag == 42 && retainedStamps == 0);
+            REQUIRE(interpolations == 3 && cameraUpdates == 1);
+            REQUIRE(streamingUpdates == 3 && streamingWaits == 3);
+            ++continuationCases;
             ++cases;
         }
     for (unsigned l = 0; l < 2; ++l)
@@ -709,11 +739,26 @@ int main()
         expectCameraCut = true; failKiller = true;
         trace.clear(); AK_ViewCount = 0; AK_Backend = backends[0];
         DW_AltKillcam_RenderScene(l, Ref(l), 3);
-        REQUIRE(trace == "NTR" && retainedStamps == 1 && extraRenders == 3);
-        REQUIRE(disarms == 1 && !s_renderArmed[l] && s_replay[l].lastObjectToken == token);
+        REQUIRE(trace == "NOVMXLREDCBVMXLNKR" && retainedStamps == 0 && extraRenders == 4);
+        REQUIRE(disarms == 1 && !s_renderArmed[l] && s_replay[l].lastObjectToken > token);
         REQUIRE(Ref(l)->playerTeleported == 1 && interpolations == 2 && cameraUpdates == 1);
         REQUIRE(!s_busy && !s_objectStreaming.active);
-        ++retainedCases;
+        ++continuationCases;
+        ++cases;
+    }
+    for (unsigned l = 0; l < 2; ++l)
+    {
+        Reset(l);
+        DW_AltKillcam_Predict(l);
+        REQUIRE(s_replay[l].active && !s_replay[l].hasObjectPose);
+        Field<int32_t>(globals[l], 533724) = 0;
+        DW_AltKillcam_LerpView(l);
+        expectCameraCut = false;
+        DW_AltKillcam_RenderScene(l, Ref(l), 3);
+        REQUIRE(trace == "NR" && extraRenders == 1 && capturedMain && !capturedObject);
+        REQUIRE(!s_replay[l].lastObjectToken && retainedStamps == 0 && cameraUpdates == 0);
+        REQUIRE(streamingUpdates == 1 && streamingWaits == 0 && !s_busy);
+        ++uncapturedCases;
         ++cases;
     }
     for (unsigned l = 0; l < 2; ++l)
@@ -744,12 +789,14 @@ int main()
             Camera c;
             REQUIRE(!GetCamera(l, &c));
             REQUIRE(!s_replay[l].active && !s_replay[l].lastObjectToken &&
-                    !s_objectCamera[l].valid && !s_renderArmed[l] && disarms == 1);
+                    !s_replay[l].hasObjectPose && !s_objectCamera[l].valid &&
+                    !s_renderArmed[l] && disarms == 1);
             REQUIRE(!GetCamera(l, &c) && disarms == 1);
             option.current.integer = 1; supportsGraph = true; gameMode = 2;
             Field<int32_t>(AK_CgGlobals[l], 533720) = 1;
             Field<int32_t>(AK_CgGlobals[l], 533724) = 3;
-            REQUIRE(GetCamera(l, &c) && s_replay[l].active && !s_replay[l].lastObjectToken);
+            REQUIRE(GetCamera(l, &c) && s_replay[l].active && !s_replay[l].lastObjectToken &&
+                    !s_replay[l].hasObjectPose);
             ++replayBoundaryCases;
             ++cases;
         }
@@ -834,7 +881,9 @@ int main()
                         std::printf("\n");
                     }
     std::printf("{\"cases\":%d,\"active_pair_cases\":54,\"failure_cases\":19,\"origin_cases\":100,"
-                "\"streaming_scope_cases\":8,\"third_person_cases\":%d,\"retained_cases\":%d,"
+                "\"streaming_scope_cases\":8,\"third_person_cases\":%d,\"continuation_cases\":%d,"
+                "\"uncaptured_cases\":%d,"
                 "\"replay_boundary_cases\":%d,\"camera_cut_cases\":%d,\"inset_cases\":%d}\n",
-                cases, thirdPersonCases, retainedCases, replayBoundaryCases, cameraCutCases, insetCases);
+                cases, thirdPersonCases, continuationCases, uncapturedCases,
+                replayBoundaryCases, cameraCutCases, insetCases);
 }

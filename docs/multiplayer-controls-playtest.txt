@@ -237,7 +237,9 @@ Client-local alternate killcam playtest (when present in the published EXE):
    streaming client. Check the transition, skip, respawn and return to the menu.
 5. Watch the throw, explosion and remainder of the replay. The main camera must
    remain in first person without a blended grenade image. Once the grenade is
-   destroyed, the inset retains its last valid image until the killcam ends.
+   destroyed, the inset keeps rendering the current scene from its last camera
+   position until the killcam ends. Explosion effects, smoke and nearby players
+   must keep moving in the inset instead of holding a frozen image.
    Native camera cuts isolate temporal reuse during the two-camera portion;
    normal camera history resumes when the game returns to a single view.
 
