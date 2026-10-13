@@ -164,10 +164,20 @@ def exercise(clients, data, catalog, offset, baseline, checks):
         token = hashlib.sha256(
             f"5800:{lobby}:{state['owner_session']}:{state.get('operator_start_cycle', 0)}".encode()
         ).hexdigest()
+
+        def controls(fill):
+            if not baseline:
+                with urllib.request.urlopen(base + "/stats.json", timeout=3) as response:
+                    matches = json.load(response)["activity"]["matches"]
+                match = next(row for row in matches if row["start_token"] == token)
+                assert match["can_fill_bots"] is fill and match["can_start"] is False
+
+        controls(True)
         auto = copy.deepcopy(docs[0])
         auto.update(dw_auto_fill_request=1, dw_auto_fill_bots=True,
                     dw_auto_fill_complete=False, dw_bot_count=0)
         publish(auto)
+        controls(False)
         manual = copy.deepcopy(docs[0]); manual["dw_bot_count"] = 1
         publish(manual, error=106)
         saved = durable()
@@ -177,6 +187,7 @@ def exercise(clients, data, catalog, offset, baseline, checks):
         off.update(dw_auto_fill_request=2, dw_auto_fill_bots=False,
                    dw_auto_fill_complete=False, dw_bot_count=0)
         publish(off)
+        controls(True)
         assert_ballot()
         before = durable()
         assert operator_request(base, token, key)[0] == 409

@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "server_sha256": "fec3cb649461d67911ed2c14d1a73769926c5bcf22be9e6741151d9c0b35279e",
+  "immutable_source": "E:\\DW\\IW8\\data\\backend-snapshot-1791856892994602000\\source",
+  "owned_inputs": {
+    "src/matchmaking_services.cpp": "ab541819094be34ecfc19336844b89bf9325906f129020e7abd71a499f4e5ec3",
+    "src/public_dashboard.h": "b2cd1c85eeab1c0e44a33df25c2be4418aa614d7440eaedd43a8987323f822ca",
+    "tools/operator_match_start_fixtures.py": "15bb5e553b0d87f7b43b7978bc36d3b8517be2bfdaa4f6a87fe0ed14cf32c905",
+    "tools/test-manual-fill-map-vote.py": "424e6bd7db39a2394bbb26aa5488ea28567c9cccbe0542eaf8baf9664ca5ae5a",
+    "tools/test-public-activity.py": "3aede35c0fbe71a88f9876e3d0d3e19df1ef8b9f43eee495245dd6340404f264",
+    "tools/test-public-dashboard.py": "32c23934703dd3c407bd81f49df526dbb10c712950009849bef06597b10387f9",
+    "tools/test-public-dashboard-dom.js": "47833ddae86d1b9465972ba95ee89e4391d25c5c388ad21ad046876039a6a999"
+  },
+  "checks": [
+    "manual-fill",
+    "activity",
+    "dashboard-contract",
+    "dashboard-dom"
+  ],
+  "dashboard_sha256": "b71d6bc340be9b3b31c5de27f82e7db7010ac6b3c50628aeabfee2db56c0b033",
+  "real_browser_dom": true,
+  "native_game_verified": false,
+  "production_changed": false
+}

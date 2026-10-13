@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "passed": true,
+  "backend_only": true,
+  "linux_sha256": "881b0ea10ce4c8f67e20fea1c7c3bcf43d969dd4369e72e6cac8f26237f8cf36",
+  "windows_sha256": "fec3cb649461d67911ed2c14d1a73769926c5bcf22be9e6741151d9c0b35279e",
+  "deployment_verified": {
+    "pid": 359504,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261012-dashboard-fill-881b0ea10ce4/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261012-dashboard-fill-881b0ea10ce4/iw8-dw-server",
+    "sha256": "881b0ea10ce4c8f67e20fea1c7c3bcf43d969dd4369e72e6cac8f26237f8cf36",
+    "process_sha256": "881b0ea10ce4c8f67e20fea1c7c3bcf43d969dd4369e72e6cac8f26237f8cf36",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "compiled_translation_units": 47,
+  "clean_build": true,
+  "retained_objects": 0,
+  "changed_backend_inputs": [
+    "src/matchmaking_services.cpp",
+    "src/public_dashboard.h"
+  ],
+  "source_snapshot_sha256": "0b5a8a577338d4a7bcd6da6bf54842a921e3a3cdde0ec436dcbdd61b9e38ecdc",
+  "source_archive_sha256": "1d1ddb3e74545eeff9de706695e360007817d65386514815a3f82275e66e0ab3",
+  "current_release_checks": {
+    "manual_fill_count_cases": 8,
+    "linux_public_activity_groups": 17,
+    "linux_dashboard_groups": 6,
+    "windows_real_dom_cases": 7,
+    "linux_compiled_html_matches_windows_dom": true,
+    "linux_real_browser_rerun": false,
+    "public_auth_transport_checks": 12,
+    "public_dashboard_groups": 6
+  },
+  "predecessor_validation": {
+    "server_sha256": "d758bf7928dff893d7be70d72c2287cf3bf1f355bd2b57cf8d66b8ad44c2c68a",
+    "protocol_groups": 315,
+    "recovery_cases": 47,
+    "team_groups": 37,
+    "rerun_for_this_release": false
+  },
+  "persisted_copy_count": 327,
+  "persisted_stopped_writer_count": 327,
+  "source_lobby_records_unchanged": true,
+  "all_audit_candidate_processes_stopped": true,
+  "automatic_rollback_retained": true,
+  "previous_release": "/opt/replay-dw/releases/20261012-fill-ballot-d758bf7928df",
+  "public_dashboard_and_health_read_only": true,
+  "public_auth_probe_scope": "Explicitly authorized fresh disposable machine identity; profile save/read affects only that test identity",
+  "native_game_verified": false,
+  "game_runs_performed": false,
+  "game_executable_changed": false,
+  "evidence": {
+    "data/dashboard-fill-release-20261012/activation-result.json": "96747ca5d738be8f637afc04bdc0b202caf73d150775649adc3c7a13e3abae93",
+    "data/dashboard-fill-release-20261012/activation-store-compatibility.json": "6a0ce4340534333b3f5b531ca8b4e1cf6f64ad891f4be6423941e2edc9a4377a",
+    "data/dashboard-fill-release-20261012/dashboard-contract.json": "e78a28b7a9ae6aab029e15da4e37a461c34fd578979516c73a305052658f9585",
+    "data/dashboard-fill-release-20261012/linux-activity.json": "cca3e3529a93e6ff0479d65db62a43bf97dc7f8d4d88ee4d7dfc360fdfb68918",
+    "data/dashboard-fill-release-20261012/linux-build.json": "5fc4c8b59679f465a3c03e070579bda1234944e57e5d03f64f19c97b40b49f71",
+    "data/dashboard-fill-release-20261012/linux-dom-binding.json": "56909445a700b9b557c3dea32243cbf20064bfff9ccf98e3e7ad835347ecd7f2",
+    "data/dashboard-fill-release-20261012/linux-final-finished.json": "36354fb4d33b4f8eecf960072704285d35a8c340ff138c64c6744f46bff26956",
+    "data/dashboard-fill-release-20261012/linux-job.json": "6aace14d20c054c81139ab9bfd34dadc2b0edc16590579030f7ad527337a96a4",
+    "data/dashboard-fill-release-20261012/linux-manual-fill.json": "a563f23fd49bed9cb532d217e9b1f0781edaf01b1efc661187e39c5741baa02f",
+    "data/dashboard-fill-release-20261012/linux-persisted-snapshot.json": "6a0ce4340534333b3f5b531ca8b4e1cf6f64ad891f4be6423941e2edc9a4377a",
+    "data/dashboard-fill-release-20261012/previous-deployment.json": "b2829137422563a8572802c183f288ece241e87414f927525e3acf4975092ff7",
+    "data/dashboard-fill-release-20261012/public-auth-transport.json": "dc3e6574ec6c8cdba87ff06af1f94a46e8f56579679b34fc2f432ab4921ddfbc",
+    "data/dashboard-fill-release-20261012/public-dashboard.json": "52dbefd413d3cac36eaa597827c9460e5067da216866621f79771b93ee7def1e",
+    "data/dashboard-fill-release-20261012/source.json": "0b5a8a577338d4a7bcd6da6bf54842a921e3a3cdde0ec436dcbdd61b9e38ecdc"
+  }
+}

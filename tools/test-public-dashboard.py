@@ -1,6 +1,6 @@
 """Public dashboard contract checks against an isolated or deployed backend."""
 
-import argparse, json, urllib.request, urllib.error
+import argparse, hashlib, json, urllib.request, urllib.error
 from pathlib import Path
 
 p = argparse.ArgumentParser()
@@ -9,9 +9,11 @@ p.add_argument("--output", type=Path, required=True)
 p.add_argument("--windows-fixture", action="store_true")
 a = p.parse_args()
 checks = []
+dashboard_hashes = []
 for route in ("/", "/stats"):
     with urllib.request.urlopen(a.url + route, timeout=10) as r:
         html = r.read().decode()
+        dashboard_hashes.append(hashlib.sha256(html.encode()).hexdigest())
         assert (
             r.status == 200 and r.headers["Content-Type"] == "text/html; charset=utf-8"
         )
@@ -62,11 +64,13 @@ for match in activity["matches"]:
         "teams",
         "start_token",
         "can_start",
+        "can_fill_bots",
         "start_requested",
         "bots_requested",
         "bot_count",
         "occupied_slots",
     }
+    assert isinstance(match["can_start"], bool) and isinstance(match["can_fill_bots"], bool)
     for player in match["members"]:
         assert set(player) == {"name", "party", "match", "host", "state"}
     for team in match["teams"]:
@@ -92,7 +96,9 @@ checks.append("All dashboard paths reject POST, PUT, DELETE and PATCH")
 with urllib.request.urlopen(a.url + "/health", timeout=10) as r:
     assert json.load(r)["server"] == "iw8-dw"
 checks.append("Existing health route retained")
+assert len(set(dashboard_hashes)) == 1
 a.output.write_text(
-    json.dumps(dict(passed=True, checks=checks, stats=stats), indent=2) + "\n"
+    json.dumps(dict(passed=True, checks=checks, stats=stats,
+                    dashboard_sha256=dashboard_hashes[0]), indent=2) + "\n"
 )
 print("PASS:", len(checks), "public dashboard contract groups")

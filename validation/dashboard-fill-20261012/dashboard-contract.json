@@ -1,0 +1,164 @@
+{
+  "passed": true,
+  "checks": [
+    "/ public HTML, browser policy, no controls",
+    "/stats public HTML, browser policy, no controls",
+    "Explicit public JSON fields and real Linux resource readings",
+    "Public player/party/match schemas contain only display fields",
+    "All dashboard paths reject POST, PUT, DELETE and PATCH",
+    "Existing health route retained"
+  ],
+  "stats": {
+    "activity": {
+      "available": true,
+      "matches": [
+        {
+          "bot_count": 0,
+          "bots_requested": false,
+          "can_fill_bots": true,
+          "can_start": true,
+          "capacity": 4,
+          "host": "Dashboard Host",
+          "label": "Match 1",
+          "maps": [
+            "mp_shipment"
+          ],
+          "members": [
+            {
+              "host": true,
+              "match": "Match 1",
+              "name": "Dashboard Host",
+              "party": "Party 1",
+              "state": "intermission"
+            },
+            {
+              "host": false,
+              "match": "Match 1",
+              "name": "Dashboard Peer",
+              "party": "Party 1",
+              "state": "intermission"
+            },
+            {
+              "host": false,
+              "match": "Match 1",
+              "name": "Dashboard Solo",
+              "party": "Party 2",
+              "state": "intermission"
+            }
+          ],
+          "modes": [
+            "tdm"
+          ],
+          "occupied_slots": 3,
+          "start_requested": false,
+          "start_token": "286658619c1c349ac967c6f6f49c9a73ce6a912bbc2fc6518bdde0961b100095",
+          "state": "intermission",
+          "teams": [
+            {
+              "label": "Team 0",
+              "members": [
+                {
+                  "host": true,
+                  "match": "Match 1",
+                  "name": "Dashboard Host",
+                  "party": "Party 1",
+                  "state": "intermission"
+                },
+                {
+                  "host": false,
+                  "match": "Match 1",
+                  "name": "Dashboard Peer",
+                  "party": "Party 1",
+                  "state": "intermission"
+                }
+              ]
+            },
+            {
+              "label": "Team 1",
+              "members": [
+                {
+                  "host": false,
+                  "match": "Match 1",
+                  "name": "Dashboard Solo",
+                  "party": "Party 2",
+                  "state": "intermission"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "label": "Party 1",
+          "leader": "Dashboard Host",
+          "match": "Match 1",
+          "members": [
+            "Dashboard Host",
+            "Dashboard Peer"
+          ],
+          "state": "intermission"
+        },
+        {
+          "label": "Party 2",
+          "leader": "Dashboard Solo",
+          "match": "Match 1",
+          "members": [
+            "Dashboard Solo"
+          ],
+          "state": "intermission"
+        }
+      ],
+      "players": [
+        {
+          "host": false,
+          "match": "Match 1",
+          "name": "Dashboard Solo",
+          "party": "Party 2",
+          "state": "intermission"
+        },
+        {
+          "host": false,
+          "match": "Match 1",
+          "name": "Dashboard Peer",
+          "party": "Party 1",
+          "state": "intermission"
+        },
+        {
+          "host": true,
+          "match": "Match 1",
+          "name": "Dashboard Host",
+          "party": "Party 1",
+          "state": "intermission"
+        }
+      ]
+    },
+    "auth_successes": 3,
+    "connection_limit": 32,
+    "cpu_seconds": null,
+    "disk_available_bytes": 21916594176,
+    "disk_total_bytes": 499410743296,
+    "host_memory_available_bytes": null,
+    "host_memory_bytes": null,
+    "load_1m": null,
+    "lobby_authentications": 3,
+    "lobby_failures": 0,
+    "lobby_frames": 15,
+    "logins": 3,
+    "nat_introductions": 0,
+    "online_players": 3,
+    "qos_enabled": false,
+    "qos_probes": 0,
+    "relay_associations": 0,
+    "relay_enabled": false,
+    "relay_failure": "",
+    "relay_packets": 0,
+    "relay_pings": 0,
+    "relay_rejected": 0,
+    "relay_verified": 0,
+    "resident_bytes": null,
+    "tasks": 12,
+    "transport_connections": 4,
+    "uptime_seconds": 2.7985418
+  }
+}

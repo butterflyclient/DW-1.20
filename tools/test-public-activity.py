@@ -1,12 +1,15 @@
 """Live encrypted-client tests of public player, party and match snapshots."""
 
-import argparse, base64, copy, hashlib, json, os, runpy, socket, struct, subprocess, sys, time, urllib.request
+import argparse, base64, copy, hashlib, json, os, runpy, shutil, socket, struct, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 p = argparse.ArgumentParser()
 p.add_argument("--server", type=Path, required=True)
 p.add_argument("--source", type=Path, required=True)
 p.add_argument("--output", type=Path, required=True)
+p.add_argument("--dashboard-dom", action="store_true")
+p.add_argument("--node", default=shutil.which("node"))
+p.add_argument("--browser-executable", type=Path)
 a = p.parse_args()
 sys.path.insert(0, str(a.source / "tools"))
 from native_wire_client import NativeClient, u64
@@ -155,6 +158,7 @@ try:
         and snap["matches"][0]["state"] == "forming"
     )
     assert snap["parties"][0]["leader"] == "Dashboard Host"
+    assert not snap["matches"][0]["can_start"] and not snap["matches"][0]["can_fill_bots"]
     checks.append(
         "One published two-player party retains its leader and lobby relationship"
     )
@@ -191,6 +195,7 @@ try:
     waiting_host["game_state"]["state"] = ""
     assert call(host, 15, u64(lobby_id) + u64(waiting["update_id"]) + text(json.dumps(waiting_host))) == b"\x01\x01"
     assert activity()["matches"][0]["state"] == "intermission"
+    assert activity()["matches"][0]["can_fill_bots"]
     checks.append("Replay's empty native waiting phase exposes the same waiting-lobby start control")
     operator_fixture = operator_match_start_fixtures.before_match(
         base, data, clients, activity, lobby_path, strings, checks)
@@ -206,6 +211,7 @@ try:
         == b"\x01\x01"
     )
     snap = wait(lambda s: s["matches"][0]["state"] == "in_game")
+    assert not snap["matches"][0]["can_start"] and not snap["matches"][0]["can_fill_bots"]
     assert (
         snap["matches"][0]["maps"] == ["mp_shipment"]
         and snap["matches"][0]["host"] == "Dashboard Host"
@@ -224,6 +230,13 @@ try:
         ] + (["--windows-fixture"] if os.name == "nt" else []),
         check=True,
     )
+    if a.dashboard_dom:
+        assert a.node, "Node.js is required for the real dashboard DOM regression"
+        command = [a.node, str(a.source / "tools/test-public-dashboard-dom.js"),
+                   "--url", base, "--output", str(a.output.parent / "dashboard-dom.json")]
+        if a.browser_executable:
+            command += ["--browser-executable", str(a.browser_executable)]
+        subprocess.run(command, check=True)
     before = {
         str(path): path.read_bytes() for path in (data / "matchmaking").rglob("*.json")
     }
@@ -243,6 +256,24 @@ try:
             assert check(activity())
         finally:
             path.write_bytes(original)
+
+    mutate(
+        lambda s: s["matches"][0]["can_fill_bots"] and
+                  s["matches"][0]["capacity"] == s["matches"][0]["occupied_slots"],
+        lambda s: s.update(maximum_members=len(s["members"])),
+    )
+    def auto_state(state, complete):
+        state.update(auto_fill_bots=True, auto_fill_complete=complete,
+                     auto_fill_started_ms=int(time.time() * 1000), auto_fill_target=1,
+                     operator_bots_requested=True, operator_bot_count=1 if complete else 0)
+
+    for complete in (False, True):
+        mutate(
+            lambda s: s["matches"][0]["can_start"] is complete and
+                      not s["matches"][0]["can_fill_bots"],
+            lambda s: auto_state(s, complete),
+        )
+    checks.append("Independent fill capability covers full waiting lobbies, excludes automatic fill before/after completion, and disappears in-game")
 
     mutate(
         lambda s: not s["matches"] and not s["parties"], lambda s: s.update(expires=0)

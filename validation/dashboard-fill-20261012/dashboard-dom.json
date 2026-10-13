@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "checks": [
+    "pending_ballot_manual_fill",
+    "ordinary_manual_waiting",
+    "automatic_fill_pending",
+    "automatic_fill_complete",
+    "full_waiting_roster",
+    "in_game",
+    "manual_fill_requested"
+  ],
+  "dashboard_sha256": "b71d6bc340be9b3b31c5de27f82e7db7010ac6b3c50628aeabfee2db56c0b033",
+  "real_browser_dom": true,
+  "operator_requests_intercepted": true,
+  "production_changed": false,
+  "native_game_verified": false
+}

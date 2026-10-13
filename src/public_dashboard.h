@@ -116,6 +116,8 @@ function renderActivity(activity) {
             message.setAttribute('role','status');
             button.addEventListener('click',()=>requestStart(match,button,message));
             card.append(button,message);
+        }
+        if (match.can_fill_bots) {
             const botsPending=match.bots_requested || startRequests.has(match.start_token+':bots');
             const available=Math.max(0,match.capacity-match.occupied_slots);
             const count=element('input','pill'); count.type='number'; count.min='1';

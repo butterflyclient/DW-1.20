@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "checks": [
+    "Only authenticated live display names appear; unassigned players do not become invented parties",
+    "One published two-player party retains its leader and lobby relationship",
+    "Two distinct matchmaking parties share one lobby and preserve team/party roster structure",
+    "Replay's empty native waiting phase exposes the same waiting-lobby start control",
+    "Operator key required; malformed, unknown and wrong-method requests leave the lobby untouched",
+    "Custom bot counts validate integer/slot bounds and preserve playlist capacity, native teams and real roster; retries are exact and legacy shrinking consumer stays off",
+    "Start publishes the real 2006 update and native host start control to every participant, with operator minimum and wait timers applied",
+    "Retry is idempotent, and the operator secret is absent from public snapshots",
+    "Actual host-update wire task changes the published match to in-game",
+    "An active match cannot be started again",
+    "Next-round waiting settings return, and an old round's button token cannot start the new round",
+    "Public snapshots do not mutate matchmaking records",
+    "Independent fill capability covers full waiting lobbies, excludes automatic fill before/after completion, and disappears in-game",
+    "Expired, disbanded and superseded host assignments cannot appear as current matches",
+    "Unreadable grouping is marked unavailable without publishing partial rosters",
+    "Disconnected members retire immediately from player, party and match lists",
+    "Native disband task removes the entire published match/party structure"
+  ],
+  "server_sha256": "fec3cb649461d67911ed2c14d1a73769926c5bcf22be9e6741151d9c0b35279e",
+  "fixture_directory": "validation\\dashboard-fill-20261012\\activity-fixture-1791857166674311500",
+  "native_game_verified": false
+}

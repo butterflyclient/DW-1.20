@@ -23,7 +23,7 @@ def request(base, token, key="", method="POST", fill_bots=False, bot_count=1):
 
 def before_match(base, data, clients, activity, lobby_path, strings, checks):
     match = activity()["matches"][0]
-    assert match["can_start"] and not match["start_requested"]
+    assert match["can_start"] and match["can_fill_bots"] and not match["start_requested"]
     token = match["start_token"]
     assert len(token) == 64
     before = lobby_path.read_bytes()
@@ -107,6 +107,7 @@ def after_match(base, clients, activity, lobby_path, fixture, call, u64, text, c
     assert request(base, old_token, key)[0] == 409
     assert lobby_path.read_bytes() == before
     assert not activity()["matches"][0]["can_start"]
+    assert not activity()["matches"][0]["can_fill_bots"]
     checks.append("An active match cannot be started again")
     state = json.loads(before)
     host = state["host_doc"]
@@ -118,7 +119,7 @@ def after_match(base, clients, activity, lobby_path, fixture, call, u64, text, c
     assert state["maximum_members"] == original["maximum_members"]
     assert state["backend_doc"]["ruleset_payload"]["dvar_overrides"] == original["backend_doc"]["ruleset_payload"]["dvar_overrides"]
     match = activity()["matches"][0]
-    assert match["can_start"] and match["start_token"] != old_token
+    assert match["can_start"] and match["can_fill_bots"] and match["start_token"] != old_token
     before = lobby_path.read_bytes()
     assert request(base, old_token, key)[0] == 404
     assert lobby_path.read_bytes() == before

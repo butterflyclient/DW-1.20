@@ -2218,6 +2218,8 @@ namespace services
                         {{"label", label},
                          {"start_token", operatorMatchToken(state)},
                          {"can_start", operatorCanStart(state)},
+                         {"can_fill_bots", lobbyWaitingForStart(state) &&
+                                           !state.value("auto_fill_bots", false)},
                          {"bots_requested", state.value("operator_bots_requested", false)},
                          {"bot_count", state.value("operator_bot_count", 0u)},
                          {"occupied_slots", occupiedSlots(state.at("members"), lobbySlots(state))},
