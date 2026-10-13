@@ -16,6 +16,7 @@ import urllib.request
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from dw_update_assets import decode as decode_assets, extract as extract_assets
+from dw_update_maps import decode as decode_maps, extract as extract_maps, verify_record as verify_maps
 
 ROOT = Path(__file__).resolve().parents[1]
 MAGIC = 0x3155505744594C50
@@ -49,7 +50,20 @@ def main():
     catalog = json.loads((args.publication / "full-image-catalog.json").read_bytes())
     image = args.publication / (catalog["latest"] + ".exe")
     assert sha(image) == catalog["latest"] and image.stat().st_size == catalog["target_size"]
-    asset_manifest = extract_assets(image.read_bytes())
+    image_bytes = image.read_bytes()
+    asset_manifest = extract_assets(image_bytes)
+    map_manifest = extract_maps(image_bytes)
+    maps = decode_maps(map_manifest) if map_manifest is not None else None
+    map_files = [] if maps is None else maps['files']
+    if maps is not None:
+        record = json.loads((args.publication / 'update-maps.json').read_bytes())
+        assert verify_maps(record) == map_manifest
+        assert catalog['maps'] == dict(package_hash=maps['package_hash'],
+                                       manifest_sha256=hashlib.sha256(map_manifest).hexdigest(),
+                                       manifest_size=len(map_manifest), files=len(map_files),
+                                       chunks=len(maps['chunks']))
+        from dw_publication import inventory, require_maps
+        require_maps(catalog, inventory()['maps'])
     assets = decode_assets(asset_manifest) if asset_manifest is not None else []
     native_paths = {}
     if assets:
@@ -105,7 +119,7 @@ def main():
 
     helper = array(args.source_root / "DW_UpdateHelper.h", "s_dwUpdateHelper")
     helper_hash = hashlib.sha256(helper).hexdigest()
-    assert image.read_bytes().count(helper) == 1, "Published PE must contain the exact helper that is exercised"
+    assert image_bytes.count(helper) == 1, "Published PE must contain the exact helper that is exercised"
     assert b"/\x00u\x00p\x00d\x00a\x00t\x00e\x00s\x00/\x00v\x002\x00/\x00c\x00h\x00e\x00c\x00k\x00" in helper
     with tempfile.TemporaryDirectory(prefix="published-update-", dir=ROOT / "data") as name:
         folder = Path(name).resolve()
@@ -115,32 +129,56 @@ def main():
         base = folder / "old-release.exe"
         shutil.copyfile(args.base_exe, base)
         base_hash = sha(base)
+        def staged_companions(executable):
+            cache = Path(str(executable) + '.update') / 'asset-staging' / catalog['latest']
+            paths = []
+            for item in assets:
+                paths.append((cache / (item['sha256'] + '.bin'), item))
+            for item in map_files:
+                paths.append((cache / ('map-' + item['sha256'] + '.bin'), item))
+            for payload, item in paths:
+                assert payload.resolve().is_relative_to(folder)
+                assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
+            return paths
+
         result = subprocess.run([str(runner), "--prepare", str(base), args.host],
-                                cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=300)
+                                cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=900 if maps else 300)
         assert result.returncode == 20, "Embedded helper must stage the full update"
         staged = Path(str(base) + ".update") / "next.exe"
         assert sha(staged) == catalog["latest"] and sha(base) == base_hash
-        for item in assets:
-            payload = Path(str(base) + '.update') / 'asset-staging' / catalog['latest'] / (item['sha256'] + '.bin')
-            assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
+        old_payloads = staged_companions(base)
         checks.append("Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged")
+        # Retain authenticated transport chunks for the missing-current-files
+        # case. One complete network download proves the public transport;
+        # subsequent cases exercise assembly without redownloading a large map.
+        current = folder / "current-release.exe"
+        if maps:
+            old_cache = Path(str(base) + '.update') / 'asset-staging' / catalog['latest']
+            new_cache = Path(str(current) + '.update') / 'asset-staging' / catalog['latest']
+            new_cache.mkdir(parents=True)
+            for chunk in {item['payload_sha256']: item for item in maps['chunks']}.values():
+                payload = old_cache / ('chunk-' + chunk['payload_sha256'] + '.bin')
+                assert sha(payload) == chunk['payload_sha256'] and payload.stat().st_size == chunk['payload_size']
+                shutil.copyfile(payload, new_cache / payload.name)
         # These isolated bytes are no longer needed after verification. Reclaim
         # them before the current-version check to bound fixture disk usage.
         assert staged.resolve().is_relative_to(folder) and base.resolve().parent == folder
         staged.unlink()
+        # Full map staging can be large; only remove verified fixture-owned files.
+        for payload, _ in old_payloads:
+            payload.unlink(missing_ok=True)
         base.unlink()
-        current = folder / "current-release.exe"
         shutil.copyfile(image, current)
-        if assets:
+        if assets or maps:
             result = subprocess.run([str(runner), '--prepare', str(current), args.host],
-                                    cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=120)
+                                    cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=900 if maps else 120)
             assert result.returncode == 20 and sha(current) == catalog['latest']
             assert not (Path(str(current) + '.update') / 'next.exe').exists()
             assert not (folder / 'zone').exists(), 'Preparation modified loaded zone assets'
-            for item in assets:
-                payload = Path(str(current) + '.update') / 'asset-staging' / catalog['latest'] / (item['sha256'] + '.bin')
-                assert sha(payload) == item['sha256'] and payload.stat().st_size == item['size']
-            checks.append('Current signed EXE separately stages missing owned assets without changing installed files or requiring an EXE replacement')
+            assert not (folder / 'mods').exists(), 'Preparation modified installed map assets'
+            staged_companions(current)
+            checks.append('Current signed EXE separately stages missing owned companions without changing installed files or requiring an EXE replacement')
+        if assets:
             (folder / 'zone').mkdir()
             for item in assets:
                 relative = Path(native_paths[item['name']])
@@ -148,8 +186,27 @@ def main():
                 destination = folder / 'zone' / relative
                 destination.parent.mkdir(exist_ok=True)
                 shutil.copyfile(args.publication / 'assets' / (item['sha256'] + '.bin'), destination)
+        if maps:
+            # Legacy companions are now present while maps are still absent.
+            # An EXE upgraded by an older helper must still repair the missing maps.
+            result = subprocess.run([str(runner), '--prepare', str(current), args.host],
+                                    cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=900)
+            assert result.returncode == 20 and sha(current) == catalog['latest']
+            assert not (Path(str(current) + '.update') / 'next.exe').exists()
+            assert not (folder / 'mods').exists()
+            staged_companions(current)
+            cache = Path(str(current) + '.update') / 'asset-staging' / catalog['latest']
+            for item in map_files:
+                relative = Path(item['path'])
+                assert not relative.is_absolute() and '..' not in relative.parts
+                destination = (folder / relative).resolve()
+                assert destination.is_relative_to(folder / 'mods/mw120r/maps')
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(cache / ('map-' + item['sha256'] + '.bin'), destination)
+                assert sha(destination) == item['sha256']
+            checks.append('Current EXE with legacy companions present stages missing maps; compressed downloads verify raw chunks and complete file hashes')
         result = subprocess.run([str(runner), "--prepare", str(current), args.host],
-                                cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=60)
+                                cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=300 if maps else 60)
         assert result.returncode == 10 and sha(current) == catalog["latest"]
         assert not (Path(str(current) + ".update") / "next.exe").exists()
         checks.append("Actual embedded helper recognizes the current release and stages no replacement")
@@ -161,6 +218,10 @@ def main():
                   owned_asset_manifest_sha256=hashlib.sha256(asset_manifest).hexdigest() if assets else None,
                   owned_asset_files=len(assets),
                   native_asset_folders_verified=bool(assets),
+                  map_package_hash=maps['package_hash'] if maps else None,
+                  map_manifest_sha256=hashlib.sha256(map_manifest).hexdigest() if maps else None,
+                  map_files=len(map_files), map_chunks=len(maps['chunks']) if maps else 0,
+                  missing_maps_on_current_executable_verified=bool(maps),
                   checks=checks, game_runs_performed=False, installed_game_modified=False,
                   apply_or_relaunch_invoked=False, temporary_fixture_removed=True,
                   legacy_delta_only_clients_require_bootstrap=True)

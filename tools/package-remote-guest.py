@@ -47,6 +47,13 @@ New players: extract the package into the compatible 1.20 Replay root folder.
 Existing players: close the game and replace only the EXE, keeping your own INI.
 The EXE embeds its owned FF/FP files and stages them in the native folders.
 The updater also repairs missing owned files. No manual fastfile copy is needed.
+On launch it also checks the server's explicitly published custom map package.
+Missing Nuketown files download compressed and decompress into
+mods\mw120r\maps\mp_nuketown. The initial map download is about 388 MB and
+installs about 1.09 GB. Allow additional free space for staging and backups.
+The native update screen requests a restart before installing missing files.
+Existing files are backed up in game_dx12_ship_replay_dw.exe.update\asset-backups.
+Maps are downloaded separately; this ZIP does not contain the map data.
 This client supports the English game data. Regional companions remain native.
 The included zone entries add only the named DW script overlay;
 they do not replace shipped game fastfiles.
@@ -85,8 +92,9 @@ erase inventory items already granted by the backend.
 com_optimized defaults to 1 for optimizations preserving the 3D scene's look.
 Set it to 0 to disable them, or 2 for the aggressive visual/CPU experiment.
 bypass_update_restart=0 enables normal verified full-EXE and owned-file updates.
-Set it to 1 to keep a custom EXE and skip its update/restart enforcement; native
-publisher/data updates and manual restarts remain available.
+Set it to 1 to keep a custom EXE. Its authenticated owned files are still checked
+and repaired; missing maps can still require a clean restart. This requires the
+custom EXE's frozen file inventory to match the currently published release.
 No backend signing keys, access keys or player identities are in this package.
 This is the current multiplayer test build, not a completed DW replacement.
 
@@ -100,9 +108,13 @@ files = {
 archive = ROOT / "data/Replay-DW-Client-Test.zip"
 source = Path(readiness["source_root"])
 assets = json.loads((source / "generated/update-assets.json").read_bytes())
+maps = json.loads((source / "generated/update-maps.json").read_bytes())
 from dw_update_assets import extract, sha
 if sha(extract(image.read_bytes())) != assets["manifest_sha256"]:
     raise RuntimeError("Client image does not bind its owned asset inventory")
+from dw_update_maps import extract as extract_maps, verify_record
+if maps is None or extract_maps(image.read_bytes()) != verify_record(maps):
+    raise RuntimeError("Client image does not bind its explicitly published custom maps")
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as package:
     package.write(image, image.name)
     for name, data in files.items():
@@ -126,6 +138,10 @@ receipt = {
     "release": deployment["public_updater"]["release"],
     "owned_native_assets": len(assets["entries"]),
     "owned_manifest_sha256": assets["manifest_sha256"],
+    "custom_map_package_sha256": maps["package_hash"],
+    "custom_maps_downloaded_separately": True,
+    "custom_map_compressed_bytes": maps["transport_bytes"],
+    "custom_map_installed_bytes": maps["uncompressed_bytes"],
     "public_address": endpoint,
     "universal_client": True,
     "player_provisioning_required": False,

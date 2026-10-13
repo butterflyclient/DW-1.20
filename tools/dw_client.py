@@ -16,6 +16,11 @@ if os.name == "nt":
     import msvcrt
 
 ROOT = Path(__file__).resolve().parents[1]
+PUBLICATION_TOOLS = {
+    'tools/publish-custom-map.py', 'tools/publish-full-executable.py',
+    'tools/verify-full-executable-publication.py', 'tools/dw_publication.py',
+    'tools/package-remote-guest.py',
+}
 
 
 def read(path):
@@ -30,6 +35,11 @@ def digest(path):
 def require_current_sources(receipt):
     """Reject a frozen job superseded by edits to its authored source owners."""
     for item in receipt["source_inputs"] + receipt.get("tool_inputs", []):
+        # Older receipts also captured release-only tools here. They never
+        # affect compiler bytes; their current hashes are bound separately to
+        # the verified publication. Keep the original build receipt immutable.
+        if item['source'] in PUBLICATION_TOOLS:
+            continue
         path = inside(ROOT / item["source"])
         if digest(path) != item["source_sha256"]:
             raise ValueError(
@@ -307,8 +317,10 @@ def prepare():
             "prepare-join-in-progress.py",
             "prepare-dw-verifier.py",
             "prepare-bot-rank-integration.py",
-            "dw_update_assets.py", "embed-update-helper.py", "replay-update-client.rc",
-            "replay-update-client.cpp", "replay-update-assets.h",
+            "dw_update_assets.py", "dw_update_maps.py", "embed-update-helper.py", "replay-update-client.rc",
+            "replay-update-client.cpp", "replay-update-assets.h", "replay-update-maps.h",
+            "test-update-maps.py", "update_maps_harness.cpp",
+            "test-update-client-catchup.py", "test-map-publication.py",
         )
     ]
     overlays = dict(manifest["overlays"])
@@ -320,7 +332,7 @@ def prepare():
             "DW_BotStyleSelection.h", "DW_BotStyleProfile.h", "DW_BotStyleWeapon.cpp",
             "DW_BotRank.cpp",
             "DW_ScriptMethods.cpp", "DW_BotStyleScripts.cpp", "DW_BotStyleZone.cpp",
-            "dw_update_assets_protocol.h",
+            "dw_update_assets_protocol.h", "dw_update_maps_protocol.h",
             "DW_MatchmakingAssignments.cpp",
             "DW_JoinInProgress.cpp",
             "DW_Noclip.cpp", "DW_Noclip.h",
@@ -423,6 +435,8 @@ def prepare():
     killcam_render.prepare(source)
     assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
     assets.prepare(source)
+    maps = load_module("dw_update_maps", ROOT / "tools/dw_update_maps.py")
+    maps.prepare(source)
     helper_header = source / "generated-updater/DW_UpdateHelper.h"
     subprocess.run([
         sys.executable, "-B", str(ROOT / "tools/embed-update-helper.py"),
@@ -604,6 +618,9 @@ def verify(directory, report_path, publish_ready=True):
             "native-clones.json",
         ),
         ("test-executable-update-integration.py", [], "updater.json"),
+        ("test-update-maps.py", [], "map-updater.json"),
+        ("test-update-client-catchup.py", [], "updater-catchup.json"),
+        ("test-map-publication.py", [], "map-publication.json"),
         ("test-compiled-unlock-progression.py", [], "unlock.json"),
         ("test-bot-style-selection.py", ["--snapshot", str(source)], "bot-styles.json"),
         ("test-script-method-integration.py", ["--snapshot", str(source)], "script-methods.json"),

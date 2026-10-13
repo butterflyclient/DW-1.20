@@ -1,0 +1,63 @@
+Replay DW custom map updates
+
+The client checks its required files on every launch, including when its EXE is
+already current. Missing or corrupt custom maps are downloaded, decompressed
+and verified before the native update fence requests a clean restart. Installing
+a newer EXE manually also triggers this check on its first launch. A retained
+pre-asset or release 29 helper can install the new EXE first; the new EXE then
+extracts its newer helper and repairs any missing companion files. Clients with
+only the old delta protocol still need the full EXE as their bootstrap.
+
+The published Nuketown package is the current native five-fastfile package plus
+map.json, installed under mods/mw120r/maps/mp_nuketown relative to the EXE. No
+PSOB cache or shipped game file is distributed. XPRESS_HUFF chunks are at most
+4 MiB uncompressed; the helper checks the transport hash before decoding, then
+checks the raw chunk and complete restored file hashes. The signed EXE binds
+the required manifest. Windows Cabinet supplies the decompressor.
+
+Preparation does not overwrite loaded game files. The apply helper waits for
+the exact parent game process to exit, backs up existing files under
+game_dx12_ship_replay_dw.exe.update/asset-backups/<target EXE hash>, and uses the
+same rollback transaction for bot overlays and custom maps. recovery.tsv records
+the original paths and hashes. Preserve these backups when recovering an update.
+
+bypass_update_restart=1 preserves a custom EXE; it does not suppress required
+asset checks. An asset repair can still require a clean restart. The frozen file
+inventory must match the authenticated server target before an asset-only repair
+is allowed. The INI, player identity and local progression are not update targets.
+
+Map publication is explicit. Building or publishing an EXE NEVER captures changed
+map files from the game folder. It only freezes the last successfully published
+map receipt in data/custom-map-publication.json. Do not run the map publisher
+without the owner's request to publish that map version.
+
+When a map update is requested, freeze and review the intended directory:
+
+  python -B tools/publish-custom-map.py --source-directory <map directory> --output data/custom-map-releases/<release name>
+
+This compresses and verifies the package locally without changing the server.
+Publish the reviewed immutable record explicitly:
+
+  python -B tools/publish-custom-map.py --package-record data/custom-map-releases/<release name>/package/package.json --output data/custom-map-releases/<release name> --upload
+
+The server backs up the previous catalog, manifest and every referenced compressed
+payload BEFORE advancing /var/lib/replay-dw/updates/custom-map-catalog.json. Backups
+are in /var/lib/replay-dw/updates/map-backups/<transaction>. They use immutable,
+hash-verified hardlinks, so an earlier package remains recoverable without copying
+all its bytes again. The first publication records that no prior package exists.
+Exact retries keep the original backup evidence. Failed or stale publications
+leave the active catalog unchanged. No server restart is required.
+
+After explicit publication, build and deploy the single production DW EXE using
+build-game.ps1 and deploy-game.ps1. Its embedded required-file manifest binds that
+published map inventory. Ordinary EXE publication verifies that the server's map
+catalog and payloads still match and leaves the map catalog unchanged.
+
+Map data stays on the DW droplet; it is not committed to Git or placed in the
+client ZIP. Sending the current EXE is sufficient for automatic acquisition on a
+compatible installation. Keep normal game dependencies and the player's own INI.
+The initial Nuketown download is about 388 MB compressed and installs 1.09 GB;
+allow additional disk space for staging and retained originals.
+
+Validation separates map structure, Windows installation fixtures and actual
+gameplay. Updater checks do not prove a map was played in the game.

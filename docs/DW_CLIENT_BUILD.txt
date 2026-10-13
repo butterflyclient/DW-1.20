@@ -26,6 +26,12 @@ monotonic release, and verifies the signed public update endpoint. Repeating it
 for the current hash keeps the same release number. Publication commits the
 catalog last under a remote lock and does not restart the backend or game.
 Receipts are retained in the job's publication directory and readiness.json.
+Publication-only tools are hash-bound to the public verification separately
+from compiler inputs. A repair to a release checker does not require another
+game compilation; game sources, helper sources and compiler inputs still must
+match the immutable build receipt, and all existing exact-image gates remain
+required. Changed publication tools require a fresh public verification before
+deployment.
 Use the canonical build/deploy commands in future sessions; do not independently
 copy an EXE into the game folder and leave its public updater catalog behind.
 

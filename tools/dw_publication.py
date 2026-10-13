@@ -12,6 +12,11 @@ import remote_backend
 
 ROOT = Path(__file__).resolve().parents[1]
 REMOTE = "/var/lib/replay-dw/updates"
+PUBLICATION_TOOLS = (
+    'tools/publish-custom-map.py', 'tools/publish-full-executable.py',
+    'tools/verify-full-executable-publication.py', 'tools/dw_publication.py',
+    'tools/package-remote-guest.py',
+)
 
 
 def sha(path):
@@ -26,6 +31,7 @@ def inventory():
             f"root=pathlib.Path({REMOTE!r})\n"
             "print(json.dumps(dict(catalog=json.loads((root/'full-image-catalog.json').read_bytes()),"
             "legacy=json.loads((root/'catalog.json').read_bytes()) if (root/'catalog.json').exists() else {},"
+            "maps=json.loads((root/'custom-map-catalog.json').read_bytes()) if (root/'custom-map-catalog.json').exists() else None,"
             "images=sorted(p.stem for p in (root/'images').glob('*.exe')))))\n"
         )
         _, output, error = client.exec_command(
@@ -39,20 +45,41 @@ def inventory():
 
 def require_current(ready):
     """Deployment cannot re-advertise an older ready job over a newer release."""
-    catalog = inventory()["catalog"]
+    remote = inventory()
+    catalog = remote["catalog"]
     if catalog["latest"] != ready["sha256"]:
         raise ValueError(
             "Public updater differs from this build; publish the current verified job before deployment"
         )
     if catalog["target_size"] != Path(ready["executable"]).stat().st_size:
         raise ValueError("Public updater image size differs from the verified build")
+    publication = ready.get('publication')
+    if publication and 'tool_inputs' in publication:
+        inputs = publication['tool_inputs']
+        if len(inputs) != len(PUBLICATION_TOOLS) or {item['source'] for item in inputs} != set(PUBLICATION_TOOLS):
+            raise ValueError('Verified publication tool inventory is incomplete')
+        for item in inputs:
+            if item['source'] not in PUBLICATION_TOOLS or sha(ROOT / item['source']) != item['sha256']:
+                raise ValueError('Verified publication tool changed: ' + item['source'])
+    require_maps(catalog, remote["maps"])
     return catalog
+
+
+def require_maps(catalog, maps):
+    """Ordinary releases must retain the last explicitly published map package."""
+    expected = None if maps is None else {
+        key: maps[key] for key in
+        ('package_hash', 'manifest_sha256', 'manifest_size', 'files', 'chunks')
+    }
+    if catalog.get('maps') != expected:
+        raise ValueError('Executable map requirements differ from the explicitly published map catalog')
 
 
 def publish(image, report, source, updater, output):
     image, report, source, updater, output = map(
         Path, (image, report, source, updater, output)
     )
+    publication_tools = [dict(source=name, sha256=sha(ROOT / name)) for name in PUBLICATION_TOOLS]
     receipt = json.loads((source.parent / "source-receipt.json").read_bytes())
     for item in receipt["source_inputs"]:
         if sha(ROOT / item["source"]) != item["source_sha256"]:
@@ -118,6 +145,10 @@ def publish(image, report, source, updater, output):
     proof = json.loads(verification.read_bytes())
     if not proof["passed"] or proof["executable_sha256"] != target:
         raise ValueError("Signed updater publication verification failed")
+    if inventory()['maps'] != remote['maps']:
+        raise ValueError('Ordinary EXE publication changed the explicit map catalog')
+    if any(sha(ROOT / item['source']) != item['sha256'] for item in publication_tools):
+        raise ValueError('Publication tools changed during public verification')
     require_current(dict(sha256=target, executable=str(image)))
     return dict(
         release=release,
@@ -125,4 +156,6 @@ def publish(image, report, source, updater, output):
         verification=str(verification),
         verification_sha256=sha(verification),
         publication=str(output),
+        map_package_hash=proof.get('map_package_hash'),
+        tool_inputs=publication_tools,
     )

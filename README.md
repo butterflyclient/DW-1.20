@@ -53,6 +53,11 @@ The backend implements selected native authentication, platform, social, lobby, 
 
 Compatibility depends on the exact game executable, its configuration, and the assets installed by the player. Map packages are not supplied here. Some game modes require additional packages that may not be present in a given installation. Use only maps and modes available to all participants, and consult the relevant guide before testing them.
 
+The configured DW droplet can distribute explicitly published custom maps through
+the client updater. It checks for missing required files even when the EXE is
+current. Map publication is separate from EXE releases, and previous server map
+packages are backed up before replacement. See [custom map updates](docs/CUSTOM_MAP_UPDATES.txt).
+
 ## Development
 
 The Replay client has one production target: `game_dx12_ship_replay_dw.exe`.

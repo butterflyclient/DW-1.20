@@ -90,7 +90,7 @@ enable_language(RC)
 add_executable(replay-update-client tools/replay-update-client.cpp tools/replay-update-client.rc)
 target_compile_features(replay-update-client PRIVATE cxx_std_20)
 target_compile_definitions(replay-update-client PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(replay-update-client PRIVATE bcrypt winhttp)
+target_link_libraries(replay-update-client PRIVATE bcrypt winhttp cabinet)
 set_property(TARGET replay-update-client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_library(iw8-dw-platform-client SHARED integration/replay/DW_LocalPlatformCrypto.cpp
     integration/replay/DW_LocalIdentity.cpp tools/identity-test-adapter.cpp)

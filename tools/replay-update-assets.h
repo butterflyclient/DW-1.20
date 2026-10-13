@@ -1,5 +1,6 @@
 #pragma once
 #include "../integration/replay/dw_update_assets_protocol.h"
+#include "../integration/replay/dw_update_maps_protocol.h"
 #include "DW_UpdateAssetPaths.h"
 #include <string_view>
 #include <optional>
@@ -17,6 +18,7 @@ namespace update_assets
         void (*write)(const fs::path &, std::span<const uint8_t>);
         Digest (*hash)(std::span<const uint8_t>);
         Bytes (*download)(const std::wstring &, const std::wstring &, std::span<const uint8_t>, uint64_t);
+        Bytes (*decompress)(std::span<const uint8_t>, uint32_t) = nullptr;
     };
     inline void require(bool condition, const char *message)
     {
@@ -161,63 +163,171 @@ namespace update_assets
         return result;
     }
 
+    #include "replay-update-maps.h"
+
     class Session
     {
+        struct File
+        {
+            fs::path relative;
+            Digest hash{};
+            uint64_t bytes, limit;
+            const DWUpdateMapFile *map = nullptr;
+        };
         struct Undo
         {
             fs::path destination, backup;
             Digest original{}, installed{};
+            uint64_t originalBytes = 0, installedBytes = 0, limit = 0;
             bool existed;
         };
         IO io;
-        fs::path zone, folder, cache, backups;
-        std::vector<DWUpdateAssetEntry> entries;
+        fs::path game, folder, cache, backups;
+        Maps maps;
+        std::vector<File> files;
         std::vector<Undo> undo;
         bool committed = false;
 
-        fs::path destination(const DWUpdateAssetEntry &entry) const
+        fs::path destination(const File &entry) const
         {
-            const auto relative = nativeRelativePath(entry);
-            const auto parent = zone / relative.parent_path();
-            const auto path = parent / relative.filename();
-            require(parent == zone || parent.parent_path() == zone,
-                    "Asset destination escaped native zone folders");
-            safePath(zone); safePath(parent); safePath(path);
+            fs::path path = game;
+            safePath(path);
+            for (const auto &part : entry.relative)
+            {
+                path /= part;
+                safePath(path);
+            }
             return path;
         }
-        fs::path blob(const DWUpdateAssetEntry &entry) const
+        fs::path blob(const File &entry) const
         {
-            const auto path = cache / (hex(entry.hash) + L".bin");
+            const auto path = cache / ((entry.map ? L"map-" : L"") + hex(entry.hash.data()) + L".bin");
             safePath(path);
             return path;
         }
-        bool validFile(const fs::path &path, const DWUpdateAssetEntry &entry) const
+        bool validFile(const fs::path &path, const File &entry) const
         {
+            if (entry.map)
+                return fileMatches(path, entry.bytes, entry.hash.data(), entry.limit);
             safePath(path);
             return fs::is_regular_file(path) && fs::file_size(path) == entry.bytes &&
-                   matches(io, io.read(path, DW_UPDATE_ASSET_MAX_BYTES), entry.hash);
+                   matches(io, io.read(path, entry.limit), entry.hash.data());
         }
         void roots(bool install)
         {
-            safePath(folder.parent_path());
+            safePath(game);
             directory(folder);
             directory(folder / "asset-staging"); directory(cache);
             if (install)
             {
-                directory(zone);
-                for (const auto &entry : entries)
-                    directory((zone / nativeRelativePath(entry)).parent_path());
+                for (const auto &entry : files)
+                {
+                    fs::path parent = game;
+                    for (const auto &part : entry.relative.parent_path())
+                    {
+                        parent /= part;
+                        directory(parent);
+                    }
+                }
                 directory(folder / "asset-backups"); directory(backups);
             }
+        }
+        void stageMap(const File &entry, const std::wstring &host)
+        {
+            require(io.decompress != nullptr, "Native map decompressor is unavailable");
+            const auto partial = cache / (L"partial-" + hex(entry.hash.data()) + L".bin");
+            safePath(partial);
+            const auto handle = CreateFileW(partial.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
+            require(handle != INVALID_HANDLE_VALUE, "Cannot stage map; check free space");
+            bool open = true;
+            try
+            {
+                const auto &file = *entry.map;
+                for (uint32_t index = 0; index < file.chunkCount; ++index)
+                {
+                    const auto &chunk = maps.chunks[file.firstChunk + index];
+                    const auto payloadPath = cache / (L"chunk-" + hex(chunk.payloadHash) + L".bin");
+                    safePath(payloadPath);
+                    Bytes compressed;
+                    if (fs::is_regular_file(payloadPath) && fs::file_size(payloadPath) == chunk.payloadBytes)
+                        compressed = io.read(payloadPath, DW_UPDATE_MAP_MAX_TRANSPORT_BYTES);
+                    if (compressed.size() != chunk.payloadBytes || !matches(io, compressed, chunk.payloadHash))
+                    {
+                        compressed = io.download(host, L"/updates/v2/asset/" + hex(chunk.payloadHash), {}, chunk.payloadBytes);
+                        require(compressed.size() == chunk.payloadBytes && matches(io, compressed, chunk.payloadHash),
+                                "Downloaded compressed map chunk hash failed");
+                        io.write(payloadPath, compressed);
+                    }
+                    // The untrusted transport hash is checked before Cabinet sees bytes.
+                    const auto raw = io.decompress(compressed, chunk.bytes);
+                    require(raw.size() == chunk.bytes && matches(io, raw, chunk.hash),
+                            "Decompressed map chunk hash or size failed");
+                    DWORD written = 0;
+                    require(WriteFile(handle, raw.data(), static_cast<DWORD>(raw.size()), &written, nullptr) &&
+                                written == raw.size(), "Map staging write failed; installed files are unchanged");
+                }
+                require(FlushFileBuffers(handle) != 0, "Cannot flush staged map");
+                require(CloseHandle(handle) != 0, "Cannot close staged map"); open = false;
+                require(validFile(partial, entry), "Complete staged map file hash failed");
+                require(MoveFileExW(partial.c_str(), blob(entry).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0,
+                        "Cannot publish staged map file");
+            }
+            catch (...)
+            {
+                if (open) CloseHandle(handle);
+                // An incomplete raw file is never reused as a verified file.
+                throw;
+            }
+        }
+        void remember(Undo &recovery, const File &entry)
+        {
+            if (!recovery.existed)
+                return;
+            require(fs::is_regular_file(recovery.destination), "Asset destination is not a file");
+            recovery.originalBytes = fs::file_size(recovery.destination);
+            recovery.original = fileHash(recovery.destination, entry.limit);
+            recovery.backup = backups / (std::to_wstring(undo.size()) + L"-" + hex(recovery.original.data()) + L".bak");
+            safePath(recovery.backup);
+            if (!fs::exists(recovery.backup))
+            {
+                if (entry.map)
+                    verifiedCopy(recovery.destination, recovery.backup, recovery.originalBytes, recovery.original.data(), entry.limit);
+                else
+                    io.write(recovery.backup, io.read(recovery.destination, entry.limit));
+            }
+            require(fileMatches(recovery.backup, recovery.originalBytes, recovery.original.data(), entry.limit) &&
+                        fileMatches(recovery.destination, recovery.originalBytes, recovery.original.data(), entry.limit),
+                    "Existing asset backup failed verification");
+            const auto journal = backups / L"recovery.tsv";
+            safePath(journal);
+            auto record = fs::exists(journal) ? io.read(journal, 1024 * 1024) : Bytes{};
+            const auto line = entry.relative.generic_string() + '\t' + recovery.backup.filename().string() + '\t' +
+                              asciiHex(recovery.original.data()) + '\n';
+            record.insert(record.end(), line.begin(), line.end());
+            io.write(journal, record);
+            require(io.read(journal, 1024 * 1024) == record, "Asset recovery journal failed verification");
         }
     public:
         Session(const IO &backend, const fs::path &exe, const fs::path &updateFolder,
                 std::span<const uint8_t> verifiedImage, const uint8_t *targetHash)
-            : io(backend), zone(exe.parent_path() / "zone"), folder(updateFolder),
+            : io(backend), game(exe.parent_path()), folder(updateFolder),
               cache(folder / "asset-staging" / hex(targetHash)),
-              backups(folder / "asset-backups" / hex(targetHash)), entries(manifest(io, verifiedImage))
+              backups(folder / "asset-backups" / hex(targetHash)), maps(mapManifest(io, verifiedImage))
         {
-            require(exe.parent_path() == folder.parent_path(), "Asset staging escaped game root");
+            require(game == folder.parent_path(), "Asset staging escaped game root");
+            for (const auto &entry : manifest(io, verifiedImage))
+            {
+                File file{fs::path("zone") / nativeRelativePath(entry), {}, entry.bytes, DW_UPDATE_ASSET_MAX_BYTES};
+                std::copy(std::begin(entry.hash), std::end(entry.hash), file.hash.begin());
+                files.push_back(file);
+            }
+            for (const auto &entry : maps.files)
+            {
+                File file{mapPath(entry), {}, entry.bytes, DW_UPDATE_MAP_MAX_FILE_BYTES, &entry};
+                std::copy(std::begin(entry.hash), std::end(entry.hash), file.hash.begin());
+                files.push_back(file);
+            }
         }
         ~Session()
         {
@@ -226,9 +336,11 @@ namespace update_assets
                 catch (const std::exception &error)
                 { std::ofstream(folder / "asset-rollback-errors.log", std::ios::app) << error.what() << '\n'; }
         }
+        Session(const Session &) = delete;
+        Session &operator=(const Session &) = delete;
         bool needed() const
         {
-            for (const auto &entry : entries)
+            for (const auto &entry : files)
                 if (!validFile(destination(entry), entry))
                     return true;
             return false;
@@ -238,23 +350,28 @@ namespace update_assets
             if (!needed())
                 return;
             roots(false);
-            for (const auto &entry : entries)
+            for (const auto &entry : files)
             {
                 if (validFile(destination(entry), entry) || validFile(blob(entry), entry))
                     continue;
-                const auto bytes = io.download(host, L"/updates/v2/asset/" + hex(entry.hash), {}, entry.bytes);
-                require(bytes.size() == entry.bytes && matches(io, bytes, entry.hash), "Downloaded owned asset hash failed");
-                io.write(blob(entry), bytes);
-                require(validFile(blob(entry), entry), "Staged owned asset hash failed");
+                if (entry.map)
+                    stageMap(entry, host);
+                else
+                {
+                    const auto bytes = io.download(host, L"/updates/v2/asset/" + hex(entry.hash.data()), {}, entry.bytes);
+                    require(bytes.size() == entry.bytes && matches(io, bytes, entry.hash.data()), "Downloaded owned asset hash failed");
+                    io.write(blob(entry), bytes);
+                    require(validFile(blob(entry), entry), "Staged owned asset hash failed");
+                }
             }
             verifyStage();
         }
         void verifyStage() const
         {
             safePath(folder); safePath(folder / "asset-staging"); safePath(cache);
-            for (const auto &entry : entries)
+            for (const auto &entry : files)
                 require(validFile(destination(entry), entry) || validFile(blob(entry), entry),
-                        "Owned overlay asset is not completely staged");
+                        "Owned asset or map is not completely staged");
         }
         void install()
         {
@@ -263,49 +380,33 @@ namespace update_assets
             verifyStage(); roots(true);
             try
             {
-                for (const auto &entry : entries)
+                for (const auto &entry : files)
                 {
                     const auto path = destination(entry);
                     if (validFile(path, entry))
                         continue;
-                    Undo recovery{path, {}, {}, {}, fs::exists(path)};
-                    std::copy(std::begin(entry.hash), std::end(entry.hash), recovery.installed.begin());
-                    if (recovery.existed)
-                    {
-                        require(fs::is_regular_file(path), "Owned overlay destination is not a file");
-                        const auto original = io.read(path, DW_UPDATE_ASSET_MAX_BYTES);
-                        recovery.original = io.hash(original);
-                        recovery.backup = backups / (std::to_wstring(undo.size()) + L"-" + hex(recovery.original.data()) + L".bak");
-                        safePath(recovery.backup);
-                        if (!fs::exists(recovery.backup))
-                            io.write(recovery.backup, original);
-                        require(matches(io, io.read(recovery.backup, DW_UPDATE_ASSET_MAX_BYTES), recovery.original.data()) &&
-                                    matches(io, io.read(path, DW_UPDATE_ASSET_MAX_BYTES), recovery.original.data()),
-                                "Existing overlay backup failed verification");
-                        const auto journal = backups / L"recovery.tsv";
-                        safePath(journal);
-                        auto record = fs::exists(journal) ? io.read(journal, 1024 * 1024) : Bytes{};
-                        const auto originalHash = asciiHex(recovery.original.data());
-                        const auto line = nativeRelativePath(entry).generic_string() + '\t' + recovery.backup.filename().string() + '\t' +
-                                          originalHash + '\n';
-                        record.insert(record.end(), line.begin(), line.end());
-                        io.write(journal, record);
-                        require(io.read(journal, 1024 * 1024) == record, "Overlay recovery journal failed verification");
-                    }
+                    Undo recovery{path, {}, {}, {}, 0, entry.bytes, entry.limit, fs::exists(path)};
+                    recovery.installed = entry.hash;
+                    remember(recovery, entry);
                     const auto temporary = cache / (L"install-" + std::to_wstring(undo.size()) + L".tmp");
                     safePath(temporary);
-                    const auto bytes = io.read(blob(entry), DW_UPDATE_ASSET_MAX_BYTES);
-                    require(matches(io, bytes, entry.hash), "Owned asset changed before replacement");
-                    io.write(temporary, bytes);
-                    require(validFile(temporary, entry), "Temporary owned asset failed verification");
+                    if (entry.map)
+                        verifiedCopy(blob(entry), temporary, entry.bytes, entry.hash.data(), entry.limit);
+                    else
+                    {
+                        const auto bytes = io.read(blob(entry), entry.limit);
+                        require(matches(io, bytes, entry.hash.data()), "Owned asset changed before replacement");
+                        io.write(temporary, bytes);
+                        require(validFile(temporary, entry), "Temporary owned asset failed verification");
+                    }
                     undo.push_back(recovery);
                     if (recovery.existed)
                         require(ReplaceFileW(path.c_str(), temporary.c_str(), nullptr, 0, nullptr, nullptr) != 0,
-                                "Atomic overlay replacement failed; backup retained");
+                                "Atomic asset replacement failed; backup retained");
                     else
                         require(MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
-                                "Atomic overlay installation failed");
-                    require(validFile(path, entry), "Installed owned overlay failed verification");
+                                "Atomic asset installation failed");
+                    require(validFile(path, entry), "Installed owned asset failed verification");
                 }
             }
             catch (...)
@@ -318,30 +419,36 @@ namespace update_assets
         {
             for (auto item = undo.rbegin(); item != undo.rend(); ++item)
             {
-                safePath(zone); safePath(item->destination.parent_path()); safePath(item->destination);
+                fs::path ancestor = game;
+                safePath(ancestor);
+                for (const auto &part : item->destination.lexically_relative(game).parent_path())
+                {
+                    ancestor /= part; safePath(ancestor);
+                }
+                safePath(item->destination);
                 if (item->existed)
                 {
                     safePath(item->backup);
-                    const auto original = io.read(item->backup, DW_UPDATE_ASSET_MAX_BYTES);
-                    require(matches(io, original, item->original.data()), "Overlay recovery backup changed");
-                    if (fs::exists(item->destination) && matches(io, io.read(item->destination, DW_UPDATE_ASSET_MAX_BYTES), item->original.data()))
+                    require(fileMatches(item->backup, item->originalBytes, item->original.data(), item->limit),
+                            "Asset recovery backup changed");
+                    if (fileMatches(item->destination, item->originalBytes, item->original.data(), item->limit))
                         continue;
-                    require(!fs::exists(item->destination) || matches(io, io.read(item->destination, DW_UPDATE_ASSET_MAX_BYTES), item->installed.data()),
-                            "Overlay changed externally; recovery copy retained");
+                    require(!fs::exists(item->destination) || fileMatches(item->destination, item->installedBytes, item->installed.data(), item->limit),
+                            "Asset changed externally; recovery copy retained");
                     const auto temporary = cache / L"rollback.tmp";
-                    safePath(temporary); io.write(temporary, original);
+                    verifiedCopy(item->backup, temporary, item->originalBytes, item->original.data(), item->limit);
                     require(fs::exists(item->destination)
                                 ? ReplaceFileW(item->destination.c_str(), temporary.c_str(), nullptr, 0, nullptr, nullptr) != 0
                                 : MoveFileExW(temporary.c_str(), item->destination.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
-                            "Overlay rollback failed; recovery backup retained");
-                    require(matches(io, io.read(item->destination, DW_UPDATE_ASSET_MAX_BYTES), item->original.data()),
-                            "Restored overlay failed verification");
+                            "Asset rollback failed; recovery backup retained");
+                    require(fileMatches(item->destination, item->originalBytes, item->original.data(), item->limit),
+                            "Restored asset failed verification");
                 }
                 else if (fs::exists(item->destination))
                 {
-                    require(matches(io, io.read(item->destination, DW_UPDATE_ASSET_MAX_BYTES), item->installed.data()),
-                            "New overlay changed externally; file retained");
-                    require(DeleteFileW(item->destination.c_str()) != 0, "Cannot roll back newly installed overlay");
+                    require(fileMatches(item->destination, item->installedBytes, item->installed.data(), item->limit),
+                            "New asset changed externally; file retained");
+                    require(DeleteFileW(item->destination.c_str()) != 0, "Cannot roll back newly installed asset");
                 }
             }
             undo.clear();

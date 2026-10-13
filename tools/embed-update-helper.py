@@ -18,6 +18,7 @@ def build(source_root, output):
     integration.mkdir(parents=True, exist_ok=True)
     files = [(ROOT / "tools/replay-update-client.cpp", project / "tools/replay-update-client.cpp")]
     files.append((ROOT / "tools/replay-update-assets.h", project / "tools/replay-update-assets.h"))
+    files.append((ROOT / "tools/replay-update-maps.h", project / "tools/replay-update-maps.h"))
     files.append((ROOT / "tools/replay-update-client.rc", project / "tools/replay-update-client.rc"))
     files += [
         (source_root / name, integration / name)
@@ -29,6 +30,12 @@ def build(source_root, output):
             "DW_UpdateAssetPaths.h",
         )
     ]
+    maps_protocol = source_root / "dw_update_maps_protocol.h"
+    files.append((maps_protocol if maps_protocol.exists() else ROOT / "integration/replay/dw_update_maps_protocol.h",
+                  integration / "dw_update_maps_protocol.h"))
+    maps_manifest = source_root / "DW_UpdateMapManifest.h"
+    if maps_manifest.exists():
+        files.append((maps_manifest, integration / "DW_UpdateMapManifest.h"))
     inputs = []
     for source, target in files:
         shutil.copyfile(source, target)
@@ -46,7 +53,7 @@ add_executable(replay-update-client tools/replay-update-client.cpp tools/replay-
 target_compile_features(replay-update-client PRIVATE cxx_std_20)
 target_include_directories(replay-update-client PRIVATE integration/replay)
 target_compile_definitions(replay-update-client PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(replay-update-client PRIVATE bcrypt winhttp)
+target_link_libraries(replay-update-client PRIVATE bcrypt winhttp cabinet)
 set_property(TARGET replay-update-client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 """,
         encoding="ascii",

@@ -70,7 +70,8 @@ namespace
     using Ticks = unsigned long long(__stdcall *)();
     void *s_kernel;
     wchar_t s_exe[1024]{}, s_helper[1060]{}, s_directory[1024]{}, s_eventName[80]{};
-    // 0 unstarted, 1 checking, 10 current, 20 staged, 30 unknown, 40 failed, 50 bypassed.
+    // 0 unstarted, 1 checking, 10 current, 20 staged, 30 unknown, 40 failed,
+    // 50 EXE bypassed and the authenticated owned asset inventory is current.
     unsigned s_state = 0, s_reported = 0;
     bool s_restartRequested = false, s_restarting = false;
     void *s_apply = nullptr, *s_ready = nullptr;
@@ -181,15 +182,19 @@ namespace
                     goto finished;
             }
             Process process{};
-            if (!spawn(L"--prepare", DW_LocalConfig_WideHost(), process))
+            const bool assetsOnly = DW_LocalConfig_BypassUpdateRestart();
+            if (!spawn(assetsOnly ? L"--prepare-assets" : L"--prepare",
+                       DW_LocalConfig_WideHost(), process))
                 goto finished;
             CloseHandle(process.thread);
             // Blocking work belongs to this worker, never the game frame.
-            if (WaitForSingleObject(process.process, 12 * 60 * 1000) == 0)
+            // Map packages are downloaded in bounded chunks. Permit a slow
+            // connection to finish the complete inventory without blocking frames.
+            if (WaitForSingleObject(process.process, 90 * 60 * 1000) == 0)
             {
                 unsigned long exit = 40;
                 if (code(process.process, &exit) && (exit == 10 || exit == 20 || exit == 30))
-                    result = exit;
+                    result = assetsOnly && exit == 10 ? 50 : exit;
             }
             CloseHandle(process.process);
         }
@@ -200,13 +205,8 @@ namespace
 
     unsigned state()
     {
-        // Configuration is fixed for this process. Bypass only the embedded
-        // executable updater; publisher/data patch statuses remain native.
-        if (DW_LocalConfig_BypassUpdateRestart())
-        {
-            __atomic_store_n(&s_state, 50U, __ATOMIC_RELEASE);
-            return 50;
-        }
+        // Configuration is fixed for this process. Every launch checks owned
+        // assets; the worker chooses whether EXE replacement is permitted.
         unsigned current = __atomic_load_n(&s_state, __ATOMIC_ACQUIRE);
         if (!current && __atomic_compare_exchange_n(
                             &s_state, &current, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
@@ -235,10 +235,12 @@ extern "C" void DW_ExecutableUpdate_Frame()
         DW_LocalPlatform_RecordStage(
             current == 1    ? "DW_EXE_UPDATE checking"
             : current == 10 ? "DW_EXE_UPDATE current"
-            : current == 20 ? "DW_EXE_UPDATE verified replacement staged; restart required"
+            : current == 20 ? (DW_LocalConfig_BypassUpdateRestart()
+                                   ? "DW_EXE_UPDATE verified owned assets staged; restart required; EXE unchanged"
+                                   : "DW_EXE_UPDATE verified update staged; restart required")
             : current == 30 ? "DW_EXE_UPDATE unknown executable; no patch applied"
-            : current == 50 ? "DW_EXE_UPDATE bypass_update_restart=1; executable updater bypassed; "
-                              "publisher/data updates remain native"
+            : current == 50 ? "DW_EXE_UPDATE bypass_update_restart=1; EXE replacement bypassed; "
+                              "authenticated owned assets current; publisher/data updates remain native"
                             : "DW_EXE_UPDATE failed; installed executable unchanged; inspect "
                               ".update/result.log");
     }
@@ -262,12 +264,15 @@ extern "C" void DW_ExecutableUpdate_Frame()
         for (unsigned i = 0; ascii[i]; ++i)
             extra[i] = ascii[i];
         Process process{};
-        if (spawn(L"--apply", extra, process))
+        if (spawn(DW_LocalConfig_BypassUpdateRestart() ? L"--apply-assets" : L"--apply",
+                  extra, process))
         {
             CloseHandle(process.thread);
             s_apply = process.process;
             s_restarting = true;
-            s_handoffDeadline = ticks() + 30000;
+            // Verification of map files and a fresh signed plan occur before
+            // acknowledgement, while the native process remains running.
+            s_handoffDeadline = ticks() + 120000;
         }
         else
         {
@@ -311,6 +316,8 @@ extern "C" uint8_t func_141053520(const uint8_t *streamer, int patchType)
     const unsigned update = state();
     if (update == 0 || update == 1)
         return 0; // Native checking/downloading state.
+    if (update == 40)
+        return 3; // Native FencePatch.CODE_STATE.failure.
     if (update == 20 && (native == 1 || native == 2))
         return 2; // COMPLETE_RESTART
     return native;
