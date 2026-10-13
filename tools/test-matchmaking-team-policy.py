@@ -184,6 +184,9 @@ try:
         from matchmaking_management_fixtures import exercise as exercise_management
         exercise_management(clients, data, query, tokens, policy, ordinary,
                             receive, documents, text, u32, u64, checks)
+        from map_vote_fixtures import exercise as exercise_map_vote
+        exercise_map_vote(clients, data, query, tokens, ordinary,
+                          receive, documents, text, u32, u64, checks)
         policy_path.write_text(json.dumps({"available_maps": ["mp_donetsk"],
             "minimum_players": 1, "split_parties_for_team_balance": True}) + "\n")
         br = {**query, "team_balance": {"num_teams": 1, "lock_squad": True},

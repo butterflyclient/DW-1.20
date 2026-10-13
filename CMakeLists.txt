@@ -29,6 +29,7 @@ add_executable(iw8-dw-server
     src/battlepass_services.cpp
     src/achievement_store.cpp
     src/matchmaking_services.cpp
+    src/matchmaking_map_vote.cpp
     src/matchmaking_store.cpp
     src/tournament_services.cpp
     src/tournament_map_policy.cpp

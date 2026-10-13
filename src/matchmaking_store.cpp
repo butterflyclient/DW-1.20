@@ -1,6 +1,7 @@
 #include "host_os.h"
 #include "matchmaking_store.h"
 #include "tournament_services.h"
+#include "matchmaking_map_vote.h"
 #include <algorithm>
 #include <charconv>
 #include <memory>
@@ -439,6 +440,7 @@ namespace matchmaking_store
                         state.at("operator_bot_count").get<uint64_t>() <= state["auto_fill_target"].get<uint64_t>() &&
                         (!state["auto_fill_complete"].get<bool>() || state["operator_bot_count"] == state["auto_fill_target"]));
             validateLobbyMembers(state, members);
+            services::map_vote::validate(state);
             if (state.contains("operator_start_overrides"))
             {
                 const auto &saved = state["operator_start_overrides"];

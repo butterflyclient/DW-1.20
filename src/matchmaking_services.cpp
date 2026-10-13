@@ -1,6 +1,7 @@
 #include "host_os.h"
 #include "matchmaking_services.h"
 #include "matchmaking_store.h"
+#include "matchmaking_map_vote.h"
 #include "tournament_services.h"
 #include "playlist_catalog.h"
 #include "lobby.h"
@@ -202,7 +203,7 @@ namespace services
 
         bool operatorCanStart(const Json &state)
         {
-            return lobbyWaitingForStart(state) &&
+            return lobbyWaitingForStart(state) && !map_vote::pending(state) &&
                    (!state.value("auto_fill_bots", false) ||
                     state.value("auto_fill_complete", false));
         }
@@ -329,6 +330,7 @@ namespace services
                     }
             }
             botRules["replay_dw_reservedSquads"] = reserved;
+            map_vote::publish(lobby, botRules);
             wire::require(botRules.size() <= 128);
             return backendDocument;
         }
@@ -1881,6 +1883,7 @@ namespace services
                     for (const auto *key : {"auto_fill_bots", "auto_fill_complete", "auto_fill_started_ms", "auto_fill_target"})
                         lobby.erase(key);
                 }
+                map_vote::update(directory, id, lobby, host);
                 lobby["update_id"] = revision + 1;
                 host["update_id"] = revision + 1;
                 host["update_time"] = documentTime;
@@ -1897,6 +1900,11 @@ namespace services
                             joiningMembers.insert(user.get<uint64_t>());
                     lobby.erase("pending_join_members");
                 }
+                // Validate the complete native publication before committing.
+                // Dynamic ballot/fill overrides can exceed the decoder's
+                // limits even when the stored base document remains bounded.
+                const auto publication = nativeBackendDocument(lobby);
+                wire::require(host.dump().size() < 16384 && publication.dump().size() < 16384);
                 writes.insert(writes.begin(), {"lobbies/" + path.filename().string(), lobby});
                 matchmaking_store::commit(root, id.titleId, writes);
                 reply.operation = migration ? "matchmaker-lobby-host-migrated"
