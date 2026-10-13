@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "server_sha256": "589ff5036f35f4dac27fa2513a3977727b7bdb1ef0f96c7fabf8646d14b52443",
+  "checks": [
+    "First native host publication accepts only a zero-bot incomplete auto-fill arm; early additions/completion remain rejected",
+    "Valid historical rules lacking count: nonzero automatic fill disable publishes exactAck and explicit Count0; subsequent manual Count1 is retained and completed-round reset publishes Count0",
+    "Real session-bound host migration resets old token100/pool/timer, accepts successor token1/count0, rejects old owner and holds successor completion for server delay",
+    "Encrypted automatic fill enforces server delay, owner/CAS binding, exact request acknowledgement, all-member publication, human replacement, operator force-start denial, prior target-count completion, native start gate and round reset"
+  ],
+  "fixture": "E:\\DW\\IW8\\data\\auto-fill-wire-1791853934544166900",
+  "native_game_verified": false,
+  "production_changed": false
+}

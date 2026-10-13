@@ -14,6 +14,7 @@ def exercise(clients, data, query, tokens, ordinary, receive, documents, text, u
     request = copy.deepcopy(query)
     current = None
     lobby = None
+    deferred = {}
 
     def publish(sender, payload, error=0):
         nonlocal current
@@ -37,8 +38,19 @@ def exercise(clients, data, query, tokens, ordinary, receive, documents, text, u
         state = json.loads(path.read_bytes())
         index = json.loads((root / "current-lobbies.json").read_bytes())["lobbies"]
         for other in clients:
-            if other is not sender and other.user in state["members"] and index.get(str(other.user)) == lobby:
-                assert receive(other) == (2, packet)
+            if other is sender or other.user not in state["members"]:
+                continue
+            if index.get(str(other.user)) != lobby:
+                # Notification delivery validates the index after its 250 ms
+                # delay. Restoring this fixture's temporary index removal may
+                # allow that exact prior snapshot to reach the peer later.
+                deferred[other.user] = packet
+                continue
+            incoming = receive(other)
+            previous = deferred.pop(other.user, None)
+            if previous is not None and incoming == (2, previous):
+                incoming = receive(other)
+            assert incoming == (2, packet)
         return state
 
     def join(client, token):

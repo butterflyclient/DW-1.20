@@ -1823,7 +1823,9 @@ namespace services
                     const auto count = host["dw_bot_count"].get<uint64_t>();
                     const auto phase = host.value("game_state", Json::object())
                                            .value("state", std::string{});
-                    wire::require(operatorCanStart(lobby) &&
+                    // Filling the waiting roster does not launch the match.
+                    // Keep the pending ballot's launch fence out of this path.
+                    wire::require(lobbyWaitingForStart(lobby) &&
                                   (phase.empty() || phase == "intermission") &&
                                   count > 0 && count <= 199);
                     const auto slots = occupiedSlots(
@@ -1957,7 +1959,8 @@ namespace services
             const auto hostKey = std::to_string(state.at("owner").get<uint64_t>());
             if (!index["lobbies"].contains(hostKey) || index["lobbies"][hostKey] != lobbyId)
                 return {409, "The host has left this lobby."};
-            if (!hostSessionActive(state, player.title) || !operatorCanStart(state))
+            if (!hostSessionActive(state, player.title) ||
+                !(fillBots ? lobbyWaitingForStart(state) : operatorCanStart(state)))
                 return {409, "This lobby is no longer waiting for a public match."};
             if (fillBots && state.value("auto_fill_bots", false))
                 return {409, "Automatic bot fill owns this round's bot count."};

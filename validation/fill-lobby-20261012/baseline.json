@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "baseline_rejection": true,
+  "server_sha256": "a3f0a6ab362c35e05f39e2aa3d339a65154ac6ac1d0c96bf77cb6185dc1bb51c",
+  "checks": [
+    {
+      "humans": 1,
+      "bots": 1,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 1,
+      "bots": 2,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 1,
+      "bots": 5,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 1,
+      "bots": 11,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 2,
+      "bots": 1,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 2,
+      "bots": 2,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 2,
+      "bots": 5,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    },
+    {
+      "humans": 2,
+      "bots": 10,
+      "expected_error": 106,
+      "ballot_and_membership_preserved": true
+    }
+  ],
+  "fixture": "validation\\fill-lobby-20261012\\manual-fill-wire-1791853853719093800",
+  "native_game_verified": false,
+  "production_changed": false
+}
