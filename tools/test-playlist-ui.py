@@ -82,6 +82,26 @@ def main():
         function nodeMethods:registerEventHandler(name, callback) self.events[name] = callback end
         nodeMethods.addEventHandler = nodeMethods.registerEventHandler
         function nodeMethods:getRootController() return 0 end
+        function nodeMethods:getParent() return self.parent end
+        function nodeMethods:getFirstChild() return self.children[1] end
+        function nodeMethods:getNextSibling()
+            if not self.parent then return nil end
+            for index,child in ipairs(self.parent.children) do
+                if child==self then return self.parent.children[index+1] end
+            end
+        end
+        function nodeMethods:UnsubscribeFromAllModels() end
+        function nodeMethods:RemoveDataLinks() end
+        function nodeMethods:ClearLastFocus() self.closed=true end
+        function nodeMethods:GetCurrentMenu() return nil end
+        function nodeMethods:GetPromptContainer() return MakeNode() end
+        function nodeMethods:Wait() return {} end
+        function nodeMethods:RemoveElement(child)
+            for index, value in ipairs(self.children) do
+                if value == child then table.remove(self.children,index);break end
+            end
+            child.parent = nil
+        end
         function nodeMethods:SetHandleMouse(value) self.mouse = value end
         function nodeMethods:SetAlpha(value) self.alpha = value end
         function nodeMethods:isInFocus() return self.focused == true end
@@ -95,7 +115,8 @@ def main():
         function nodeMethods:getElementTextDims() return #self.text * 10,20 end
         local noOperation = function() end
         function MakeNode()
-            return setmetatable({children={},events={},rect={left=0,right=430,top=0,bottom=50}}, {
+            local events={}
+            return setmetatable({children={},events=events,m_eventHandlers=events,rect={left=0,right=430,top=0,bottom=50}}, {
                 __index = function(_, key)
                     if nodeMethods[key] then return nodeMethods[key] end
                     for _, prefix in ipairs({"Set", "set", "Register", "Animate", "Subscribe",
@@ -114,7 +135,8 @@ def main():
         end
         LUI.Alignment = {Left=0,Top=0}
         LUI.DIRECTION = {horizontal=0,vertical=1}
-        LUI.DataSourceInGlobalModel = {new=function() return {GetModel=noOperation} end}
+        LUI.DataSourceInGlobalModel = {new=function() return {GetModel=noOperation,GetValue=function() return 2 end} end}
+        LUI.EASING = {outQuadratic=0}
         Engine = {
             DDJFBBJAIG=function() return false end,
             BHFFIBEFFH=noOperation,DCHDDCJCEG=noOperation,
@@ -145,20 +167,65 @@ def main():
                 end
                 assert(name=="replay_dw_autoFillBots")
                 Preference=value
-            end
+            end,
+            CFHDGABACF=function(name) return name=="MTTRPNMPRP" and 24 or 1 end
         }
         CONDITIONS = setmetatable({}, {__index=function() return function() return false end end})
         Lobby = {GFFECBCCF=function() return false end,BGIADHIHAG=function() return false end}
         DataSources = {frontEnd={lobby={inSplitScreen={GetModel=noOperation},memberCount={GetModel=noOperation}}}}
+        DataSources.frontEnd.lobby.memberMaxCount={GetValue=function() return 12 end}
+        DataSources.frontEnd.lobby.mapName={GetModel=noOperation}
         ACTIONS = {AnimateSequence=function(widget, sequence) widget.lastSequence=sequence end}
         TWEEN_PROPERTY = setmetatable({}, {__index=function(_, key) return key end})
         SWATCHES = {genericButton={textDefault={},textFocus={},background={},glow={}}}
-        FONTS = {MainRegular={File="main"},GetFont=function(value) return value end}
+        FONTS = {MainRegular={File="main"},BodyRegular={File="body"},GetFont=function(value) return value end}
         RegisterMaterial=function(value) return value end
         ToUpperCase=string.upper
         SOUND_SETS={mpMainMenu={move="move",moveUp="up",moveDown="down"}}
+        FrontEndScene={ClientCharacters={LocalSquadMember=0},HideAllLobbyCharactersPastIndex=noOperation,
+            HideAllCharacters=noOperation,RequestWeaponWorldModels=noOperation}
+        OPERATOR={GetSelectedOperatorIndex=function() return 0 end,GetEquippedOperatorSkin=function() return 0,0 end,
+            GetWeaponDataFromLoadout=function() return 0,0 end,GetPetForEquippedOperator=function() return 0 end,
+            ShowGhostTeaser=noOperation}
+        Teams={allies=1,axis=2}
+        CoD={SFX={LobbyTextCoalition=0,LobbyTextAllegiance=1,MouseClick=2}}
+        FocusType={MouseOver=0}
+        LAYOUT={GetElementWidth=function() return 100 end,GetTextWidth=function() return 100 end}
+        MP={GetFactionReference=tostring,GetTeamLogo=function() return "logo" end,GetTeamName=tostring}
+        Engine.DHFCHIIJCA=noOperation;Engine.BJDBIAGIDA=noOperation;Engine.CBEAHDFCFC=tostring
+        Lobby.GetLocalClientTeam=function() return Teams.allies end
+        Lobby.UpdateClientCharacters=function() return {} end
+        Lobby.BuildFocusArrowWidget=MakeNode;Lobby.UpdateFocusArrow=noOperation
+        Lobby.UpdateLocalClientCharacter=noOperation;Lobby.PreloadViewHandsForLocalPlayer=noOperation
+        Lobby.PartyState={STARTING=4}
+        Lobby.EBDDFIIHID=function() return true end
+        Lobby.BGIBDIBHH=function() return NativePartyState,{timeRemaining=30000} end
+        Lobby.AllMembersPath="members";Lobby.SquadMembersPath="squad"
+        Lobby.IsCurrentGameTypeteamBased=function() return true end
+        NativePartyState=1
     ''')
     inputs = {}
+    element_source = ORIGINAL / "luielement.lua.2044.lua"
+    raw_element = element_source.read_text(encoding="utf-8-sig")
+    vm.execute(raw_element[raw_element.index("function LUI.UIElement.RemoveFromParent("):
+                           raw_element.index("function LUI.UIElement.getFullID(")])
+    vm.execute(raw_element[raw_element.index("local function var_0_1(arg_52_0"):
+                           raw_element.index("function LUI.UIElement.addAndCallEventHandler(")])
+    vm.execute('''
+        local create=MakeNode
+        MakeNode=function()
+            local node=create()
+            node.addEventHandler=LUI.UIElement.addEventHandler
+            node.closeTree=LUI.UIElement.closeTree
+            node.closeChildren=LUI.UIElement.closeChildren
+            node.RemoveFromParent=LUI.UIElement.RemoveFromParent
+            return node
+        end
+        for _,kind in pairs(LUI) do
+            if type(kind)=="table" and kind.new==create then kind.new=MakeNode;kind.build=MakeNode end
+        end
+    ''')
+    inputs[str(element_source)] = hashlib.sha256(element_source.read_bytes()).hexdigest()
     button_source = ORIGINAL / "luibutton.lua.2037.lua"
     raw_button = button_source.read_text(encoding="utf-8-sig")
     focus_begin = raw_button.index("function LUI.UIButton.SetFocusable(")
@@ -209,6 +276,32 @@ def main():
     original("frontend/mp/brplaymenubuttons.lua.395.lua", "BRPlayButtonsModule")
     original("frontend/playlistlist.lua.742.lua", "PlaylistListModule")
     original("utils/onboarding.lua.2213.lua", "OnboardingModule")
+    vm.execute('''
+        MenuBuilder.registerType("LobbyMemberGrid",function()
+            local grid=MakeNode();grid.PlayerCount=MakeNode();return grid
+        end)
+        MenuBuilder.registerType("LobbyMap",MakeNode)
+        MenuBuilder.registerType("ChallengesSummary",MakeNode)
+        MenuBuilder.registerType("LobbyTeamDetails",function()
+            local detail=MakeNode()
+            for _,name in ipairs({"LobbyTeamSwitcher","FactionIcon","SuperfactionName","TeamSwitchName","TeamViewName"}) do
+                detail[name]=MakeNode()
+            end
+            detail.LobbyTeamSwitcher.StyledLabel=MakeNode()
+            return detail
+        end)
+    ''')
+    original("frontend/mp/matchmakinglobby.lua.538.lua", "NativeMatchmakingLobby")
+    original("frontend/mp/lobbysmallteammatchmade.lua.514.lua", "NativeSmallTeamLobby")
+    flow_path = ORIGINAL / "frontend/mp/lobbyflowwidget.lua.503.lua"
+    flow_source = flow_path.read_text(encoding="utf-8-sig")
+    vm.globals().NativeLobbyFlow = vm.execute(
+        flow_source[:flow_source.index("local function var_0_12(")] +
+        "return { UpdateLobbyBasedOnMatchmakerState=var_0_9, UpdateLobbyStatus=var_0_10, "
+        "GetMatchMadeWidgetToBuild=var_0_3, AddMatchMadeWidget=var_0_4, UpdateLobbyState=var_0_5, "
+        "ReplaceLobbyWidget=var_0_8, UpdateParentLobbyStatus=var_0_7, InMatchMadeState=var_0_2}",
+        "NativeLobbyFlowSpec")
+    inputs[str(flow_path)] = hashlib.sha256(flow_path.read_bytes()).hexdigest()
     for relative, kind, field, scope, label_index, callback_index in (
         ("frontend/mp/playlistpromotedbutton.lua.578.lua", "PlaylistPromotedButton", "Name", "21", "8", "9"),
         ("frontend/mp/playlistfeaturedbutton.lua.572.lua", "PlaylistFeaturedButton", "Name", "21", "8", "9"),
@@ -319,6 +412,32 @@ def main():
         ballot.RefreshMapVote({active=false})
         for _,button in ipairs(panel.Choices) do assert(not button:AcceptsFocusType(0) and not button.mouse) end
         results[#results+1]="Native map-choice actions select A/B/C; reduced, completed and inactive ballots retire controller focus through original UIButton focusability methods"
+        local flow=MakeNode()
+        flow._state=1
+        for name,callback in pairs(NativeLobbyFlow) do flow[name]=callback end
+        flow.CRMMain=MakeNode()
+        function flow.CRMMain:ShouldHideCRM() return false end
+        function flow.CRMMain:HideCRM() end
+        flow.Nat=MakeNode();flow.JoinableStatus=MakeNode()
+        flow:UpdateLobbyBasedOnMatchmakerState(0)
+        assert(flow._state==2 and flow.matchMakingLobby.id=="MatchmakingLobby")
+        local waiting=flow.matchMakingLobby
+        assert(waiting.ReplayDWMapVote and waiting.ReplayDWMapVote.Anchor==waiting.lobbyMemberGrid)
+        ballot.RefreshMapVote({active=true,complete=false,remaining=20,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
+        assert(waiting.ReplayDWMapVote.alpha==1 and waiting.lobbyMemberGrid.navigation.right==waiting.ReplayDWMapVote.Choices[1])
+        flow:UpdateLobbyStatus(0)
+        assert(flow._state==2 and flow.matchMakingLobby==waiting)
+        NativePartyState=Lobby.PartyState.STARTING
+        flow:UpdateLobbyStatus(0)
+        assert(flow._state==3 and flow.matchMadeLobby.id=="LobbySmallTeamMatchmade")
+        local matched=flow.matchMadeLobby
+        assert(matched.ReplayDWMapVote and not matched.ReplayDWMapVote.Anchor)
+        matched:processEvent({name="update_lobby",controller=0})
+        ballot.RefreshMapVote({active=true,complete=false,remaining=19,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
+        assert(matched.ReplayDWMapVote.Anchor==matched.lobbyMemberGrid)
+        assert(matched.lobbyMemberGrid.navigation.right==matched.ReplayDWMapVote.Choices[1])
+        assert(matched.ReplayDWMapVote.Choices[1].navigation.left==matched.lobbyMemberGrid)
+        results[#results+1]="Original LobbyFlowWidget shows votes in MatchmakingLobby before STARTING, keeps the native transition, and binds the timer-created small-team roster controller route"
         for _,panel in ipairs({mp,br}) do
             local checkbox=panel.ReplayDWFillLobbyBots
             assert(checkbox and checkbox.parent==panel.parent)
@@ -451,6 +570,83 @@ def main():
         MenuBuilder.m_types.replaydwplaylistfillstate().Refresh()
         assert(stage.WasCompleted(nil,0)==true)
         results[#results+1]="Automatic season/mode videos and BR tutorial prompts default off; enabling their dvars delegates to original onboarding checks without changing saved flags, and reloaded stages are repaired idempotently"
+        local retained={}
+        local retiredCalls=0
+        local function guardTree(node)
+            retained[#retained+1]=node
+            for _,name in ipairs({"SetAlpha","setText","SetHandleMouse","SetFocusable","isInFocus","processEvent","SetValue"}) do
+                local original=node[name]
+                if original then
+                    node[name]=function(self,...)
+                        if self.closed then retiredCalls=retiredCalls+1;error("Native call on closed "..tostring(self.id)..":"..name) end
+                        return original(self,...)
+                    end
+                end
+            end
+            for _,child in ipairs(node.children) do guardTree(child) end
+        end
+        local function liveBallot()
+            ballot.RefreshMapVote({active=true,complete=false,remaining=10,
+                choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
+        end
+        local function refreshRetained()
+            liveBallot()
+            ballot.RefreshMapVote({active=false})
+            ballot.Refresh()
+            assert(retiredCalls==0)
+        end
+        local oldToggle=MenuBuilder.m_types.genericcheckboxbuttonwithlabel
+        local legacyClosed=0
+        MenuBuilder.m_types.genericcheckboxbuttonwithlabel=function(...)
+            local toggle=oldToggle(...)
+            toggle:addEventHandler("on_close",function() legacyClosed=legacyClosed+1 end)
+            return toggle
+        end
+        local closedMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        local closedPanel=closedMenu.ReplayDWMapVote
+        local closedToggle=closedMenu.MPPlayMenuButtons.ReplayDWFillLobbyBots
+        guardTree(closedMenu)
+        closedMenu:closeTree()
+        refreshRetained()
+        assert(legacyClosed==1 and closedPanel.ReplayDWRetired and closedToggle.ReplayDWRetired)
+        assert(ballot.mapVotes[closedPanel]==nil and ballot.widgets[closedToggle]==nil)
+        refreshRetained()
+        local childMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        local childPanel=childMenu.ReplayDWMapVote
+        local childToggle=childMenu.MPPlayMenuButtons.ReplayDWFillLobbyBots
+        guardTree(childMenu)
+        childPanel.Choices[2]:closeTree()
+        childToggle.Checkbox:closeTree()
+        refreshRetained()
+        assert(childPanel.ReplayDWRetired and childToggle.ReplayDWRetired)
+        refreshRetained()
+        for _,event in ipairs({"lose_focus","gain_focus"}) do
+            local reentrant=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+            local reentrantPanel=reentrant.ReplayDWMapVote
+            liveBallot()
+            reentrantPanel.Choices[1]:processEvent({name="gain_focus"})
+            local target=event=="lose_focus" and reentrantPanel.Choices[1] or reentrantPanel.Anchor
+            target:addEventHandler(event,function() reentrant:closeTree() end)
+            guardTree(reentrant)
+            ballot.RefreshMapVote({active=false})
+            assert(reentrantPanel.ReplayDWRetired)
+            refreshRetained()
+        end
+        local replacing=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
+        local replacingPanel=replacing.ReplayDWMapVote
+        local oldAnchor=replacing.lobbyMemberGrid
+        guardTree(oldAnchor)
+        oldAnchor:closeTree()
+        refreshRetained()
+        assert(not replacingPanel.ReplayDWRetired and not replacingPanel.Anchor)
+        local newAnchor=MakeNode()
+        replacing.lobbyMemberGrid=newAnchor
+        replacing:addElement(newAnchor)
+        liveBallot()
+        assert(replacingPanel.Anchor==newAnchor and newAnchor.navigation.right==replacingPanel.Choices[1])
+        assert(replacingPanel.Choices[1].navigation.left==newAnchor)
+        assert(#retained>0 and retiredCalls==0)
+        results[#results+1]="Original closeTree/addEventHandler retire panels and toggle subtrees synchronously while preserving prior handlers; strongly retained closed nodes receive zero later refresh/focus calls, including reentrant lose/gain focus and replaced roster anchors"
         return results
     ''')
     old_builder = vm.globals().MenuBuilder.BuildRegisteredType

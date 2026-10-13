@@ -1,0 +1,364 @@
+{
+  "passed": true,
+  "function": "LUI_LuaCall_LUIElement_isInFocus_1",
+  "original_entry_rva": 27044992,
+  "lua_receiver_index": 1,
+  "native_pool": {
+    "slot_count": 4000,
+    "element_size": 320,
+    "handle_size": 4,
+    "slot_offset": 0,
+    "generation_offset": 2,
+    "focus_flag": 4
+  },
+  "modeled_boundaries": [
+    "lua_gettop",
+    "lua_isuserdata",
+    "lua_touserdata",
+    "lua_pushboolean",
+    "luaL_error"
+  ],
+  "linked_provenance": {
+    "build_report": "data\\dw-client\\jobs\\1791849078611245800\\builds\\build-workstation-08d803a8bc8b40cf\\build-report.json",
+    "build_report_sha256": "06a937c71e8033087ba07b50e105c9beffeefd3c54658d72bfc852af8c7ac760",
+    "native_binding_relocation_verified": true,
+    "relative_references": [
+      {
+        "original_rva": 34093232,
+        "linked_rva": 34420912
+      },
+      {
+        "original_rva": 27045026,
+        "linked_rva": 27327650
+      },
+      {
+        "original_rva": 40986384,
+        "linked_rva": 41330448
+      },
+      {
+        "original_rva": 34119600,
+        "linked_rva": 34447280
+      },
+      {
+        "original_rva": 34093664,
+        "linked_rva": 34421344
+      },
+      {
+        "original_rva": 27045058,
+        "linked_rva": 27327682
+      },
+      {
+        "original_rva": 40986384,
+        "linked_rva": 41330448
+      },
+      {
+        "original_rva": 34119600,
+        "linked_rva": 34447280
+      },
+      {
+        "original_rva": 34097776,
+        "linked_rva": 34425456
+      },
+      {
+        "original_rva": 27045084,
+        "linked_rva": 27327708
+      },
+      {
+        "original_rva": 27045149,
+        "linked_rva": 27327773
+      },
+      {
+        "original_rva": 27045104,
+        "linked_rva": 27327728
+      },
+      {
+        "original_rva": 27045149,
+        "linked_rva": 27327773
+      },
+      {
+        "original_rva": 94170096,
+        "linked_rva": 94514160
+      },
+      {
+        "original_rva": 27045131,
+        "linked_rva": 27327755
+      },
+      {
+        "original_rva": 27045149,
+        "linked_rva": 27327773
+      },
+      {
+        "original_rva": 92890176,
+        "linked_rva": 93234240
+      },
+      {
+        "original_rva": 34094720,
+        "linked_rva": 34422400
+      },
+      {
+        "original_rva": 34093232,
+        "linked_rva": 34420912
+      },
+      {
+        "original_rva": 27045193,
+        "linked_rva": 27327817
+      },
+      {
+        "original_rva": 40986384,
+        "linked_rva": 41330448
+      },
+      {
+        "original_rva": 34119600,
+        "linked_rva": 34447280
+      }
+    ]
+  },
+  "images": [
+    {
+      "kind": "original",
+      "image": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay.exe",
+      "image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+      "entry_rva": 27044992,
+      "fault_rva": 27045149,
+      "binding_size": 212,
+      "binding_sha256": "1542040069cf71fd54d920c350b129c582f09faeceee3f68de2839216192c7ad",
+      "generation_table_rva": 94170096,
+      "element_flags_rva": 92890176,
+      "cases": [
+        {
+          "name": "valid_first_unfocused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 0,
+          "returned": 1
+        },
+        {
+          "name": "valid_focused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 1,
+          "returned": 1
+        },
+        {
+          "name": "valid_last_focused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 1,
+          "returned": 1
+        },
+        {
+          "name": "stale_generation",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5395754269,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "out_of_range_4000",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5395754269,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "out_of_range_65535",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5395754269,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "null_userdata",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5395754269,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "argument_count_rejected",
+          "calls": [
+            "lua_gettop",
+            "luaL_error"
+          ],
+          "lua_error": true
+        },
+        {
+          "name": "receiver_type_rejected",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "luaL_error"
+          ],
+          "lua_error": true
+        }
+      ]
+    },
+    {
+      "kind": "linked",
+      "image": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1791849078611245800\\builds\\build-workstation-08d803a8bc8b40cf\\game_dx12_ship_replay_recompiled.exe",
+      "image_sha256": "9cd35035d301265186332858a2fd7460c3ab4b09bb2948974c1c95b4d31e6e9c",
+      "entry_rva": 27327616,
+      "fault_rva": 27327773,
+      "binding_size": 212,
+      "binding_sha256": "777cda6e9e8261b2e2c57ca4b45bf22717c8636a447061d94b4aa3e937c95666",
+      "generation_table_rva": 94514160,
+      "element_flags_rva": 93234240,
+      "cases": [
+        {
+          "name": "valid_first_unfocused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 0,
+          "returned": 1
+        },
+        {
+          "name": "valid_focused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 1,
+          "returned": 1
+        },
+        {
+          "name": "valid_last_focused",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata",
+            "lua_pushboolean",
+            "lua_gettop"
+          ],
+          "boolean": 1,
+          "returned": 1
+        },
+        {
+          "name": "stale_generation",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5396036893,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "out_of_range_4000",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5396036893,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "out_of_range_65535",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5396036893,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "null_userdata",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "lua_touserdata"
+          ],
+          "fault": {
+            "rip": 5396036893,
+            "read_address": 80,
+            "read_size": 4,
+            "rax": 80
+          }
+        },
+        {
+          "name": "argument_count_rejected",
+          "calls": [
+            "lua_gettop",
+            "luaL_error"
+          ],
+          "lua_error": true
+        },
+        {
+          "name": "receiver_type_rejected",
+          "calls": [
+            "lua_gettop",
+            "lua_isuserdata",
+            "luaL_error"
+          ],
+          "lua_error": true
+        }
+      ]
+    }
+  ],
+  "case_count": 18,
+  "scope": "Offline exact native binding execution; UI close lifecycle and live game are separate gates."
+}

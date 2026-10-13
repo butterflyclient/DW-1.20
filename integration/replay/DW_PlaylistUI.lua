@@ -18,12 +18,60 @@ state.ballot = { active = false, choices = {} }
 state.presentation = setmetatable({}, { __mode = "k" })
 local preference = "replay_dw_autoFillBots"
 local scale = _1080p or 1
+local closedAnchors = setmetatable({}, { __mode = "k" })
+
+local function watchCloseTree(widget, retire)
+    widget:addEventHandler("on_close", retire)
+    local child = widget:getFirstChild()
+    while child do
+        watchCloseTree(child, retire)
+        child = child:getNextSibling()
+    end
+end
+
+local function detachAnchor(panel)
+    local anchor = panel.Anchor
+    if anchor then
+        if anchor.navigation and anchor.navigation.right == panel.Choices[1] then
+            anchor.navigation.right = panel.PreviousRight
+        end
+        for _, button in ipairs(panel.Choices) do
+            if button.navigation.left == anchor then button.navigation.left = nil end
+        end
+    end
+    panel.Anchor, panel.PreviousRight = nil, nil
+end
+
+local function bindAnchor(panel, anchor)
+    if not anchor or closedAnchors[anchor] or panel.ReplayDWRetired then return end
+    panel.Anchor = anchor
+    panel.PreviousRight = anchor.navigation and anchor.navigation.right
+    for _, button in ipairs(panel.Choices) do button.navigation.left = anchor end
+    anchor:addEventHandler("on_close", function()
+        closedAnchors[anchor] = true
+        if panel.Anchor == anchor then detachAnchor(panel) end
+    end)
+end
+
+local function retireMapVote(panel)
+    if panel.ReplayDWRetired then return end
+    panel.ReplayDWRetired = true
+    state.mapVotes[panel] = nil
+    detachAnchor(panel)
+end
 
 local function refreshMapVote(panel, ballot)
+    if panel.ReplayDWRetired then return end
+    -- Small-team lobbies create their roster on the first update_lobby timer.
+    -- Bind its existing controller route once that native child is available.
+    if not panel.Anchor and panel.Menu.lobbyMemberGrid then
+        bindAnchor(panel, panel.Menu.lobbyMemberGrid)
+    end
     panel:SetAlpha(ballot.active and 1 or 0, 0)
     panel.Title:setText(ballot.complete and "Map selected" or
         ("Vote for the next map  •  " .. tostring(ballot.remaining or 0) .. "s"), 0)
     for index, button in ipairs(panel.Choices) do
+        if panel.ReplayDWRetired then return end
         local choice = ballot.choices and ballot.choices[index]
         local enabled = ballot.active and choice ~= nil and not ballot.complete
         local retiringFocus = not enabled and button:isInFocus()
@@ -32,7 +80,9 @@ local function refreshMapVote(panel, ballot)
         button:SetFocusable(enabled)
         if retiringFocus then
             button:processEvent({ name = "lose_focus", controller = panel.Controller })
+            if panel.ReplayDWRetired then return end
             if panel.Anchor then panel.Anchor:processEvent({ name = "gain_focus", controller = panel.Controller }) end
+            if panel.ReplayDWRetired then return end
         end
         if choice then
             local name = choice.name:gsub("^mp_", ""):gsub("_", " ")
@@ -67,9 +117,8 @@ local function addMapVote(menu, options, anchor)
     panel.Title:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, 0, 30 * scale)
     panel:addElement(panel.Title)
     panel.Choices = {}
-    panel.Anchor = anchor
+    panel.Menu = menu
     panel.Controller = options and options.controllerIndex or 0
-    panel.PreviousRight = anchor and anchor.navigation and anchor.navigation.right
     local selectors = { "replay_dw_mapVoteSelectA", "replay_dw_mapVoteSelectB", "replay_dw_mapVoteSelectC" }
     for index = 1, 3 do
         local button = LUI.UIButton.new()
@@ -80,7 +129,7 @@ local function addMapVote(menu, options, anchor)
         button:addElement(button.Label)
         button:addEventHandler("button_action", function()
             local ballot = state.ballot
-            if ballot.active and not ballot.complete and ballot.choices[index] then
+            if not panel.ReplayDWRetired and ballot.active and not ballot.complete and ballot.choices[index] then
                 Dvar.DHEGHJJJHI(selectors[index], true)
             end
         end)
@@ -95,6 +144,9 @@ local function addMapVote(menu, options, anchor)
     end
     menu:addElement(panel)
     menu.ReplayDWMapVote = panel
+    watchCloseTree(panel, function() retireMapVote(panel) end)
+    menu:addEventHandler("on_close", function() retireMapVote(panel) end)
+    bindAnchor(panel, anchor)
     state.mapVotes[panel] = true
     refreshMapVote(panel, state.ballot)
 end
@@ -106,7 +158,7 @@ end
 local function refreshCheckboxes()
     local enabled = readPreference()
     for widget in pairs(state.widgets) do
-        widget.Checkbox:SetValue(enabled, true)
+        if not widget.ReplayDWRetired then widget.Checkbox:SetValue(enabled, true) end
     end
 end
 state.Refresh = refreshCheckboxes
@@ -120,7 +172,12 @@ local function buildToggle(options)
     toggle.Text:setText("Fill lobby with bots", 0)
     toggle.Checkbox:SetValue(readPreference(), true)
     state.widgets[toggle] = true
+    watchCloseTree(toggle, function()
+        toggle.ReplayDWRetired = true
+        state.widgets[toggle] = nil
+    end)
     toggle:addEventHandler("button_action", function()
+        if toggle.ReplayDWRetired then return end
         Dvar.DHEGHJJJHI(preference, not readPreference())
         refreshCheckboxes()
     end)
@@ -285,9 +342,10 @@ MenuBuilder.BuildRegisteredType = function(kind, options)
     elseif name == "brplaymenu" then
         addAboveVerticalList(widget, widget.BRPlayMenuButtons, options)
         addMapVote(widget, options, firstPlaylistButton(widget.BRPlayMenuButtons))
-    elseif name == "lobbyindividualmatchmade" or name == "lobbylpcmatchmade" or name == "lobbybattleroyale" then
-        -- Exact stock public-lobby builders and their already-created native
-        -- roster grid, verified in the original Replay Lua asset export.
+    elseif name == "matchmakinglobby" or name == "lobbysmallteammatchmade" or
+        name == "lobbyindividualmatchmade" or name == "lobbylpcmatchmade" or name == "lobbybattleroyale" then
+        -- LobbyFlowWidget holds MatchmakingLobby until native STARTING, then
+        -- chooses the small-team, individual or LPC match-made presentation.
         addMapVote(widget, options, widget.lobbyMemberGrid)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)

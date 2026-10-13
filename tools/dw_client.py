@@ -293,6 +293,7 @@ def prepare():
             "prepare-bot-think-integration.py", "generate-bot-names.py",
             "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
             "test-map-voting-client.py", "map_vote_harness.cpp",
+            "test-ui-focus-lifetime.py",
             "prepare-bot-profile-ownership.py",
             "prepare-noclip-integration.py",
             "prepare-alt-killcam-integration.py", "prepare-alt-killcam-render.py",
@@ -596,6 +597,7 @@ def verify(directory, report_path, publish_ready=True):
             "playlist.json",
         ),
         ("test-playlist-ui.py", ["--snapshot", str(source)], "playlist-ui-behavior.json"),
+        ("test-ui-focus-lifetime.py", [], "ui-focus-lifetime.json"),
         (
             "test-lobby-native-clones.py",
             ["--preparation", str(directory / "lobby-native-clones.json")],
