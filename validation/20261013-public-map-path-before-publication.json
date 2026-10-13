@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "checks": [
+    "Release 30 helper reproduces the reported map-stage error against the actual public server in a 125-character folder",
+    "Exact freshly embedded candidate helper downloads and verifies every published compressed map chunk and complete native file beyond MAX_PATH",
+    "Asset-only staging preserves candidate EXE and creates no installed map files"
+  ],
+  "baseline_executable_sha256": "fa3aa2605ae3943a7b2ef458d1c81c804ac21854359ee0b4d75317fadc01ac54",
+  "candidate_executable_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+  "original_helper_sha256": "76d0e0eb9d906a155ff0b044218dcf85cb3856440da1b48c915ba22f046f4dd0",
+  "fixed_helper_sha256": "ef58f67d4c9c526ce3744bdd4c488596c38937a0e91ca81e9e644ec92d100ea0",
+  "game_folder_characters": 125,
+  "map_package_hash": "4bed5e4b68bb206217a62e4ce10888040d3f6c7487ef4f865d81d365032cb747",
+  "map_transport_bytes": 388490821,
+  "map_raw_bytes": 1092837623,
+  "original_log": "Cannot stage map; check free space\n",
+  "host": "162.243.115.160",
+  "game_executed": false,
+  "installed_game_modified": false,
+  "server_modified": false,
+  "temporary_fixture_removed": true
+}

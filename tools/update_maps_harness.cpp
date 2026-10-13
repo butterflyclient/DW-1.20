@@ -21,7 +21,7 @@ namespace
     bool corruptDownload;
     Bytes read(const fs::path &path, uint64_t limit)
     {
-        std::ifstream stream(path, std::ios::binary | std::ios::ate);
+        std::ifstream stream(nativePath(path), std::ios::binary | std::ios::ate);
         require(stream.good(), "Fixture input unavailable");
         const auto size = stream.tellg();
         require(size >= 0 && uint64_t(size) <= limit, "Fixture input bound");
@@ -33,7 +33,8 @@ namespace
     {
         if (failWrite && ++writes == failWrite)
             throw std::runtime_error("Injected fixture write failure");
-        const auto handle = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+        const auto native = nativePath(path);
+        const auto handle = CreateFileW(native.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
         require(handle != INVALID_HANDLE_VALUE, "Fixture write open failed");
         DWORD count = 0;
@@ -85,6 +86,12 @@ int wmain(int argc, wchar_t **argv)
     try
     {
         require(argc == 4, "Map fixture arguments");
+        require(nativePath(L"E:\\fixture\\game.exe").native() == L"\\\\?\\E:\\fixture\\game.exe", "Extended drive path conversion");
+        require(nativePath(L"\\\\server\\share\\game.exe").native() == L"\\\\?\\UNC\\server\\share\\game.exe", "Extended UNC path conversion");
+        require(nativePath(nativePath(L"E:\\fixture\\game.exe")) == nativePath(L"E:\\fixture\\game.exe"), "Extended path normalization is not idempotent");
+        bool deviceRejected = false;
+        try { nativePath(L"\\\\.\\PhysicalDrive0"); } catch (const std::exception &) { deviceRejected = true; }
+        require(deviceRejected, "Native device path accepted");
         const auto image = read(argv[2], 1024 * 1024);
         const auto maps = mapManifest(backend, image);
         if (std::wstring(argv[1]) == L"--parse")

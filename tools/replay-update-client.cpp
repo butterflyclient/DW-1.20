@@ -74,7 +74,7 @@ namespace
 
     Bytes read(const fs::path &path, uint64_t limit = DW_UPDATE_MAX_IMAGE)
     {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        std::ifstream file(update_assets::nativePath(path), std::ios::binary | std::ios::ate);
         require(file.good(), "Cannot read update input");
         const auto length = file.tellg();
         require(length >= 0 && static_cast<uint64_t>(length) <= limit,
@@ -126,15 +126,15 @@ namespace
 
     void write(const fs::path &path, std::span<const uint8_t> bytes)
     {
-        Handle file(CreateFileW(path.c_str(),
+        const auto native = update_assets::nativePath(path);
+        Handle file(CreateFileW(native.c_str(),
                                 GENERIC_WRITE,
                                 0,
                                 nullptr,
                                 CREATE_ALWAYS,
                                 FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
                                 nullptr));
-        require(file.value != INVALID_HANDLE_VALUE,
-                "Cannot stage update; check free space and folder permissions");
+        update_assets::requireWin32(file.value != INVALID_HANDLE_VALUE, "Cannot stage update");
         size_t at = 0;
         while (at < bytes.size())
         {
@@ -146,7 +146,7 @@ namespace
                     "Update write failed; the installed EXE is unchanged");
             at += count;
         }
-        require(FlushFileBuffers(file.value) != 0, "Cannot flush staged update");
+        update_assets::requireWin32(FlushFileBuffers(file.value) != 0, "Cannot flush staged update");
     }
 
     Bytes download(const std::wstring &host,
@@ -471,7 +471,7 @@ namespace
             bool replaced = false;
             for (unsigned attempt = 0; attempt < 50; ++attempt)
             {
-                if (ReplaceFileW(exe.c_str(), next.c_str(), backup.c_str(), 0, nullptr, nullptr))
+                if (ReplaceFileW(update_assets::nativePath(exe).c_str(), update_assets::nativePath(next).c_str(), update_assets::nativePath(backup).c_str(), 0, nullptr, nullptr))
                 {
                     replaced = true;
                     break;
@@ -490,8 +490,8 @@ namespace
                     matches(read(backup), reply.plan.baseHash))
                 {
                     const auto rollback = stage(exe) / "rollback.exe";
-                    require(CopyFileW(backup.c_str(), rollback.c_str(), FALSE) != 0 &&
-                                MoveFileExW(rollback.c_str(), exe.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
+                    require(CopyFileW(update_assets::nativePath(backup).c_str(), update_assets::nativePath(rollback).c_str(), FALSE) != 0 &&
+                                MoveFileExW(update_assets::nativePath(rollback).c_str(), update_assets::nativePath(exe).c_str(), MOVEFILE_WRITE_THROUGH) != 0,
                             "Replacement failed; restore the retained backup EXE to the game folder");
                 }
                 throw std::runtime_error("Windows could not replace the EXE; installed image and "
@@ -502,8 +502,8 @@ namespace
                 require(matches(read(backup), reply.plan.baseHash),
                         "Installed image and recovery backup failed verification");
                 const auto rollback = stage(exe) / "rollback.exe";
-                require(CopyFileW(backup.c_str(), rollback.c_str(), FALSE) != 0 &&
-                            ReplaceFileW(exe.c_str(), rollback.c_str(), nullptr, 0, nullptr, nullptr) !=
+                require(CopyFileW(update_assets::nativePath(backup).c_str(), update_assets::nativePath(rollback).c_str(), FALSE) != 0 &&
+                            ReplaceFileW(update_assets::nativePath(exe).c_str(), update_assets::nativePath(rollback).c_str(), nullptr, 0, nullptr, nullptr) !=
                                 0,
                         "Final verification failed; restore the retained backup EXE");
                 throw std::runtime_error(
@@ -549,7 +549,8 @@ int wmain(int argc, wchar_t **argv)
         update_assets::safePath(exe.parent_path()); update_assets::safePath(exe);
         update_assets::directory(folder);
         update_assets::safePath(folder / "operation.lock");
-        Handle lock(CreateFileW((folder / "operation.lock").c_str(),
+        const auto lockPath = update_assets::nativePath(folder / "operation.lock");
+        Handle lock(CreateFileW(lockPath.c_str(),
                                 GENERIC_READ | GENERIC_WRITE,
                                 0,
                                 nullptr,
@@ -562,20 +563,20 @@ int wmain(int argc, wchar_t **argv)
         if ((mode == L"--prepare" || mode == L"--prepare-assets") && argc == 4)
         {
             const int result = prepare(exe, argv[3], mode == L"--prepare-assets");
-            std::ofstream(folder / "result.log", std::ios::app)
+            std::ofstream(update_assets::nativePath(folder / "result.log"), std::ios::app)
                 << "prepare result=" << result << '\n';
             return result;
         }
         require((mode == L"--apply" || mode == L"--apply-assets") && argc == 5, "Invalid updater mode");
         apply(exe, std::stoul(argv[3]), argv[4], mode == L"--apply-assets");
-        std::ofstream(folder / "result.log", std::ios::app)
+        std::ofstream(update_assets::nativePath(folder / "result.log"), std::ios::app)
             << "verified replacement and relaunch completed\n";
         return 0;
     }
     catch (const std::exception &error)
     {
         if (!exe.empty())
-            std::ofstream(stage(exe) / "result.log", std::ios::app) << error.what() << '\n';
+            std::ofstream(update_assets::nativePath(stage(exe) / "result.log"), std::ios::app) << error.what() << '\n';
         return 40;
     }
 }

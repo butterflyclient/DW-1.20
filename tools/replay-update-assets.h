@@ -25,6 +25,35 @@ namespace update_assets
         if (!condition)
             throw std::runtime_error(message);
     }
+    inline void requireWin32(bool condition, const char *message)
+    {
+        if (!condition)
+        {
+            const auto error = GetLastError();
+            throw std::runtime_error(std::string(message) + " (Windows error " + std::to_string(error) + ")");
+        }
+    }
+    inline fs::path nativePath(const fs::path &input)
+    {
+        // Hash-addressed staging filenames exceed MAX_PATH even when the game
+        // itself has a conventional path. Extended paths do not depend on the
+        // process manifest or the owner's LongPathsEnabled registry setting.
+        auto absolute = fs::absolute(input).lexically_normal();
+        absolute.make_preferred();
+        const auto value = absolute.native();
+        require(value.size() < 32759 && !value.starts_with(L"\\\\.\\"), "Invalid native update path");
+        if (value.starts_with(L"\\\\?\\"))
+        {
+            require((value.size() > 6 && value[5] == L':' && value[6] == L'\\') ||
+                        value.starts_with(L"\\\\?\\UNC\\"), "Unsupported native update device path");
+            return absolute;
+        }
+        if (value.starts_with(L"\\\\"))
+            return fs::path(L"\\\\?\\UNC\\" + value.substr(2));
+        require(value.size() > 2 && value[1] == L':' && value[2] == L'\\',
+                "Update path is not an absolute Windows file path");
+        return fs::path(L"\\\\?\\" + value);
+    }
     inline std::wstring hex(const uint8_t *bytes)
     {
         std::wstring result;
@@ -52,20 +81,25 @@ namespace update_assets
     }
     inline void safePath(const fs::path &path)
     {
-        const auto flags = GetFileAttributesW(path.c_str());
+        const auto native = nativePath(path);
+        const auto flags = GetFileAttributesW(native.c_str());
         if (flags != INVALID_FILE_ATTRIBUTES)
             require(!(flags & FILE_ATTRIBUTE_REPARSE_POINT), "Asset update path is a reparse point");
         else
-            require(GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND,
-                    "Asset update path cannot be inspected");
+        {
+            const auto error = GetLastError();
+            if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND)
+                throw std::runtime_error("Asset update path cannot be inspected (Windows error " + std::to_string(error) + ")");
+        }
     }
     inline void directory(const fs::path &path)
     {
-        safePath(path);
-        if (!fs::exists(path))
-            fs::create_directory(path);
-        require(fs::is_directory(path), "Asset update directory is unavailable");
-        safePath(path);
+        const auto native = nativePath(path);
+        safePath(native);
+        if (!fs::exists(native))
+            fs::create_directory(native);
+        require(fs::is_directory(native), "Asset update directory is unavailable");
+        safePath(native);
     }
     inline std::string name(const DWUpdateAssetEntry &entry)
     {
@@ -239,7 +273,7 @@ namespace update_assets
             safePath(partial);
             const auto handle = CreateFileW(partial.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
-            require(handle != INVALID_HANDLE_VALUE, "Cannot stage map; check free space");
+            requireWin32(handle != INVALID_HANDLE_VALUE, "Cannot stage map");
             bool open = true;
             try
             {
@@ -264,13 +298,14 @@ namespace update_assets
                     require(raw.size() == chunk.bytes && matches(io, raw, chunk.hash),
                             "Decompressed map chunk hash or size failed");
                     DWORD written = 0;
-                    require(WriteFile(handle, raw.data(), static_cast<DWORD>(raw.size()), &written, nullptr) &&
-                                written == raw.size(), "Map staging write failed; installed files are unchanged");
+                    requireWin32(WriteFile(handle, raw.data(), static_cast<DWORD>(raw.size()), &written, nullptr) != 0,
+                                 "Map staging write failed; installed files are unchanged");
+                    require(written == raw.size(), "Map staging write was incomplete; installed files are unchanged");
                 }
-                require(FlushFileBuffers(handle) != 0, "Cannot flush staged map");
-                require(CloseHandle(handle) != 0, "Cannot close staged map"); open = false;
+                requireWin32(FlushFileBuffers(handle) != 0, "Cannot flush staged map");
+                requireWin32(CloseHandle(handle) != 0, "Cannot close staged map"); open = false;
                 require(validFile(partial, entry), "Complete staged map file hash failed");
-                require(MoveFileExW(partial.c_str(), blob(entry).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0,
+                requireWin32(MoveFileExW(partial.c_str(), blob(entry).c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0,
                         "Cannot publish staged map file");
             }
             catch (...)
@@ -311,7 +346,7 @@ namespace update_assets
     public:
         Session(const IO &backend, const fs::path &exe, const fs::path &updateFolder,
                 std::span<const uint8_t> verifiedImage, const uint8_t *targetHash)
-            : io(backend), game(exe.parent_path()), folder(updateFolder),
+            : io(backend), game(nativePath(exe).parent_path()), folder(nativePath(updateFolder)),
               cache(folder / "asset-staging" / hex(targetHash)),
               backups(folder / "asset-backups" / hex(targetHash)), maps(mapManifest(io, verifiedImage))
         {
@@ -401,10 +436,10 @@ namespace update_assets
                     }
                     undo.push_back(recovery);
                     if (recovery.existed)
-                        require(ReplaceFileW(path.c_str(), temporary.c_str(), nullptr, 0, nullptr, nullptr) != 0,
+                        requireWin32(ReplaceFileW(path.c_str(), temporary.c_str(), nullptr, 0, nullptr, nullptr) != 0,
                                 "Atomic asset replacement failed; backup retained");
                     else
-                        require(MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
+                        requireWin32(MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
                                 "Atomic asset installation failed");
                     require(validFile(path, entry), "Installed owned asset failed verification");
                 }
@@ -437,7 +472,7 @@ namespace update_assets
                             "Asset changed externally; recovery copy retained");
                     const auto temporary = cache / L"rollback.tmp";
                     verifiedCopy(item->backup, temporary, item->originalBytes, item->original.data(), item->limit);
-                    require(fs::exists(item->destination)
+                    requireWin32(fs::exists(item->destination)
                                 ? ReplaceFileW(item->destination.c_str(), temporary.c_str(), nullptr, 0, nullptr, nullptr) != 0
                                 : MoveFileExW(temporary.c_str(), item->destination.c_str(), MOVEFILE_WRITE_THROUGH) != 0,
                             "Asset rollback failed; recovery backup retained");
@@ -448,7 +483,7 @@ namespace update_assets
                 {
                     require(fileMatches(item->destination, item->installedBytes, item->installed.data(), item->limit),
                             "New asset changed externally; file retained");
-                    require(DeleteFileW(item->destination.c_str()) != 0, "Cannot roll back newly installed asset");
+                    requireWin32(DeleteFileW(item->destination.c_str()) != 0, "Cannot roll back newly installed asset");
                 }
             }
             undo.clear();

@@ -1,6 +1,8 @@
 """Actual bounded Cabinet map transactions and signed asset-only helper; no game."""
 import argparse
 import copy
+import ctypes
+from ctypes import wintypes
 import hashlib
 import http.server
 import importlib.util
@@ -52,6 +54,7 @@ def main():
         parser.error('Pass --build or both --package-proof and --frozen-source')
     with tempfile.TemporaryDirectory(prefix='update-maps-fixture-', dir=ROOT / 'data') as temporary:
         root = Path(temporary).resolve()
+        assert root.parent == (ROOT / "data").resolve()
         snapshot = root / 'source'; package = snapshot / 'generated/bot-style-scripts'
         package.mkdir(parents=True); (snapshot / 'src').mkdir()
         proof = json.loads(args.package_proof.read_bytes()); copied = {}
@@ -108,6 +111,10 @@ def main():
         subprocess.run(['cmake', '--build', str(root / 'build'), '--config', 'Release', '--parallel', '2'], check=True, creationflags=flags)
         harness = root / 'build/Release/update-maps.exe'
         subprocess.run([str(harness), str(root / 'installations'), str(image), str(payload_folder)], check=True, creationflags=flags)
+        long_root = root / ('t' * (125 - len(str(root)) - 1))
+        long_root.mkdir()
+        subprocess.run([str(harness), str(long_root), str(image), str(payload_folder)], check=True, creationflags=flags)
+        checks.append('Actual extended-path map staging, backups, install and rollback succeed beyond MAX_PATH without registry or manifest changes')
         checks.append('Six actual Windows transactions cover bounded chunk decoding, no decode before transport authentication, corrupt staging, shared overlay/map atomic rollback, new-file rollback and commit')
         for issue in ('traversal', 'stock', 'psob', 'long-id', 'missing', 'duplicate', 'over-file', 'over-chunk', 'coverage', 'total', 'table-hash', 'multiple'):
             bad_files, bad_chunks = copy.deepcopy(files), copy.deepcopy(chunks)
@@ -189,6 +196,53 @@ def main():
                 staged = stage / 'asset-staging' / sha(target) / ('map-' + item['sha256'] + '.bin')
                 assert maps.file_sha(staged) == item['sha256'] and staged.stat().st_size == item['size']
             checks.append('Actual XPRESS_HUFF helper restores every exact streamed file hash and size')
+            unicode_prefix = 'deep_é_地图_'
+            deep_folder = root / (unicode_prefix + 'd' * (125 - len(str(root)) - 1 - len(unicode_prefix)))
+            deep_folder.mkdir()
+            deep_exe = deep_folder / 'game_dx12_ship_replay_dw.exe'
+            deep_exe.write_bytes(b'MZcustom-owned-client')
+            run(deep_exe, '--prepare-assets', 20)
+            deep_stage = Path(str(deep_exe) + '.update')
+            for item in files:
+                staged = deep_stage / 'asset-staging' / sha(target) / ('map-' + item['sha256'] + '.bin')
+                assert len(str(staged)) > 260 and maps.file_sha(staged) == item['sha256']
+            assert deep_exe.read_bytes() == b'MZcustom-owned-client' and not (deep_exe.parent / 'mods').exists()
+            checks.append('Actual signed helper stages every exact map and overlay under a deep Unicode game folder with staging paths exceeding 317 characters')
+            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                          wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+            kernel.CreateFileW.restype = wintypes.HANDLE
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel.SetFileAttributesW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+            kernel.SetFileAttributesW.restype = wintypes.BOOL
+            for problem, code in (('locked', 32), ('readonly', 5)):
+                blocked = root / problem / 'game_dx12_ship_replay_dw.exe'
+                blocked.parent.mkdir(); blocked.write_bytes(b'MZcustom-owned-client')
+                for item in overlays['entries']:
+                    destination = blocked.parent / 'zone' / overlays['relative_paths'][item['name']]
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(payload_folder / (item['sha256'] + '.bin'), destination)
+                partial = Path(str(blocked) + '.update') / 'asset-staging' / sha(target) / ('partial-' + files[0]['sha256'] + '.bin')
+                partial.parent.mkdir(parents=True); partial.write_bytes(b'')
+                native = '\\\\?\\' + str(partial.resolve())
+                handle = None
+                if problem == 'locked':
+                    handle = kernel.CreateFileW(native, 0x80000000, 0, None, 3, 0x80, None)
+                    assert handle != wintypes.HANDLE(-1).value
+                else:
+                    assert kernel.SetFileAttributesW(native, 1)
+                try:
+                    run(blocked, '--prepare-assets', 40)
+                    log = (Path(str(blocked) + '.update') / 'result.log').read_text()
+                    assert 'Cannot stage map (Windows error ' + str(code) + ')' in log, log
+                    assert 'check free space' not in log
+                    assert blocked.read_bytes() == b'MZcustom-owned-client' and not (blocked.parent / 'mods').exists()
+                finally:
+                    if handle: kernel.CloseHandle(handle)
+                    if problem == 'readonly': assert kernel.SetFileAttributesW(native, 0x80)
+                run(blocked, '--prepare-assets', 20)
+                checks.append('Actual helper reports ' + problem + ' cache Windows error ' + str(code) + ' precisely and reuses the same staging location on retry')
+
             # A new signed target is still insufficient if its owned manifest differs
             # from the frozen helper which will run with the custom installed EXE.
             bad_files = copy.deepcopy(files); bad_files[0]['sha256'] = 'a' * 64

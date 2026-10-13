@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "passed": true,
+  "issue": "Native update helper used MAX_PATH-limited staging paths and labeled every map file-open failure as insufficient free space.",
+  "reproduced_windows_error": 3,
+  "reproduced_staging_path_characters": 317,
+  "fix": "Explicit extended Windows filesystem paths for staging, cache, backups, installation and rollback; original game launch spelling preserved; numeric Windows errors recorded.",
+  "release": 31,
+  "executable_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+  "executable_bytes": 105174016,
+  "direct_server_download_url": "http://162.243.115.160:8085/updates/v2/image/0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+  "filename_to_save": "game_dx12_ship_replay_dw.exe",
+  "source_inputs": [
+    {
+      "path": "tools/replay-update-assets.h",
+      "sha256": "f3e85d455552e70f4f49eed544291058d5f3472755e2f4894a6bf3cec4a31235"
+    },
+    {
+      "path": "tools/replay-update-client.cpp",
+      "sha256": "a2cd3afa360443f0038bb9cef0cc2198226994edbfa46dadff49889bef5433f9"
+    },
+    {
+      "path": "tools/replay-update-maps.h",
+      "sha256": "530ead54c213b0bc8177f7c8cd12ee941a5888b1c06dcaaaa5260196adb22fe4"
+    },
+    {
+      "path": "tools/test-update-maps.py",
+      "sha256": "157fe7b01117d6c2d5a15ddf9851ca48d41def755786cd4788c7a3f52b5e12ee"
+    },
+    {
+      "path": "tools/update_maps_harness.cpp",
+      "sha256": "a051f3b349c1d55653a7ba0f61d48b706e02866d75506d4b64edbdd67ba4a356"
+    },
+    {
+      "path": "tools/test-public-map-staging-path.py",
+      "sha256": "deabebd82d10b4ae1ac251221d03cd242e8c2d73bc528c441f047e3786d8a9b4"
+    }
+  ],
+  "private_compile": {
+    "job": "data\\dw-client\\jobs\\1791896139414557300",
+    "fresh_cpp_units": 129,
+    "unresolved_symbols": 0,
+    "passed_check_groups": 30
+  },
+  "actual_public_long_path_test_before_publication": {
+    "passed": true,
+    "checks": [
+      "Release 30 helper reproduces the reported map-stage error against the actual public server in a 125-character folder",
+      "Exact freshly embedded candidate helper downloads and verifies every published compressed map chunk and complete native file beyond MAX_PATH",
+      "Asset-only staging preserves candidate EXE and creates no installed map files"
+    ],
+    "baseline_executable_sha256": "fa3aa2605ae3943a7b2ef458d1c81c804ac21854359ee0b4d75317fadc01ac54",
+    "candidate_executable_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+    "original_helper_sha256": "76d0e0eb9d906a155ff0b044218dcf85cb3856440da1b48c915ba22f046f4dd0",
+    "fixed_helper_sha256": "ef58f67d4c9c526ce3744bdd4c488596c38937a0e91ca81e9e644ec92d100ea0",
+    "game_folder_characters": 125,
+    "map_package_hash": "4bed5e4b68bb206217a62e4ce10888040d3f6c7487ef4f865d81d365032cb747",
+    "map_transport_bytes": 388490821,
+    "map_raw_bytes": 1092837623,
+    "original_log": "Cannot stage map; check free space\n",
+    "host": "162.243.115.160",
+    "game_executed": false,
+    "installed_game_modified": false,
+    "server_modified": false,
+    "temporary_fixture_removed": true
+  },
+  "compiled_native_map_update_checks": {
+    "passed": true,
+    "checks": [
+      "Fixture helper sources match the exact frozen helper embedded in the compiled client",
+      "Actual extended-path map staging, backups, install and rollback succeed beyond MAX_PATH without registry or manifest changes",
+      "Six actual Windows transactions cover bounded chunk decoding, no decode before transport authentication, corrupt staging, shared overlay/map atomic rollback, new-file rollback and commit",
+      "Compiled parser rejected traversal",
+      "Compiled parser rejected stock",
+      "Compiled parser rejected psob",
+      "Compiled parser rejected long-id",
+      "Compiled parser rejected missing",
+      "Compiled parser rejected duplicate",
+      "Compiled parser rejected over-file",
+      "Compiled parser rejected over-chunk",
+      "Compiled parser rejected coverage",
+      "Compiled parser rejected total",
+      "Compiled parser rejected table-hash",
+      "Compiled parser rejected multiple",
+      "Actual CNG helper authenticates custom-client asset-only staging, preserves EXE, stages no destination files and refreshes expired transfer plan with a new signed nonce",
+      "Actual XPRESS_HUFF helper restores every exact streamed file hash and size",
+      "Actual signed helper stages every exact map and overlay under a deep Unicode game folder with staging paths exceeding 317 characters",
+      "Actual helper reports locked cache Windows error 32 precisely and reuses the same staging location on retry",
+      "Actual helper reports readonly cache Windows error 5 precisely and reuses the same staging location on retry",
+      "Asset-only custom client rejects a signed latest target whose frozen map manifest differs",
+      "Signed target still rejects raw-hash before writing any installed destination",
+      "Signed target still rejects decompress before writing any installed destination",
+      "Signed target still rejects whole-file-hash before writing any installed destination"
+    ],
+    "fixture_signing_key_only": true,
+    "compiled_client_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+    "bounded_chunk_bytes": 4194304,
+    "game_launched": false,
+    "installed_game_modified": false,
+    "production_server_restarted": false,
+    "private_fixture_removed": true
+  },
+  "historical_wait_replace_relaunch_checks": {
+    "passed": true,
+    "checks": [
+      "pre-assets: real historical helper installs new EXE; first new launch stages maps using new embedded helper; asset-only apply then stays current",
+      "release29: real historical helper installs new EXE; first new launch stages maps using new embedded helper; asset-only apply then stays current",
+      "Current EXE repairs missing and same-length corrupt map files without replacing its image",
+      "Bypassed custom EXE with matching authenticated own inventory repairs assets and never replaces EXE",
+      "Signed latest target with mismatching frozen inventory is rejected under bypass",
+      "Corrupt compressed payload is rejected before asset or EXE installation",
+      "Expired staged plan is refreshed with a fresh signed nonce before clean asset-only apply"
+    ],
+    "historical_helpers": [
+      {
+        "version": "pre-assets",
+        "retained_source": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1791731914707990700\\source\\generated-updater\\helper-source",
+        "source_sha256": "37294ac66bb65e0fa67688fe0e00492af62f3283fd85f4810410a2efa8ec9b37",
+        "fixture_helper_sha256": "16fe63cb0b668d2c1e003812f68e42b14ad18044f231ef0a65db64ab290618af",
+        "public_trust_replaced_only": true
+      },
+      {
+        "version": "release29",
+        "retained_source": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1791857394598514500\\source\\generated-updater\\helper-source",
+        "source_sha256": "c367a4175d0a618753e42c9af353d4531262b935de11510773994f6f6e477d00",
+        "fixture_helper_sha256": "07ebc89b12df596f9e3609b8b43af6a7a673182d3c981836e644655a143b4ef0",
+        "public_trust_replaced_only": true
+      }
+    ],
+    "build_proof": {
+      "image_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+      "build_report_sha256": "e6fa637aa0b8e625d96ab4a73efac6f0e8d1e77e424a27ea2f6b36d1d60da19d",
+      "frozen_helper_sources_match": true
+    },
+    "fixture_only": true,
+    "fixture_key_only": true,
+    "game_executed": false,
+    "public_host_used": false,
+    "installed_game_modified": false,
+    "private_fixture_removed": true
+  },
+  "public_verification": {
+    "passed": true,
+    "host": "162.243.115.160",
+    "release": 31,
+    "executable_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+    "bytes": 105174016,
+    "tested_older_hashes": 30,
+    "release_history_sha256": "16c91909d435d8964cb1197f84c7ea5c65b45f8db2629b01f6ab6b252ce81d3b",
+    "helper_sha256": "ef58f67d4c9c526ce3744bdd4c488596c38937a0e91ca81e9e644ec92d100ea0",
+    "pinned_trust_sha256": "dd938c08c31afb1e783d191744505674c19ac4a3f967e46bbea3c676f05a507f",
+    "owned_asset_manifest_sha256": "e08e208ef9de60258c0512bbd74306029e1df333f715aa6f32f62324f694f9bb",
+    "owned_asset_files": 20,
+    "native_asset_folders_verified": true,
+    "map_package_hash": "4bed5e4b68bb206217a62e4ce10888040d3f6c7487ef4f865d81d365032cb747",
+    "map_manifest_sha256": "9d184a92694c646a58b45527603a113b102649a9d35e59755c397bd8b2c14997",
+    "map_files": 6,
+    "map_chunks": 266,
+    "missing_maps_on_current_executable_verified": true,
+    "checks": [
+      "Signed fresh-nonce full-image replies point all tested older hashes directly to the latest release",
+      "Latest executable receives current status without another download/update loop",
+      "Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged",
+      "Current signed EXE separately stages missing owned companions without changing installed files or requiring an EXE replacement",
+      "Current EXE with legacy companions present stages missing maps; compressed downloads verify raw chunks and complete file hashes",
+      "Actual embedded helper recognizes the current release and stages no replacement"
+    ],
+    "game_runs_performed": false,
+    "installed_game_modified": false,
+    "apply_or_relaunch_invoked": false,
+    "temporary_fixture_removed": true,
+    "legacy_delta_only_clients_require_bootstrap": true
+  },
+  "deployed_executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "owner_ini_preserved": true,
+  "local_game_maps_modified": false,
+  "map_package_unchanged": true,
+  "map_package_sha256": "4bed5e4b68bb206217a62e4ce10888040d3f6c7487ef4f865d81d365032cb747",
+  "remote_backend": {
+    "pid": 362512,
+    "active": "active",
+    "substate": "running",
+    "executable": "/opt/replay-dw/releases/20261012-dashboard-fill-881b0ea10ce4/iw8-dw-server",
+    "process_executable": "/opt/replay-dw/releases/20261012-dashboard-fill-881b0ea10ce4/iw8-dw-server",
+    "sha256": "881b0ea10ce4c8f67e20fea1c7c3bcf43d969dd4369e72e6cac8f26237f8cf36",
+    "process_sha256": "881b0ea10ce4c8f67e20fea1c7c3bcf43d969dd4369e72e6cac8f26237f8cf36",
+    "host": "162.243.115.160",
+    "verified_live_process": true,
+    "remote": true
+  },
+  "backend_restarted_for_this_fix": false,
+  "package": {
+    "schema": 2,
+    "archive": "E:\\DW\\IW8\\data\\Replay-DW-Client-Test.zip",
+    "archive_sha256": "25b05a30e99ab70d5d69467c3def953b75fbf7a9d2e469aa375409a0f3862aeb",
+    "game_sha256": "0bd798d6d7d962abf578df9e9750d27442f8f9346580f9bb090122c75f6c06ca",
+    "release": 31,
+    "owned_native_assets": 20,
+    "owned_manifest_sha256": "e08e208ef9de60258c0512bbd74306029e1df333f715aa6f32f62324f694f9bb",
+    "custom_map_package_sha256": "4bed5e4b68bb206217a62e4ce10888040d3f6c7487ef4f865d81d365032cb747",
+    "custom_maps_downloaded_separately": true,
+    "custom_map_compressed_bytes": 388490821,
+    "custom_map_installed_bytes": 1092837623,
+    "public_address": "162.243.115.160",
+    "universal_client": true,
+    "player_provisioning_required": false,
+    "proxy_dll_included": false,
+    "private_signing_keys_included": false,
+    "player_identity_included": false,
+    "second_network_gameplay_verified": false
+  },
+  "game_runs_performed": false,
+  "actual_windows_helper_processes_tested": true,
+  "release30_clients_blocked_before_exe_replacement_need_manual_exe_bootstrap": true,
+  "bypass_keeps_asset_repair_enabled": true,
+  "tester_specific_path_not_provided": true
+}

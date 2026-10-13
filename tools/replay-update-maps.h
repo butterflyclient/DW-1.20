@@ -150,6 +150,6 @@ inline void verifiedCopy(const fs::path &source, const fs::path &target, uint64_
 {
     safePath(source); safePath(target);
     require(fileMatches(source, bytes, expected, limit), "Asset changed before streaming copy");
-    require(CopyFileW(source.c_str(), target.c_str(), FALSE) != 0, "Cannot copy staged asset or recovery file");
+    requireWin32(CopyFileW(source.c_str(), target.c_str(), FALSE) != 0, "Cannot copy staged asset or recovery file");
     require(fileMatches(target, bytes, expected, limit), "Streaming asset copy failed verification");
 }
