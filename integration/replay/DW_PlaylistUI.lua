@@ -13,9 +13,91 @@ end
 local originalBuild = MenuBuilder.BuildRegisteredType
 local originalLocalize = Engine.CBBHFCGDIC
 local state = { widgets = setmetatable({}, { __mode = "k" }) }
+state.mapVotes = setmetatable({}, { __mode = "k" })
+state.ballot = { active = false, choices = {} }
 state.presentation = setmetatable({}, { __mode = "k" })
 local preference = "replay_dw_autoFillBots"
 local scale = _1080p or 1
+
+local function refreshMapVote(panel, ballot)
+    panel:SetAlpha(ballot.active and 1 or 0, 0)
+    panel.Title:setText(ballot.complete and "Map selected" or
+        ("Vote for the next map  •  " .. tostring(ballot.remaining or 0) .. "s"), 0)
+    for index, button in ipairs(panel.Choices) do
+        local choice = ballot.choices and ballot.choices[index]
+        local enabled = ballot.active and choice ~= nil and not ballot.complete
+        local retiringFocus = not enabled and button:isInFocus()
+        button:SetAlpha(choice and 1 or 0, 0)
+        button:SetHandleMouse(enabled)
+        button:SetFocusable(enabled)
+        if retiringFocus then
+            button:processEvent({ name = "lose_focus", controller = panel.Controller })
+            if panel.Anchor then panel.Anchor:processEvent({ name = "gain_focus", controller = panel.Controller }) end
+        end
+        if choice then
+            local name = choice.name:gsub("^mp_", ""):gsub("_", " ")
+            button.Label:setText((choice.winner and "✓  " or "") .. name ..
+                "   (" .. tostring(choice.votes or 0) .. " votes)", 0)
+            local count = #ballot.choices
+            button.navigation.up = panel.Choices[index == 1 and count or index - 1]
+            button.navigation.down = panel.Choices[index == count and 1 or index + 1]
+        end
+    end
+    if panel.Anchor then
+        panel.Anchor.navigation = panel.Anchor.navigation or {}
+        if ballot.active and not ballot.complete then
+            panel.Anchor.navigation.right = panel.Choices[1]
+        elseif panel.Anchor.navigation.right == panel.Choices[1] then
+            panel.Anchor.navigation.right = panel.PreviousRight
+        end
+    end
+end
+
+state.RefreshMapVote = function(ballot)
+    state.ballot = ballot
+    for panel in pairs(state.mapVotes) do refreshMapVote(panel, ballot) end
+end
+
+local function addMapVote(menu, options, anchor)
+    if menu.ReplayDWMapVote or not LUI or not LUI.UIElement or not LUI.UIButton or not LUI.UIText then return end
+    local panel = LUI.UIElement.new()
+    panel.id = "ReplayDWMapVote"
+    panel:SetAnchorsAndPosition(0, 1, 0, 1, 660 * scale, 1050 * scale, 430 * scale, 680 * scale)
+    panel.Title = LUI.UIText.new()
+    panel.Title:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, 0, 30 * scale)
+    panel:addElement(panel.Title)
+    panel.Choices = {}
+    panel.Anchor = anchor
+    panel.Controller = options and options.controllerIndex or 0
+    panel.PreviousRight = anchor and anchor.navigation and anchor.navigation.right
+    local selectors = { "replay_dw_mapVoteSelectA", "replay_dw_mapVoteSelectB", "replay_dw_mapVoteSelectC" }
+    for index = 1, 3 do
+        local button = LUI.UIButton.new()
+        button.id = "ReplayDWMapChoice" .. tostring(index)
+        button:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, (36 + (index - 1) * 52) * scale, (82 + (index - 1) * 52) * scale)
+        button.Label = LUI.UIText.new()
+        button.Label:SetAnchorsAndPosition(0, 0, 0, 0, 8 * scale, -8 * scale, 8 * scale, -8 * scale)
+        button:addElement(button.Label)
+        button:addEventHandler("button_action", function()
+            local ballot = state.ballot
+            if ballot.active and not ballot.complete and ballot.choices[index] then
+                Dvar.DHEGHJJJHI(selectors[index], true)
+            end
+        end)
+        button.navigation = {}
+        button.navigation.left = anchor
+        panel.Choices[index] = button
+        panel:addElement(button)
+    end
+    for index, button in ipairs(panel.Choices) do
+        button.navigation.up = panel.Choices[index == 1 and 3 or index - 1]
+        button.navigation.down = panel.Choices[index == 3 and 1 or index + 1]
+    end
+    menu:addElement(panel)
+    menu.ReplayDWMapVote = panel
+    state.mapVotes[panel] = true
+    refreshMapVote(panel, state.ballot)
+end
 
 local function readPreference()
     return Dvar.IBEGCHEFE(preference) == true
@@ -199,8 +281,14 @@ MenuBuilder.BuildRegisteredType = function(kind, options)
     local name = string.lower(kind)
     if name == "mpplaymenu" then
         addAboveVerticalList(widget, widget.MPPlayMenuButtons, options)
+        addMapVote(widget, options, firstPlaylistButton(widget.MPPlayMenuButtons))
     elseif name == "brplaymenu" then
         addAboveVerticalList(widget, widget.BRPlayMenuButtons, options)
+        addMapVote(widget, options, firstPlaylistButton(widget.BRPlayMenuButtons))
+    elseif name == "lobbyindividualmatchmade" or name == "lobbylpcmatchmade" or name == "lobbybattleroyale" then
+        -- Exact stock public-lobby builders and their already-created native
+        -- roster grid, verified in the original Replay Lua asset export.
+        addMapVote(widget, options, widget.lobbyMemberGrid)
     elseif name == "playlistmenu" or name == "brplaylistmenu" then
         addAboveGrid(widget, options)
     elseif name == "playlistpromotedbutton" or name == "playlistfeaturedbutton" or

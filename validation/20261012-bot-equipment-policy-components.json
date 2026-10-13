@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "baseline_cases": 34,
+  "mesh_continuation_cases": 1,
+  "current_bot_identity_guard_cases": 14,
+  "native_fire_policy_cases": 32,
+  "native_equipment_preference_cases": 17,
+  "native_equipment_selection_leaves_modeled": true,
+  "native_fire_body_sha256": "8651f2051d111d845c505038f603a0c5d00ab8dd9d81e8eaf006d21bff6b6135",
+  "native_ads_emission_body_sha256": "31cf873965d4db36e42ccb2c18ae90c50ae0fbbfffcfc2fc0c45b6f5875e3f76",
+  "native_ads_emission_instructions_executed": true,
+  "native_ads_eligibility_body_sha256": "ff5b135b17ee65c7cd013ff7be7056c7594d94cce69252898be8713a2f6e5bd3",
+  "native_ads_eligibility_instructions_executed": true,
+  "native_body_sha256": "dd9853932dab5fab9bdd03ccfdddfec5705e580f4a06cdb65abb8330da86543b",
+  "source_sha256": "849e9fb0b379fd281718f5e73bc720969c9f1d7a09a546ec89cd81f075ca1005",
+  "build_report": null,
+  "linked_image_sha256": null,
+  "exact_linked_image": false,
+  "passed": true,
+  "game_run_performed": false
+}

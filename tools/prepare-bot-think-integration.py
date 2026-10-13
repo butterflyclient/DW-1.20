@@ -108,6 +108,12 @@ def prepare(snapshot, replace_owned=False):
         ("fn_a7d1c4643723c645", "Bot_ADSButtonEligibility", "31cf873965d4db36e42ccb2c18ae90c50ae0fbbfffcfc2fc0c45b6f5875e3f76"),
         ("fn_b5b36aabb516f88e", "Bot_CurrentEntityEligibility", "7f6d7082bf00e1cd932e62f882f4207ea08e9e09e451c259cf14f832cd806054"),
         ("fn_c917a8bce82b2fb5", "Bot_ThinkCaller", "0ed5163c27cf8a60beb758211c7ab1d56fdd5cdf01d1157f79aacc0f4742e91b"),
+        ("fn_d0ec61d8b5fa5c02", "Bot_GrenadeAction", "42d804acda844355a194ee7a85240c21903b4ade88a47a09d3af651cbc896fc3"),
+        ("fn_21cdf08c7165f1a4", "Bot_GrenadeEligibility", "c37335595f73949648ff63f2e4fe51e2da19f3e7a01d1d38adfbeaa441005a59"),
+        ("fn_b7989c2dc4ad4175", "Bot_OwnedOffhandSelection", "26029e3b0b58c4cddaf12d352f0d68b661c2f6715088f48d8a258063bb25cada"),
+        ("fn_435703bd63df4fa0", "Bot_GrenadeThrowArc", "206dc890a602e3aa6f93493bf479c39a6314f5c65840ef1e89931ddb3c8d1802"),
+        ("fn_096db323e550f7e2", "Bot_OffhandButtonDecision", "a5d674b5e9bd19499021435659520fd95c95c25a64790e4ffd00cf3cb67a6667"),
+        ("fn_7baf9f44fec9fcbc", "Bot_GrenadeCookingState", "07075db6b3e2459a0a89fb4ddcd89ecbffe2ca6417778cb2f0226d882ca74905"),
     ):
         row = functions[identity]
         pieces = []
@@ -255,6 +261,14 @@ def prepare(snapshot, replace_owned=False):
                               native_button_emission_preserved=True,
                               burst_cadence_br_only=False, burst_all_mapped_dw_modes=True,
                               burst_requires_native_can_fire=True)
+    proof["equipment_policy"] = dict(mapped_dw_bots_only=True, all_game_modes=True,
+                                    preference_mask=1, minimum_target_distance=128,
+                                    maximum_target_distance=2048, br_gulag_mask=0x600,
+                                    native_owned_inventory_ammo_preserved=True,
+                                    native_throw_arc_and_cooldowns_preserved=True,
+                                    native_throw_cook_states_preserved=True,
+                                    lethal_button=0x1000, tactical_button=0x2000,
+                                    buttons_forced=False)
     proof["current_bot_guard"] = dict(native_client_type_offset=214756, native_bot_type=2,
                                      client_entity_offset=280, bot_info_offset=1368,
                                      bot_entity_offset=0, bot_player_offset=448,

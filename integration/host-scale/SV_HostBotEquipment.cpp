@@ -60,6 +60,15 @@ extern "C" bool SV_HostBot_InGulag(void *data)
     return bot && bot->player && (bot->player->gameExtraInfo & 0x600) != 0;
 }
 
+extern "C" bool SV_HostBot_EquipmentActionActive(void *data)
+{
+    const auto *bot = static_cast<const HostScale::BotEquipmentData *>(data);
+    // Native Bot grenade action owns both throw/cook continuation (bit 0)
+    // and a pending scripted grenade request (bit 1). Movement policies must
+    // suspend even on a release frame with neither offhand button pressed.
+    return bot && bot->player && (bot->grenadeFlags & 3) != 0;
+}
+
 extern "C" bool SV_HostBot_NeedsRangedWeapon(void *data)
 {
     const auto *bot = static_cast<HostScale::BotEquipmentData *>(data);

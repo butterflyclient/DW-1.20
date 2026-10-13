@@ -64,6 +64,18 @@ int main()
     entries[3].weapon.configuration[17] = 9; // Preserve the assigned attachment data.
 
     Reset();
+    assert(!SV_HostBot_EquipmentActionActive(nullptr));
+    assert(!SV_HostBot_EquipmentActionActive(&bot));
+    bot.grenadeFlags = 1; // Native throw/cook continuation, including release frames.
+    assert(SV_HostBot_EquipmentActionActive(&bot));
+    bot.grenadeFlags = 2; // Pending scripted grenade target.
+    assert(SV_HostBot_EquipmentActionActive(&bot));
+    bot.grenadeFlags = 4; // Other aim/arc state alone does not claim an active throw.
+    assert(!SV_HostBot_EquipmentActionActive(&bot));
+    bot.grenadeFlags = 3; bot.player = nullptr;
+    assert(!SV_HostBot_EquipmentActionActive(&bot));
+
+    Reset();
     player.inventory[0] = 2; player.inventory[1] = 1;
     player.currentWeapon = 1; bot.scriptWeapon = entries[1].weapon;
     assert(SV_HostBot_NeedsRangedWeapon(&bot));
@@ -96,5 +108,5 @@ int main()
     assert(!SV_HostBot_PrepareEquipment(&bot));
     entity.health = 100;
     assert(SV_HostBot_PrepareEquipment(&bot) && !bot.scriptWeapon.index);
-    puts("BR equipment lifecycle: passed (starter, jail rocks, native duel attachments, melee, primary loot, death and mode gates)");
+    puts("BR equipment lifecycle: passed (starter, jail rocks, native duel attachments, melee, primary loot, death, mode gates and active native grenade/cook phase)");
 }

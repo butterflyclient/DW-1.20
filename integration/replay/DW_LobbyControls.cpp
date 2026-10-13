@@ -55,6 +55,8 @@ extern "C"
     unsigned replay_rva_0148fce0();                      // Sys_Milliseconds
 }
 
+#include "DW_MapVoting.h"
+
 namespace
 {
     // Replay's complete registered type encoding. Script dvars use STRING (9),
@@ -492,22 +494,26 @@ extern "C" void DW_LobbyControls_Frame()
         s_autoAck = Dvar_RegisterInt("replay_dw_autoFillAck", 0, 0, 0x7FFFFFFF, 0,
                                     "Accepted host automatic fill request token");
         DW_BotPolicy_Register();
+        dwMapVoting::Register();
         Dvar_EndPermanentRegistration();
         Cmd_AddCommandInternal("fill_lobby", FillLobby_f, &s_fillCommand);
     }
-    DW_PlaylistUI_Frame();
     if (!s_start->current.integer)
         s_started = false;
     if (!s_botCount->current.integer && !s_autoFill->current.enabled && !s_autoActive->current.enabled)
         s_filled = false;
     if (!Com_FrontEndScene_IsActive() || !replay_rva_01187fa0())
     {
+        if (!Com_FrontEndScene_IsActive()) dwMapVoting::Suspend();
+        DW_PlaylistUI_Frame();
         s_autoWasHost = false;
         s_autoClockValid = false;
         s_autoArmAcknowledged = false;
         return;
     }
     auto *party = replay_rva_01187ee0();
+    dwMapVoting::Frame(party);
+    DW_PlaylistUI_Frame();
     if (!party || !replay_rva_0118dd00(party) || !replay_rva_01189120(party))
     {
         s_autoWasHost = false;
@@ -650,7 +656,7 @@ extern "C" void DW_LobbyControls_Frame()
             requested,
             capacity);
     }
-    if (s_start->current.integer && !s_started && !AutoFillPending(party))
+    if (s_start->current.integer && !s_started && !AutoFillPending(party) && !dwMapVoting::Pending(party))
     {
         replay_rva_0119cfa0(party, true);
         s_started = true;
@@ -665,6 +671,7 @@ extern "C" void DW_LobbyControls_HostDocument(uint64_t lobby,
                                               const char **document,
                                               unsigned *length)
 {
+    dwMapVoting::HostDocument(lobby, document, length);
     if (!s_requestPending || lobby != s_lobby || result != replay_rva_0c27e4b0 + 131864 ||
         !*reinterpret_cast<const bool *>(replay_rva_0c27e4b0 + 80128))
         return;
@@ -706,17 +713,22 @@ extern "C" bool func_14119B0E0(void *party, const void *activeClient)
 {
     DW_MatchmakingAssignments_PrepareLaunch(party);
     const bool nativeReady = DW_LobbyControls_ReadyToLaunchNative(party, activeClient);
-    return nativeReady && !AutoFillPending(party);
+    return nativeReady && !AutoFillPending(party) && !dwMapVoting::Pending(party);
 }
 
 extern "C" uint64_t func_14119E3D0(void *party, const void *activeClient)
 {
     DW_MatchmakingAssignments_PrepareLaunch(party);
-    return AutoFillPending(party) ? uint64_t{0}
+    return AutoFillPending(party) || dwMapVoting::Pending(party) ? uint64_t{0}
                                  : DW_LobbyControls_StartMatchInternalNative(party, activeClient);
 }
 
 extern "C" bool DW_LobbyControls_AutoFillEnabled()
 {
     return s_autoFill && s_autoFill->current.enabled;
+}
+
+extern "C" int DW_MapVoting_UIState(char *buffer, unsigned capacity)
+{
+    return dwMapVoting::UIState(buffer, capacity);
 }

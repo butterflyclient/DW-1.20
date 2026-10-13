@@ -83,6 +83,13 @@ def main():
         nodeMethods.addEventHandler = nodeMethods.registerEventHandler
         function nodeMethods:getRootController() return 0 end
         function nodeMethods:SetHandleMouse(value) self.mouse = value end
+        function nodeMethods:SetAlpha(value) self.alpha = value end
+        function nodeMethods:isInFocus() return self.focused == true end
+        function nodeMethods:processEvent(event)
+            if event.name == "gain_focus" then self.focused = true end
+            if event.name == "lose_focus" then self.focused = false end
+            if self.events[event.name] then return self.events[event.name](self,event) end
+        end
         function nodeMethods:AddTooltipData(controller, value) self.tooltip = value end
         function nodeMethods:getLocalRect() return 0,0,430,25 end
         function nodeMethods:getElementTextDims() return #self.text * 10,20 end
@@ -116,6 +123,7 @@ def main():
         }
         NativeTranslations = {}
         Preference = false
+        MapSelections = {}
         IntroPreferences = {}
         OnboardingNativeReads = 0
         OnboardingNativeWrites = 0
@@ -131,7 +139,11 @@ def main():
                 return IntroPreferences[name]==true
             end,
             DHEGHJJJHI=function(name,value)
-                assert(name=="replay_dw_autoFillBots" and type(value)=="boolean")
+                assert(type(value)=="boolean")
+                if string.find(name,"replay_dw_mapVoteSelect",1,true)==1 then
+                    MapSelections[#MapSelections+1]=name;return
+                end
+                assert(name=="replay_dw_autoFillBots")
                 Preference=value
             end
         }
@@ -147,6 +159,22 @@ def main():
         SOUND_SETS={mpMainMenu={move="move",moveUp="up",moveDown="down"}}
     ''')
     inputs = {}
+    button_source = ORIGINAL / "luibutton.lua.2037.lua"
+    raw_button = button_source.read_text(encoding="utf-8-sig")
+    focus_begin = raw_button.index("function LUI.UIButton.SetFocusable(")
+    focus_end = raw_button.index("\nlocal function", focus_begin)
+    vm.execute(raw_button[focus_begin:focus_end])
+    vm.execute('''
+        local create=LUI.UIButton.new
+        LUI.UIButton.new=function()
+            local button=create()
+            button.SetFocusable=LUI.UIButton.SetFocusable
+            button.AcceptsFocusType=LUI.UIButton.AcceptsFocusType
+            button:SetFocusable(true)
+            return button
+        end
+    ''')
+    inputs[str(button_source)] = hashlib.sha256(button_source.read_bytes()).hexdigest()
 
     def original(relative, module_name):
         path = ORIGINAL / relative
@@ -269,6 +297,28 @@ def main():
         local grid=MenuBuilder.BuildRegisteredType("PlaylistMenu",options)
         local brGrid=MenuBuilder.BuildRegisteredType("BRPlaylistMenu",options)
         local results={}
+        local ballot=MenuBuilder.m_types.replaydwplaylistfillstate()
+        local panel=mpMenu.ReplayDWMapVote
+        assert(panel and panel.alpha==0)
+        for _,button in ipairs(panel.Choices) do assert(not button:AcceptsFocusType(0)) end
+        ballot.RefreshMapVote({active=true,complete=false,remaining=12,choices={
+            {name="Backlot",votes=1},{name="Crash",votes=2},{name="Office",votes=0}}})
+        assert(panel.alpha==1 and panel.Choices[1].Label.text=="Backlot   (1 votes)")
+        assert(panel.Choices[3].navigation.down==panel.Choices[1])
+        assert(panel.Choices[1].navigation.up==panel.Choices[3])
+        panel.Choices[3].events.button_action()
+        assert(MapSelections[1]=="replay_dw_mapVoteSelectC")
+        panel.Choices[3]:processEvent({name="gain_focus"})
+        ballot.RefreshMapVote({active=true,complete=false,choices={{name="Backlot",votes=1}}})
+        assert(not panel.Choices[3]:AcceptsFocusType(0) and not panel.Choices[3]:isInFocus())
+        assert(panel.Anchor:isInFocus() and panel.Choices[1].navigation.up==panel.Choices[1])
+        panel.Choices[1]:processEvent({name="gain_focus"})
+        ballot.RefreshMapVote({active=true,complete=true,choices={{name="Backlot",votes=1,winner=true}}})
+        assert(not panel.Choices[1]:isInFocus() and not panel.Choices[1]:AcceptsFocusType(0))
+        panel.Choices[1].events.button_action(); assert(#MapSelections==1)
+        ballot.RefreshMapVote({active=false})
+        for _,button in ipairs(panel.Choices) do assert(not button:AcceptsFocusType(0) and not button.mouse) end
+        results[#results+1]="Native map-choice actions select A/B/C; reduced, completed and inactive ballots retire controller focus through original UIButton focusability methods"
         for _,panel in ipairs({mp,br}) do
             local checkbox=panel.ReplayDWFillLobbyBots
             assert(checkbox and checkbox.parent==panel.parent)

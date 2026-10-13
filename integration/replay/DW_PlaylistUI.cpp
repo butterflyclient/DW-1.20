@@ -8,6 +8,7 @@ extern "C"
     extern void *gl_151868880;
     unsigned replay_rva_0148fce0(); // Original Sys_Milliseconds binding.
     double func_142084A10(void *, int); // lua_tonumber.
+    int DW_MapVoting_UIState(char *, unsigned);
 }
 
 namespace
@@ -53,6 +54,15 @@ extern "C" void DW_PlaylistUI_Frame()
             ok = Execute(vm, dwPlaylistUISource, sizeof(dwPlaylistUISource) - 1, installed);
         if (ok && installed == 1)
         {
+            char voteState[1024]{}, update[1400]{};
+            if (DW_MapVoting_UIState(voteState, sizeof(voteState)) > 0)
+            {
+                const int length = Com_sprintf(update, sizeof(update),
+                    "MenuBuilder.m_types.replaydwplaylistfillstate().RefreshMapVote(%s); return 1", voteState);
+                double refreshed = 0;
+                if (length > 0 && unsigned(length) < sizeof(update))
+                    ok = Execute(vm, update, unsigned(length), refreshed);
+            }
             if (s_reportedVM != vm)
                 Com_Printf(25, "DW_PLAYLIST_UI native playlist bot-fill toggle installed.\n");
             s_reportedVM = vm;

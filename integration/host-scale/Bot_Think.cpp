@@ -52,6 +52,7 @@ namespace
         // only the match preferences during this one serialized native call.
         uint64_t profile = 0;
         bool battleRoyale = false;
+        bool equipmentPreference = false;
         bool policy = Enabled() &&
                       DW_BotPolicy_ProfileSeed(uint16_t(info->entity->number), &profile) &&
                       Field<uint32_t>(ps, 12) <= 1 && !(Field<uint8_t>(info, 620) & 0x1F) &&
@@ -70,6 +71,14 @@ namespace
                      (hostile.words[team >> 5] & (0x80000000u >> (team & 31))) &&
                      (!battleRoyale || !(Field<uint32_t>(info->entity->client, 22336) & 0x200)) &&
                      !BT_IsSkydiving(ps);
+            const float x = enemy->origin.x - info->entity->origin.x;
+            const float y = enemy->origin.y - info->entity->origin.y;
+            const float z = enemy->origin.z - info->entity->origin.z;
+            const float rangeSquared = x * x + y * y + z * z;
+            equipmentPreference = policy && rangeSquared >= 128.0f * 128.0f &&
+                                  rangeSquared <= 2048.0f * 2048.0f &&
+                                  (!battleRoyale ||
+                                   !(Field<uint32_t>(info->entity->client, 22336) & 0x600));
         }
         if (!policy)
         {
@@ -91,12 +100,18 @@ namespace
         if (BT_CanFire(info) && (fireType == 0 || fireType == 5)) // Native FULLAUTO / BEAM.
             match->burstType = 0; // Native BOT_BURST_FIRE_TYPE_NONE.
         match->flags |= 2; // Request native Bot_ShouldADS, including its weapon/dual/hip checks.
+        if (equipmentPreference)
+            // Bot_UpdateCombat and its native grenade selector consume bit 0.
+            // They choose an owned lethal/tactical, require ammo and legal
+            // weapon/cook states, preserve cooldowns, solve a safe throw arc,
+            // then select 0x1000/0x2000 from the actual equipped offhand.
+            match->flags |= 1;
         BT_Combat(info, command);
         // Native combat may return before refreshing lastADS while waiting for
         // aim, ammunition or a firing opportunity. Try its ADS eligibility after
         // that decision, with the preference still active. Keep grenade/melee
         // actions intact; final native Bot_ShouldPressADS still owns the button.
-        if (!(command->buttons & (0x1000 | 4)) && BT_ADSAllowed(info, info->player))
+        if (!(command->buttons & (0x3000 | 4)) && BT_ADSAllowed(info, info->player))
             Field<int32_t>(info, 29208) = SVHS_LevelTime;
         match->flags = originalFlags;
         match->burstType = originalBurst;

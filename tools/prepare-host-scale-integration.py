@@ -268,6 +268,30 @@ def prepare(snapshot, replace_owned=False):
         elif name == "SVHS_UpdateSprintConsumer":
             assert any(i.mnemonic == "movabs" and i.op_str == "r13, 0x800000000000" for i in rows)
             assert base + by_id["fn_3ccf96c2c47212df"]["rva"] in direct_calls(rows)
+    slide_proof = []
+    for identity, role, expected in (
+        ("fn_9482b8e719a40fea", "Slide_CheckCanSlide", "1b0a391cd59d7685ac5decec99e9a6138c86d2938b9d6d3a8b67fe9aa528a978"),
+        ("fn_7dd88fbc6faf4680", "Slide_EndCheck", "9f777980a9af49c6d29cf4ec3c799e5c3b0daa6bdd9b8207f474af0145354f4e"),
+        ("fn_29fda24a496de5fe", "Slide_Update", "be9a36400d6bb0e3e553ced2d7ddb9a4b6a48b58d91309f7b7d0af805a763f66"),
+        ("fn_662cb01b043d3d79", "CL_Input_AddCurrentStanceToCmd", "09b3b22773ca71718831f6a5dd38b3e80b554e86ce16a11b03b75a1629616891"),
+    ):
+        body, rows = instructions(identity)
+        assert hashlib.sha256(body).hexdigest() == expected, role
+        slide_proof.append(dict(identity=identity, role=role, original_rva=by_id[identity]["rva"],
+                                original_bytes=len(body), original_sha256=expected))
+        if role == "Slide_CheckCanSlide":
+            assert any(i.mnemonic == "bt" and i.op_str == "rax, 0x16" for i in rows)
+            assert any(i.mnemonic == "shr" and i.op_str == "eax, 0x14" for i in rows)
+        elif role == "Slide_EndCheck":
+            assert any(i.mnemonic == "test" and i.op_str == "byte ptr [rbx + 0x10], 0x80" for i in rows)
+            assert any(i.mnemonic == "test" and i.op_str == "byte ptr [rbx + 0x118], 0x80" for i in rows)
+        elif role == "Slide_Update":
+            assert any(i.mnemonic == "shr" and i.op_str == "eax, 0x1d" for i in rows)
+            assert any(i.mnemonic == "or" and i.op_str == "dword ptr [rbp + 0x14], 0x20000000" for i in rows)
+        else:
+            assert any(i.mnemonic == "and" and i.op_str == "rdx, 0xffffffffffffff3f" for i in rows)
+            assert any(i.mnemonic == "bts" and i.op_str == "rdx, 0x16" for i in rows)
+            assert any(i.mnemonic == "bts" and i.op_str == "rdx, 7" for i in rows)
     think_prefix = pe.get_data(funcs["SVHS_BotThink"] - base, 750)
     assert hashlib.sha256(think_prefix).hexdigest() == "d0123e3e923dc409bf1548398f5aeaef4916aab3d72cbeb5a7ea452da8743322"
     tls_tail = pe.get_data(funcs["SVHS_BotThink"] - base + len(think_prefix), 32)
@@ -507,6 +531,15 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
                                tactical_sprint_request=0x800000000000,
                                physics_can_start_sprint_identity="fn_3ccf96c2c47212df",
                                meters_and_timers_owned_by_native_physics=True),
+                   slide_cancel=dict(native=slide_proof, slide_request=0x400000,
+                                     crouch_request=0x80, slide_flag=29, sprint_flag=20,
+                                     space_from_crouch_releases_stance=True,
+                                     jump_or_prone_authored=False,
+                                     header="src/sv_host_bot_slide.h",
+                                     header_sha256=hashlib.sha256(
+                                         (snapshot / "src/sv_host_bot_slide.h").read_bytes()).hexdigest(),
+                                     checker_cpp_sha256=hashlib.sha256(
+                                         (ROOT / "tools/test-bot-slide-cancel.cpp").read_bytes()).hexdigest()),
                   game_run_performed=False)
     (snapshot / "generated/host-scale-integration.json").write_text(json.dumps(result, indent=2) + "\n")
     for filename, module_name in (("prepare-bot-think-integration.py", "native_bot_think"),

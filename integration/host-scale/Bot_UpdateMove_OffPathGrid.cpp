@@ -3,6 +3,7 @@
 #include "sv_host_bot_equipment.h"
 #include "SV_HostBotEquipmentBindings.h"
 #include "DW_BotStyleProfile.h"
+#include "sv_host_bot_slide.h"
 #include <intrin.h>
 
 namespace
@@ -59,9 +60,11 @@ namespace
 
     struct UrgencyState
     {
-        void *owner, *player;
+        void *owner, *player, *statics;
         uint64_t ownedButtons;
+        uint64_t profile;
         int32_t lastTime;
+        SlideCancel::State slide;
     };
 
     UrgencyState s_urgency[200]{};
@@ -81,6 +84,8 @@ namespace
         uint8_t opaque800[996];
         uint64_t weaponFlags;
         float adsFraction;
+        uint8_t opaque1808[10264];
+        uint8_t skydivingState, opaque12073[3];
     };
 
 #pragma pack(pop)
@@ -91,7 +96,8 @@ namespace
     static_assert(offsetof(SprintPlayerView, sprintButtonUpRequired) == 796);
     static_assert(offsetof(SprintPlayerView, weaponFlags) == 1796);
     static_assert(offsetof(SprintPlayerView, adsFraction) == 1804);
-    static_assert(sizeof(SprintPlayerView) == 1808);
+    static_assert(offsetof(SprintPlayerView, skydivingState) == 12072);
+    static_assert(sizeof(SprintPlayerView) == 12076);
     constexpr uint64_t SprintRequest = 2;
     constexpr uint64_t TacticalSprintRequest = 0x800000000000ull;
     constexpr uint64_t TravelInterruptButtons = 0x4233ddull;
@@ -105,7 +111,7 @@ namespace
         return x * x + y * y + z * z;
     }
 
-    bool CurrentMappedBot(const BotNavigationView *bot)
+    bool CurrentMappedBot(const BotNavigationView *bot, uint64_t *profileSeed = nullptr)
     {
         if (!bot || !bot->entity || !bot->playerState || !bot->sentient)
             return false;
@@ -114,13 +120,16 @@ namespace
             return false;
         void *client = SVHS_Clients[slot];
         uint64_t profile = 0;
-        return client &&
+        const bool current = client &&
                static_cast<const uint8_t *>(client) + 1368 ==
                    reinterpret_cast<const uint8_t *>(bot) &&
                Field<int32_t>(client, 214756) == 2 && Field<Entity *>(client, 280) == bot->entity &&
                bot->entity->client == bot->playerState && bot->entity->sentient == bot->sentient &&
                SVHS_IsBotEntity(bot->entity) && SVHS_IsBotPlaying(client) &&
                DW_BotPolicy_ProfileSeed(slot, &profile);
+        if (current && profileSeed)
+            *profileSeed = profile;
+        return current;
     }
 
     bool Locked(const BotNavigationView *bot)
@@ -377,25 +386,66 @@ extern "C" void SV_HostBot_UpdateTravelUrgency(void *data,
     using namespace HostScale;
     auto *bot = static_cast<BotNavigationView *>(data);
     const unsigned slot = bot && bot->entity ? uint16_t(bot->entity->number) : 200;
-    if (!command || slot >= 200 || !Enabled() || !CurrentMappedBot(bot))
+    uint64_t profile = 0;
+    if (!command || slot >= 200 || !Enabled() || !CurrentMappedBot(bot, &profile))
         return;
     auto &state = s_urgency[slot];
     const bool same =
-        state.owner == bot && state.player == bot->playerState && SVHS_LevelTime >= state.lastTime;
-    if (same && reusedCommand)
-        command->buttons &= ~state.ownedButtons;
-    state = {bot, bot->playerState, 0, SVHS_LevelTime};
+        state.owner == bot && state.player == bot->playerState && state.statics == SVHS_GameStatics &&
+        state.profile == profile && SVHS_LevelTime >= state.lastTime;
+    if (same)
+    {
+        // Native Bot_Think carries the preceding crouch button even on a full
+        // thought. Release only our carried stance bits; explicit script input
+        // keeps ownership and interrupts this optional sequence below.
+        const uint64_t stance = state.ownedButtons &
+            (SlideCancel::SlideRequest | SlideCancel::CrouchRequest) &
+            ~uint64_t(Field<uint32_t>(bot, 8988));
+        command->buttons &= ~(stance | (reusedCommand ? state.ownedButtons &
+            (SprintRequest | TacticalSprintRequest) : 0));
+    }
+    else
+    {
+        state = {};
+        state.owner = bot;
+        state.player = bot->playerState;
+        state.statics = SVHS_GameStatics;
+        state.profile = profile;
+        SlideCancel::Reset(state.slide, profile, SVHS_LevelTime);
+    }
+    state.ownedButtons = 0;
+    state.lastTime = SVHS_LevelTime;
     const auto *player = reinterpret_cast<const SprintPlayerView *>(bot->playerState);
     if (!player || !bot->sentient || bot->entity->health <= 0 || bot->traversal ||
         SV_HostBot_InGulag(bot) || Locked(bot) || uint32_t(player->movementType) > 1 ||
         (player->otherFlags & 0x800) || player->groundEntity == 2047 ||
-        player->sprintButtonUpRequired || (player->weaponFlags & (1ull << 42)) ||
+        (player->movementFlags & (1ull << 5)) || player->skydivingState ||
+        SV_HostBot_EquipmentActionActive(bot) || (player->weaponFlags & (1ull << 42)) ||
         !__builtin_isfinite(player->adsFraction) || player->adsFraction > 0.0f ||
         (command->buttons & TravelInterruptButtons) || Field<int8_t>(command, 156) < 64 ||
         !MeshAreaReady(bot->navigator) || !SVHS_NavHasPath(bot->navigator) ||
         SVHS_BotCanFire(bot) ||
         DistanceSquared(bot->entity->origin, bot->nativeGoal) <
             UrgentTravelDistance * UrgentTravelDistance)
+    {
+        SlideCancel::Update(state.slide, SVHS_LevelTime, player ? player->movementFlags : 0,
+                            false, false);
+        return;
+    }
+
+    Vec3 lootGoal{};
+    const bool looting = SV_HostBot_GetLootGoal(bot, &lootGoal);
+    const bool canStart = !looting && !player->sprintButtonUpRequired &&
+                          !(player->movementFlags & (SlideCancel::Crouched | 1));
+    const auto slide = SlideCancel::Update(state.slide, SVHS_LevelTime, player->movementFlags,
+                                           !looting, canStart);
+    if (slide.active)
+    {
+        state.ownedButtons = slide.buttons & ~command->buttons;
+        command->buttons |= slide.buttons;
+        return;
+    }
+    if (player->sprintButtonUpRequired)
         return;
 
     // Reused commands bypass BotThink's TLS scope. These two original routines

@@ -80,6 +80,24 @@ namespace
     static_assert(sizeof(BotRecord) == 88 && offsetof(BotRecord, team) == 77);
     static_assert(offsetof(BotRecord, opaque80) == 80);
     static_assert(offsetof(BotRecord, valid) == 84 && offsetof(BotRecord, client) == 86);
+    // ReadBotData synchronizes these exact 36 bytes independently of the
+    // expanded display record. Guests derive names from the same index/skill,
+    // without depending on host-only roster state or widening UInt16 indices.
+    struct BotWireRecord
+    {
+        uint16_t nameIndex;
+        uint8_t unknown50[2];
+        uint32_t modelIndex[3];
+        uint8_t unknown64[12];
+        uint8_t unknown76, team;
+        uint16_t skill;
+        uint8_t opaque80[2];
+        uint16_t unknown82;
+    };
+    static_assert(sizeof(BotWireRecord) == 36);
+    static_assert(offsetof(BotWireRecord, skill) == 30);
+    static_assert(offsetof(BotRecord, skill) - offsetof(BotRecord, nameIndex) ==
+                  offsetof(BotWireRecord, skill));
     // Five visible characters, including the brackets. The engine's two-byte
     // color controls do not occupy visible tag characters; the complete text
     // and terminator still fit the native eleven-byte bot clan field.
@@ -489,7 +507,7 @@ extern "C" void DW_BotPolicy_BuildRoster(const void *party, unsigned capacity, u
         s_rosterLobby = lobby;
         s_rosterParty = party;
         s_rosterStart = (static_cast<const BotRecord *>(func_140CA2230(0))->nameIndex +
-                         static_cast<const BotRecord *>(func_140CA2230(0))->skill) % DWBotNameCount;
+                         static_cast<const BotRecord *>(func_140CA2230(0))->skill) % DWBotWireNameCount;
         s_rosterCandidate = 0;
         for (unsigned i = 0; i < 200; ++i)
         {
@@ -520,15 +538,16 @@ extern "C" void DW_BotPolicy_BuildRoster(const void *party, unsigned capacity, u
                 collision = true;
         if (created && !collision)
             continue;
-        // 73 is coprime to 150: all base names occur once before a uniquely
-        // suffixed overflow name is needed for a native 151..199-bot lobby.
+        // 73 is coprime to 32768: every custom UInt16 choice is visited once.
+        // Each preserved native skill selects its bank in the 100k-name pool.
+        // Only actual humans and the at-most-199 cached bots are compared.
         bool unique = false;
         unsigned attempts = 0;
-        while (!unique && attempts++ < DWBotNameCount * 3)
+        while (!unique && attempts++ < DWBotWireNameCount)
         {
-            const unsigned candidate = s_rosterCandidate++ % (DWBotNameCount * 3);
-            const unsigned name = (s_rosterStart + (candidate % DWBotNameCount) * 73) % DWBotNameCount;
-            selected.nameIndex = uint16_t(0x8000 | (name + (candidate / DWBotNameCount) * DWBotNameCount));
+            const unsigned candidate = s_rosterCandidate++ % DWBotWireNameCount;
+            const unsigned name = (s_rosterStart + candidate * 73) % DWBotWireNameCount;
+            selected.nameIndex = uint16_t(0x8000 | name);
             BG_GameStateInfo_ExpandBotData(&selected.nameIndex, &selected);
             unique = true;
             for (unsigned human = 0; human < capacity; ++human)
@@ -593,21 +612,12 @@ extern "C" void BG_GameStateInfo_ExpandBotData(const void *wireData, void *displ
 {
     if (!wireData || !displayData)
         return;
-    const unsigned index = *static_cast<const uint16_t *>(wireData);
+    const auto &wire = *static_cast<const BotWireRecord *>(wireData);
+    const unsigned index = wire.nameIndex;
     auto *bot = static_cast<BotRecord *>(displayData);
     const char *name = nullptr;
-    if (DW_LocalBackend_IsEnabled() && index >= 0x8000 && index < 0x8000 + DWBotNameCount * 3)
-    {
-        const unsigned choice = index - 0x8000;
-        if (choice < DWBotNameCount)
-            name = DWBotNames[choice];
-        else
-        {
-            Com_sprintf(bot->name, sizeof(bot->name), "%s%u", DWBotNames[choice % DWBotNameCount],
-                        choice / DWBotNameCount + 1);
-            name = bot->name;
-        }
-    }
+    if (DW_LocalBackend_IsEnabled() && index >= 0x8000)
+        name = DWBotNameForWire(wire.nameIndex, wire.skill);
     else
     {
         const void *table = nullptr;

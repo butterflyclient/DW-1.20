@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "game_launched": false,
+  "modeled_engine_boundaries": true,
+  "preserved_record_size": 88,
+  "current_owner_cases": 14,
+  "checks": [
+    "growth preserves earlier full records and slots",
+    "reduction retains lower ordinals",
+    "human collision moves only collided bot",
+    "199 unique names preserve native200 capacity",
+    "all100k names fit native byte limits and are reachable through preserved wire index/skill",
+    "guest wire-only decoding agrees without host roster state",
+    "name collision retains appearance",
+    "new lobby resets old roster cache"
+  ],
+  "inputs": {
+    "E:\\DW\\IW8\\tools\\bot_roster_growth_harness.cpp": "69b5f84052d5d9f77f508c2b2c3d17c92c3ef78c19ace118dc0600ddb84964e2",
+    "E:\\DW\\IW8\\integration\\replay\\DW_BotRoster.cpp": "a90e96b0955abfdcaf743974eb43ddfb6de6bf03990865b9ed9f1382b35912fd",
+    "E:\\DW\\IW8\\integration\\replay\\DW_BotNames.h": "3bf634e51ba79e9d687fb9197aebb3133d950b4f6c97f8f8476123bab08ae810",
+    "E:\\DW\\IW8\\integration\\replay\\DW_BotNames.txt": "fc9f65e0ca16e6fc21a36165ed64fcfe8fbbf2d1b07c0c087e94748020a0b51a",
+    "E:\\DW\\IW8\\tools\\generate-bot-names.py": "b2c373edc351c62fa3a9d256352f4599f17ace23f0be6a057c359dec87d109ae",
+    "data\\dw-client\\jobs\\1791835376750923300\\source\\src\\DW_BotBindings.h": "5e4414f0e66bfa6b1a333d8942566436a88875ab879946ad0b629419eb9ff313"
+  }
+}

@@ -63,6 +63,8 @@ def main():
         try:
             result = library.Test_Run()
             assert result == 0, f"Roster growth failed at harness line {result}"
+            result = library.Test_NamePool()
+            assert result == 0, f"100k name pool/wire decoding failed at harness line {result}"
             library.Test_ProfileOwnership.argtypes = [ctypes.c_uint]
             for scenario in range(14):
                 assert library.Test_ProfileOwnership(scenario) == 0, scenario
@@ -73,6 +75,8 @@ def main():
         source,
         ROOT / "integration/replay/DW_BotRoster.cpp",
         ROOT / "integration/replay/DW_BotNames.h",
+        ROOT / "integration/replay/DW_BotNames.txt",
+        ROOT / "tools/generate-bot-names.py",
         args.header_dir / "DW_BotBindings.h",
     ]
     args.output.write_text(
@@ -88,6 +92,8 @@ def main():
                     "reduction retains lower ordinals",
                     "human collision moves only collided bot",
                     "199 unique names preserve native200 capacity",
+                    "all100k names fit native byte limits and are reachable through preserved wire index/skill",
+                    "guest wire-only decoding agrees without host roster state",
                     "name collision retains appearance",
                     "new lobby resets old roster cache",
                 ],
@@ -99,7 +105,7 @@ def main():
         )
         + "\n"
     )
-    print("PASS: native 88-byte roster growth, collision and 199-name component checks")
+    print("PASS: native 88-byte roster growth, collision, 199 unique names and 100k pool/wire component checks")
 
 
 if __name__ == "__main__":

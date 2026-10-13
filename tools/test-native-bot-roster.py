@@ -619,11 +619,14 @@ def main():
     all_names = [string(pool + 88 * i) for i in range(1, 200)]
     assert len(set(n.casefold() for n in all_names)) == 199
     assert all(len(n) < 36 for n in all_names)
+    name_corpus = selected_header.parent / "DW_BotNames.txt"
+    supplied_names = set(name_corpus.read_text(encoding="utf-8").splitlines())
+    assert len(supplied_names) == 100000 and all(name in supplied_names for name in all_names)
     # Case/color-normalized human collision must consume another unique name.
     write(member(party, 0) + 52, ("^3" + all_names[0].upper()).encode() + b"\0")
     run("DW_BotPolicy_BuildRoster", party, 200, 199)
     assert string(pool + 88) .casefold() != all_names[0].casefold()
-    checks.append("Native wire name expansion agrees on guests; 199 requested bots use unique 150-list names plus suffixed overflow and avoid case/color-normalized human name collisions")
+    checks.append("Native wire name expansion agrees on guests; 199 requested bots use unique names from the supplied 100,000-name corpus and avoid case/color-normalized human name collisions")
     args.output.write_text(
         json.dumps(
             dict(
@@ -632,6 +635,7 @@ def main():
                 game_sha256=report["sha256"],
                 checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 bindings_header_sha256=hashlib.sha256(selected_header.read_bytes()).hexdigest(),
+                bot_name_corpus_sha256=hashlib.sha256(name_corpus.read_bytes()).hexdigest(),
                 gunsmith_data_sha256=style_proof["generated_header_sha256"],
                 stock_weapon_style_selections=stock_selections,
                 selected_attachment_total=selected_attachment_total,

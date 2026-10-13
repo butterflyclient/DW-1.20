@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 import collections
@@ -45,7 +46,7 @@ def main():
     vm = Uc(UC_ARCH_X86, UC_MODE_64)
     stack, arena, halt = 0x10000000, 0x11000000, 0x12000000
     for address in (stack, arena, halt):
-        vm.mem_map(address, 0x10000)
+        vm.mem_map(address, 0x80000 if address == arena else 0x10000)
     pages = set()
 
     def page(address):
@@ -157,6 +158,7 @@ def main():
         lobby=True,
         host=True,
         systemlink=False,
+        map_eligible=False,  # Existing controls groups isolate the native private-party exclusion.
         controller=0,
         playlist_bots=False,
         mode=2,
@@ -169,7 +171,7 @@ def main():
         bots=0,
     )
     command = dict(callback=None, argc=2)
-    calls, registered, checks, pool_calls = [], {}, [], []
+    calls, registered, checks, pool_calls, map_calls = [], {}, [], [], []
     lua = dict(top=2, locked=False, limits={}, now=10000)
     names = (
         "DW_LocalBackend_IsEnabled",
@@ -239,6 +241,19 @@ def main():
     )
     names += ("replay_rva_00ca2070", "DW_BotPolicy_BuildRoster", "Com_sprintf")
     names += ("replay_rva_00f6eb20", "replay_rva_021367b0")
+    names += ("replay_rva_0118e960", "replay_rva_0118fdc0", "replay_rva_01191980",
+              "replay_rva_010d23e0", "replay_rva_0118cf60")
+    map_integer_domains = {
+        "replay_dw_mapVoteCycle": 0x7FFFFFFF,
+        "replay_dw_mapVoteRemainingMs": 30000,
+        "replay_dw_mapVoteChoiceCount": 3,
+        "replay_dw_mapVoteWinner": 2,
+        **{"replay_dw_mapVoteEntry" + choice: 19 for choice in "ABC"},
+        **{"replay_dw_mapVoteVotes" + choice: 200 for choice in "ABC"},
+        **{"replay_dw_mapVoteLobby" + str(part): 65535 for part in range(4)},
+    }
+    map_boolean_names = ("replay_dw_mapVoteActive", "replay_dw_mapVoteComplete",
+                         *["replay_dw_mapVoteSelect" + choice for choice in "ABC"])
     store = dict(
         active=False,
         top=4,
@@ -299,6 +314,26 @@ def main():
             returned(values[1])
         elif name in boolean:
             returned(int(settings[boolean[name]]))
+        elif name == "replay_rva_0118e960":
+            assert values[0] == arena + 0x8000
+            returned(int(not settings["map_eligible"]))
+        elif name == "replay_rva_0118fdc0":
+            assert values[0] == arena + 0x8000 and values[1] <= 3
+            write(values[0] + 311148, values[1], "<I")
+            map_calls.append(("vote", values[1]))
+            returned()
+        elif name == "replay_rva_01191980":
+            assert all(entry < 20 for entry in values[:3])
+            map_calls.append(("entries", *values[:3]))
+            returned()
+        elif name == "replay_rva_010d23e0":
+            assert values[0] == 0 and values[1] < 20
+            map_calls.append(("rules", values[1]))
+            returned()
+        elif name == "replay_rva_0118cf60":
+            assert values[1] == arena + 0x8000 and values[2] < 200
+            write(values[0], 100 + values[2], "<Q")
+            returned(values[0])
         elif name == "Cmd_AddCommandInternal":
             assert string(values[0]) == "fill_lobby" and command["callback"] is None
             command["callback"] = values[1]
@@ -328,14 +363,14 @@ def main():
         elif name == "Com_sprintf":
             format = string(values[2])
             assert format in (',"dw_bot_count":%u}',
-                ',"dw_bot_count":%u,"dw_auto_fill_bots":%s,"dw_auto_fill_complete":%s,"dw_auto_fill_request":%u}')
-            text = ',"dw_bot_count":' + str(values[3])
-            if "dw_auto_fill_bots" in format:
-                rsp = machine.reg_read(UC_X86_REG_RSP)
-                text += ',"dw_auto_fill_bots":' + string(read(rsp + 40, "<Q"))
-                text += ',"dw_auto_fill_complete":' + string(read(rsp + 48, "<Q"))
-                text += ',"dw_auto_fill_request":' + str(read(rsp + 56, "<Q"))
-            body = (text + "}").encode()
+                ',"dw_bot_count":%u,"dw_auto_fill_bots":%s,"dw_auto_fill_complete":%s,"dw_auto_fill_request":%u}',
+                ',"dw_map_vote":{"version":1,"entry":%u,"votes":{', '%s"%llu":%u', '}}}')
+            argument = iter([values[3], *[read(machine.reg_read(UC_X86_REG_RSP) + 40 + i * 8, "<Q")
+                                          for i in range(4)]])
+            def substitute(match):
+                value = next(argument)
+                return string(value) if match[0] == "%s" else str(value if match[0] == "%llu" else value & 0xFFFFFFFF)
+            body = re.sub(r"%llu|%s|%u", substitute, format).encode()
             assert len(body) + 1 <= values[1]
             vm.mem_write(values[0], body + b"\0")
             returned(len(body))
@@ -356,27 +391,26 @@ def main():
             returned()
         elif name == "Dvar_RegisterInt":
             key = string(values[0])
-            assert key in (
-                "replay_dw_forceStart",
-                "replay_dw_fillBots",
-                "replay_dw_botCount",
-                "replay_dw_autoFillBotTarget",
-                "replay_dw_autoFillRevision",
-                "replay_dw_autoFillAck",
-            ) and values[1:4] == [0, 0, 0x7FFFFFFF if key in (
-                "replay_dw_autoFillRevision", "replay_dw_autoFillAck") else
-                199 if key in ("replay_dw_botCount", "replay_dw_autoFillBotTarget") else 1]
+            domains = {
+                "replay_dw_forceStart": 1, "replay_dw_fillBots": 1,
+                "replay_dw_botCount": 199, "replay_dw_autoFillBotTarget": 199,
+                "replay_dw_autoFillRevision": 0x7FFFFFFF, "replay_dw_autoFillAck": 0x7FFFFFFF,
+                **map_integer_domains,
+            }
+            assert key in domains and values[1:4] == [0, 0, domains[key]]
             assert key not in registered
-            pointer = arena + 0x2000 + len(registered) * 0x100
+            pointer = arena + 0x70000 + len(registered) * 0x100
             write(pointer + 29, 5, "<B")
             registered[key] = pointer
             returned(pointer)
         elif name == "Dvar_RegisterBool":
             key = string(values[0])
-            assert key in ("replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete",
-                           "lui_dwIntroVideos", "lui_dwTutorialPrompts")
+            assert key in (
+                *map_boolean_names,
+                "replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete",
+                "lui_dwIntroVideos", "lui_dwTutorialPrompts")
             assert values[1:3] == [0, 0] and key not in registered
-            pointer = arena + 0x2000 + len(registered) * 0x100
+            pointer = arena + 0x70000 + len(registered) * 0x100
             write(pointer + 29, 0, "<B")
             registered[key] = pointer
             returned(pointer)
@@ -881,6 +915,73 @@ def main():
     checks.append(
         "Native bundle price binding zeros regular, sale and smart costs only for DW; other columns/tables, missing rows, non-DW calls and Lua arity retain their original behavior"
     )
+    assert set(map_integer_domains) | set(map_boolean_names) <= set(registered)
+    for key in map_integer_domains:
+        assert read(registered[key] + 29, "<B") == 5 and read(registered[key] + 40) == 0
+    for key in map_boolean_names:
+        assert read(registered[key] + 29, "<B") == 0 and read(registered[key] + 40, "<B") == 0
+    checks.append("Map-vote registration retains exact native bool/int types, defaults and bounded entry/count/time/identity domains")
+
+    # The prior controls cases exercise the real private-party ballot exclusion,
+    # not a stub of Pending or Frame. Public contexts now execute the linked
+    # ballot bridge and both original launch wrappers against its real dvars.
+    settings.update(enabled=True, main=True, frontend=True, lobby=True, host=True,
+                    systemlink=False, mode=2, map_eligible=True, requested=0, bots=0)
+    write(dvars["gl_14D386820"] + 40, 0)
+    write(dvars["DVARBOOL_onlinegame"] + 40, 1)
+    write(registered["replay_dw_autoFillBots"] + 40, 0)
+    write(registered["replay_dw_autoFillBotsActive"] + 40, 0)
+    write(registered["replay_dw_forceStart"] + 40, 0)
+    write(registered["replay_dw_botCount"] + 40, 0)
+    write(lobby_identity, 7, "<Q")
+    run("DW_LobbyControls_Frame")
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 0
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    for part in range(4):
+        write(registered["replay_dw_mapVoteLobby" + str(part)] + 40, 7 if part == 0 else 0)
+    for choice, entry in zip("ABC", (0, 1, 2)):
+        write(registered["replay_dw_mapVoteEntry" + choice] + 40, entry)
+    write(registered["replay_dw_mapVoteChoiceCount"] + 40, 3)
+    write(registered["replay_dw_mapVoteActive"] + 40, 1)
+    write(registered["replay_dw_mapVoteWinner"] + 40, 1)
+    run("DW_LobbyControls_Frame")
+    assert ("entries", 0, 1, 2) in map_calls
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_mapVoteComplete"] + 40, 1)
+    run("DW_LobbyControls_Frame")
+    assert ("rules", 1) in map_calls
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 1
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 7
+    body = b'{"test":1}\0'
+    vm.mem_write(arena + 0x6300, body)
+    write(arena + 0x6200, arena + 0x6300, "<Q")
+    write(arena + 0x6220, len(body))
+    run("DW_LobbyControls_HostDocument", 7,
+        base + symbols["gl_14C27E4B0"] + 131864, arena + 0x6200, arena + 0x6220)
+    assert json.loads(string(read(arena + 0x6200, "<Q"))) == {
+        "test": 1, "dw_map_vote": {"version": 1, "entry": 1, "votes": {}}}
+    checks.append("Actual public launch wrappers deny initial/unfrozen ballots, apply the acknowledged native winner, and append the versioned native host handshake")
+    write(registered["replay_dw_mapVoteSelectA"] + 40, 1)
+    write(lobby_identity, 8, "<Q")
+    run("DW_LobbyControls_Frame")
+    assert read(registered["replay_dw_mapVoteSelectA"] + 40) == 0
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_mapVoteLobby0"] + 40, 8)
+    run("DW_LobbyControls_Frame")
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 1
+    settings["frontend"] = False
+    run("DW_LobbyControls_Frame")
+    settings["frontend"] = True
+    run("DW_LobbyControls_Frame")
+    assert run("func_14119E3D0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_mapVoteCycle"] + 40, 1)
+    write(registered["replay_dw_mapVoteComplete"] + 40, 0)
+    run("DW_LobbyControls_Frame")
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 0
+    write(registered["replay_dw_mapVoteComplete"] + 40, 1)
+    run("DW_LobbyControls_Frame")
+    assert run("func_14119B0E0", arena + 0x8000, arena + 0x8100) == 1
+    checks.append("Linked controls retire stale choices across allocation changes and hold the same allocation after frontend exit until its next ballot cycle freezes")
     args.output.write_text(
         json.dumps(
             dict(

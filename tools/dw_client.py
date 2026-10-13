@@ -267,6 +267,10 @@ def initialize():
 
 def prepare():
     config, state, base = settings()
+    subprocess.run(
+        [sys.executable, "-B", str(ROOT / "tools/generate-bot-names.py"), "--check"],
+        cwd=ROOT, check=True,
+    )
     manifest = initialize()
     for item in manifest["files"]:
         if digest(base / item["path"]) != item["sha256"]:
@@ -286,6 +290,9 @@ def prepare():
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "test-playlist-ui.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
+            "prepare-bot-think-integration.py", "generate-bot-names.py",
+            "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
+            "test-map-voting-client.py", "map_vote_harness.cpp",
             "prepare-bot-profile-ownership.py",
             "prepare-noclip-integration.py",
             "prepare-alt-killcam-integration.py", "prepare-alt-killcam-render.py",
@@ -318,6 +325,7 @@ def prepare():
             "DW_Noclip.cpp", "DW_Noclip.h",
             "DW_AltKillcam.cpp", "DW_AltKillcam.h",
             "DW_AltKillcamRender.cpp", "DW_AltKillcamRender.h",
+            "DW_MapVoting.h",
         }
         for path in sorted(inside(ROOT / root).iterdir()):
             if root != "integration/host-scale" and path.name not in replay_additions:
@@ -358,6 +366,15 @@ def prepare():
                  compiled_source="tools/" + validator_name,
                  compiled_sha256=digest(validation_target))
         )
+    # Keep the supplied name corpus tied to the generated compiled pool.
+    names = ROOT / "integration/replay/DW_BotNames.txt"
+    names_target = source / "src/DW_BotNames.txt"
+    shutil.copyfile(names, names_target)
+    if digest(names) != digest(names_target):
+        raise ValueError("Bot name corpus changed while freezing")
+    source_inputs.append(dict(source="integration/replay/DW_BotNames.txt",
+                              source_sha256=digest(names), compiled_source="src/DW_BotNames.txt",
+                              compiled_sha256=digest(names_target)))
     ui = load_module("dw_client_playlist", ROOT / "tools/prepare-playlist-ui.py")
     ui.prepare(
         source,
@@ -565,7 +582,9 @@ def verify(directory, report_path, publish_ready=True):
         ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
         ("test-host-command-ownership.py", ["--snapshot", str(source)], "host-command-ownership.json"),
         ("test-bot-behavior.py", ["--snapshot", str(source)], "bot-behavior.json"),
+        ("test-bot-slide-cancel.py", ["--snapshot", str(source)], "bot-slide-cancel.json"),
         ("test-lobby-controls.py", [], "controls.json"),
+        ("test-map-voting-client.py", ["--snapshot", str(source)], "map-voting.json"),
         (
             "test-native-bot-roster.py",
             ["--header-source", str(source / "src/DW_BotBindings.h")],

@@ -57,6 +57,12 @@ namespace HostScale
         uint32_t scriptFlags, scriptButtons;
         uint8_t opaque8992[18812];
         BotWeapon scriptWeapon;
+        uint8_t opaque27864[20];
+        int32_t grenadeHoldUntil;
+        uint8_t opaque27888[104];
+        BotWeapon grenadeWeapon;
+        uint8_t opaque28052[16];
+        uint32_t grenadeFlags;
     };
 
     static_assert(sizeof(BotWeapon) == 60 && sizeof(BotWeaponEntry) == 62);
@@ -69,6 +75,9 @@ namespace HostScale
     static_assert(offsetof(BotEquipmentData, lastCommand) == 456);
     static_assert(offsetof(BotEquipmentData, scriptFlags) == 8984);
     static_assert(offsetof(BotEquipmentData, scriptWeapon) == 27804);
+    static_assert(offsetof(BotEquipmentData, grenadeHoldUntil) == 27884);
+    static_assert(offsetof(BotEquipmentData, grenadeWeapon) == 27992);
+    static_assert(offsetof(BotEquipmentData, grenadeFlags) == 28068);
 } // namespace HostScale
 
 extern "C"
@@ -76,4 +85,5 @@ extern "C"
     bool SV_HostBot_PrepareEquipment(void *);
     bool SV_HostBot_NeedsRangedWeapon(void *);
     bool SV_HostBot_InGulag(void *);
+    bool SV_HostBot_EquipmentActionActive(void *);
 }

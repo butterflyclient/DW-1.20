@@ -95,6 +95,10 @@ class Runner:
                   "SV_HostNav_PrintStatus":"print", "SV_HostBot_GetLootGoal":"loot-goal",
                   "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map",
                   "DW_BotPolicy_ProfileSeed":"mapped-profile"}
+        if not self.report:
+            # Object-only navigation fixtures model the equipment boundary.
+            # A linked fixture executes the actual compiled read-only helper.
+            common["SV_HostBot_EquipmentActionActive"] = "equipment-active"
         if edited and self.report:
             for name, alias in common.items():
                 if name in self.report["symbols"]:
@@ -295,6 +299,8 @@ class Machine:
             if goal is not None:self.put(b, struct.pack('<3f', *goal))
             self.ret(goal is not None)
         elif kind == 'gulag':self.ret(getattr(self, 'gulag', False))
+        elif kind == 'equipment-active':
+            self.ret(bool(a and self.get(a + 448, '<Q') and self.get(a + 28068, '<I') & 3))
         elif kind == 'SVHS_NavHasPath':self.ret(getattr(self, 'path_exists', False))
         elif kind == 'SVHS_BotYawVectors':
             self.put(b,struct.pack('<3f',1.,0.,0.));self.put(c,struct.pack('<3f',0.,-1.,0.));self.ret()
@@ -494,7 +500,10 @@ def mesh_bot(vm, mode_case, targets=(), target_handle=None, teams=(), command_by
     bot, entity, sentient, player = 0x5b000000, 0x5b010000, 0x5b020000, 0x5b030000
     nav, vtable, command, area = 0x5b040000, 0x5b050000, 0x5b060000, 0x5b070000
     vm.put(bot, bytes(28152));vm.put(entity, bytes(1440));vm.put(sentient, bytes(184))
-    vm.put(player, bytes(1024));vm.put(nav, bytes(1400));vm.put(vtable, bytes(512))
+    # Allocate the complete prefix consumed by shared movement/equipment views,
+    # including skydiving state12072 and BR game-extra flags22336. The native
+    # player allocation contains these bytes; a one-page model falsely faults.
+    vm.put(player, bytes(22340));vm.put(nav, bytes(1400));vm.put(vtable, bytes(512))
     vm.put(command, command_bytes or bytes(264));vm.put(area, 0x5b071000, '<Q')
     vm.put(0x51400000, 0x51400100, '<Q'); vm.found = mode_case != 'unreachable'
     for at,value in ((bot,entity),(bot+8,sentient),(bot+360,nav),(bot+448,player),
@@ -562,6 +571,8 @@ def main():
     urgency_cases = 0
     for mode, population in ((0, 20), (1, 20), (2, 150)):
         for denial in ('none', 'fire', 'ads-button', 'use', 'armor', 'ads-fraction', 'up-required',
+                       'grenade-button', 'tactical-button', 'equipment-cook', 'equipment-script',
+                       'skydiving', 'ladder',
                        'downed', 'dead', 'airborne', 'locked', 'gulag', 'no-path', 'short',
                        'no-meter', 'native-denied', 'tac-disabled', 'medium-route',
                        'boundary-route', 'human', 'unmapped', 'stale-slot', 'stale-player',
@@ -581,6 +592,12 @@ def main():
             elif denial == 'armor':vm.put(player + 1796, 1 << 42, '<Q')
             elif denial == 'ads-fraction':vm.put(player + 1804, 0.5, '<f')
             elif denial == 'up-required':vm.put(player + 796, 1, '<i')
+            elif denial == 'grenade-button':vm.put(cmd, 0x1000, '<Q')
+            elif denial == 'tactical-button':vm.put(cmd, 0x2000, '<Q')
+            elif denial == 'equipment-cook':vm.put(bot + 28068, 1, '<I')
+            elif denial == 'equipment-script':vm.put(bot + 28068, 2, '<I')
+            elif denial == 'skydiving':vm.put(player + 12072, 1, '<B')
+            elif denial == 'ladder':vm.put(player + 20, 1 << 5, '<Q')
             elif denial == 'downed':vm.put(player + 28, 0x800, '<Q')
             elif denial == 'dead':vm.put(entity + 440, 0, '<i')
             elif denial == 'airborne':vm.put(player + 626, 2047, '<H')

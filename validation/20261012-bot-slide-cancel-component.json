@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "passed": true,
+  "native_game_verified": false,
+  "image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "native_consumers": [
+    {
+      "role": "Slide_CheckCanSlide",
+      "rva": 18009744,
+      "bytes": 1020,
+      "sha256": "1b0a391cd59d7685ac5decec99e9a6138c86d2938b9d6d3a8b67fe9aa528a978"
+    },
+    {
+      "role": "Slide_EndCheck",
+      "rva": 18011584,
+      "bytes": 772,
+      "sha256": "9f777980a9af49c6d29cf4ec3c799e5c3b0daa6bdd9b8207f474af0145354f4e"
+    },
+    {
+      "role": "Slide_Update",
+      "rva": 18016880,
+      "bytes": 1273,
+      "sha256": "be9a36400d6bb0e3e553ced2d7ddb9a4b6a48b58d91309f7b7d0af805a763f66"
+    },
+    {
+      "role": "CL_Input_AddCurrentStanceToCmd",
+      "rva": 22758544,
+      "bytes": 272,
+      "sha256": "09b3b22773ca71718831f6a5dd38b3e80b554e86ce16a11b03b75a1629616891"
+    }
+  ],
+  "header_sha256": "d1b81f53ec8673e655f30a77aad4b985d4d23f8e90b13a43cc77937e1f26cd5a",
+  "movement_sha256": "4dd1a55d2774d20de67d2b710155be0865ad222e6466e7135cd0cdbe722adf52",
+  "helper_cpp_sha256": "fb1630407e1320eb61a2449a384c21eed4285f9e156c03af847e46e552a80427",
+  "compiled_component_executed": true,
+  "linked_source_verified": false,
+  "checks": [
+    "Native C-slide request, fresh C-cancel edge and Space-from-crouch stance release",
+    "Actual sprint/slide/crouch/standing acknowledgments and native rejection timeout",
+    "Per-roster cooldown/jitter and interruption at every active phase",
+    "No authored jump/prone command and no playerstate/physics timer writes",
+    "Mapped bot command ownership and combat/equipment/loot/plate/Gulag gates"
+  ]
+}

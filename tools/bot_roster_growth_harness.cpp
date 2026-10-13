@@ -154,6 +154,15 @@ extern "C" __declspec(dllexport) int Test_Run()
         CHECK(pool[i].valid);
         for (unsigned other = i + 1; other < 200; ++other)
             CHECK(!SameName(pool[i].name, pool[other].name));
+        // A guest has only the synchronized 36-byte record, not host cache.
+        BotWireRecord wire{};
+        const auto *source = reinterpret_cast<const uint8_t *>(&pool[i].nameIndex);
+        auto *destination = reinterpret_cast<uint8_t *>(&wire);
+        for (unsigned byte = 0; byte < sizeof(wire); ++byte)
+            destination[byte] = source[byte];
+        BotRecord expanded{};
+        BG_GameStateInfo_ExpandBotData(&wire, &expanded);
+        CHECK(SameName(expanded.name, pool[i].name));
     }
     const auto priorModel = pool[1].modelIndex[0];
     auto &human = reinterpret_cast<MemberRecord *>(party + 2192)[0];
@@ -164,6 +173,43 @@ extern "C" __declspec(dllexport) int Test_Run()
     NativeSelection(6000);
     DW_BotPolicy_BuildRoster(party, 152, 2);
     CHECK(pool[1].skill == 6000 && pool[2].skill == 6001);
+    return 0;
+}
+
+extern "C" __declspec(dllexport) int Test_NamePool()
+{
+    CHECK(DWBotNameCount == 100000);
+    static bool reached[DWBotNameCount]{};
+    // Four unchanged native skill values suffice to cover the entire pool;
+    // no UInt16 index truncation or private host-side name table is needed.
+    for (unsigned skill = 0; skill < 4; ++skill)
+        for (unsigned choice = 0; choice < DWBotWireNameCount; ++choice)
+            reached[DWBotNamePoolIndex(uint16_t(0x8000 | choice), uint16_t(skill))] = true;
+    for (unsigned name = 0; name < DWBotNameCount; ++name)
+    {
+        CHECK(reached[name]);
+        const char *text = DWBotNameData + DWBotNameOffsets[name];
+        unsigned length = 0;
+        while (text[length])
+        {
+            CHECK((text[length] >= 'A' && text[length] <= 'Z') ||
+                  (text[length] >= 'a' && text[length] <= 'z') ||
+                  (text[length] >= '0' && text[length] <= '9') || text[length] == '_');
+            CHECK(++length < sizeof(BotRecord::name));
+        }
+        CHECK(length > 0);
+    }
+    for (unsigned skill : {0u, 1u, 2u, 3u, 65535u})
+        for (unsigned choice : {0u, DWBotWireNameCount - 1})
+        {
+            BotWireRecord wire{};
+            wire.nameIndex = uint16_t(0x8000 | choice);
+            wire.skill = uint16_t(skill);
+            BotRecord expanded{};
+            BG_GameStateInfo_ExpandBotData(&wire, &expanded);
+            CHECK(SameName(expanded.name, DWBotNameForWire(wire.nameIndex, wire.skill)));
+            CHECK(wire.nameIndex == uint16_t(0x8000 | choice) && wire.skill == skill);
+        }
     return 0;
 }
 

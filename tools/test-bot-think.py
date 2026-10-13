@@ -273,6 +273,7 @@ class Runner:
         put(symbols["BT_EntityInUse"], 0x56400000, "<Q"); put(0x56400000, bytes(2048))
         if case.get("native_fire"):
             put(ent + 1440 + 440, case.get("enemy_health", 100), "<i")
+            put(ent + 1440 + 304, struct.pack("<fff", 2000.0 - case.get("enemy_distance", 2000.0), 0.0, 0.0))
             put(ent + 1440 + 344, sentient + 184, "<Q")
             put(sentient + 184 + 16, 2, "<I")
             put(0x56400000 + 1, 1, "<B")
@@ -290,7 +291,7 @@ class Runner:
             page(address)
         page(stop); put(stack, stop, "<Q")
         vm.reg_write(UC_X86_REG_RSP, stack); vm.reg_write(UC_X86_REG_RCX, 0 if case.get("null_client") else client); vm.reg_write(UC_X86_REG_RDX, command)
-        events, arguments = [], []
+        events, arguments, equipment_preferences = [], [], []
         def returned(value=0, floating=None):
             sp = vm.reg_read(UC_X86_REG_RSP)
             vm.reg_write(UC_X86_REG_RAX, value & 0xffffffffffffffff)
@@ -348,6 +349,15 @@ class Runner:
                     returned(int(case.get("native_dual", False)))
                 elif name == "NF_fire_wait":
                     returned(int(case.get("aim_wait", False)))
+                elif name == "NF_grenade_action" and case.get("offhand_button"):
+                    # Selection/ammunition/arc leaves are modeled here; the
+                    # actual native Combat body owns priority and button flow.
+                    eligible = (get(bot + 32484, "<I") & 1 and
+                                case.get("offhand_owned", True) and case.get("offhand_ammo", 1) > 0 and
+                                not case.get("offhand_blocked", False))
+                    if eligible:
+                        put(b, get(b, "<Q") | case["offhand_button"], "<Q")
+                    returned(int(bool(eligible)))
                 elif name == "NF_grenade_action" and case.get("grenade_action"):
                     put(b, get(b, "<Q") | 0x1000, "<Q"); returned(1)
                 elif name in ("NF_firetime", "NF_delay"):
@@ -403,6 +413,7 @@ class Runner:
                     put(sentient + 72, 2, "<H")
                 returned(); return
             if name == "BT_Combat":
+                equipment_preferences.append(get(bot + 32484, "<I") & 1)
                 if case.get("native_fire"):
                     # Execute both complete native Combat and Fire bodies;
                     # their leaf boundaries model visibility, weapon facts,
@@ -456,12 +467,15 @@ class Runner:
                         ((client, 36000), (ent, 1440 * 4), (player, 25000))]
         vm.emu_start(entry, stop, count=1000000)
         assert vm.reg_read(UC_X86_REG_RIP) == stop
-        return dict(command=bytes(vm.mem_read(command, 264)).hex(), client=bytes(vm.mem_read(client, 36000)).hex(),
+        result = dict(command=bytes(vm.mem_read(command, 264)).hex(), client=bytes(vm.mem_read(client, 36000)).hex(),
                     events=events, arguments=arguments, statics=get(0x56800000 + 16, "<Q"),
                     tactical=bytes(vm.mem_read(sentient + 148, 6)).hex(),
                     entity_player_and_bot_state_unchanged=before_state ==
                     [bytes(vm.mem_read(address, size)) for address, size in
                      ((client, 36000), (ent, 1440 * 4), (player, 25000))])
+        if case.get("inspect_equipment"):
+            result["equipment_preferences"] = equipment_preferences
+        return result
 
 
 def main():
@@ -570,9 +584,41 @@ def main():
         assert not result["events"], (options, "Native brain ran on an invalid current owner", result["events"])
         assert result["statics"] == 0
         assert result["entity_player_and_bot_state_unchanged"], options
+    equipment_cases = [
+        ("BR lethal", {}, True, 0x1000),
+        ("MP lethal", {"br_policy": False}, True, 0x1000),
+        ("BR tactical", {"offhand_button": 0x2000}, True, 0x2000),
+        ("MP tactical", {"br_policy": False, "offhand_button": 0x2000}, True, 0x2000),
+        ("absent equipment", {"offhand_owned": False}, True, 0),
+        ("empty equipment", {"offhand_ammo": 0}, True, 0),
+        ("native weapon/cook blocked", {"offhand_blocked": True}, True, 0),
+        ("too close", {"enemy_distance": 64}, False, 0),
+        ("too distant", {"enemy_distance": 4096}, False, 0),
+        ("BR Gulag jail", {"gulag_phase": 0x200}, False, 0),
+        ("BR Gulag arena", {"gulag_phase": 0x400}, False, 0),
+        ("friendly", {"friendly": True}, False, 0),
+        ("dead target", {"enemy_health": 0}, False, 0),
+        ("unmapped", {"mapped_profile": False}, False, 0),
+        ("disabled", {"enabled": False}, False, 0),
+        ("skydiving", {"sky": True, "skydive": 2}, False, 0),
+        ("script locked", {"script_flags": 0x1000}, False, 0),
+    ]
+    for label, options, preferred, emitted in equipment_cases:
+        case = dict(native_fire=True, br_policy=True, acquire=True, fire=True, ads=True,
+                    offhand_button=0x1000, inspect_equipment=True)
+        case.update(options)
+        result = runner.run(True, case)
+        assert result["equipment_preferences"] == [int(preferred)], (label, result["equipment_preferences"])
+        buttons = struct.unpack_from("<Q", bytes.fromhex(result["command"]))[0]
+        assert buttons & 0x3000 == emitted, (label, hex(buttons))
+        if emitted:
+            assert not buttons & (1 | 0x200), (label, "primary fire/ADS overrides offhand action")
+        assert struct.unpack_from("<I", bytes.fromhex(result["client"]), 1368 + 32484)[0] == 0x10, label
     report = dict(schema=1, baseline_cases=len(baselines), mesh_continuation_cases=1,
                   current_bot_identity_guard_cases=len(guard_cases),
                   native_fire_policy_cases=len(policy_cases),
+                  native_equipment_preference_cases=len(equipment_cases),
+                  native_equipment_selection_leaves_modeled=True,
                   native_fire_body_sha256=runner.fire["original_sha256"],
                   native_ads_emission_body_sha256=runner.press_ads["original_sha256"],
                   native_ads_emission_instructions_executed=True,
