@@ -888,7 +888,8 @@ namespace lobby
         catch (const std::exception &error)
         {
             ++failures;
-            io.log(std::string("LOBBY rejected stage=") + stage + ": " + error.what());
+            io.log(std::string("LOBBY rejected stage=") + stage + ": " + error.what() +
+                   wire::checkDetail(error));
         }
     }
 } // namespace lobby

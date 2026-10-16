@@ -1,0 +1,60 @@
+REPLAY DW DROPLET STORAGE MAINTENANCE - 2026-10-16
+
+What runs
+replay-dw-maintenance.timer (daily 07:30 UTC, before the 08:00 backup) runs
+/opt/replay-dw/maintain-storage.py --apply. Without --apply it only reports.
+Installed by deploy/linux/install-service.sh with the backup units.
+
+Retention rules (only these paths are ever touched)
+  updates/map-incoming-<ns>   failed publication staging older than 24 h
+  updates/images              keep the catalog's latest + two newest others
+  updates/patches             keep those listed in the v1 catalog.json
+  updates/assets              keep those referenced by full-image-catalog.json,
+                              custom-map-catalog.json or a retained map backup
+  updates/map-backups         keep the newest three
+  update blobs                never removed before they are 48 h old
+  /var/backups/.../before-*   ad-hoc pre-deployment backups: seven days
+  /tmp/replay-dw-*            release build jobs: two days, unless in use
+  /opt/replay-dw/releases     the active release + five newest others
+Daily state-*.tar.gz and updates-* snapshots: seven days (backup-state.sh).
+
+Why this is safe
+Clients are offered only the full-image catalog's latest image; the updater
+derives its asset and map lists from that target image, and v1 clients only
+the patches listed in catalog.json. Update decisions are made under
+updates/publication.lock, which the publishers hold, and a missing or
+malformed catalog skips update pruning entirely. A pruned update blob remains
+in the daily hard-link snapshot for seven days; its space is freed when that
+snapshot expires. Republishing an older EXE or map uploads its files again.
+
+Checks
+  systemctl list-timers 'replay-dw-*'
+  journalctl -u replay-dw-maintenance   (JSON summary per run)
+  python3 /opt/replay-dw/maintain-storage.py   (dry run, any time)
+The unit exits 2 (visible in systemctl --failed) when free space is under 15%.
+
+One-time cleanup 2026-10-16 (owner approved)
+Disk: 25 GB used / 8.0 GB free before; 11 GB used / 23 GB free after (32%).
+1. data/storage-cleanup-20261016/cleanup-once.py removed 135 items (4.2 GB):
+   71 legacy build/test trees and artifacts under /opt/replay-dw (including
+   backup-restore-check, an Oct 7 restore-test copy of player state, and
+   stale world-writable copies of the deploy scripts), 12 loose release tars,
+   35 build-source tars in /root, the duplicate initial-state archive
+   (identical sha256 to backups/initial-migration.tar.gz), 3 failed staging
+   directories (884 MB) and 13 finished /tmp release jobs.
+2. data/storage-cleanup-20261016/repack-backups.py rewrote the six old-format
+   daily archives (Oct 11-16 08:00), dropping only update-store members whose
+   sha256 matched the live or snapshot file at the same path, plus
+   never-published staging. Every kept member was re-read and hash-compared
+   before replacing the original; mtimes (and so retention) are unchanged.
+   10.28 GB reclaimed; e.g. Oct 16 3.88 GB -> 66 MB. Each archive has a
+   state-<stamp>.repack.json manifest of dropped members.
+3. The first maintenance run (via the systemd unit) removed 641 items:
+   57 old releases, 19 superseded EXE images, 17 unlisted patches, 526
+   unreferenced assets, 3 old map backups and 19 stale before-* backups.
+   Images and assets remain in updates-20261016T192309Z until Oct 24.
+4. 280 small logs/scripts/receipts from earlier sessions in /root were moved
+   (hash-verified) to data/droplet-root-history-20261016 on the workstation.
+Kept: the active release and five previous, the latest EXE image and two
+previous, the v1 patches, all referenced assets, three map backups, all
+daily state archives, initial-migration.tar.gz and other small receipts.

@@ -13,9 +13,12 @@ install -m 644 "$source_dir/replay-dw.service" /etc/systemd/system/
 install -m 644 "$source_dir/replay-dw-backup.service" /etc/systemd/system/
 install -m 644 "$source_dir/replay-dw-backup.timer" /etc/systemd/system/
 install -m 755 "$source_dir/backup-state.sh" /opt/replay-dw/backup-state.sh
+install -m 644 "$source_dir/replay-dw-maintenance.service" /etc/systemd/system/
+install -m 644 "$source_dir/replay-dw-maintenance.timer" /etc/systemd/system/
+install -m 755 "$source_dir/maintain-storage.py" /opt/replay-dw/maintain-storage.py
 install -m 644 "$source_dir/replay-dw.logrotate" /etc/logrotate.d/replay-dw
 systemctl daemon-reload
-systemctl enable replay-dw replay-dw-backup.timer
+systemctl enable replay-dw replay-dw-backup.timer replay-dw-maintenance.timer
 # Keep SSH reachable; only expose the native emulator endpoints.
 ufw allow 22/tcp
 ufw allow 8085/tcp
@@ -23,4 +26,4 @@ ufw allow 8443/tcp
 ufw allow 3075/tcp
 ufw allow 3076:3109/udp
 ufw --force enable
-systemctl start replay-dw replay-dw-backup.timer
+systemctl start replay-dw replay-dw-backup.timer replay-dw-maintenance.timer

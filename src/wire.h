@@ -3,15 +3,47 @@
 #include <string>
 #include <stdexcept>
 #include <cstring>
+#include <source_location>
 
 namespace wire
 {
     using crypto::Bytes;
 
-    inline void require(bool ok)
+    // Keeps the established message, which handlers compare to classify the
+    // failure, and records which check rejected the task for the task log.
+    class Malformed : public std::runtime_error
+    {
+    public:
+        explicit Malformed(const std::source_location &where)
+            : std::runtime_error("Malformed native task parameters"), file(where.file_name()),
+              line(where.line())
+        {
+        }
+
+        std::string check() const
+        {
+            const std::string_view path(file);
+            const auto slash = path.find_last_of("/\\");
+            return std::string(slash == path.npos ? path : path.substr(slash + 1)) + ":" +
+                   std::to_string(line);
+        }
+
+    private:
+        const char *file;
+        unsigned line;
+    };
+
+    inline void require(bool ok, const std::source_location where = std::source_location::current())
     {
         if (!ok)
-            throw std::runtime_error("Malformed native task parameters");
+            throw Malformed(where);
+    }
+
+    // Log suffix naming the failed check; empty for other exceptions.
+    inline std::string checkDetail(const std::exception &error)
+    {
+        const auto *malformed = dynamic_cast<const Malformed *>(&error);
+        return malformed ? " check=" + malformed->check() : std::string();
     }
 
     inline std::string base64Encode(std::span<const uint8_t> bytes)

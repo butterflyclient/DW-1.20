@@ -1,0 +1,115 @@
+REPLAY DW BACKEND HARDENING - 2026-10-16
+
+Scope
+An edge-case and gap audit of the live backend: nine days of droplet server
+logs (40,906 lines), the systemd journal, runtime/backup disk usage, and the
+network-facing, dispatch and persistence code. No game was launched. Fixes
+target evidenced production risks; no native contract was guessed.
+
+FINDINGS AND FIXES
+
+1. Disk exhaustion from daily backups (critical, operations)
+   /var/lib/replay-dw/updates held 5.3 GB of immutable, content-addressed
+   update content (EXE images, map assets, map backups) plus 844 MB of
+   abandoned publication staging. backup-state.sh recompressed all of it
+   every day with the server stopped: archives grew 0.46 GB (Oct 13) to
+   3.9 GB (Oct 16), 11 GB of backups with 8 GB free. With seven-day
+   retention the 33 GB disk would have filled within about two days, and
+   the daily outage had grown from 73 s to 4 min 45 s.
+   Fix (deploy/linux/backup-state.sh):
+   - The tarball holds only mutable state and the small update catalogs.
+   - updates/{assets,images,patches,map-manifests,asset-manifests,map-backups}
+     are snapshotted as hard links into /var/backups/replay-dw/updates-<stamp>/
+     under the publishers' publication.lock, before the writer stops. They
+     cost no space while the live copy exists and are pruned with the same
+     seven-day retention. Publishers only os.replace new inodes, so links
+     never change underneath a snapshot.
+   - updates/map-incoming-* staging is never archived.
+   - The backup refuses to start (and never stops the server) unless free
+     space covers the uncompressed state plus 1 GiB.
+   - The server restarts as soon as tar finishes; hashing/pruning follow.
+   - Partial .pending output of an interrupted run is removed.
+   Restore: stop replay-dw, extract state-<stamp>.tar.gz into
+   /var/lib/replay-dw, then cp -al each updates-<stamp>/<store> back into
+   /var/lib/replay-dw/updates/. Same-disk backups, not offsite copies.
+
+2. Publication staging leak (operations)
+   tools/publish-custom-map.py left updates/map-incoming-<ns> behind whenever
+   an upload or commit failed. It now removes its own staging on failure and
+   sweeps staging older than 24 hours before each publication. Both run under
+   publication.lock, so a commit still running remotely after a local SSH
+   timeout finishes first. Existing leftovers are removed by the next
+   publication's sweep (or manually; they are partial uploads only).
+
+3. Shared 32-connection limit across all listeners (availability)
+   One global limit covered player lobby sessions (long-lived, one per
+   signed-in player), HTTP auth/content/update requests, and the TLS probe
+   port. Internet scanners hit the droplet in bursts of 25 connections, and
+   the HTTP header loop had no whole-request deadline: a peer sending one
+   byte before each 3-second socket timeout held a slot for hours. 32 such
+   peers locked every player out.
+   Fix (src/server.cpp):
+   - Separate budgets: lobby 160, HTTP 64, TLS probe 16 (total under the
+     unit's TasksMax=320), each with a per-address cap (24/16/4). Loopback
+     is exempt from per-address caps.
+   - HTTP headers must complete within 15 s; bodies within 30 s plus
+     1 s per 32 KiB; update downloads within 60 s plus 1 s per 32 KiB.
+   - Refusals are logged at most once per minute per listener.
+   - Thread-creation failure now refuses that connection instead of
+     stopping the listener (and with it the whole server).
+   - /stats.json connection_limit reports the player (lobby) budget.
+
+4. Undiagnosable task failures (diagnostics)
+   21 production 145/15 host updates were rejected as task-parameters-invalid
+   (106), including a 36-minute host retry loop on Oct 11 (older build) and
+   three on the current build just before lobby disbands. 12 achievement
+   activations failed as persistent-data-error (102) on Oct 9. Neither log
+   line said which check or what failure occurred, so the cause cannot be
+   recovered from evidence.
+   Fix:
+   - wire::require records its call site (std::source_location) in a
+     wire::Malformed exception that keeps the established message, so all
+     existing classification is unchanged. 106 replies now log
+     check=<file>:<line>, as do REST/QoS/achievement-REST rejections and
+     lobby-level rejections.
+   - 102 replies log reason="..." with fixed library/OS wording only, e.g.
+     the errno text for a full disk; filesystem errors omit paths.
+   - Any other exception from a handler fails that task with
+     internal-task-error (102) instead of tearing down the caller's whole
+     authenticated lobby session.
+   The 145/15 validation rules are unchanged: the next occurrence will name
+   the exact rule, and only then should behavior change.
+
+Also reviewed, no change needed: atomic writes (fsync + rename keeps the old
+file on ENOSPC), Linux select/getpeername/timeout shims, lobby pre-auth read
+deadlines, handshake rejection of scanners (103 in nine days), crash history
+(none; restarts were deployments and the backup timer).
+
+REMAINING GAPS (not changed here)
+- Full EXE images are never pruned: 22 images, 2.1 GB. A retention policy
+  must keep every image a published catalog or catch-up path still serves.
+- The 145/15 host-update rejections and lobby disbands need the new check=
+  evidence before any validation change.
+- Unbound native routes and excluded mission predicates are unchanged; see
+  DW_SUPPORTED_BACKEND_HANDOFF_20261011.txt.
+
+VERIFICATION
+Both images were compiled clean (47/47 translation units, /W4 /WX) from
+committed e33fb1b plus the seven src overlays above:
+  Windows 92247abc01c5c511a1a14a2aac75c97f7a961809bdcc9b37b1d62977f63de17f
+  Linux   a7f1f062de35fd0600c00dae13b04bedc717c248e694a2c763e9243380224a97
+Each exact image passed: 315 encrypted protocol/service checks, 47 store
+recovery cases, 37 team-policy groups, player lifecycle, auto fill (4),
+manual fill (8), public activity (17) and the new connection gates
+(tools/test-connection-budget.py: 10 loopback checks on both platforms, plus
+12 per-address checks on Linux binding the droplet's own address). Linux also
+accepted all 336 persisted production lobbies, from a copy and again with the
+writer stopped.
+Deployed to 162.243.115.160 as
+/opt/replay-dw/releases/20261016-connection-hardening-a7f1f062de35 with 14.7 s
+downtime, including a pre-upgrade backup taken by the new script: 66.7 MB in
+10.6 s (this morning: 3.9 GB, about 5 minutes stopped). Health, the public
+dashboard contract (6 groups) and the running /proc image hash were verified.
+The previous release remains for rollback; the previous backup script is kept
+in the release directory. No game was launched.
+Receipt: validation/20261016-backend-hardening-release.json.

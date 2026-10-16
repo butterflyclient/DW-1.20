@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "platform.h"
 #include "executable_updates.h"
@@ -40,9 +41,67 @@ namespace
 {
     constexpr unsigned maxBody = 256 * 1024;
     constexpr unsigned maxHeader = 16 * 1024;
-    constexpr unsigned maxClients = 32;
+    // Whole-request deadlines. Each recv/send also has its own short socket
+    // timeout, but a peer trickling one byte per timeout would otherwise hold
+    // its connection slot indefinitely.
+    constexpr auto headerDeadline = std::chrono::seconds(15);
+    constexpr auto bodyDeadline = std::chrono::seconds(30);
+    constexpr unsigned minimumTransferRate = 32 * 1024; // bytes/second for large bodies
     std::atomic<bool> stopping{false};
     std::atomic<unsigned> active{0}, probes{0}, authRequests{0};
+
+    // Each listener has its own connection budget. A signed-in player holds
+    // one long-lived lobby connection, so short HTTP requests, the TLS probe
+    // port and internet scanners must not consume player session capacity.
+    // A per-peer cap keeps one address from exhausting a listener; loopback
+    // is exempt so local servers and fixtures keep their full budget.
+    class Admission
+    {
+    public:
+        Admission(unsigned total, unsigned peerTotal) : limit(total), perPeer(peerTotal) {}
+
+        bool acquire(uint32_t peer)
+        {
+            std::lock_guard lock(mutex);
+            if (count >= limit)
+                return false;
+            if (!loopback(peer))
+            {
+                auto &used = peers[peer];
+                if (used >= perPeer)
+                    return false;
+                ++used;
+            }
+            ++count;
+            return true;
+        }
+
+        void release(uint32_t peer)
+        {
+            std::lock_guard lock(mutex);
+            --count;
+            if (const auto found = peers.find(peer); found != peers.end() && !--found->second)
+                peers.erase(found);
+        }
+
+        unsigned capacity() const
+        {
+            return limit;
+        }
+
+    private:
+        static bool loopback(uint32_t peer)
+        {
+            return (ntohl(peer) >> 24) == 127;
+        }
+
+        const unsigned limit, perPeer;
+        std::mutex mutex;
+        unsigned count = 0;
+        std::unordered_map<uint32_t, unsigned> peers;
+    };
+
+    Admission lobbyAdmission(160, 24), httpAdmission(64, 16), authAdmission(16, 4);
     const auto started = std::chrono::steady_clock::now();
     std::filesystem::path runtimeDirectory;
     std::mutex logMutex;
@@ -167,7 +226,7 @@ namespace
                    {"online_players", activity.at("players").size()},
                    {"activity", activity},
                    {"transport_connections", active.load()},
-                   {"connection_limit", maxClients},
+                   {"connection_limit", lobbyAdmission.capacity()},
                    {"logins", platform::logins()},
                    {"auth_successes", platform::authentications()},
                    {"lobby_authentications", lobby::authenticated.load()},
@@ -289,8 +348,11 @@ namespace
         std::string request;
         std::array<char, 4096> buffer{};
         size_t headerEnd = std::string::npos;
+        const auto accepted = std::chrono::steady_clock::now();
         while ((headerEnd = request.find("\r\n\r\n")) == std::string::npos)
         {
+            if (std::chrono::steady_clock::now() - accepted > headerDeadline)
+                return;
             const int n = recv(socket, buffer.data(), static_cast<int>(buffer.size()), 0);
             if (n <= 0)
                 return;
@@ -403,8 +465,13 @@ namespace
             at = end + 2;
         }
         const size_t bodyAt = headerEnd + 4;
+        // Large streaming uploads get time proportional to their declared size.
+        const auto bodyEnd = std::chrono::steady_clock::now() + bodyDeadline +
+                             std::chrono::seconds(static_cast<long long>(length / minimumTransferRate));
         while (request.size() - bodyAt < length)
         {
+            if (std::chrono::steady_clock::now() > bodyEnd)
+                return;
             const unsigned remaining = length - static_cast<unsigned>(request.size() - bodyAt);
             const int n = recv(socket,
                                buffer.data(),
@@ -476,8 +543,13 @@ namespace
                 return;
             std::string chunk(64 * 1024, '\0');
             uint64_t remaining = size;
+            // A reader slower than the minimum rate releases its slot.
+            const auto sendEnd = std::chrono::steady_clock::now() + 2 * bodyDeadline +
+                                 std::chrono::seconds(static_cast<long long>(size / minimumTransferRate));
             while (remaining && !stopping.load())
             {
+                if (std::chrono::steady_clock::now() > sendEnd)
+                    return;
                 const auto count = static_cast<size_t>(std::min<uint64_t>(chunk.size(), remaining));
                 file.read(chunk.data(), static_cast<std::streamsize>(count));
                 if (file.gcount() != static_cast<std::streamsize>(count))
@@ -884,6 +956,11 @@ namespace
             throw std::runtime_error("cannot bind port " + std::to_string(port) + ": " +
                                      std::to_string(WSAGetLastError()));
         log("LISTEN port=" + std::to_string(port));
+        auto &admission = handler == lobbyConnection ? lobbyAdmission
+                          : handler == http          ? httpAdmission
+                                                     : authAdmission;
+        unsigned refused = 0;
+        auto nextRefusalLog = std::chrono::steady_clock::now();
         auto nextMaintenance = std::chrono::steady_clock::now();
         while (!stopping.load())
         {
@@ -910,12 +987,29 @@ namespace
             const SOCKET client = accept(listener.value, nullptr, nullptr);
             if (client == INVALID_SOCKET)
                 continue;
-            if (active.fetch_add(1) >= maxClients)
+            sockaddr_in peer{};
+            int peerSize = sizeof(peer);
+            if (getpeername(client, reinterpret_cast<sockaddr *>(&peer), &peerSize) ||
+                peer.sin_family != AF_INET)
             {
-                --active;
                 closesocket(client);
                 continue;
             }
+            const auto peerAddress = peer.sin_addr.s_addr;
+            if (!admission.acquire(peerAddress))
+            {
+                closesocket(client);
+                ++refused;
+                if (std::chrono::steady_clock::now() >= nextRefusalLog)
+                {
+                    log("LISTEN port=" + std::to_string(port) +
+                        " connection budget exhausted; refused=" + std::to_string(refused));
+                    refused = 0;
+                    nextRefusalLog = std::chrono::steady_clock::now() + std::chrono::minutes(1);
+                }
+                continue;
+            }
+            ++active;
             const DWORD milliseconds = 3000;
             setsockopt(client,
                        SOL_SOCKET,
@@ -930,32 +1024,34 @@ namespace
             try
             {
                 std::thread(
-                    [client, handler]
+                    [client, handler, peerAddress, budget = &admission]
                     {
-                        Socket connection(client);
-                        try
                         {
-                            sockaddr_in peer{};
-                            int size = sizeof(peer);
-                            if (getpeername(client, reinterpret_cast<sockaddr *>(&peer), &size) ||
-                                peer.sin_family != AF_INET)
-                                throw std::runtime_error("Cannot determine connection peer");
-                            const network::PeerScope publication(peer.sin_addr.s_addr);
-                            handler(client);
+                            Socket connection(client);
+                            try
+                            {
+                                const network::PeerScope publication(peerAddress);
+                                handler(client);
+                            }
+                            catch (const std::exception &e)
+                            {
+                                log(std::string("REQUEST error: ") + e.what());
+                            }
                         }
-                        catch (const std::exception &e)
-                        {
-                            log(std::string("REQUEST error: ") + e.what());
-                        }
+                        budget->release(peerAddress);
                         --active;
                     })
                     .detach();
             }
-            catch (...)
+            catch (const std::exception &e)
             {
+                // Refuse this connection; thread exhaustion must not stop
+                // the listener and disconnect every signed-in player.
+                admission.release(peerAddress);
                 --active;
                 closesocket(client);
-                throw;
+                log(std::string("LISTEN port=") + std::to_string(port) +
+                    " connection thread unavailable: " + e.what());
             }
         }
     }

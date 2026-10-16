@@ -46,6 +46,36 @@ def inventory():
     return json.loads(raw)
 
 
+def remote_python(client, code, timeout=60):
+    _, out, error = client.exec_command("python3 - <<'PY'\n" + code + '\nPY', timeout=timeout)
+    raw = out.read()
+    if out.channel.recv_exit_status():
+        raise RuntimeError(error.read().decode())
+    return raw
+
+
+def staging_cleanup_script(incoming=None, stale_seconds=24 * 3600, root=REMOTE):
+    """Remove one failed transaction's staging, or staging abandoned long ago.
+
+    The publication lock is held, so a commit still running remotely (for
+    example after a local SSH timeout) finishes before its staging is removed.
+    """
+    return textwrap.dedent(f'''
+        import fcntl,pathlib,shutil,time
+        root=pathlib.Path({root!r})
+        selected={incoming!r}
+        with (root/'publication.lock').open('a') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            for path in root.glob('map-incoming-*'):
+                stamp=path.name[len('map-incoming-'):]
+                if not stamp.isdigit() or not path.is_dir() or path.is_symlink():
+                    continue
+                if str(path)==selected or (selected is None and
+                        time.time_ns()-int(stamp)>{stale_seconds}*10**9):
+                    shutil.rmtree(path)
+    ''')
+
+
 def catalog_for(record, release):
     from dw_update_maps import verify_record
     verify_record(record)
@@ -214,17 +244,25 @@ def publish(record, output, upload=False):
         return dict(published=False, catalog=catalog)
     incoming = REMOTE + '/map-incoming-' + str(time.time_ns())
     with remote_backend.connect() as client:
-        with client.open_sftp() as sftp:
-            sftp.mkdir(incoming);sftp.mkdir(incoming + '/assets')
-            sftp.put(record['manifest_path'], incoming + '/manifest.bin')
-            sftp.put(str(output / 'custom-map-catalog.json'), incoming + '/catalog.json')
-            for digest,item in record['payloads'].items():
-                sftp.put(item['source'], incoming + '/assets/' + digest + '.bin')
-        script = transaction_script(incoming, sha(output / 'custom-map-catalog.json'))
-        _, out, error = client.exec_command("python3 - <<'PY'\n" + script + '\nPY', timeout=60)
-        raw = out.read()
-        if out.channel.recv_exit_status():
-            raise RuntimeError(error.read().decode())
+        # Earlier interrupted uploads otherwise keep hundreds of MB forever.
+        remote_python(client, staging_cleanup_script())
+        try:
+            with client.open_sftp() as sftp:
+                sftp.mkdir(incoming);sftp.mkdir(incoming + '/assets')
+                sftp.put(record['manifest_path'], incoming + '/manifest.bin')
+                sftp.put(str(output / 'custom-map-catalog.json'), incoming + '/catalog.json')
+                for digest,item in record['payloads'].items():
+                    sftp.put(item['source'], incoming + '/assets/' + digest + '.bin')
+            raw = remote_python(client, transaction_script(incoming, sha(output / 'custom-map-catalog.json')))
+        except BaseException:
+            # Committed payloads were already moved out of staging; what is
+            # left is a partial upload. A lost connection leaves it for the
+            # next publication's stale sweep.
+            try:
+                remote_python(client, staging_cleanup_script(incoming))
+            except Exception:
+                pass
+            raise
     receipt = json.loads(raw)
     receipt['frozen_record'] = record
     receipt['catalog_sha256'] = sha(output / 'custom-map-catalog.json')

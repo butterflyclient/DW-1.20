@@ -1,0 +1,9 @@
+[Unit]
+Description=Replay DW storage maintenance (superseded and reproducible files)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /opt/replay-dw/maintain-storage.py --apply
+UMask=0077
+Nice=10
+IOSchedulingClass=idle

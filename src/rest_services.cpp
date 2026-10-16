@@ -271,7 +271,7 @@ namespace services
                 " version=" + std::to_string(r.version) + " accept=" + std::to_string(r.accept) +
                 " content=" + std::to_string(r.content) + " has_body=" + std::to_string(r.hasBody) +
                 " parameter_offset=" + std::to_string(p.offset) +
-                " parameter_bytes=" + std::to_string(p.data.size());
+                " parameter_bytes=" + std::to_string(p.data.size()) + wire::checkDetail(e);
             return invalid;
         }
         Reply reply{0, {}, "rest-route-not-configured"};
@@ -340,7 +340,8 @@ namespace services
                 reply.error = 106;
                 reply.operation = "achievement-rest-domain-invalid";
                 reply.detail += " content=" + std::to_string(r.content) +
-                                " body_bytes=" + std::to_string(r.body.size());
+                                " body_bytes=" + std::to_string(r.body.size()) +
+                                wire::checkDetail(e);
                 return reply;
             }
         }

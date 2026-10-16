@@ -272,7 +272,8 @@ namespace services
                                  " bandwidth_down=" + std::to_string(bandwidthDown) +
                                  " bandwidth_up=" + std::to_string(bandwidthUp) +
                                  " parameter_offset=" + std::to_string(p.offset) +
-                                 " parameter_bytes=" + std::to_string(p.data.size());
+                                 " parameter_bytes=" + std::to_string(p.data.size()) +
+                                 wire::checkDetail(e);
                 return invalid;
             }
         }

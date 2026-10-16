@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "passed": true,
+  "host": "162.243.115.160",
+  "owner_approved": true,
+  "disk_before": {
+    "used_gb": 25,
+    "free_gb": 8.0
+  },
+  "disk_after": {
+    "used_gb": 11,
+    "free_gb": 23,
+    "used_percent": 32
+  },
+  "one_time_cleanup": {
+    "removed": 135,
+    "freed_bytes": 4198951463
+  },
+  "backup_repack": {
+    "archives": 6,
+    "reclaimed_bytes": 10276189171,
+    "kept_members_hash_verified": true,
+    "mtimes_preserved": true
+  },
+  "first_maintenance_run": {
+    "removed": 641,
+    "freed_bytes_now": 894834528,
+    "via": "systemctl start replay-dw-maintenance.service",
+    "result": "success"
+  },
+  "root_history_moved": {
+    "files": 280,
+    "destination": "data/droplet-root-history-20261016",
+    "hash_verified": true
+  },
+  "installed": {
+    "script": "/opt/replay-dw/maintain-storage.py",
+    "script_sha256": "47ec8978bbdac551fce47f67db691143028e85af51e56653acd4e877793f97f0",
+    "timer": "replay-dw-maintenance.timer 07:30 UTC daily (before 08:00 backup)"
+  },
+  "fixture_test": "11 exact removals, 25 kept cases, dry run unchanged, idempotent, malformed catalog blocks update pruning",
+  "post_checks": [
+    "live server a7f1f062 process verified, health transport-ready",
+    "latest EXE image, 287 referenced assets and 10 v1 patches present",
+    "all state archives pass sha256sum -c",
+    "maintenance dry run: 0 pending"
+  ],
+  "server_restarted": false,
+  "game_runs_performed": false,
+  "evidence": {
+    "data/storage-cleanup-20261016/cleanup-applied.json": "59bb6ebc27d332a9b2a24843c0c4ef08b103facbc3ab0c7df9388013c85e2b70",
+    "data/storage-cleanup-20261016/cleanup-dry-run.json": "6a70ba28c4770094affb68a91b17ab4a52ffd3d4b361e464d51af7cc9d41dbea",
+    "data/storage-cleanup-20261016/cleanup-once.py": "6ac709a3034f6382f4e5c2289105c0cfb8f49f6f9cdade6a1e97fd7cf3e7f89f",
+    "data/storage-cleanup-20261016/maintenance-dry-run.json": "7791b33ce2a40a45ceca6fa62c9bb989ade730c93c0a45887c6297830b00f31e",
+    "data/storage-cleanup-20261016/maintenance-first-run.json": "0d0a94d2ffb1972267ab4f393ef2615836ab8fe8630c58f93decc7e05d4e7a79",
+    "data/storage-cleanup-20261016/repack-applied.log": "c03649ad48b9b7a1ab418d08e59fa7bd3deb433c1285e7c5a0e0ae7c9da7127c",
+    "data/storage-cleanup-20261016/repack-backups.py": "1d92a9e3ae111a98440b878322c5660092eb32e8f3020b6e8fdba1021772ce41",
+    "data/storage-cleanup-20261016/state-20261016T080146Z.repack.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/storage-cleanup-20261016/test-maintain-storage.py": "63ac607d083e7afec14383f97f246545755fd425e7e83bdf5ac5855942a3a058"
+  }
+}

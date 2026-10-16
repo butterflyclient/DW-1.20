@@ -672,6 +672,21 @@ namespace services
         }
     }
 
+    namespace
+    {
+        // Internal failure text is fixed library or OS wording (never request
+        // bodies or paths); bound it to one printable log token sequence.
+        Reply failure(uint32_t error, std::string operation, const std::string &reason)
+        {
+            Reply reply{error, {}, std::move(operation)};
+            std::string text;
+            for (const char c : reason.substr(0, 160))
+                text += c >= 32 && c < 127 ? c : '?';
+            reply.detail = " reason=\"" + text + "\"";
+            return reply;
+        }
+    } // namespace
+
     Reply dispatch(const platform::LobbyIdentity &authenticatedIdentity,
                    uint8_t service,
                    uint8_t task,
@@ -752,19 +767,30 @@ namespace services
                 return variables(id, task, p);
             return {unavailable, {}, "service-unimplemented"};
         }
-        catch (const nlohmann::json::exception &)
+        catch (const nlohmann::json::exception &e)
         {
-            return {storageFailure, {}, "persistent-json-invalid"};
+            return failure(storageFailure, "persistent-json-invalid", e.what());
         }
-        catch (const std::filesystem::filesystem_error &)
+        catch (const std::filesystem::filesystem_error &e)
         {
-            return {storageFailure, {}, "persistent-filesystem-error"};
+            // The OS error (for example a full disk) without the path names.
+            return failure(storageFailure, "persistent-filesystem-error", e.code().message());
         }
         catch (const std::runtime_error &e)
         {
             if (std::string(e.what()) == "Malformed native task parameters")
-                return {invalid, {}, "task-parameters-invalid"};
-            return {storageFailure, {}, "persistent-data-error"};
+            {
+                Reply reply{invalid, {}, "task-parameters-invalid"};
+                reply.detail = wire::checkDetail(e);
+                return reply;
+            }
+            return failure(storageFailure, "persistent-data-error", e.what());
+        }
+        catch (const std::exception &e)
+        {
+            // A logic or allocation failure in one handler fails that task
+            // only; it must not tear down the caller's authenticated session.
+            return failure(storageFailure, "internal-task-error", e.what());
         }
     }
 

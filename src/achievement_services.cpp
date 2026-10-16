@@ -2304,6 +2304,7 @@ namespace services
     {
         achievement_store::recover(root, id.titleId, validateEventWrite);
         const char *stage = "json";
+        std::string check;
         try
         {
             std::vector<std::set<std::string>> keys;
@@ -2394,9 +2395,10 @@ namespace services
             if (std::string(stage) == "persistence" ||
                 std::string(e.what()) != "Malformed native task parameters")
                 throw;
+            check = wire::checkDetail(e);
         }
         Reply invalid{106, {}, "achievement-rest-domain-invalid"};
-        invalid.detail = " validation_stage=" + std::string(stage);
+        invalid.detail = " validation_stage=" + std::string(stage) + check;
         return invalid;
     }
 
