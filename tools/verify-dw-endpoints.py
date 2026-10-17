@@ -1,6 +1,7 @@
 """Execute linked endpoint getters; platform filename lookup alone is simulated."""
 
 import struct
+from pathlib import Path
 
 import unicorn
 import unicorn.x86_const as x
@@ -222,6 +223,7 @@ def verify(pe, report):
             machine.mem_write(table + slot * 8, struct.pack("<Q", check_thunk))
         machine.mem_write(http, struct.pack("<Q", table) + bytes(1232))
         chosen_urls, imported_keys, disconnects, callbacks = [], [], [], []
+        tls_options = {}
         connection_address, file_thunk, callback_thunk = (
             arena + 0x8000,
             arena + 0xF400,
@@ -415,6 +417,8 @@ def verify(pe, report):
                 return_native(uc)
             elif address == symbols["func_1422EACE0"]:
                 assert args[0] == 0x1234
+                if args[1] in (64, 81, 181, 182):
+                    tls_options[args[1]] = args[2]
                 if args[1] == 10002:
                     chosen_urls.append(string(args[2]))
                 return_native(uc)
@@ -532,8 +536,10 @@ def verify(pe, report):
         machine.mem_write(config, f"https://{host}:8443/auth/\0".encode())
         assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
         assert chosen_urls[-1] == (
-            f"http://{host}:8085/auth/" if enabled else f"https://{host}:8443/auth/"
+            f"http://{host}:8085/auth/" if enabled and host == '127.0.0.1' else f"https://{host}:8443/auth/"
         )
+        if enabled and host != '127.0.0.1':
+            assert tls_options == {64: 1, 81: 2, 181: 2, 182: 2}, 'Remote auth must verify peer/host and restrict requests/redirects to HTTPS'
         machine.mem_write(config, b"https://native.auth.invalid/auth/\0")
         assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
         assert chosen_urls[-1] == "https://native.auth.invalid/auth/"
@@ -542,7 +548,7 @@ def verify(pe, report):
             machine.mem_write(config, legacy.encode() + b"\0")
             assert invoke("func_1420E34D0", http, 3, config, 15000) & 255 == 1
             assert chosen_urls[-1] == (
-                f"http://{host}:8085/v1.0/tokens/lsg/?client=replaylocal"
+                f"{'http' if host == '127.0.0.1' else 'https'}://{host}:{8085 if host == '127.0.0.1' else 8443}/v1.0/tokens/lsg/?client=replaylocal"
                 if enabled
                 else legacy
             )
@@ -1116,7 +1122,21 @@ int main() {
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Focused compiled authentication getter regression; no game launch")
-    parser.add_argument("--auth-address-component", action="store_true", required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--auth-address-component", action="store_true")
+    mode.add_argument("--build", type=Path)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    verify_auth_address_component(args.output)
+    if args.build:
+        import hashlib, json
+        from pathlib import Path
+        import pefile
+        report = json.loads((args.build / 'build-report.json').read_bytes())
+        image = Path(report['executable'])
+        assert hashlib.sha256(image.read_bytes()).hexdigest() == report['sha256']
+        cases = verify(pefile.PE(str(image), fast_load=True), report)
+        Path(args.output).write_text(json.dumps(dict(passed=True, game_sha256=report['sha256'],
+            cases=cases, remote_tls_and_redirect_options_verified=True, game_runs_performed=False), indent=2)+'\n')
+        print('PASS linked loopback/remote endpoint and TLS option selection')
+    else:
+        verify_auth_address_component(args.output)

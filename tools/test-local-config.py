@@ -118,7 +118,7 @@ def run_checks(pe, base, symbols):
     existing = b"host=10.20.30.40\nplayer_name=Custom Test\nunlock_all=1\nrank=53\n"
     expected = dict(bypass=False, host="10.20.30.40", player_name="Custom Test", unlock_all=True,
                     rank=53, test_command="replay-dw-test.command", test_enabled="replay-dw-test.enabled",
-                    auth_url="http://10.20.30.40:8085/auth/")
+                    auth_url="https://10.20.30.40:8443/auth/")
     cases = [("omitted", existing, False), ("zero", existing + b"bypass_update_restart=0\n", False),
              ("one", existing + b"bypass_update_restart=1\n", True),
              ("BOM", b"\xef\xbb\xbf" + existing + b"bypass_update_restart=1\r\n", True),
@@ -142,6 +142,7 @@ def run_checks(pe, base, symbols):
     checks.append("executable INI preference")
     actual = check(pe, base, symbols, {})
     assert not actual["bypass"] and actual["host"] == "127.0.0.1" and not actual["unlock_all"] and actual["rank"] == 0
+    assert actual['auth_url'] == 'http://127.0.0.1:8085/auth/'
     checks.append("no INI defaults")
     return checks
 
