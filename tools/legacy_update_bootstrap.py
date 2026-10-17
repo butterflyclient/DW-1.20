@@ -1,10 +1,12 @@
 """Bridge every retained version-1 updater identity to a published full image.
 
-An empty-source RAW delta is a complete target encoded in MSDelta's existing
-format. Old helpers still verify their own base hash/size, the signed plan,
-the delta hash and the exact restored EXE; they need no new protocol support.
+A size-specific RAW delta uses a periodic source with no matches in the target.
+The Windows decoder requires the original source length. Complementary sources
+verify that its contents are unused. Old helpers retain their signed plan,
+base hash/size, delta hash and restored EXE checks without a protocol change.
 """
 import ctypes
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import importlib.util
 import json
@@ -55,28 +57,49 @@ def publish(image, catalog, output):
         spec = importlib.util.spec_from_file_location('raw_bootstrap_delta', ROOT / 'tools/publish-executable-update.py')
         delta = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(delta)
-        patch = delta.make_patch(b'', target)
-        # Exercise the exact ApplyDeltaProvidedB API used by the old helper,
-        # with a nonempty source unlike the source used to create the delta.
-        source = ctypes.create_string_buffer(b'older Replay executable bytes')
-        encoded = ctypes.create_string_buffer(patch)
-        restored = ctypes.create_string_buffer(len(target))
-        api = delta.delta_api().ApplyDeltaProvidedB
-        api.argtypes = [ctypes.c_int64, delta.Input, delta.Input, ctypes.c_void_p, ctypes.c_size_t]
-        api.restype = ctypes.c_int
-        if not api(0, delta.Input(ctypes.addressof(source), len(source) - 1, False),
-                   delta.Input(ctypes.addressof(encoded), len(patch), False),
-                   ctypes.addressof(restored), len(target)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        if sha(restored.raw) != catalog['latest']:
-            raise ValueError('Legacy Windows helper API did not reproduce the exact target')
-        digest = sha(patch)
+        output.mkdir(parents=True, exist_ok=True)
+        pattern = None
+        for index in range(4096):
+            candidate = bytes([(index * 73 + 17) % 256, (index * 151 + 31 + index // 256) % 256])
+            if candidate[0] != candidate[1] and candidate + candidate[:1] not in target and candidate[1:] + candidate not in target:
+                pattern = candidate
+                break
+        if pattern is None:
+            raise ValueError('No source pattern without target matches was found')
+
+        def prepare_patch(size):
+            cache = output / ('size-' + str(size) + '.delta')
+            original = (pattern * ((size + 1) // 2))[:size]
+            patch = cache.read_bytes() if cache.exists() else delta.make_patch(original, target)
+            if not 0 < len(patch) <= delta.MAX_IMAGE:
+                raise ValueError('Legacy delta exceeds bounds')
+            encoded = ctypes.create_string_buffer(patch)
+            restored = ctypes.create_string_buffer(len(target))
+            api = delta.delta_api().ApplyDeltaProvidedB
+            api.argtypes = [ctypes.c_int64, delta.Input, delta.Input, ctypes.c_void_p, ctypes.c_size_t]
+            api.restype = ctypes.c_int
+            for sample in (pattern, bytes(value ^ 255 for value in pattern)):
+                source = ctypes.create_string_buffer((sample * ((size + 1) // 2))[:size])
+                if not api(0, delta.Input(ctypes.addressof(source), size, False),
+                           delta.Input(ctypes.addressof(encoded), len(patch), False),
+                           ctypes.addressof(restored), len(target)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                if sha(restored.raw) != catalog['latest']:
+                    raise ValueError('Legacy delta depends on source contents')
+            cache.write_bytes(patch)
+            digest = sha(patch)
+            payload = output / (digest + '.delta')
+            if not payload.exists():
+                payload.hardlink_to(cache)
+            print('Verified legacy source size', size, 'with complementary source contents', flush=True)
+            return size, dict(sha256=digest, size=len(patch), source=str(payload))
+
+        with ThreadPoolExecutor(max_workers=3) as workers:
+            prepared = dict(workers.map(prepare_patch, sorted(set(sizes.values()))))
+        payloads = {entry['sha256']: entry for entry in prepared.values()}
         bridge = dict(schema=1, format='msdelta-raw-v1', release=catalog['release'],
                       latest=catalog['latest'], target_size=len(target),
-                      patches={h: dict(base_size=n, size=len(patch), sha256=digest) for h, n in sizes.items()})
-        output.mkdir(parents=True, exist_ok=True)
-        payload = output / (digest + '.delta')
-        payload.write_bytes(patch)
+                      patches={h: dict(base_size=n, size=prepared[n]['size'], sha256=prepared[n]['sha256']) for h, n in sizes.items()})
         document = (json.dumps(bridge, indent=2) + '\n').encode()
         (output / 'catalog.json').write_bytes(document)
         incoming = REMOTE + '/legacy-incoming-' + str(time.time_ns())
@@ -87,9 +110,10 @@ def publish(image, catalog, output):
         if scp:
             subprocess.run([scp, '-B', '-i', str(ROOT / '.toolchains/deploy_ed25519'),
                 '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + str(ROOT / 'data/droplet-known-hosts'),
-                str(payload), 'root@162.243.115.160:' + incoming + '/' + payload.name], check=True)
+                *[item['source'] for item in payloads.values()], 'root@162.243.115.160:' + incoming + '/'], check=True)
         else:
-            sftp.put(str(payload), incoming + '/' + payload.name)
+            for h, item in payloads.items():
+                sftp.put(item['source'], incoming + '/' + h + '.delta')
         sftp.put(str(output / 'catalog.json'), incoming + '/catalog.json')
         code = f'''
 import pathlib,json,hashlib,fcntl,os,time
@@ -102,14 +126,15 @@ with (root/'publication.lock').open('a') as lock:
  assert digest(root/'catalog.json')=={sha(previous_bytes)!r},'Legacy catalog changed concurrently'
  assert digest(incoming/'catalog.json')=={sha(document)!r}
  new=json.loads((incoming/'catalog.json').read_bytes())
- payload=incoming/{payload.name!r}
- assert payload.stat().st_size=={len(patch)} and digest(payload)=={digest!r}
  patches=root/'patches';patches.mkdir(exist_ok=True)
- final=patches/payload.name
- if final.exists():
-  assert digest(final)=={digest!r};payload.unlink()
- else:os.chmod(payload,0o644);os.replace(payload,final)
- with final.open('rb') as f:os.fsync(f.fileno())
+ for h,size in { {h:item['size'] for h,item in payloads.items()}!r}.items():
+  payload=incoming/(h+'.delta')
+  assert payload.stat().st_size==size and digest(payload)==h
+  final=patches/payload.name
+  if final.exists():
+   assert digest(final)==h;payload.unlink()
+  else:os.chmod(payload,0o644);os.replace(payload,final)
+  with final.open('rb') as f:os.fsync(f.fileno())
  fd=os.open(patches,os.O_DIRECTORY);os.fsync(fd);os.close(fd)
  backups=root/'legacy-catalog-backups';backups.mkdir(exist_ok=True)
  backup=backups/(str(time.time_ns())+'-'+{sha(previous_bytes)!r}+'.json')
@@ -151,10 +176,11 @@ with (root/'publication.lock').open('a') as lock:
                 or not before - 5 <= values[3] <= int(time.time()) + 5 or values[4] <= values[3]
                 or values[5] != nonce or values[6].hex() != base or values[7].hex() != catalog['latest']
                 or values[9:11] != (size, len(target)) or values[12] != catalog['release']
-                or (expected_status and (values[8].hex() != digest or values[11] != len(patch)))):
+                or (expected_status and (values[8].hex() != prepared[size]['sha256'] or values[11] != prepared[size]['size']))):
             raise ValueError('Legacy update plan does not bind its retained base and target')
-    result = dict(json.loads(raw), passed=True, independent_raw_delta=True, apply_delta_provided_verified=True,
+    result = dict(json.loads(raw), passed=True, source_contents_independent=True, apply_delta_provided_verified=True,
                   signed_legacy_plans_verified=len(sizes) + 1,
-                  patch_sha256=digest, patch_bytes=len(patch), catalog_sha256=sha(document))
+                  source_sizes=len(prepared), complementary_source_checks=2 * len(prepared),
+                  payloads={h:item['size'] for h,item in payloads.items()}, catalog_sha256=sha(document))
     (output / 'publication.json').write_text(json.dumps(result, indent=2) + '\n')
     return result
