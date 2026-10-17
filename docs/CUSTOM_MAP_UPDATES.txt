@@ -6,8 +6,8 @@ and verified before the native update fence requests a clean restart. Installing
 a newer EXE manually also triggers this check on its first launch. A retained
 pre-asset or release 29 helper can install the new EXE first; the new EXE then
 extracts its newer helper and repairs any missing companion files. Clients with
-only the old delta protocol receive a signed, source-independent RAW delta as
-their automatic bootstrap to the new EXE. The original base-hash/size checks and
+only the old delta protocol receive a signed direct patch from their exact
+retained compiler image as their automatic bootstrap to the new EXE. The original base-hash/size checks and
 Windows ApplyDeltaProvidedB reconstruction stay in place. The new helper handles
 all subsequent EXE, companion and map downloads.
 
