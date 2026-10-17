@@ -44,9 +44,11 @@ def inventory(catalog, catalog_bytes, game_directory):
     rows = []
     # Root overrides precede the native zone directory. Do not discover packages
     # inside old builds, compiler archives or frontend comparison directories.
+    # A DW custom map release installs its own folder (DW_MapAvailability.cpp).
     for name in names:
         candidates = []
-        for directory in (root, root / "zone", root / "main"):
+        custom = root / "mods" / "mw120r" / "maps" / name
+        for directory in (root, root / "zone", root / "main", custom):
             path = directory / (name + ".ff")
             if path.is_file():
                 resolved = path.resolve(strict=True)
@@ -62,9 +64,11 @@ def inventory(catalog, catalog_bytes, game_directory):
                         record[suffix[1:]] = basic_file(resolved_companion, root)
                 candidates.append(record)
         primary = candidates[0] if candidates else None
+        # Stock packages are IWffa100; zonetool-built custom maps are IWffc100.
+        magic = "IWffc100" if primary and primary["path"].startswith("mods/") else "IWffa100"
         available = bool(
             primary and primary["complete_header"]
-            and primary["bytes"] > 16 and primary["magic"] == "IWffa100"
+            and primary["bytes"] > 16 and primary["magic"] == magic
         )
         rows.append({
             "name": name,

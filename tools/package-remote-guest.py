@@ -48,8 +48,9 @@ Existing players: close the game and replace only the EXE, keeping your own INI.
 The EXE embeds its owned FF/FP files and stages them in the native folders.
 The updater also repairs missing owned files. No manual fastfile copy is needed.
 On launch it also checks the server's explicitly published custom map package.
-Missing Nuketown files download compressed and decompress into
-mods\mw120r\maps\mp_nuketown. Allow free space for the compressed download,
+Missing Nuketown and Nuketown Classic files download compressed and decompress
+into mods\mw120r\maps\mp_nuketown and mods\mw120r\maps\mp_nuketown_c.
+Allow free space for the compressed download,
 decompressed map files, temporary staging and backups.
 The native update screen requests a restart before installing missing files.
 Existing files are backed up in game_dx12_ship_replay_dw.exe.update\asset-backups.

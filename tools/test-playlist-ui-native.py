@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--lua-source', type=Path,
                         default=Path(__file__).resolve().parents[1] / 'integration/replay/DW_PlaylistUI.lua')
+    parser.add_argument('--inspection-header', type=Path,
+                        help='Frozen DW_WeaponInspectUI_Source.h; defaults to this build job source')
     args = parser.parse_args()
     report_path = args.build / 'build-report.json' if args.build.is_dir() else args.build
     report = json.loads(report_path.read_bytes())
@@ -43,9 +45,19 @@ def main():
     machine.mem_map(arena, 0x80000)
     stack, stop = arena + 0x10000 - 8, arena + 0x1F000
     source = args.lua_source.read_bytes().replace(b'\r\n', b'\n')
+    inspection_header = args.inspection_header or (
+        report_path.parent.parent.parent / 'source/src/DW_WeaponInspectUI_Source.h')
+    inspection_header_bytes = inspection_header.read_bytes()
+    inspection_chunks = re.findall(
+        rb'inline constexpr char dwWeaponInspectUISource\[\] = R"([A-Za-z0-9_]+)\((.*?)\)\1";',
+        inspection_header_bytes.replace(b'\r\n', b'\n'), re.S)
+    assert len(inspection_chunks) == 1, 'Frozen inspection header must contain exactly one installer chunk'
+    inspection_source = inspection_chunks[0][1]
+    assert inspection_source.startswith(b'local state=MenuBuilder.m_types.replaydwplaylistfillstate(); ')
     state = dict(enabled=True, main=True, now=1000, locked=False, top=7,
                  installed=False, eligible=True, load_error=0, call_error=0, error_kind='probe',
-                 vm=arena + 0x1000, loads=[], prints=[], events=[], ballots=[],
+                 inspection_installed=False, inspection_eligible=True,
+                 vm=arena + 0x1000, loads=[], calls=[], prints=[], events=[], ballots=[],
                  map_names=("Backlot", "Crash's\\map", "Office"))
     names = ('DW_LocalBackend_IsEnabled', 'Sys_IsMainThread', 'replay_rva_0148fce0',
              'DW_Progression_LUILock', 'DW_Progression_LUIUnlock',
@@ -140,6 +152,7 @@ def main():
             assert state['locked'], name
             assert vm.reg_read(x.UC_X86_REG_RCX) == state['vm'], name
             if name == 'DW_Progression_LuaTop':
+                assert state['top'] == 7, 'Previous chunk did not restore the native VM stack'
                 returned(state['top'])
             elif name == 'DW_Progression_LuaSetTop':
                 state['top'] = vm.reg_read(x.UC_X86_REG_RDX) & 0xFFFFFFFF
@@ -156,6 +169,9 @@ def main():
                     kind = 'ballot'
                     assert text == state['expected_ballot'], 'Refresh did not use the actual linked UIState result'
                     state['ballots'].append(text)
+                elif text.startswith(b'local state=MenuBuilder.m_types.replaydwplaylistfillstate(); '):
+                    kind = 'inspection'
+                    assert text == inspection_source, 'Linked inspection Lua differs from its frozen header'
                 else:
                     kind = 'installer'
                     assert text == source, 'Linked embedded Lua differs from supplied source'
@@ -164,15 +180,19 @@ def main():
                 state['top'] += 1
                 returned(state['load_error'] if kind == state['error_kind'] else 0)
             elif name == 'DW_Progression_LuaCall':
+                state['calls'].append(state['kind'])
                 error = state['call_error'] if state['kind'] == state['error_kind'] else 0
                 assert vm.reg_read(x.UC_X86_REG_RDX) == 0
                 assert vm.reg_read(x.UC_X86_REG_R8) == 1
                 assert vm.reg_read(x.UC_X86_REG_R9) == 0
                 if not error and state['kind'] == 'installer' and state['eligible']:
                     state['installed'] = True
+                if not error and state['kind'] == 'inspection' and state['inspection_eligible']:
+                    state['inspection_installed'] = True
                 returned(error)
             elif name == 'func_142084A10':
-                number = float(state['installed'])
+                number = float(state['inspection_installed'] if state['kind'] == 'inspection'
+                               else state['installed'])
                 vm.reg_write(x.UC_X86_REG_XMM0, int.from_bytes(struct.pack('<d', number), 'little'))
                 returned()
 
@@ -225,15 +245,43 @@ def main():
     frame('one-second throttle', advance=1)
     assert len(state['loads']) == before
     frame('marker idempotence')
-    assert state['loads'][before:] == ['probe', 'ballot'] and len(state['prints']) == 2
-    state['installed'] = False
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot'] and len(state['prints']) == 2
+    state['installed'], state['inspection_installed'] = False, False
     frame('VM reload at reused address reinstalls')
-    assert state['loads'][-3:] == ['probe', 'installer', 'ballot']
-    state['vm'], state['installed'] = arena + 0x2000, False
+    assert state['loads'][-4:] == ['probe', 'installer', 'inspection', 'ballot']
+    state['vm'], state['installed'], state['inspection_installed'] = arena + 0x2000, False, False
     frame('replacement VM installs and reports success')
     assert state['installed'] and len(state['prints']) == 3
     assert state['ballots'][-1] == b'MenuBuilder.m_types.replaydwplaylistfillstate().RefreshMapVote({active=false}); return 1'
     checks.append('Actual linked inactive map-vote state refreshes the installed Lua without changing its stack or lock')
+
+    state['inspection_installed'], state['inspection_eligible'] = False, False
+    before = len(state['loads'])
+    frame('inspection installer waits for stock options without reinstalling playlist or interrupting ballot')
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['installed'] and not state['inspection_installed'] and len(state['prints']) == 3
+    state['inspection_eligible'] = True
+    before = len(state['loads'])
+    frame('inspection installer retries when stock options become available')
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 3
+
+    state['error_kind'], state['load_error'] = 'inspection', 1
+    before, calls_before = len(state['loads']), len(state['calls'])
+    frame('inspection load error preserves installed UI and ballot while restoring stack and lock')
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['calls'][calls_before:] == ['probe', 'ballot']
+    assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
+    state['load_error'], state['call_error'] = 0, 1
+    before = len(state['loads'])
+    frame('inspection pcall error preserves installed UI and suppresses repeated refresh error log')
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
+    state['call_error'] = 0
+    before = len(state['loads'])
+    frame('inspection retries successfully after load and pcall errors without playlist reinstall')
+    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
 
     def write(address, value, format='<i'):
         machine.mem_write(address, struct.pack(format, value))
@@ -300,6 +348,9 @@ def main():
                   checker_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                   lua_source=str(args.lua_source), lua_source_sha256=hashlib.sha256(args.lua_source.read_bytes()).hexdigest(),
                   embedded_lua_sha256=hashlib.sha256(source).hexdigest(),
+                  inspection_header=str(inspection_header),
+                  inspection_header_sha256=hashlib.sha256(inspection_header_bytes).hexdigest(),
+                  embedded_inspection_lua_sha256=hashlib.sha256(inspection_source).hexdigest(),
                   evidence='Actual linked frame instructions; modeled native Lua and locking boundaries',
                   game_launched=False)
     args.output.parent.mkdir(parents=True, exist_ok=True)

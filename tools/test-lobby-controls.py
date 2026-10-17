@@ -185,6 +185,7 @@ def main():
         "Dvar_RegisterBool",
         "Dvar_RegisterString",
         "DW_MapAvailability_InstalledIds",
+        "DW_MapAvailability_EnsureScanned",
         "DW_LocalBackend_LogLine",
         "DW_BotPolicy_Register",
         "DW_BotPolicy_Prepare",
@@ -423,6 +424,9 @@ def main():
             returned(pointer)
         elif name == "DW_LocalBackend_LogLine":
             diagnostics.append(string(values[0]))
+            returned()
+        elif name == "DW_MapAvailability_EnsureScanned":
+            # The package scan (file system) is not modeled; InstalledIds supplies the list.
             returned()
         elif name == "DW_MapAvailability_InstalledIds":
             vm.mem_write(arena + 0x5200, b" mp_nuketown \0")
