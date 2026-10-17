@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 project(iw8_demonware LANGUAGES CXX)
 add_executable(iw8-dw-server
     src/server.cpp
+    src/tls_transport.cpp
     src/host_os.cpp
     src/crypto_provider.cpp
     src/network.cpp
@@ -62,7 +63,7 @@ if(WIN32)
 else()
   find_package(OpenSSL 3 REQUIRED)
   find_package(Threads REQUIRED)
-  target_link_libraries(iw8-dw-server PRIVATE OpenSSL::Crypto Threads::Threads)
+  target_link_libraries(iw8-dw-server PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
   target_link_libraries(iw8-session-lease-contract-test PRIVATE OpenSSL::Crypto Threads::Threads)
   target_compile_options(iw8-session-lease-contract-test PRIVATE -Wall -Wextra -Wpedantic)
   target_compile_options(iw8-dw-server PRIVATE -Wall -Wextra -Wpedantic)

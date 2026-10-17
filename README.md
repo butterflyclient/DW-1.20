@@ -165,6 +165,11 @@ cmake --build build --config Release --target iw8-dw-server --parallel
 
 The game-client instructions above are for Windows. A server on a different machine requires the [remote hosting configuration](docs/remote-host-test.md).
 
+For internet hosting, use the [native HTTPS setup](docs/server-tls.md). Remote
+authentication, platform sessions, content requests, and updates use verified
+TLS on port 8443. Local play on `127.0.0.1` keeps the simple HTTP setup above.
+The Linux server rejects remote plaintext credential requests by default.
+
 ## Features and compatibility
 
 The backend implements selected native authentication, platform, social, lobby, matchmaking, content, and progression services used by the compatible client. The exact supported operations and remaining gaps are documented in the topic guides under [`docs/`](docs/), including [matchmaking](docs/public-matchmaking.txt), [friends and player names](docs/player-names-and-friends.md), and [platform session persistence](docs/platform-session-persistence.txt).

@@ -12,6 +12,7 @@ namespace network
     {
         uint32_t bindIp = htonl(INADDR_LOOPBACK), publicIp = htonl(INADDR_LOOPBACK);
         std::string publicHost = "127.0.0.1";
+        uint16_t httpsPort = 0;
         uint16_t qos = 0, relay = 0, bandwidth = 0;
         unsigned bandwidthCount = 1;
         std::map<std::string, std::string> clients;
@@ -29,6 +30,7 @@ namespace network
     {
         bindIp = publicIp = htonl(INADDR_LOOPBACK);
         publicHost = "127.0.0.1";
+        httpsPort = 0;
         qos = relay = bandwidth = 0;
         bandwidthCount = 1;
         clients.clear();
@@ -110,9 +112,13 @@ namespace network
 
     std::string httpOrigin(uint16_t port)
     {
+        if (!loopbackPeer && httpsPort)
+            return "https://" + publicHost + ":" + std::to_string(httpsPort);
         return "http://" + (loopbackPeer ? std::string("127.0.0.1") : publicHost) + ":" +
                std::to_string(port);
     }
+
+    void setHttpsPort(uint16_t port) { httpsPort = port; }
 
     uint16_t qosPort()
     {

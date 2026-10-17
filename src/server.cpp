@@ -29,6 +29,7 @@
 #include "relay_services.h"
 #include "relay_provider.h"
 #include "network.h"
+#include "tls_transport.h"
 #include "public_dashboard.h"
 #include "operator_controls.h"
 #include "../third_party/nlohmann/json.hpp"
@@ -139,10 +140,12 @@ namespace
     bool sendAll(SOCKET socket, const std::string &bytes)
     {
         size_t sent = 0;
+        const auto deadline = std::chrono::steady_clock::now() + bodyDeadline +
+            std::chrono::seconds(static_cast<long long>(bytes.size() / minimumTransferRate));
         while (sent < bytes.size())
         {
             const int n =
-                send(socket, bytes.data() + sent, static_cast<int>(bytes.size() - sent), 0);
+                tls_transport::send(socket, bytes.data() + sent, static_cast<int>(bytes.size() - sent), deadline);
             if (n <= 0)
                 return false;
             sent += static_cast<unsigned>(n);
@@ -353,7 +356,7 @@ namespace
         {
             if (std::chrono::steady_clock::now() - accepted > headerDeadline)
                 return;
-            const int n = recv(socket, buffer.data(), static_cast<int>(buffer.size()), 0);
+            const int n = tls_transport::receive(socket, buffer.data(), static_cast<int>(buffer.size()), accepted + headerDeadline);
             if (n <= 0)
                 return;
             request.append(buffer.data(), static_cast<size_t>(n));
@@ -376,6 +379,21 @@ namespace
         {
             reply(socket, 400, "{\"error\":\"invalid_request\"}");
             return;
+        }
+        if (tls_transport::required() && !network::isLoopbackPeer() && !tls_transport::active())
+        {
+            // Optional public bootstrap for old clients. Only signed public
+            // update plans and hash-addressed game packages; never account routes.
+            const bool publicUpdate = tls_transport::legacyUpdatesAllowed() &&
+                ((method == "POST" && (path == "/updates/v1/check" || path == "/updates/v2/check")) ||
+                 (method == "GET" && (path.starts_with("/updates/v1/patch/") ||
+                                      path.starts_with("/updates/v2/image/") ||
+                                      path.starts_with("/updates/v2/asset/"))));
+            if (!publicUpdate)
+            {
+                reply(socket, 403, "{\"error\":\"https_required\"}");
+                return;
+            }
         }
         const auto bodyLimit = (method == "PUT" && path.starts_with("/content-streaming/upload/"))
                                    ? services::maximumStreamingBody
@@ -473,11 +491,10 @@ namespace
             if (std::chrono::steady_clock::now() > bodyEnd)
                 return;
             const unsigned remaining = length - static_cast<unsigned>(request.size() - bodyAt);
-            const int n = recv(socket,
+            const int n = tls_transport::receive(socket,
                                buffer.data(),
                                static_cast<int>(std::min<unsigned>(
-                                   remaining, static_cast<unsigned>(buffer.size()))),
-                               0);
+                                   remaining, static_cast<unsigned>(buffer.size()))), bodyEnd);
             if (n <= 0)
                 return;
             request.append(buffer.data(), static_cast<size_t>(n));
@@ -871,6 +888,12 @@ namespace
 
     void nativeAuth(SOCKET socket)
     {
+        if (tls_transport::enabled())
+        {
+            tls_transport::Connection secure(socket);
+            http(socket);
+            return;
+        }
         std::array<unsigned char, 5> prefix{};
         if (!receiveExact(socket, prefix.data(), static_cast<unsigned>(prefix.size())))
             return;
@@ -1109,6 +1132,9 @@ int main(int argc, char **argv)
     try
     {
         network::initialize(directory);
+        tls_transport::initialize(directory, portOffset);
+        if (tls_transport::enabled())
+            network::setHttpsPort(tls_transport::port());
         platform::initialize(directory);
         if (argc == 5 && std::string(argv[2]) == "--provision-profile")
         {

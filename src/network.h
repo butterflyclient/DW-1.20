@@ -25,6 +25,7 @@ namespace network
     uint32_t advertisedAddress();
     std::array<uint8_t, 4> advertisedBytes();
     std::string httpOrigin(uint16_t port);
+    void setHttpsPort(uint16_t port);
     uint16_t qosPort();
     uint16_t relayPort();
     uint16_t bandwidthPort();
