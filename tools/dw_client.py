@@ -393,18 +393,23 @@ def prepare(pending_map_record=None):
                 compiled_sha256=hashlib.sha256(content).hexdigest(),
             )
         )
-    # The native overlay verifier follows the authored overlay's current rows.
-    # Freeze it with the job and guard its owner just like the integration code.
-    for validator_name in ("verify_debug_states.py", "verify_spatial.py"):
+    # Freeze current validators with the job, including remote TLS expectations.
+    # The compiler template may contain older endpoint or overlay rules.
+    validators = {
+        "verify_debug_states.py": "verify_debug_states.py",
+        "verify_spatial.py": "verify_spatial.py",
+        "verify-dw-endpoints.py": "verify_dw_endpoints.py",
+    }
+    for validator_name, frozen_name in validators.items():
         validator = ROOT / "tools" / validator_name
-        validation_target = source / "tools" / validator_name
+        validation_target = source / "tools" / frozen_name
         validator_hash = digest(validator)
         shutil.copyfile(validator, validation_target)
         if digest(validator) != validator_hash or digest(validation_target) != validator_hash:
             raise ValueError("Validator changed while freezing: " + validator_name)
         source_inputs.append(
             dict(source="tools/" + validator_name, source_sha256=validator_hash,
-                 compiled_source="tools/" + validator_name,
+                 compiled_source="tools/" + frozen_name,
                  compiled_sha256=digest(validation_target))
         )
     # Keep the supplied name corpus tied to the generated compiled pool.

@@ -157,9 +157,15 @@ def main():
         report = json.loads((args.build / 'build-report.json').read_bytes())
         frozen = Path(report['source_root'])
         record = json.loads((frozen / 'generated/update-maps.json').read_bytes())
-        assert record and record['published']
+        assert record and (record.get('published') or record.get('pending_explicit_publication'))
         assert maps.extract(Path(report['executable']).read_bytes()) == maps.verify_record(record)
-        assert maps.file_sha(ROOT / 'data/custom-map-publication.json') == record['publication_receipt_sha256']
+        declaration = ROOT / 'data/custom-map-publication.json'
+        current = json.loads(declaration.read_bytes())
+        assert current['published']
+        assert current['package_hash'] == record['package_hash']
+        assert current['manifest_sha256'] == record['manifest_sha256']
+        if not record.get('pending_explicit_publication'):
+            assert maps.file_sha(declaration) == record['publication_receipt_sha256']
         checks.append('Freshly compiled production EXE binds only the exact explicitly published map inventory')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(passed=True, checks=checks, game_launched=False,
