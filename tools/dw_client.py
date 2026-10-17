@@ -297,10 +297,12 @@ def prepare():
     tool_inputs = [
         dict(source="tools/" + name, source_sha256=digest(ROOT / "tools" / name))
         for name in (
+            "dw_client.py", "dw_catalog.py",
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "test-playlist-ui.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
             "prepare-bot-think-integration.py", "generate-bot-names.py",
+            "prepare-br-bot-loot-integration.py", "prepare-host-bot-equipment.py",
             "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
             "test-map-voting-client.py", "map_vote_harness.cpp",
             "test-ui-focus-lifetime.py",

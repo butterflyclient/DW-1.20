@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "job": "data\\dw-client\\jobs\\1792197118736660800",
+  "previous_job": "data\\dw-client\\jobs\\1792131363983337100",
+  "current_authored_sources_guarded": true,
+  "retained_latest_production_sources": [
+    "integration/replay/DW_MapAvailability.cpp",
+    "integration/replay/DW_BotStyleZone.cpp",
+    "integration/replay/DW_ExecutableUpdate.cpp",
+    "integration/replay/DW_LocalBackend_Frame.cpp"
+  ],
+  "changed_authored_inputs": [
+    "integration/replay/DW_PlaylistUI.lua",
+    "integration/replay/DW_BotStyleWeapon.cpp",
+    "integration/replay/DW_MapVoting.h"
+  ],
+  "new_preparer_dependencies_guarded": [
+    "tools/dw_client.py",
+    "tools/dw_catalog.py",
+    "tools/prepare-br-bot-loot-integration.py",
+    "tools/prepare-host-bot-equipment.py"
+  ],
+  "lua_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
+  "native_map_tile": [
+    96,
+    849,
+    526,
+    979
+  ],
+  "ballot_rectangle": [
+    96,
+    849,
+    768,
+    979
+  ],
+  "native_roster_layout_changed": false,
+  "voting_tooltips": false,
+  "home_play_menu_ballot": false,
+  "server_modified": false,
+  "maps_modified": false,
+  "game_run_performed": false
+}

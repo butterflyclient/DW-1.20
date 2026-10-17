@@ -192,6 +192,14 @@ extern "C" __declspec(dllexport) int Test_Run()
     return 0;
 }
 extern "C" __declspec(dllexport) const char *Test_Document() { return packed; }
+extern "C" __declspec(dllexport) const char *Test_UIChoice(unsigned selected)
+{
+    static char state[1024]{};
+    Bind(*reinterpret_cast<uint64_t *>(replay_rva_0c27e4b0 + 79656));
+    dwMapVoting::cycle->current.integer = 7;
+    *reinterpret_cast<unsigned *>(party + 311148) = selected;
+    return dwMapVoting::UIState(state, sizeof(state)) > 0 ? state : nullptr;
+}
 extern "C" __declspec(dllexport) int Test_LargeSnapshot()
 {
     static char large[10000]{};

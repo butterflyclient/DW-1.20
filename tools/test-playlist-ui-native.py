@@ -40,7 +40,7 @@ def main():
             machine.mem_map(base + section.VirtualAddress, size)
             machine.mem_write(base + section.VirtualAddress, section.get_data())
     arena = 0x100000000
-    machine.mem_map(arena, 0x20000)
+    machine.mem_map(arena, 0x80000)
     stack, stop = arena + 0x10000 - 8, arena + 0x1F000
     source = args.lua_source.read_bytes().replace(b'\r\n', b'\n')
     state = dict(enabled=True, main=True, now=1000, locked=False, top=7,
@@ -107,7 +107,7 @@ def main():
             output, capacity, format_address, first = [vm.reg_read(reg) for reg in
                 (x.UC_X86_REG_RCX, x.UC_X86_REG_RDX, x.UC_X86_REG_R8, x.UC_X86_REG_R9)]
             format = string(format_address)
-            assert format in ('{active=false}', '{active=true,complete=%s,remaining=%d,choices={',
+            assert format in ('{active=false}', '{active=true,complete=%s,remaining=%d,round=%d,selected=%d,choices={',
                               "%s{name='%s',votes=%d,winner=%s}", '}}',
                               'MenuBuilder.m_types.replaydwplaylistfillstate().RefreshMapVote(%s); return 1')
             rsp = vm.reg_read(x.UC_X86_REG_RSP)
@@ -268,8 +268,16 @@ def main():
     write(mm + 80096, 0, '<Q')
     frame('active map state reaches Lua through actual linked serializer')
     assert b'active=true,complete=false,remaining=11' in state['ballots'][-1]
+    assert b'round=0,selected=0' in state['ballots'][-1]
     assert b"name='Backlot',votes=3,winner=false" in state['ballots'][-1]
     assert b"name='Crash\\'s\\\\map',votes=5,winner=false" in state['ballots'][-1]
+    write(arena + 0x18000 + 311148, 2)
+    frame('actual native local choice acknowledges the selected card')
+    assert b'round=0,selected=2' in state['ballots'][-1]
+    write(arena + 0x18000 + 311148, 3)
+    frame('out-of-ballot native choice cannot mark a card selected')
+    assert b'round=0,selected=0' in state['ballots'][-1]
+    write(arena + 0x18000 + 311148, 1)
     write(complete + 40, 1)
     frame('frozen winner reaches Lua with localized and escaped map names')
     assert b'complete=true' in state['ballots'][-1] and b'votes=5,winner=true' in state['ballots'][-1]

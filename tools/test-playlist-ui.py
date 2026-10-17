@@ -14,6 +14,25 @@ from lupa.lua51 import LuaRuntime
 ORIGINAL = Path(r"E:\replay-compiler\evidence\workstation-luafile-decompiled-all\ui")
 
 
+def check_map_vote_native_apis(lua):
+    # Stock builders retain their broad model/animation mocks below. Keep this
+    # custom panel's much smaller API surface explicit so a misspelled or
+    # unavailable Set*/set* call cannot silently succeed in that fallback.
+    panel = lua[:lua.index("local function readPreference()")]
+    supported = {
+        "AcceptsFocusType", "SetAlpha", "SetAnchorsAndPosition", "SetFocusable",
+        "SetFont", "SetAlignment", "SetHandleMouse", "SetRGBFromInt",
+        "addElement", "addEventHandler", "getFirstChild", "getNextSibling",
+        "isInFocus", "processEvent", "setImage", "setText", "gsub",
+    }
+    used = set(re.findall(r":([A-Za-z_][A-Za-z_0-9]*)\s*\(", panel))
+    assert used <= supported, "Unverified map-vote API: " + repr(sorted(used - supported))
+    constructors = set(re.findall(r"LUI\.([A-Za-z_][A-Za-z_0-9]*)\.new\s*\(", panel))
+    assert constructors <= {"UIElement", "UIButton", "UIText", "UIImage"}
+    assert not re.search(r"AddTooltipData|tooltipDescription|SetButtonDescription", panel), "Voting UI must not register tooltips"
+    return sorted(used)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
@@ -75,8 +94,29 @@ def main():
         end
         function nodeMethods:SetAnchorsAndPosition(a,b,c,d,left,right,top,bottom)
             self.rect = {left=left, right=right, top=top, bottom=bottom}
+            self.anchors = {a,b,c,d}
         end
         function nodeMethods:GetCurrentAnchorsAndPositions() return self.rect end
+        function nodeMethods:SetLeft(value) self.rect.left=value end
+        function nodeMethods:SetRight(value) self.rect.right=value end
+        function nodeMethods:SetTop(value)
+            self.rect.top=value;self.layoutWrites=(self.layoutWrites or 0)+1
+        end
+        function nodeMethods:SetBottom(value)
+            self.rect.bottom=value;self.layoutWrites=(self.layoutWrites or 0)+1
+        end
+        function nodeMethods:GetMaxVisibleRows() return assert(self.maxVisibleRows) end
+        function nodeMethods:SetMaxVisibleRows(value)
+            assert(type(value)=="number" and value>=1)
+            self.maxVisibleRows=value
+            self.rowWrites=(self.rowWrites or 0)+1
+        end
+        function nodeMethods:AddArrow(value)
+            self.arrows=self.arrows or {};self.arrows[#self.arrows+1]=value
+        end
+        function nodeMethods:AddItemNumbers(value) self.itemNumbers=value end
+        function nodeMethods:SetGridDataSource(value) self.gridDataSource=value end
+        function nodeMethods:RefreshContent() self.refreshes=(self.refreshes or 0)+1 end
         function nodeMethods:setText(value) self.text = value end
         function nodeMethods:getText() return self.text end
         function nodeMethods:registerEventHandler(name, callback) self.events[name] = callback end
@@ -104,13 +144,31 @@ def main():
         end
         function nodeMethods:SetHandleMouse(value) self.mouse = value end
         function nodeMethods:SetAlpha(value) self.alpha = value end
+        function nodeMethods:SetFont(value)
+            assert(value == "main" or value == "bold" or value == "body", "Unverified Replay font")
+            self.font = value
+        end
+        function nodeMethods:SetAlignment(value)
+            assert(value ~= nil, "Missing native alignment constant")
+            self.alignment = value
+        end
+        function nodeMethods:SetRGBFromInt(value) self.color = value end
+        function nodeMethods:SetRGBFromTable(value) self.colorTable = value end
+        function nodeMethods:setImage(value)
+            assert(type(value)=="string" and #value>0, "Missing material")
+            self.image = value
+        end
+        function nodeMethods:SetButtonDisabled(value) self.buttonDisabled = value end
+        function nodeMethods:SetDataSource(source) self.dataSource = source end
         function nodeMethods:isInFocus() return self.focused == true end
         function nodeMethods:processEvent(event)
             if event.name == "gain_focus" then self.focused = true end
             if event.name == "lose_focus" then self.focused = false end
             if self.events[event.name] then return self.events[event.name](self,event) end
         end
-        function nodeMethods:AddTooltipData(controller, value) self.tooltip = value end
+        function nodeMethods:AddTooltipData(controller, value)
+            self.tooltip=value;self.tooltipRegistrations=(self.tooltipRegistrations or 0)+1
+        end
         function nodeMethods:getLocalRect() return 0,0,430,25 end
         function nodeMethods:getElementTextDims() return #self.text * 10,20 end
         local noOperation = function() end
@@ -133,8 +191,10 @@ def main():
                 "UIHorizontalStackedLayout","UIBorder"}) do
             LUI[kind] = {new=MakeNode,build=MakeNode}
         end
-        LUI.Alignment = {Left=0,Top=0}
+        LUI.Alignment = {Left=0,Top=0,Center=1,Right=2}
         LUI.DIRECTION = {horizontal=0,vertical=1}
+        LUI.BEARING = {up=0,down=1}
+        LUI.DataSourceFromList = {new=function() return {} end}
         LUI.DataSourceInGlobalModel = {new=function() return {GetModel=noOperation,GetValue=function() return 2 end} end}
         LUI.EASING = {outQuadratic=0}
         Engine = {
@@ -145,7 +205,10 @@ def main():
         }
         NativeTranslations = {}
         Preference = false
+        TournamentAllowed = true
+        CustomMaps = " "
         MapSelections = {}
+        MapVoteRawMaps = {"mp_backlot","mp_crash","mp_nuketown"}
         IntroPreferences = {}
         OnboardingNativeReads = 0
         OnboardingNativeWrites = 0
@@ -165,20 +228,30 @@ def main():
                 if string.find(name,"replay_dw_mapVoteSelect",1,true)==1 then
                     MapSelections[#MapSelections+1]=name;return
                 end
+                if name=="NLPONNQNRS" then TournamentAllowed=value;return end
                 assert(name=="replay_dw_autoFillBots")
                 Preference=value
             end,
-            CFHDGABACF=function(name) return name=="MTTRPNMPRP" and 24 or 1 end
+            CFHDGABACF=function(name) return name=="MTTRPNMPRP" and 24 or 1 end,
+            DHEEJCCJBH=function(name)
+                if name=="replay_dw_customMaps" then return CustomMaps end
+                for index,key in ipairs({"NSMOLKMMPM","MSQROKTRSN","ROLQKTOMM"}) do
+                    if name==key then return MapVoteRawMaps[index] end
+                end
+                error("Unexpected native string dvar: "..tostring(name))
+            end
         }
         CONDITIONS = setmetatable({}, {__index=function() return function() return false end end})
         Lobby = {GFFECBCCF=function() return false end,BGIADHIHAG=function() return false end}
         DataSources = {frontEnd={lobby={inSplitScreen={GetModel=noOperation},memberCount={GetModel=noOperation}}}}
-        DataSources.frontEnd.lobby.memberMaxCount={GetValue=function() return 12 end}
+        DataSources.frontEnd.lobby.memberMaxCount={GetModel=noOperation,GetValue=function() return 12 end}
         DataSources.frontEnd.lobby.mapName={GetModel=noOperation}
         ACTIONS = {AnimateSequence=function(widget, sequence) widget.lastSequence=sequence end}
         TWEEN_PROPERTY = setmetatable({}, {__index=function(_, key) return key end})
-        SWATCHES = {genericButton={textDefault={},textFocus={},background={},glow={}}}
-        FONTS = {MainRegular={File="main"},BodyRegular={File="body"},GetFont=function(value) return value end}
+        SWATCHES = {genericButton={textDefault={},textFocus={},background={},glow={},description={}},
+            text={primaryText={}}}
+        FONTS = {MainRegular={File="main"},MainBold={File="bold"},BodyRegular={File="body"},
+            GetFont=function(value) return value end}
         RegisterMaterial=function(value) return value end
         ToUpperCase=string.upper
         SOUND_SETS={mpMainMenu={move="move",moveUp="up",moveDown="down"}}
@@ -191,7 +264,21 @@ def main():
         CoD={SFX={LobbyTextCoalition=0,LobbyTextAllegiance=1,MouseClick=2}}
         FocusType={MouseOver=0}
         LAYOUT={GetElementWidth=function() return 100 end,GetTextWidth=function() return 100 end}
-        MP={GetFactionReference=tostring,GetTeamLogo=function() return "logo" end,GetTeamName=tostring}
+        MP={GetFactionReference=tostring,GetTeamLogo=function() return "logo" end,GetTeamName=tostring,
+            LOBBY_PLAYER_COUNT={medium=12}}
+        CSV={mpMapTable={file="maps-fixture.csv",cols={ref=0,name=1,loadingImage=2}}}
+        MapLookupFixtures={
+            mp_backlot={"Backlot","native_backlot_material_fixture"},
+            mp_crash={"Crash","native_crash_material_fixture"}
+        }
+        MapLookupCalls={}
+        StringTable={DIFCHIGDFB=function(file,column,ref,resultColumn)
+            assert(file==CSV.mpMapTable.file and column==CSV.mpMapTable.cols.ref)
+            assert(type(ref)=="string" and (resultColumn==1 or resultColumn==2))
+            MapLookupCalls[#MapLookupCalls+1]={ref=ref,column=resultColumn}
+            local row=MapLookupFixtures[ref]
+            return row and row[resultColumn] or ""
+        end}
         Engine.DHFCHIIJCA=noOperation;Engine.BJDBIAGIDA=noOperation;Engine.CBEAHDFCFC=tostring
         Lobby.GetLocalClientTeam=function() return Teams.allies end
         Lobby.UpdateClientCharacters=function() return {} end
@@ -201,10 +288,29 @@ def main():
         Lobby.EBDDFIIHID=function() return true end
         Lobby.BGIBDIBHH=function() return NativePartyState,{timeRemaining=30000} end
         Lobby.AllMembersPath="members";Lobby.SquadMembersPath="squad"
+        Lobby.GetLobbyMemberDataSourceAtIndex=function() return noOperation end
         Lobby.IsCurrentGameTypeteamBased=function() return true end
         NativePartyState=1
     ''')
     inputs = {}
+    for relative, tokens in (
+        ("frontend/mp/mapvotebutton.lua.529.lua",
+         (":setImage(RegisterMaterial(", ":SetFont(FONTS.GetFont(", ":SetAlignment(LUI.Alignment.Left)")),
+        ("frontend/mp/mapvotebuttonbackground.lua.530.lua",
+         (":SetRGBFromInt(", 'RegisterMaterial("widg_gradient_top_to_bottom")')),
+        ("uieditor/fonts.lua.2103.lua", ("FONTS.MainRegular", "FONTS.BodyRegular")),
+        ("ingame/codcasterlayer.lua.976.lua", (":SetMaxVisibleRows(",)),
+        ("luigrid.lua.2049.lua", (":GetMaxVisibleRows()",)),
+    ):
+        native = ORIGINAL / relative
+        native_text = native.read_text(encoding="utf-8-sig")
+        assert all(token in native_text for token in tokens), "Native widget API evidence changed: " + relative
+        inputs[str(native)] = hashlib.sha256(native.read_bytes()).hexdigest()
+    map_utils = ORIGINAL / "utils/mp/mputils.lua.2204.lua"
+    raw_map_utils = map_utils.read_text(encoding="utf-8-sig")
+    vm.execute(raw_map_utils[raw_map_utils.index("function MP.GetMapName("):
+                             raw_map_utils.index("function MP.GetGameTypeImage(")])
+    inputs[str(map_utils)] = hashlib.sha256(map_utils.read_bytes()).hexdigest()
     element_source = ORIGINAL / "luielement.lua.2044.lua"
     raw_element = element_source.read_text(encoding="utf-8-sig")
     vm.execute(raw_element[raw_element.index("function LUI.UIElement.RemoveFromParent("):
@@ -269,6 +375,16 @@ def main():
             widget.PlayButtonWrapper={PlayButton=button};return widget
         end)
         MenuBuilder.registerType("VerticalMinimalScrollbar", MakeNode)
+        MenuBuilder.registerType("NavigationArrow", function()
+            local widget=MakeNode();widget.Arrow=MakeNode();return widget
+        end)
+        local gridCreate=LUI.UIDataSourceGrid.new
+        LUI.UIDataSourceGrid.new=function(options)
+            local grid=gridCreate()
+            grid.maxVisibleRows=options.maxVisibleRows
+            grid.gridOptions=options
+            return grid
+        end
     ''')
     original("widgets/genericcheckbox.lua.2373.lua", "GenericCheckBoxModule")
     original("frontend/genericcheckboxbuttonwithlabel.lua.288.lua", "CheckBoxLabelModule")
@@ -277,9 +393,6 @@ def main():
     original("frontend/playlistlist.lua.742.lua", "PlaylistListModule")
     original("utils/onboarding.lua.2213.lua", "OnboardingModule")
     vm.execute('''
-        MenuBuilder.registerType("LobbyMemberGrid",function()
-            local grid=MakeNode();grid.PlayerCount=MakeNode();return grid
-        end)
         MenuBuilder.registerType("LobbyMap",MakeNode)
         MenuBuilder.registerType("ChallengesSummary",MakeNode)
         MenuBuilder.registerType("LobbyTeamDetails",function()
@@ -291,6 +404,7 @@ def main():
             return detail
         end)
     ''')
+    original("frontend/lobbymembergrid.lua.336.lua", "NativeLobbyMemberGrid")
     original("frontend/mp/matchmakinglobby.lua.538.lua", "NativeMatchmakingLobby")
     original("frontend/mp/lobbysmallteammatchmade.lua.514.lua", "NativeSmallTeamLobby")
     flow_path = ORIGINAL / "frontend/mp/lobbyflowwidget.lua.503.lua"
@@ -381,26 +495,166 @@ def main():
         serialized = dict(frozen_lua_sha256=hashlib.sha256(data).hexdigest(),
                           generated_header_sha256=hashlib.sha256(embedded).hexdigest(),
                           exact_embedded_lua=True)
+    map_vote_apis = check_map_vote_native_apis(source.read_text())
+    fonts = vm.globals().FONTS
+    title_font = fonts.MainBold
+    fonts.MainBold = None
+    assert vm.execute(source.read_text()) == 0
+    assert not vm.eval('MenuBuilder.IsTypeRegistered("ReplayDWPlaylistFillState")')
+    fonts.MainBold = title_font
     assert vm.execute(source.read_text()) == 1
     checks = vm.execute(r'''
         local options={controllerIndex=0}
+        assert(TournamentAllowed==true)
+        local brProbe=MenuBuilder.BuildRegisteredType("BRPlayMenu",options)
+        assert(TournamentAllowed==true)
         local mpMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        assert(TournamentAllowed==false)
         local brMenu=MenuBuilder.BuildRegisteredType("BRPlayMenu",options)
         local mp,br=mpMenu.MPPlayMenuButtons,brMenu.BRPlayMenuButtons
         local grid=MenuBuilder.BuildRegisteredType("PlaylistMenu",options)
         local brGrid=MenuBuilder.BuildRegisteredType("BRPlaylistMenu",options)
         local results={}
         local ballot=MenuBuilder.m_types.replaydwplaylistfillstate()
-        local panel=mpMenu.ReplayDWMapVote
+        assert(not mpMenu.ReplayDWMapVote and not brMenu.ReplayDWMapVote)
+        local nativeRoster=MenuBuilder.BuildRegisteredType("LobbyMemberGrid",{controllerIndex=0,modelPath="members"})
+        local rosterFields={"PlayerList","PlayerCount","Line","VerticalMinimalScrollbar","ArrowUp","ArrowDown","ListCount"}
+        local function assertRosterUntouched(roster)
+            assert(roster.PlayerList:GetMaxVisibleRows()==11 and not roster.PlayerList.rowWrites)
+            for _,field in ipairs(rosterFields) do
+                local original,current=nativeRoster[field],roster[field]
+                for _,edge in ipairs({"left","right","top","bottom"}) do
+                    assert(original.rect[edge]==current.rect[edge], "Vote UI moved native roster "..field.." "..edge)
+                end
+                assert(original.layoutWrites==current.layoutWrites, "Vote UI resized native roster "..field)
+            end
+        end
+        local ballotMenu=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
+        local panel=ballotMenu.ReplayDWMapVote
         assert(panel and panel.alpha==0)
+        assertRosterUntouched(ballotMenu.lobbyMemberGrid)
         for _,button in ipairs(panel.Choices) do assert(not button:AcceptsFocusType(0)) end
-        ballot.RefreshMapVote({active=true,complete=false,remaining=12,choices={
+        local function localRect(node,width,height)
+            local r,a=node.rect,assert(node.anchors)
+            return {left=a[1]*width+r.left,right=(1-a[2])*width+r.right,
+                    top=a[3]*height+r.top,bottom=(1-a[4])*height+r.bottom}
+        end
+        local function inside(node,width,height)
+            local r=localRect(node,width,height)
+            assert(r.left>=0 and r.right<=width and r.top>=0 and r.bottom<=height)
+            assert(r.right>r.left and r.bottom>r.top)
+            return r
+        end
+        assert(panel.rect.left==96 and panel.rect.right==768 and panel.rect.top==849 and panel.rect.bottom==979)
+        for _,field in ipairs(rosterFields) do
+            assert(panel.rect.top>=nativeRoster[field].rect.bottom, "Map ballot overlaps native roster "..field)
+        end
+        assert(panel.rect.left<=96 and panel.rect.right>=526 and panel.rect.top<=849 and panel.rect.bottom>=979,
+            "Map ballot must fully cover the native map tile")
+        assert(panel.Background.alpha==1 and panel.Background.image=="white", "Map tile cover must be opaque")
+        assert(panel.Title.font=="bold" and panel.Title.alignment==LUI.Alignment.Left)
+        assert(panel.Countdown.font and panel.Countdown.alignment~=nil)
+        assert(not panel.Status, "Compact voting panel must have no footer")
+        inside(panel.Title,672,130);inside(panel.Countdown,672,130)
+        assert(panel.Title.rect.top==8 and panel.Title.rect.bottom==24)
+        local function assertNoTooltips(node)
+            assert(not node.tooltip and not node.tooltipDescription and not node.buttonDescription
+                and not node.tooltipRegistrations, "Voting subtree registered a tooltip")
+            for _,child in ipairs(node.children) do assertNoTooltips(child) end
+        end
+        assertNoTooltips(panel)
+        local previous
+        for _,card in ipairs(panel.Choices) do
+            local r=inside(card,672,130)
+            assert(r.top==35 and r.bottom==121 and r.right-r.left==208)
+            if previous then assert(previous.right<r.left and previous.top==r.top) end
+            previous=r
+            for _,text in ipairs({card.Label,card.Votes,card.Selection}) do
+                assert(text.font and text.alignment~=nil, "Ballot text lacks an explicit native font/alignment")
+                inside(text,208,86)
+            end
+            assert(card.Label.font=="bold" and card.Votes.font=="main")
+            assert(card.Image and card.Scrim and card.Background and card.Accent and #card.Border==4)
+            local image=inside(card.Image,208,86)
+            assert(image.left==1 and image.right==207 and image.top==1 and image.bottom==85)
+            assert(card.Label.rect.top==48 and card.Label.rect.bottom==64)
+            assert(card.Votes.rect.top==66 and card.Votes.rect.bottom==82)
+            assert(card.Selection.rect.top==27 and card.Selection.rect.bottom==41)
+            assert(card.Background.image=="white" and card.Accent.image=="white")
+            for _,border in ipairs(card.Border) do assert(border.image=="white") end
+        end
+        local choices={{name="Backlot",votes=1},{name="Crash",votes=2},{name="Office",votes=0}}
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=0,remaining=12,choices=choices})
+        assert(panel.alpha==1 and string.upper(panel.Choices[1].Label.text)=="BACKLOT")
+        for _,kind in ipairs({"MPPlayMenu","BRPlayMenu"}) do
+            local home=MenuBuilder.BuildRegisteredType(kind,options)
+            assert(not home.ReplayDWMapVote, "Cached active ballot leaked onto rebuilt home Play menu")
+        end
+        assert(panel.Choices[1].Image.image=="native_backlot_material_fixture")
+        assert(panel.Choices[2].Image.image=="native_crash_material_fixture")
+        assert(panel.Choices[3].Image.image=="loading_mp_generic_bg")
+        assert(panel.Choices[1].Votes.text=="1 VOTE" and panel.Choices[2].Votes.text=="2 VOTES")
+        assert(panel.Choices[3].Votes.text=="0 VOTES")
+        assert(panel.Title.text=="VOTE FOR THE NEXT MAP" and panel.Countdown.text=="12s")
+        assertRosterUntouched(ballotMenu.lobbyMemberGrid)
+        assert(panel.Choices[1].navigation.right==panel.Choices[2])
+        assert(panel.Choices[2].navigation.left==panel.Choices[1])
+        assert(panel.Choices[2].navigation.right==panel.Choices[3])
+        assert(panel.Choices[3].navigation.left==panel.Choices[2])
+        assert(panel.Choices[1].navigation.left==panel.Anchor and panel.Choices[3].navigation.right==panel.Anchor)
+        local function style(card)
+            local values={tostring(card.Background.color),tostring(card.Background.alpha),
+                tostring(card.Accent.color),tostring(card.Accent.alpha)}
+            for _,border in ipairs(card.Border) do
+                values[#values+1]=tostring(border.color);values[#values+1]=tostring(border.alpha)
+            end
+            return table.concat(values,",")
+        end
+        local card=panel.Choices[2]
+        local normal=style(card)
+        card:processEvent({name="button_over",controller=0})
+        assert(style(card)~=normal, "Mouse hover has no visible styling")
+        card:processEvent({name="button_up",controller=0})
+        assert(style(card)==normal)
+        card:processEvent({name="gain_focus",controller=0})
+        assert(style(card)~=normal, "Controller focus has no visible styling")
+        card:processEvent({name="lose_focus",controller=0})
+        assert(style(card)==normal)
+        results[#results+1]="Three bounded horizontal image cards cover the native map tile with an opaque background, explicit Replay fonts/alignment, native image lookup/fallback, countdown and visible focus styles; no footer or tooltips are registered"
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=0,remaining=12,choices={
             {name="Backlot",votes=1},{name="Crash",votes=2},{name="Office",votes=0}}})
-        assert(panel.alpha==1 and panel.Choices[1].Label.text=="Backlot   (1 votes)")
         assert(panel.Choices[3].navigation.down==panel.Choices[1])
         assert(panel.Choices[1].navigation.up==panel.Choices[3])
         panel.Choices[3].events.button_action()
         assert(MapSelections[1]=="replay_dw_mapVoteSelectC")
+        assert(panel.Choices[3].Selection.text=="VOTING...")
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=0,remaining=11,choices=choices})
+        assert(panel.Choices[3].Selection.text=="VOTING...", "Polling erased an unacknowledged vote")
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=3,remaining=10,choices=choices})
+        assert(panel.Choices[3].Selection.text=="YOUR VOTE")
+        panel.Choices[1].events.button_action()
+        assert(MapSelections[2]=="replay_dw_mapVoteSelectA" and panel.Choices[1].Selection.text=="VOTING...")
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=3,remaining=9,choices=choices})
+        assert(panel.Choices[1].Selection.text=="VOTING...")
+        ballot.RefreshMapVote({active=true,complete=false,round=10,selected=1,remaining=8,choices=choices})
+        assert(panel.Choices[1].Selection.text=="YOUR VOTE")
+        panel.Choices[2].events.button_action()
+        assert(MapSelections[3]=="replay_dw_mapVoteSelectB" and panel.Choices[2].Selection.text=="VOTING...")
+        ballot.RefreshMapVote({active=true,complete=false,round=11,selected=0,remaining=20,choices=choices})
+        for _,button in ipairs(panel.Choices) do
+            assert(button.Selection.text~="VOTING..." and button.Selection.text~="YOUR VOTE")
+        end
+        panel.Choices[3].events.button_action()
+        ballot.RefreshMapVote({active=false})
+        ballot.RefreshMapVote({active=true,complete=false,round=11,selected=0,remaining=19,choices=choices})
+        for _,button in ipairs(panel.Choices) do assert(button.Selection.text~="VOTING...") end
+        panel.Choices[1].events.button_action()
+        MapVoteRawMaps[1]="mp_vacant"
+        ballot.RefreshMapVote({active=true,complete=false,round=11,selected=0,remaining=18,choices={
+            {name="Vacant",votes=0},{name="Crash",votes=0},{name="Office",votes=0}}})
+        for _,button in ipairs(panel.Choices) do assert(button.Selection.text~="VOTING...") end
+        MapVoteRawMaps[1]="mp_backlot"
+        results[#results+1]="A/B/C native vote actions show pending submission until native selected acknowledges, permit changed votes, and clear stale selection across rounds and inactive ballots"
         panel.Choices[3]:processEvent({name="gain_focus"})
         ballot.RefreshMapVote({active=true,complete=false,choices={{name="Backlot",votes=1}}})
         assert(not panel.Choices[3]:AcceptsFocusType(0) and not panel.Choices[3]:isInFocus())
@@ -408,8 +662,12 @@ def main():
         panel.Choices[1]:processEvent({name="gain_focus"})
         ballot.RefreshMapVote({active=true,complete=true,choices={{name="Backlot",votes=1,winner=true}}})
         assert(not panel.Choices[1]:isInFocus() and not panel.Choices[1]:AcceptsFocusType(0))
-        panel.Choices[1].events.button_action(); assert(#MapSelections==1)
+        assert(panel.alpha==0, "Completed ballot still covers native map tile")
+        assertRosterUntouched(ballotMenu.lobbyMemberGrid)
+        local submitted=#MapSelections
+        panel.Choices[1].events.button_action(); assert(#MapSelections==submitted)
         ballot.RefreshMapVote({active=false})
+        assert(panel.alpha==0)
         for _,button in ipairs(panel.Choices) do assert(not button:AcceptsFocusType(0) and not button.mouse) end
         results[#results+1]="Native map-choice actions select A/B/C; reduced, completed and inactive ballots retire controller focus through original UIButton focusability methods"
         local flow=MakeNode()
@@ -423,8 +681,23 @@ def main():
         assert(flow._state==2 and flow.matchMakingLobby.id=="MatchmakingLobby")
         local waiting=flow.matchMakingLobby
         assert(waiting.ReplayDWMapVote and waiting.ReplayDWMapVote.Anchor==waiting.lobbyMemberGrid)
+        local roster=waiting.lobbyMemberGrid
+        assertRosterUntouched(roster)
+        local rosterData=roster.PlayerList.gridDataSource
         ballot.RefreshMapVote({active=true,complete=false,remaining=20,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
         assert(waiting.ReplayDWMapVote.alpha==1 and waiting.lobbyMemberGrid.navigation.right==waiting.ReplayDWMapVote.Choices[1])
+        assertRosterUntouched(roster)
+        ballot.RefreshMapVote({active=true,complete=false,remaining=19,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
+        assert(roster.PlayerList.gridDataSource==rosterData)
+        assertRosterUntouched(roster)
+        ballot.RefreshMapVote({active=true,complete=true,remaining=0,choices={{name="Backlot",votes=1,winner=true},{name="Crash",votes=0}}})
+        assert(waiting.ReplayDWMapVote.alpha==0)
+        assertRosterUntouched(roster)
+        ballot.RefreshMapVote({active=false})
+        assert(waiting.ReplayDWMapVote.alpha==0)
+        assertRosterUntouched(roster)
+        ballot.RefreshMapVote({active=true,complete=false,remaining=20,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
+        assertRosterUntouched(roster)
         flow:UpdateLobbyStatus(0)
         assert(flow._state==2 and flow.matchMakingLobby==waiting)
         NativePartyState=Lobby.PartyState.STARTING
@@ -435,9 +708,12 @@ def main():
         matched:processEvent({name="update_lobby",controller=0})
         ballot.RefreshMapVote({active=true,complete=false,remaining=19,choices={{name="Backlot",votes=1},{name="Crash",votes=0}}})
         assert(matched.ReplayDWMapVote.Anchor==matched.lobbyMemberGrid)
+        assertRosterUntouched(matched.lobbyMemberGrid)
         assert(matched.lobbyMemberGrid.navigation.right==matched.ReplayDWMapVote.Choices[1])
         assert(matched.ReplayDWMapVote.Choices[1].navigation.left==matched.lobbyMemberGrid)
         results[#results+1]="Original LobbyFlowWidget shows votes in MatchmakingLobby before STARTING, keeps the native transition, and binds the timer-created small-team roster controller route"
+        results[#results+1]="Original LobbyMemberGrid retains all eleven visible rows, every native position and its data source with zero extra row/layout writes across active, refreshed, completed and inactive ballots"
+        results[#results+1]="Home MP/BR Play menus never build map ballots even with cached active voting, preventing the exit-to-home overlay from waiting for a backend poll"
         for _,panel in ipairs({mp,br}) do
             local checkbox=panel.ReplayDWFillLobbyBots
             assert(checkbox and checkbox.parent==panel.parent)
@@ -522,6 +798,46 @@ def main():
             assert(label:getText()=="PLAYLIST/UNRELATED_KEY")
         end
         results[#results+1]="Original MP and BR promoted/featured callbacks repair cached initial names and later model updates without Localize; BRFeatureButton uses its actual GamemodeName callback"
+        results[#results+1]="Building the MP play menu clears online_tournament_enabled (tournament entry hidden); BR builds leave it untouched"
+        assert(Engine.CBBHFCGDIC("PLAYLIST/NUKETOWN_TDM")=="Nuketown TDM")
+        assert(Engine.CBBHFCGDIC("LUA_MENU_MP/NUKETOWN_TDM_DESC")=="Team Deathmatch on Nuketown.")
+        NativeTranslations["PLAYLIST/NUKETOWN_TDM"]="Native Nuketown"
+        assert(Engine.CBBHFCGDIC("PLAYLIST/NUKETOWN_TDM")=="Native Nuketown")
+        NativeTranslations["PLAYLIST/NUKETOWN_TDM"]=nil
+        local nuke=MenuBuilder.BuildRegisteredType("PlaylistFeaturedButton",options)
+        nuke.modelName="PLAYLIST/NUKETOWN_TDM";nuke.RefreshModel()
+        assert(nuke.Name:getText()=="NUKETOWN TDM")
+        nuke.DisabledText=MakeNode()
+        local function source(id) return {ID={GetValue=function(_,controller) assert(controller==0);return id end}} end
+        CustomMaps=" mp_crash "
+        nuke:SetDataSource(source(65),0)
+        assert(nuke.dataSource.ID:GetValue(0)==65 and nuke.buttonDisabled==true)
+        assert(nuke.DisabledText.text=="Requires the Nuketown map files")
+        nuke:SetButtonDisabled(false)
+        assert(nuke.buttonDisabled==true)
+        CustomMaps=" mp_crash mp_nuketown "
+        nuke:SetButtonDisabled(false)
+        assert(nuke.buttonDisabled==false)
+        nuke:SetButtonDisabled(true)
+        assert(nuke.buttonDisabled==true)
+        CustomMaps=" "
+        local other=MenuBuilder.BuildRegisteredType("PlaylistFeaturedButton",options)
+        other:SetDataSource(source(16),0)
+        other:SetButtonDisabled(false)
+        assert(other.buttonDisabled==false)
+        CustomMaps=" mp_nuketown_c "
+        nuke:SetDataSource(source(65),0)
+        assert(nuke.buttonDisabled==true)
+        MenuBuilder.registerType("LobbyStatusPanel", function()
+            local widget=MakeNode();widget.Title=MakeNode()
+            widget.Title:setText(string.upper("PLAYLIST/NUKETOWN_TDM"))
+            return widget
+        end)
+        local status=MenuBuilder.BuildRegisteredType("LobbyStatusPanel",options)
+        assert(status.Title:getText()=="NUKETOWN TDM")
+        status.Title:setText("@PLAYLIST/NUKETOWN_TDM");assert(status.Title:getText()=="NUKETOWN TDM")
+        status.Title:setText("TEAM DEATHMATCH");assert(status.Title:getText()=="TEAM DEATHMATCH")
+        results[#results+1]="Nuketown TDM title/description fall back only when untranslated; the public lobby status title is repaired; its featured button stays disabled unless replay_dw_customMaps lists exactly mp_nuketown, other playlists are unaffected"
         local panel=MakeNode()
         panel.featuredButtonWidgets={}
         function panel:InsertIntoButtonList(widget,list,kind)
@@ -574,7 +890,9 @@ def main():
         local retiredCalls=0
         local function guardTree(node)
             retained[#retained+1]=node
-            for _,name in ipairs({"SetAlpha","setText","SetHandleMouse","SetFocusable","isInFocus","processEvent","SetValue"}) do
+            for _,name in ipairs({"SetAlpha","setText","setImage","SetRGBFromInt","SetFont",
+                    "SetTop","SetBottom","SetMaxVisibleRows",
+                    "SetAlignment","SetHandleMouse","SetFocusable","isInFocus","processEvent","SetValue"}) do
                 local original=node[name]
                 if original then
                     node[name]=function(self,...)
@@ -603,25 +921,36 @@ def main():
             return toggle
         end
         local closedMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
-        local closedPanel=closedMenu.ReplayDWMapVote
+        local closedLobby=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
+        local closedPanel=closedLobby.ReplayDWMapVote
         local closedToggle=closedMenu.MPPlayMenuButtons.ReplayDWFillLobbyBots
+        liveBallot()
+        assert(closedPanel.alpha==1)
         guardTree(closedMenu)
+        guardTree(closedLobby)
+        closedLobby:closeTree()
+        assert(closedPanel.ReplayDWRetired and closedPanel.closed and not closedPanel.parent)
+        assert(ballot.mapVotes[closedPanel]==nil, "Lobby close waited for a ballot refresh")
+        local exitHome=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+        assert(not exitHome.ReplayDWMapVote and ballot.ballot.active)
         closedMenu:closeTree()
-        refreshRetained()
         assert(legacyClosed==1 and closedPanel.ReplayDWRetired and closedToggle.ReplayDWRetired)
         assert(ballot.mapVotes[closedPanel]==nil and ballot.widgets[closedToggle]==nil)
         refreshRetained()
         local childMenu=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
-        local childPanel=childMenu.ReplayDWMapVote
+        local childLobby=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
+        local childPanel=childLobby.ReplayDWMapVote
         local childToggle=childMenu.MPPlayMenuButtons.ReplayDWFillLobbyBots
         guardTree(childMenu)
+        guardTree(childLobby)
         childPanel.Choices[2]:closeTree()
+        assert(childPanel.ReplayDWRetired and ballot.mapVotes[childPanel]==nil)
         childToggle.Checkbox:closeTree()
         refreshRetained()
         assert(childPanel.ReplayDWRetired and childToggle.ReplayDWRetired)
         refreshRetained()
         for _,event in ipairs({"lose_focus","gain_focus"}) do
-            local reentrant=MenuBuilder.BuildRegisteredType("MPPlayMenu",options)
+            local reentrant=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
             local reentrantPanel=reentrant.ReplayDWMapVote
             liveBallot()
             reentrantPanel.Choices[1]:processEvent({name="gain_focus"})
@@ -635,16 +964,34 @@ def main():
         local replacing=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
         local replacingPanel=replacing.ReplayDWMapVote
         local oldAnchor=replacing.lobbyMemberGrid
+        liveBallot()
+        assert(replacingPanel.Choices[2].navigation.right==oldAnchor)
         guardTree(oldAnchor)
         oldAnchor:closeTree()
+        for _,button in ipairs(replacingPanel.Choices) do
+            assert(button.navigation.left~=oldAnchor and button.navigation.right~=oldAnchor,
+                "Horizontal vote navigation retains a closed roster anchor")
+        end
         refreshRetained()
         assert(not replacingPanel.ReplayDWRetired and not replacingPanel.Anchor)
-        local newAnchor=MakeNode()
+        local newAnchor=MenuBuilder.BuildRegisteredType("LobbyMemberGrid",{controllerIndex=0,modelPath="members"})
         replacing.lobbyMemberGrid=newAnchor
         replacing:addElement(newAnchor)
         liveBallot()
         assert(replacingPanel.Anchor==newAnchor and newAnchor.navigation.right==replacingPanel.Choices[1])
         assert(replacingPanel.Choices[1].navigation.left==newAnchor)
+        assertRosterUntouched(newAnchor)
+        ballot.RefreshMapVote({active=false})
+        local closingMenu=MenuBuilder.BuildRegisteredType("MatchmakingLobby",options)
+        local closingPanel,closingAnchor=closingMenu.ReplayDWMapVote,closingMenu.lobbyMemberGrid
+        liveBallot()
+        assertRosterUntouched(closingAnchor)
+        guardTree(closingMenu)
+        closingPanel:closeTree()
+        assert(closingPanel.ReplayDWRetired and closingPanel.closed and not closingPanel.parent)
+        assertRosterUntouched(closingAnchor)
+        assert(not closingAnchor.navigation.right)
+        refreshRetained()
         assert(#retained>0 and retiredCalls==0)
         results[#results+1]="Original closeTree/addEventHandler retire panels and toggle subtrees synchronously while preserving prior handlers; strongly retained closed nodes receive zero later refresh/focus calls, including reentrant lose/gain focus and replaced roster anchors"
         return results
@@ -655,9 +1002,11 @@ def main():
     compare = vm.eval("function(previous) return previous==MenuBuilder.BuildRegisteredType end")
     assert compare(old_builder)
     items = [checks[i] for i in range(1, len(checks) + 1)]
+    items.append("Absent native title fonts defer installation without registering the marker; installation retries successfully after fonts become available")
     items.append("Repeated installation is idempotent and creates no sealed global/module fields")
     receipt = dict(passed=True,checks=items,source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                    original_lua_inputs=inputs,lua_version=vm.eval("_VERSION"),
+                   map_vote_verified_api_surface=map_vote_apis,
                    serialized_source=serialized,
                    linked_build=linked,
                    modeled_boundaries="Native rendering/input/model APIs; original builder, checkbox and list Lua execute",

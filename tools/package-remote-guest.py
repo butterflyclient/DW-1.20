@@ -49,8 +49,8 @@ The EXE embeds its owned FF/FP files and stages them in the native folders.
 The updater also repairs missing owned files. No manual fastfile copy is needed.
 On launch it also checks the server's explicitly published custom map package.
 Missing Nuketown files download compressed and decompress into
-mods\mw120r\maps\mp_nuketown. The initial map download is about 388 MB and
-installs about 1.09 GB. Allow additional free space for staging and backups.
+mods\mw120r\maps\mp_nuketown. Allow free space for the compressed download,
+decompressed map files, temporary staging and backups.
 The native update screen requests a restart before installing missing files.
 Existing files are backed up in game_dx12_ship_replay_dw.exe.update\asset-backups.
 Maps are downloaded separately; this ZIP does not contain the map data.
@@ -92,9 +92,8 @@ erase inventory items already granted by the backend.
 com_optimized defaults to 1 for optimizations preserving the 3D scene's look.
 Set it to 0 to disable them, or 2 for the aggressive visual/CPU experiment.
 bypass_update_restart=0 enables normal verified full-EXE and owned-file updates.
-Set it to 1 to keep a custom EXE. Its authenticated owned files are still checked
-and repaired; missing maps can still require a clean restart. This requires the
-custom EXE's frozen file inventory to match the currently published release.
+Set it to 1 to bypass the updater completely: it performs no update check,
+download or repair. Set it back to 0 to receive EXE and map updates again.
 No backend signing keys, access keys or player identities are in this package.
 This is the current multiplayer test build, not a completed DW replacement.
 

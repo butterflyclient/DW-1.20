@@ -188,6 +188,8 @@ namespace
 // Fixed-arity native method: self dw_botstyleweapon(managedWeapon, slot).
 // MP slots choose the same profile weapon displayed in the lobby. BR slot -1
 // retains the acquired firearm's base while applying its compatible style.
+// The script handoff uses slot -2 when stock custom-class/class-choice rules
+// deny customization; it must return the complete original managed weapon.
 extern "C" void DW_BotStyleWeaponMethod(void *context, uint64_t self)
 {
     HostScale::BotWeapon original{};

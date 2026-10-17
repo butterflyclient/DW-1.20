@@ -333,6 +333,20 @@ int main()
         ++preserved;
     }
     unsigned capacityCases = 0;
+    // Gameplay permission denial preserves every byte, skips native parsing,
+    // and also applies before spawn and to BR acquired weapons.
+    for (unsigned scenario = 0; scenario < 3; ++scenario)
+    {
+        Fixture fixture;
+        fixture.slot = -2;
+        fixture.br = scenario == 2;
+        if (scenario == 1)
+            fixture.entity.health = 0;
+        Run(fixture);
+        Original(fixture);
+        assert(!fixture.parses && !fixture.validations);
+        ++preserved;
+    }
     for (unsigned scenario = 0; scenario < 6; ++scenario)
     {
         Fixture fixture;

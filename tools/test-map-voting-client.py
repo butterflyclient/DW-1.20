@@ -97,6 +97,12 @@ def main():
         document = json.loads(component.Test_Document())
         assert document["dw_map_vote"]["votes"] == {"1": 2, "2": 3}
         assert component.Test_LargeSnapshot() == 0, "A valid >8KB native host document lost the ballot handshake"
+        component.Test_UIChoice.argtypes = [ctypes.c_uint]
+        component.Test_UIChoice.restype = ctypes.c_char_p
+        for selected in range(5):
+            ballot = component.Test_UIChoice(selected)
+            expected = selected if selected <= 3 else 0
+            assert ballot and f"round=7,selected={expected}".encode() in ballot
         component_hash = sha(dll)
         ctypes.windll.kernel32.FreeLibrary(ctypes.c_void_p(component._handle))
         ui_path = directory / "ui.json"
@@ -112,6 +118,7 @@ def main():
                    checks=["initial launch waits for exact lobby publication", "stale completed ballot cannot launch another lobby",
                            "stale button selection is retired on allocation change", "human primary native tally excludes bots and guest slots",
                            "host migration reapplies the frozen native winner", "frontend exit fences the same allocation until a newer round",
+                           "actual native local vote acknowledges cards and bounds stale choices to the current ballot",
                            "private parties retain native behavior", "original UIButton focusability retires hidden/completed choices"],
                    modeled_boundaries="Native memory, dvar, engine calls and rendering; actual authored C++ bridge and Lua execute",
                    game_runs_performed=False, rendered_ui_verified=False)

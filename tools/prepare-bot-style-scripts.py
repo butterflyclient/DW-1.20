@@ -49,6 +49,8 @@ ORIGINAL_HASHES = {
     "scripts/mp/gametypes/br_weapons.gsc.gscbin": "06cead66afa73d00b678733f22d1d262ad95538c03eed3717f744072d97c7971",
 }
 POLICY_SOURCE_HASHES = {
+    "2398.gscbin": "d34e9aa31ab93df67fed860fe508dea76103868bac82bbbb28225d7c016d25ae",
+    "scripts/mp/gametypes/war.gsc.gscbin": "ca9a7e0f355dbc0c0d5be834a56f3e206a4f3fd3f88410c87b147f706c947234",
     "scripts/mp/gametypes/br.gsc.gscbin": "a45cb419d3a47fca11244ed273f515bd3d3a45fc62b1b1f45ff4cfaf0592d596",
     "2300.gscbin": "a3a929faf49ba9958ee15d467fe39746eabe5803fc875e51553b4daa36800e10",
 }
@@ -296,6 +298,37 @@ def survival_edits():
     return fragment(False), fragment(True)
 
 
+def custom_loadout_gate():
+    # Stock game::allowclasschoice owns mode callbacks, skiploadout, infiltration
+    # and the gametype table. The match-rules switch independently forbids CAC.
+    policy = exported("2398.gscbin", 0xB174)
+    assignment, _, event = stock_instruction(policy, 0x579)
+    if assignment != bytes.fromhex("3867820000") or event["canonical_token"]["id"] != "0x8267":
+        raise ValueError("Stock allowCustomClasses match-rules field changed")
+    call, source, event = stock_instruction(exported("1827.gscbin", 0xC4B9), 0x87)
+    if call[0] != 0x75 or event["first"].get("id") != "0x95e" or event["second"].get("id") != "0x1193":
+        raise ValueError("Stock game::allowclasschoice import changed")
+    war_using, war_source, _ = stock_instruction(
+        exported("scripts/mp/gametypes/war.gsc.gscbin", 0x254), 0x2C)
+    br_using, br_source, _ = stock_instruction(
+        exported("scripts/mp/gametypes/br.gsc.gscbin", 0x254), 0x4F)
+    if war_using != bytes.fromhex("1d2101") or br_using != war_using or war_source or br_source:
+        raise ValueError("Stock isusingmatchrulesdata zero-argument builtin changed")
+    # The field exists only with explicit match rules. Ordinary mode defaults
+    # still use classchoice; explicit rules fail closed when their field is unset.
+    return war_using + bytes.fromhex("a51c07007b67820000a859190500") + call + b"\x59", source
+
+
+def custom_loadout_slot(slot):
+    gate, source = custom_loadout_gate()
+    # Keep the existing two-argument native ABI. A denied slot is an exact
+    # managed clone; preserve BR ground/starter/mode weapons without styling.
+    value = {b"\x5c": 0, b"\x16\x01": 1, b"\x51\x01": -1}[slot]
+    # A single expression leaves exactly one argument below the stock builder
+    # call marker: allowed * (slot + 2) - 2. No branch crosses that marker.
+    return gate + bytes((0x16, value + 2, 0x8B, 0x16, 2, 0x4E)), source
+
+
 def mp_class_refresh_edit():
     stock = exported("1827.gscbin", 0x5CF8)
     start = int(stock[3]["function_at"], 16)
@@ -305,7 +338,12 @@ def mp_class_refresh_edit():
         raise ValueError("Stock MP cached/preloaded class convergence changed")
     functions = {e["name"].get("string", e["name"].get("id")): int(e["function_at"], 16)
                  for e in stock[2] if "function_at" in e}
-    code, refs = bytearray(bytes.fromhex("3a7e") + struct.pack("<H", MP_CLASS_METHOD_ID)), []
+    gate, source = custom_loadout_gate()
+    code, refs = bytearray(gate), []
+    denied = len(code) + 1
+    code.extend(b"\x72\0\0")
+    code.extend(bytes.fromhex("3a7e") + struct.pack("<H", MP_CLASS_METHOD_ID))
+    unready = len(code) + 1
     code.extend(b"\x72\0\0")
     def local(token):
         code.extend(b"\x98\0\0\0")
@@ -320,17 +358,18 @@ def mp_class_refresh_edit():
     code.extend(bytes.fromhex("1516011a3e"))
     local("0x9c55")
     code.extend(bytes.fromhex("583625569c0000"))
-    struct.pack_into("<h", code, 5, len(code) - 7)
+    for operand in (denied, unready):
+        struct.pack_into("<h", code, operand, len(code) - operand - 2)
     return Edit(0x79, b"", bytes(code),
                 "Post-bind managed MP class clone, reconstruction and native weapon preload before grant",
-                function_token=0x5CF8, references=tuple(refs))
+                function_token=0x5CF8, source=source, references=tuple(refs))
 
 
 def plans(method_id):
     direct = b"\x3a\x80" + struct.pack("<H", method_id)
     primary, secondary, acquired = b"\x5c", b"\x16\x01", b"\x51\x01"
     fullname = bytes.fromhex("1e4203")
-    return (
+    result = (
         Plan(
             "scripts/mp/bots/bots_gametype_br.gsc.gscbin",
             "bot_give_weapon",
@@ -457,6 +496,14 @@ def plans(method_id):
             ),
         ),
     )
+    # All managed weapon handoffs share the same stock gameplay permission.
+    # Slots sit below the original builder marker, so denial must retain one
+    # slot argument rather than bypassing the callback and unbalancing the VM.
+    slots = {slot: custom_loadout_slot(slot) for slot in (primary, secondary, acquired)}
+    return tuple(replace(plan, edits=tuple(
+        replace(edit, new=slots[edit.new][0], source=slots[edit.new][1])
+        if "Push " in edit.purpose and "slot " in edit.purpose else edit
+        for edit in plan.edits)) for plan in result)
 
 
 def reference_fields(code, function_ranges):
@@ -726,6 +773,14 @@ def transform(plan, method_id, bound=False):
         mp_class_refresh=dict(method_id=MP_CLASS_METHOD_ID, grant_token=0x5CF8,
                               fresh_stock_clone=True, native_preload_before_grant=True)
                          if any(e.function_token == 0x5CF8 for e in edits) else None,
+        custom_loadout_policy=dict(
+            match_rules_field=0x8267, stock_class_choice_import=[0x95E, 0x1193],
+            stock_using_match_rules_builtin=0x121,
+            ordinary_defaults_use_stock_class_choice=True,
+            denied_preserve_original_slot=-2, source_provenance=POLICY_SOURCE_HASHES,
+            weapon_handoffs=sum("Push " in e.purpose and "slot " in e.purpose for e in edits),
+            native_abi_changed=False,
+        ),
         function_count=len(functions),
         inserted_method_id=method_id,
         method_bound=bound,
@@ -1198,6 +1253,10 @@ def prepare(snapshot, replace_owned=False):
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    shim = importlib.util.spec_from_file_location("dw_catalog", Path(__file__).resolve().with_name("dw_catalog.py"))
+    shim_module = importlib.util.module_from_spec(shim)
+    shim.loader.exec_module(shim_module)
+    shim_module.share_catalog(module)  # one catalog parse, not one per binding
     associations = json.loads((snapshot / "source-units.json").read_bytes())
     if (snapshot / "source-units.json").stat().st_nlink != 1:
         raise ValueError(

@@ -2,9 +2,62 @@
 
 from pathlib import Path
 import argparse, ctypes, hashlib, importlib.util, json, subprocess, tempfile, struct
+from itertools import product
 
 ROOT = Path(__file__).resolve().parents[1]
 LLVM = Path("C:/Program Files/LLVM/bin")
+
+
+def exercise_custom_loadout_gate(module):
+    """Execute the emitted gameplay gate; stock policy remains the callee."""
+    # The imported stock policy explicitly invokes its mode callback on self.
+    policy = module.exported("2398.gscbin", 0x1193)
+    assert module.stock_instruction(policy, 0x44)[0] == b"\x3a"
+    assert module.stock_instruction(policy, 0x45)[0] == bytes.fromhex("7b94110000")
+    assert module.stock_instruction(policy, 0x4A)[0] == b"\x4a"
+    cases = 0
+    for slot, push in ((0, b"\x5c"), (1, b"\x16\x01"), (-1, b"\x51\x01")):
+        code, source = module.custom_loadout_slot(push)
+        assert source == bytes.fromhex("5e09000093110000")
+        for uses_match_rules, match_rules, class_choice in product(
+            (False, True), (None, False, True), (False, True),
+        ):
+            pc, stack, calls, field_reads, rules_calls = 0, [], 0, 0, 0
+            while pc < len(code):
+                op = code[pc]; pc += 1
+                if op in (0x16, 0x51):
+                    stack.append(code[pc] * (-1 if op == 0x51 else 1)); pc += 1
+                elif op == 0x5C: stack.append(0)
+                elif op == 0x7B:
+                    assert struct.unpack_from("<I", code, pc)[0] == 0x8267; pc += 4
+                    stack.append(match_rules); field_reads += 1
+                elif op == 0x1D:
+                    assert code[pc:pc+2] == bytes.fromhex("2101"); pc += 2
+                    stack.append(uses_match_rules); rules_calls += 1
+                elif op == 0xA5: stack.append(not stack.pop())
+                elif op in (0xA8, 0x59): stack.append(bool(stack.pop()))
+                elif op in (0x19, 0x1C):
+                    delta = struct.unpack_from("<h", code, pc)[0]; pc += 2
+                    if bool(stack[-1]) == (op == 0x1C): pc += delta
+                    else: stack.pop()
+                elif op == 0x75:
+                    pc += 3; calls += 1; stack.append(class_choice)
+                elif op == 0x72:
+                    delta = struct.unpack_from("<h", code, pc)[0]; pc += 2
+                    if not stack.pop(): pc += delta
+                elif op == 0x58: stack.pop()
+                elif op in (0x8B, 0x4E):
+                    right, left = stack.pop(), stack.pop()
+                    stack.append(left * right if op == 0x8B else left - right)
+                else: raise AssertionError((hex(op), pc))
+            permitted = not uses_match_rules or bool(match_rules)
+            # False class-choice includes Gunfight's prescribed mode weapons;
+            # true includes ordinary TDM and a later mode-authorized loadout.
+            assert stack == [slot if permitted and class_choice else -2]
+            assert calls == int(permitted)
+            assert field_reads == int(uses_match_rules) and rules_calls == 1
+            cases += 1
+    return cases
 
 
 def exercise_mp_class_refresh(module):
@@ -14,17 +67,37 @@ def exercise_mp_class_refresh(module):
     functions = {int(e["function_at"], 16): e["name"].get("string", e["name"].get("id"))
                  for e in stock[2] if "function_at" in e}
     references = {r.operand: functions[r.target] for r in edit.references}
-    assert edit.source == b"" and len(references) == 2
+    gate, gate_source = module.custom_loadout_gate()
+    assert edit.source == gate_source and len(references) == 2
     cases = 0
     for receiver in ("managed", "managed_dead", "human", "generic", "br", "pre_bind"):
-        for cached in (False, True):
+        for uses_match_rules, permission, class_choice, cached in product(
+            (False, True), (None, False, True), (False, True), (False, True),
+        ):
             original = dict(primary="stock-primary", secondary="stock-secondary", other=17)
             grant = original
             fields = {0x9C56: original if cached else None}
-            stack, calls, pc = [], [], 0
+            stack, calls, pc, field_reads, rules_calls = [], [], 0, 0, 0
             while pc < len(edit.new):
                 op = edit.new[pc]; pc += 1
-                if op == 0x3A: stack.append("self")
+                if op == 0x7B:
+                    assert struct.unpack_from("<I", edit.new, pc)[0] == 0x8267; pc += 4
+                    stack.append(permission); field_reads += 1
+                elif op == 0x1D:
+                    assert edit.new[pc:pc+2] == bytes.fromhex("2101"); pc += 2
+                    stack.append(uses_match_rules); rules_calls += 1
+                elif op == 0xA5: stack.append(not stack.pop())
+                elif op == 0xA8: stack.append(bool(stack.pop()))
+                elif op in (0x19, 0x1C):
+                    delta = struct.unpack_from("<h", edit.new, pc)[0]; pc += 2
+                    if bool(stack[-1]) == (op == 0x1C): pc += delta
+                    else: stack.pop()
+                elif op == 0x75:
+                    assert edit.new[pc:pc+3] == gate[-4:-1]; pc += 3
+                    calls.append("stock-class-choice")
+                    stack.append(class_choice)
+                elif op == 0x59: stack.append(bool(stack.pop()))
+                elif op == 0x3A: stack.append("self")
                 elif op == 0x7E:
                     assert struct.unpack_from("<H", edit.new, pc)[0] == 0x8789; pc += 2
                     assert stack.pop() == "self"
@@ -58,12 +131,15 @@ def exercise_mp_class_refresh(module):
                 else: raise AssertionError((hex(op), pc))
             assert not stack
             assert original == dict(primary="stock-primary", secondary="stock-secondary", other=17)
-            if receiver in ("managed", "managed_dead"):
+            permitted = not uses_match_rules or bool(permission)
+            choice_calls = ["stock-class-choice"] if permitted else []
+            assert field_reads == int(uses_match_rules) and rules_calls == 1
+            if permitted and class_choice and receiver in ("managed", "managed_dead"):
                 assert grant is not original and grant["other"] == 17
-                assert calls == ["clone-and-reconstruct", ("native-preload", "profile-primary", "profile-secondary")]
+                assert calls == choice_calls + ["clone-and-reconstruct", ("native-preload", "profile-primary", "profile-secondary")]
                 assert fields[0x9C56] is None
             else:
-                assert grant is original and not calls
+                assert grant is original and calls == choice_calls
                 assert fields[0x9C56] is (original if cached else None)
             cases += 1
     return cases
@@ -184,6 +260,7 @@ def main():
     assert binding == proof["method_binding"]
     module.load_tools(snapshot)
     policy_execution = exercise_survival(module)
+    custom_loadout_execution = exercise_custom_loadout_gate(module)
     mp_class_execution = exercise_mp_class_refresh(module)
     native = module.inspect_native(snapshot)
     assert native == proof["native"]
@@ -217,7 +294,7 @@ def main():
         assert hashlib.sha256(Path(fresh["path"]).read_bytes()).hexdigest() == fresh["sha256"]
         if result["inserted_survival_method_id"]:
             assert result["inserted_survival_method_id"] == 0x8788
-            assert len(result["function_edits"]) == 2 and len(result["source_insertions"]) == 2
+            assert len(result["function_edits"]) == 2 and len(result["source_insertions"]) == 3
             assert len(result["inserted_references"]) == 3
             assert result["survival_policy"]["cooldown_ms"] == 500
         if result["mp_class_refresh"]:
@@ -227,6 +304,13 @@ def main():
             text = Path(fresh["path"]).read_text()
             assert "loadout_copyclassstruct( var_6 )" in text
             assert "preloadandqueueclassstruct( var_6, undefined, 1 )" in text
+        text = Path(fresh["path"]).read_text()
+        gate_count = (
+            5 if result["asset_name"] == "1827" else
+            1 if result["inserted_survival_method_id"] else 3
+        )
+        assert text.count("istrue( level.matchrules_allowcustomclasses )") == gate_count
+        assert text.count("!isusingmatchrulesdata() || istrue( level.matchrules_allowcustomclasses )") == gate_count
         assert (
             hashlib.sha256(Path(result["output_path"]).read_bytes()).hexdigest()
             == result["output_sha256"]
@@ -312,6 +396,7 @@ def main():
         survival_fragment_execution=policy_execution,
         all_three_custom_method_contracts_verified=True,
         mp_class_refresh_fragment_cases=mp_class_execution,
+        custom_loadout_permission_fragment_cases=custom_loadout_execution,
         fresh_decompile_all_assets=True,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

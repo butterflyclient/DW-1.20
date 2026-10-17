@@ -267,13 +267,18 @@ namespace dwMapVoting
 
     int UIState(char *output, unsigned capacity)
     {
+        auto *party = replay_rva_01187ee0();
         if (!active || !active->current.enabled ||
             !Acknowledged(*reinterpret_cast<const uint64_t *>(replay_rva_0c27e4b0 + 79656)) ||
-            !Eligible(replay_rva_01187ee0()))
+            !Eligible(party))
             return Com_sprintf(output, capacity, "{active=false}");
+        // Native Party_Vote updates this same local choice before the host
+        // tallies it. Expose acknowledgement, not an invented Lua-side vote.
+        const auto choice = *reinterpret_cast<const unsigned *>(static_cast<const uint8_t *>(party) + 311148);
         unsigned used = unsigned(Com_sprintf(output, capacity,
-            "{active=true,complete=%s,remaining=%d,choices={", complete->current.enabled ? "true" : "false",
-            (remaining->current.integer + 999) / 1000));
+            "{active=true,complete=%s,remaining=%d,round=%d,selected=%d,choices={",
+            complete->current.enabled ? "true" : "false", (remaining->current.integer + 999) / 1000,
+            cycle->current.integer, choice <= unsigned(choiceCount->current.integer) ? int(choice) : 0));
         for (unsigned i = 0; i < unsigned(choiceCount->current.integer); ++i)
         {
             const char *map = replay_rva_01b9d510(int(i));

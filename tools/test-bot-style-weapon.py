@@ -174,7 +174,7 @@ def main():
             (ROOT / "tools/bot_style_weapon_harness.cpp").read_bytes()
         ).hexdigest(),
         profile_cases=454,
-        preservation_cases=22,
+        preservation_cases=25,
         survival_predicate_cases=12,
         current_owner_cases=10,
         mp_class_readiness_cases=12,
