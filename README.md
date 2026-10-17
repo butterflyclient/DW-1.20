@@ -8,7 +8,7 @@ The repository contains the C++ server, Replay client integration, configuration
 
 These steps build the **backend server** and connect an existing compatible DW client to it. You need a matching Replay 1.20 game installation and DW client package from your package provider. This source download does not include the game, and building the server does not create the game executable.
 
-**Local-play prerequisite:** the client embeds trusted server public keys. A newly initialized server creates its own keys, so changing a production client's `host` alone does not make it trust your server. Before attempting step 6, obtain a client prepared for your own server's public keys from the client maintainer. The public source download does not currently provide a standalone client bootstrap workflow. You can complete steps 1–5 to build and check the backend independently; they do not by themselves enable in-game local play. Never solve a key mismatch by copying the production server's private keys.
+The client embeds trusted server public keys. Step 6 creates a separate local client using **your server's public key**, without rebuilding the game or changing the original client. You still need an existing compatible DW client and its game assets. Never copy production private keys into a local server.
 
 ### 1. Install the build tools
 
@@ -17,7 +17,7 @@ These steps build the **backend server** and connect an existing compatible DW c
 - Install **CMake 3.24 or newer** and select its option to add CMake to PATH.
 - Open a new PowerShell window after installation.
 
-Python is not required for the server build or the direct local launch below.
+Install **Python 3.10 or newer** for the one-time local-client setup in step 6. The Windows Python launcher (`py`) is used below; use `python` instead if that is how Python is installed on your PC. No extra Python packages are needed for setup. Python is not required to compile or run the backend itself.
 
 ### 2. Open the source folder
 
@@ -68,22 +68,73 @@ Invoke-RestMethod 'http://127.0.0.1:8085/health'
 
 The response should identify the server as `iw8-dw`. You can also open [the local dashboard](http://127.0.0.1:8085/stats) in your browser. A healthy backend confirms server startup; the next step checks the game.
 
-### 6. Connect your DW game client
+### 6. Set up your local client (once)
 
-Complete this step only with a client prepared to trust this local server's keys, as described above.
+Close the game. Leave the local backend running. In a second PowerShell window,
+open the **source folder** from step 2 and run the following. Replace the example
+EXE path with the original DW executable in your actual game folder:
 
-1. Close the game before editing its configuration.
-2. In the **game folder**, back up `game_dx12_ship_replay_dw.ini`, then open it in a text editor. If it does not exist, create it beside `game_dx12_ship_replay_dw.exe`. Make sure it is not saved as `.ini.txt`.
-3. Set the existing `host` entry to `host=127.0.0.1`, or add that line if absent.
-4. Keep the package's other required settings. A package configured for a remote guest may need a local-compatible identity/configuration from its provider; remote credentials are not automatically accounts on your new server.
-5. Start the matching client using its supplied `Run_Replay_DW.cmd` from the game folder, with the local server still running.
-6. Once signed in, enter Multiplayer and create a private match using a map included in your installation. Use the available bot controls if desired.
+```powershell
+py -3 tools/setup-local-client.py --client 'C:\Games\Replay\game_dx12_ship_replay_dw.exe' --server-data '.\data\local-play'
+```
 
-The executable-specific INI takes precedence over `replay-dw.ini`. Restart the client after changing it. This walkthrough is for one PC; LAN or internet play needs the additional setup in [remote hosting](docs/remote-host-test.md). No router port forwarding is needed for same-PC loopback play.
+**Use the same data folder that your server is running with.** If you previously
+started it with `.\data` instead, pass `--server-data '.\data'`. That folder must
+already contain `platform-public.blob`; start the server once to create its keys.
+Do not select a folder from another server or generate replacement keys every run.
 
-### 7. Stop and restart
+The tool creates four files beside the original game EXE:
+
+| File | Purpose |
+| --- | --- |
+| `game_dx12_ship_replay_local_dw.exe` | Separate client with your server's public key in platform, native-auth/content, and embedded-helper trust constants. |
+| `game_dx12_ship_replay_local_dw.ini` | Selects `host=127.0.0.1` and `bypass_update_restart=1`. |
+| `Run_Replay_DW_Local.cmd` | Starts the local client with the game folder as its working directory. |
+| `game_dx12_ship_replay_local_dw.setup.json` | Records original/output hashes, public-key fingerprint, and changed byte ranges. |
+
+Setup reads only the **public** key, preserves the original EXE and INI, and does
+not edit the repository's client source or access the remote server. It checks
+the PE layout and exact existing key constants before writing; an unsupported
+or already-personalized EXE is rejected rather than guessed at. This produces a
+local variant, not a verified production release artifact.
+
+Automatic EXE, asset, and map updates are disabled for this local variant. Keep
+`bypass_update_restart=1` in its INI, and install required maps/assets from your
+compatible client package. A new local backend does not contain the production
+server's downloadable packages. The original production client remains separate.
+
+### 7. Play and check login
+
+1. Keep the server from step 4 running.
+2. In your **game folder**, double-click **Run_Replay_DW_Local.cmd**. Use this
+   launcher, not the original production launcher.
+3. Once signed in, enter Multiplayer and create a private match using an installed
+   map. Use the available bot controls if desired.
+
+If login fails, check `replay-dw-client.log` in the game folder. The latest launch
+should show `host=127.0.0.1`, followed by `DW_LOCAL_PLATFORM_VERIFIED` when the
+signed platform reply is accepted. That marker confirms the platform trust step;
+native authentication and loading a match are subsequent checks.
+
+The setup workflow has been checked against a real DW executable and fresh server
+signatures using the actual game crypto verifier. Full game login and match play
+still need testing on your installation. For failures, send the latest client log
+and the setup JSON; do not send server private keys or player credentials.
+
+This walkthrough is for one PC. LAN/internet play needs additional configuration
+from [remote hosting](docs/remote-host-test.md); no router port forwarding is needed
+for same-PC loopback play.
+
+### 8. Stop, restart, or update
 
 Close the game, then press **Ctrl+C** in the server window to stop the server. Next time, repeat step 4 and launch your client. Rebuild only after changing or updating the source. Back up `data\local-play` while the server is stopped. Runtime data is private and excluded from Git.
+
+You do not need to rerun local-client setup on every launch. If you receive a newer
+original DW EXE or deliberately replace your local server keys, close the game,
+back up and move aside the four generated local-client files, then repeat step 6
+using the untouched original EXE and the correct server data folder. Setup refuses
+to overwrite existing local-client files. To return to production play, use your
+original EXE, INI, and launcher.
 
 ### Common build and startup problems
 
@@ -97,7 +148,10 @@ Close the game, then press **Ctrl+C** in the server window to stop the server. N
 | CMake reports a different source directory or generator | Do not reuse a build folder copied from another machine. Rename that `build` folder, then configure again. |
 | Server exits or health check fails | Read the server window and `data/local-play/server.log`. Check for another server using the same ports before starting a second copy. |
 | Health check passes but the game cannot sign in | Check the matching client package, executable-specific INI, game working folder, and server log. A successful build does not prove client compatibility. |
-| `server-platform-reply-signature-or-expiry` or an untrusted-key login error | Confirm that the client was prepared for this server's public keys. Changing `host` does not change the keys embedded in the client. Keep the local server's keys between runs. |
+| Missing `platform-public.blob` | Start your server once, then pass its actual runtime data folder to step 6. |
+| Unsupported or already personalized client | Start from the untouched original `game_dx12_ship_replay_dw.exe`. Send the error and original EXE hash to the maintainer if its layout is unsupported. |
+| Local client files already exist | Keep them for ordinary launches. To rerun setup, close the game, back them up and move all four aside first. |
+| `server-platform-reply-signature-or-expiry` or an untrusted-key login error | Use `Run_Replay_DW_Local.cmd` and confirm setup used the same data folder as the running server. Keep the server keys between runs. If trust matches, check the Windows clock and send the latest client log. |
 
 ## Build the server on Linux
 
