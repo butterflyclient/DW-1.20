@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import time
 import textwrap
 
@@ -169,8 +171,17 @@ def publish(image, report, release, output, upload=False, updater_verification=N
         )
         if out.channel.recv_exit_status():
             raise RuntimeError(error.read().decode())
+        scp = shutil.which('scp')
+        if scp:
+            # Native SSH avoids the Python SFTP throughput bottleneck for the
+            # large image. The same pinned host key and final hash checks apply.
+            subprocess.run([scp, '-B', '-i', str(ROOT / '.toolchains/deploy_ed25519'),
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=' + str(ROOT / 'data/droplet-known-hosts'),
+                str(binary.resolve()), 'root@162.243.115.160:' + incoming + '/' + binary.name], check=True)
         with client.open_sftp() as sftp:
-            sftp.put(str(binary), incoming + "/" + binary.name)
+            if not scp:
+                sftp.put(str(binary), incoming + "/" + binary.name)
             if assets is not None:
                 sftp.mkdir(incoming + '/assets')
                 for digest in assets['payloads']:
