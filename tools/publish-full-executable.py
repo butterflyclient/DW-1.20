@@ -277,7 +277,8 @@ if index.exists():
     assert old==new or new['release']>old['release'],'Release rollback rejected'
 legacy=root/'catalog.json'
 if legacy.exists():
-    assert new['release']>json.loads(legacy.read_bytes())['release'],'Release must follow legacy publication'
+    prior=json.loads(legacy.read_bytes())
+    assert new['release']>prior['release'] or (new['release']==prior['release'] and new['latest']==prior['latest']),'Release must follow legacy publication'
 images=root/'images';images.mkdir(exist_ok=True)
 if 'assets' in new:
     asset_folder=root/'assets';asset_folder.mkdir(exist_ok=True)

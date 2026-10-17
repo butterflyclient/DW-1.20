@@ -16,6 +16,7 @@ PUBLICATION_TOOLS = (
     'tools/publish-custom-map.py', 'tools/publish-full-executable.py',
     'tools/verify-full-executable-publication.py', 'tools/dw_publication.py',
     'tools/package-remote-guest.py',
+    'tools/legacy_update_bootstrap.py', 'tools/publish-executable-update.py',
 )
 
 
@@ -147,6 +148,8 @@ def publish(image, report, source, updater, output):
         raise ValueError("Signed updater publication verification failed")
     if inventory()['maps'] != remote['maps']:
         raise ValueError('Ordinary EXE publication changed the explicit map catalog')
+    from legacy_update_bootstrap import publish as publish_legacy
+    legacy = publish_legacy(image, inventory()['catalog'], output / 'legacy-bootstrap')
     if any(sha(ROOT / item['source']) != item['sha256'] for item in publication_tools):
         raise ValueError('Publication tools changed during public verification')
     require_current(dict(sha256=target, executable=str(image)))
@@ -158,4 +161,5 @@ def publish(image, report, source, updater, output):
         publication=str(output),
         map_package_hash=proof.get('map_package_hash'),
         tool_inputs=publication_tools,
+        legacy_bootstrap=legacy,
     )

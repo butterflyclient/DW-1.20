@@ -6,7 +6,10 @@ and verified before the native update fence requests a clean restart. Installing
 a newer EXE manually also triggers this check on its first launch. A retained
 pre-asset or release 29 helper can install the new EXE first; the new EXE then
 extracts its newer helper and repairs any missing companion files. Clients with
-only the old delta protocol still need the full EXE as their bootstrap.
+only the old delta protocol receive a signed, source-independent RAW delta as
+their automatic bootstrap to the new EXE. The original base-hash/size checks and
+Windows ApplyDeltaProvidedB reconstruction stay in place. The new helper handles
+all subsequent EXE, companion and map downloads.
 
 The published package contains Nuketown and Nuketown Classic, each with its
 native five-fastfile package plus map.json. They install under

@@ -53,7 +53,8 @@ listener is supplied by the Linux build.
 
 The public plaintext compatibility path serves only signed update plans and
 hash-addressed update files. This lets older installed EXEs obtain the current
-client, whose helper then fetches required assets and maps. Plaintext login,
+client, whose helper then fetches required assets and maps. Early delta-only
+clients receive a compatible signed RAW-delta bootstrap first. Plaintext login,
 session, authentication, and operator requests remain blocked. Update signatures
 and file hashes are checked before installation. The intentional
 `bypass_update_restart=1` override still skips automatic updating.
