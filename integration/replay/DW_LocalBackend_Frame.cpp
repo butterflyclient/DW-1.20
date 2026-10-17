@@ -9,6 +9,8 @@ extern "C"
 {
     void DW_ExecutableUpdate_Frame();
     void DW_LobbyControls_Frame();
+    void DW_WeaponInspectInput_Frame();
+    void DW_SlideView_Init();
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *, char *, unsigned long);
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
     __declspec(dllimport) void *__stdcall GetProcAddress(void *, const char *);
@@ -134,16 +136,20 @@ namespace
                 reinterpret_cast<Headers>(GetProcAddress(library, "WinHttpQueryHeaders"));
             auto read = reinterpret_cast<Read>(GetProcAddress(library, "WinHttpReadData"));
             auto close = reinterpret_cast<Close>(GetProcAddress(library, "WinHttpCloseHandle"));
+            using Option = int (__stdcall *)(Handle, unsigned long, void *, unsigned long);
+            auto option = reinterpret_cast<Option>(GetProcAddress(library, "WinHttpSetOption"));
+            const bool tls = DW_LocalConfig_UseTls();
+            unsigned long redirectPolicy = 0; // WINHTTP_OPTION_REDIRECT_POLICY_NEVER
             if (open && connect && request && timeouts && send && receive && headers && read &&
                 close)
             {
                 Handle session = open(L"IW8-Replay-LocalDW/1", 1, nullptr, nullptr, 0);
                 Handle connection = nullptr, message = nullptr;
                 if (session && timeouts(session, 1000, 1000, 1000, 1000))
-                    connection = connect(session, DW_LocalConfig_WideHost(), 8085, 0);
+                    connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
                 if (connection)
-                    message = request(connection, L"GET", L"/health", nullptr, nullptr, nullptr, 0);
-                if (message && send(message, nullptr, 0, nullptr, 0, 0, 0) &&
+                    message = request(connection, L"GET", L"/health", nullptr, nullptr, nullptr, tls ? 0x00800000 : 0);
+                if (message && option && option(message, 88, &redirectPolicy, sizeof(redirectPolicy)) && send(message, nullptr, 0, nullptr, 0, 0, 0) &&
                     receive(message, nullptr))
                 {
                     unsigned long status = 0, statusSize = sizeof(status);
@@ -183,8 +189,8 @@ namespace
             FreeLibrary(library);
         }
         WriteEndpointLog(ok ? "DW_LOCAL_PROBE_OK host=" : "DW_LOCAL_PROBE_FAILED host=",
-                         ok ? ":8085 backend health reached; native authentication/tasks pending"
-                            : ":8085 backend health unavailable; check this endpoint's server "
+                         ok ? " backend health reached; native authentication/tasks pending"
+                            : " backend health unavailable; check this endpoint's server "
                               "and network access");
         __atomic_store_n(&s_probe, ok ? 2U : 3U, __ATOMIC_RELEASE);
         return 0;
@@ -299,6 +305,8 @@ extern "C" void DW_LocalBackend_Frame()
         }
     }
     DW_LocalProgression_Frame();
+    DW_WeaponInspectInput_Frame();
+    DW_SlideView_Init();
     DW_ExecutableUpdate_Frame();
     DW_LobbyControls_Frame();
     if (!s_registered)
@@ -309,7 +317,7 @@ extern "C" void DW_LocalBackend_Frame()
         Cmd_AddCommandInternal("dw_localBackendStatus", DW_LocalBackend_Status_f, &s_statusCommand);
         Cmd_AddCommandInternal("dw_localBackendProbe", DW_LocalBackend_Probe_f, &s_probeCommand);
         WriteEndpointLog("DW_LOCAL_BUILD_INIT host=",
-                         "; platform/auth HTTP=8085 native-auth=8443 lobby=3075; "
+                         "; remote HTTPS=8443 loopback HTTP=8085 lobby=3075; "
                          "workstation-compiled source active");
         s_registered = true;
         DW_LocalBackend_Probe_f();

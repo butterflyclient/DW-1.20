@@ -134,22 +134,29 @@ namespace update_assets
         require(fs::is_directory(native), "Asset update directory is unavailable");
         safePath(native);
     }
-    inline std::string name(const DWUpdateAssetEntry &entry)
+    inline std::string_view ownerPrefix(unsigned owner)
+    {
+        require(owner == 1 || owner == 2, "Unknown owned overlay group");
+        return owner == 1 ? "dw_bot_styles_mp_" : "dw_weapon_inspect_mp_";
+    }
+    inline std::string name(const DWUpdateAssetEntry &entry, unsigned owner = 0)
     {
         const auto end = std::find(std::begin(entry.name), std::end(entry.name), '\0');
         require(end != std::end(entry.name) && std::all_of(end, std::end(entry.name), [](char c) { return c == 0; }),
                 "Invalid owned asset name padding");
         std::string value(entry.name, end);
-        constexpr char owner[] = "dw_bot_styles_mp_";
-        const auto at = value.find(owner);
+        if (!owner)
+            owner = value.find(ownerPrefix(1)) != std::string::npos ? 1 : 2;
+        const auto prefix = ownerPrefix(owner);
+        const auto at = value.find(prefix);
         require(at != std::string::npos && at <= 17 &&
                     (at == 0 || value[at - 1] == '_') &&
                     std::all_of(value.begin(), value.begin() + at, [](char c)
                     { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; }) &&
-                    value.size() == at + sizeof(owner) - 1 + 16 + 3 &&
+                    value.size() == at + prefix.size() + 16 + 3 &&
                     (value.ends_with(".ff") || value.ends_with(".fp")),
                 "Asset manifest attempts to replace a shipped or non-zone file");
-        const auto begin = value.begin() + at + sizeof(owner) - 1;
+        const auto begin = value.begin() + at + prefix.size();
         require(std::all_of(begin, begin + 16, [](char c)
                 { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }),
                 "Owned overlay identity is not a content hash");
@@ -158,7 +165,8 @@ namespace update_assets
     inline fs::path nativeRelativePath(const DWUpdateAssetEntry &entry)
     {
         const auto value = name(entry);
-        const std::string_view prefix(value.data(), value.find("dw_bot_styles_mp_"));
+        const auto owner = value.find(ownerPrefix(1)) != std::string::npos ? 1 : 2;
+        const std::string_view prefix(value.data(), value.find(ownerPrefix(owner)));
         for (const auto &rule : s_dwUpdateAssetFolderRules)
         {
             if (prefix != rule.prefix)
@@ -171,63 +179,114 @@ namespace update_assets
         }
         throw std::runtime_error("Owned overlay has no native folder policy");
     }
-    inline std::vector<DWUpdateAssetEntry> manifest(const IO &io, std::span<const uint8_t> image)
+    inline void validateGroup(const std::vector<DWUpdateAssetEntry> &entries,
+                              unsigned owner, const uint8_t *bundle)
     {
-        constexpr uint8_t magic[16] = {'R','E','P','L','A','Y','D','W','A','S','S','E','T','0','1',0};
-        std::vector<DWUpdateAssetEntry> result;
-        Digest bundle{};
-        bool found = false;
-        for (size_t at = 0; at + sizeof(DWUpdateAssetHeader) <= image.size(); ++at)
-        {
-            if (std::memcmp(image.data() + at, magic, sizeof(magic)))
-                continue;
-            DWUpdateAssetHeader header{};
-            std::memcpy(&header, image.data() + at, sizeof(header));
-            if (header.version != DW_UPDATE_ASSET_VERSION || header.reserved || !header.count ||
-                header.count > DW_UPDATE_ASSET_MAX_FILES ||
-                header.bytes != sizeof(header) + header.count * sizeof(DWUpdateAssetEntry) ||
-                header.bytes > image.size() - at)
-                continue; // The helper also contains the parser's magic constant.
-            require(!found, "Multiple owned asset manifests in verified executable");
-            const auto payload = image.subspan(at + sizeof(header), header.bytes - sizeof(header));
-            Bytes authenticated(std::begin(header.bundleHash), std::end(header.bundleHash));
-            authenticated.insert(authenticated.end(), payload.begin(), payload.end());
-            require(matches(io, authenticated, header.entriesHash), "Embedded asset manifest hash failed");
-            std::copy(std::begin(header.bundleHash), std::end(header.bundleHash), bundle.begin());
-            found = true;
-            result.resize(header.count);
-            std::memcpy(result.data(), payload.data(), payload.size());
-        }
-        if (!found)
-            return result; // Complete updates to older releases remain compatible.
         std::set<std::string> names;
         std::map<std::wstring, uint64_t> payloads;
         std::string zone;
-        for (const auto &entry : result)
+        require(!entries.empty(), "Empty owned overlay group");
+        for (const auto &entry : entries)
         {
-            const auto value = name(entry);
+            const auto value = name(entry, owner);
             nativeRelativePath(entry);
             require(entry.bytes && entry.bytes <= DW_UPDATE_ASSET_MAX_BYTES && names.insert(value).second,
                     "Duplicate or oversized owned asset");
             const auto digest = hex(entry.hash);
             auto [where, inserted] = payloads.emplace(digest, entry.bytes);
             require(inserted || where->second == entry.bytes, "Inconsistent owned payload size");
-            if (value.starts_with("dw_bot_styles_mp_") && value.ends_with(".ff"))
+            if (value.starts_with(ownerPrefix(owner)) && value.ends_with(".ff"))
             {
                 require(zone.empty(), "Multiple primary overlay zones");
                 zone = value.substr(0, value.size() - 3);
-                require(zone.substr(zone.size() - 16) == asciiHex(bundle.data()).substr(0, 16),
+                require(zone.substr(zone.size() - 16) == asciiHex(bundle).substr(0, 16),
                         "Owned zone identity does not match its complete bundle");
             }
         }
         require(!zone.empty() && payloads.size() <= 4, "Missing primary or invalid overlay payload set");
         for (const auto &value : names)
         {
-            require(value.substr(value.size() - zone.size() - 3, zone.size()) == zone &&
+            require(value.size() >= zone.size() + 3 &&
+                        value.substr(value.size() - zone.size() - 3, zone.size()) == zone &&
                         names.contains(value.substr(0, value.size() - 3) + (value.ends_with(".ff") ? ".fp" : ".ff")),
                     "Mismatched or incomplete owned FF/FP pair");
         }
-        return result;
+    }
+    inline std::vector<DWUpdateAssetEntry> manifest(const IO &io, std::span<const uint8_t> image)
+    {
+        constexpr uint8_t magic[16] = {'R','E','P','L','A','Y','D','W','A','S','S','E','T','0','1',0};
+        std::vector<DWUpdateAssetEntry> legacy, aggregate, aggregateBot;
+        Digest legacyBundle{}, aggregateBotBundle{};
+        bool foundLegacy = false, foundAggregate = false;
+        for (size_t at = 0; at + sizeof(DWUpdateAssetHeader) <= image.size(); ++at)
+        {
+            if (std::memcmp(image.data() + at, magic, 14) || image[at + 15] ||
+                    (image[at + 14] != '1' && image[at + 14] != '2'))
+                continue;
+            DWUpdateAssetHeader header{};
+            std::memcpy(&header, image.data() + at, sizeof(header));
+            const bool v2 = image[at + 14] == '2';
+            const auto groups = v2 ? DW_UPDATE_ASSET_GROUPS : 0;
+            if (header.version != (v2 ? DW_UPDATE_ASSET_AGGREGATE_VERSION : DW_UPDATE_ASSET_VERSION) ||
+                header.reserved != groups || !header.count || header.count > DW_UPDATE_ASSET_MAX_FILES ||
+                header.bytes != sizeof(header) + header.count * sizeof(DWUpdateAssetEntry) + groups * sizeof(DWUpdateAssetGroup) ||
+                header.bytes > image.size() - at)
+                continue; // Parser constants are not embedded manifest records.
+            require(!(v2 ? foundAggregate : foundLegacy), "Multiple owned asset manifests in verified executable");
+            const auto payload = image.subspan(at + sizeof(header), header.bytes - sizeof(header));
+            Bytes authenticated(std::begin(header.bundleHash), std::end(header.bundleHash));
+            authenticated.insert(authenticated.end(), payload.begin(), payload.end());
+            require(matches(io, authenticated, header.entriesHash), "Embedded asset manifest hash failed");
+            if (!v2)
+            {
+                legacy.resize(header.count);
+                std::memcpy(legacy.data(), payload.data(), payload.size());
+                validateGroup(legacy, 1, header.bundleHash);
+                std::copy(std::begin(header.bundleHash), std::end(header.bundleHash), legacyBundle.begin());
+                foundLegacy = true;
+                continue;
+            }
+            size_t offset = 0, total = 0;
+            Bytes descriptors;
+            for (unsigned owner = 1; owner <= DW_UPDATE_ASSET_GROUPS; ++owner)
+            {
+                require(payload.size() - offset >= sizeof(DWUpdateAssetGroup), "Truncated owned group descriptor");
+                DWUpdateAssetGroup group{};
+                std::memcpy(&group, payload.data() + offset, sizeof(group));
+                require(group.owner == owner && group.count && group.count <= header.count - total,
+                        "Unknown, duplicate or unordered owned group");
+                descriptors.insert(descriptors.end(), payload.begin() + offset, payload.begin() + offset + sizeof(group));
+                offset += sizeof(group);
+                const auto bytes = group.count * sizeof(DWUpdateAssetEntry);
+                require(bytes <= payload.size() - offset, "Truncated owned group entries");
+                std::vector<DWUpdateAssetEntry> entries(group.count);
+                std::memcpy(entries.data(), payload.data() + offset, bytes);
+                validateGroup(entries, owner, group.bundleHash);
+                if (owner == 1)
+                {
+                    aggregateBot = entries;
+                    std::copy(std::begin(group.bundleHash), std::end(group.bundleHash), aggregateBotBundle.begin());
+                }
+                aggregate.insert(aggregate.end(), entries.begin(), entries.end());
+                offset += bytes;
+                total += group.count;
+            }
+            require(offset == payload.size() && total == header.count && matches(io, descriptors, header.bundleHash),
+                    "Aggregate owned group identity failed");
+            foundAggregate = true;
+        }
+        if (!foundAggregate)
+            return legacy; // Includes complete updates to releases without any manifest.
+        require(foundLegacy && legacyBundle == aggregateBotBundle && legacy.size() == aggregateBot.size() &&
+                    std::memcmp(legacy.data(), aggregateBot.data(), legacy.size() * sizeof(DWUpdateAssetEntry)) == 0,
+                "Aggregate manifest lacks its exact legacy catch-up group");
+        std::map<std::wstring, uint64_t> payloads;
+        for (const auto &entry : aggregate)
+        {
+            const auto [where, inserted] = payloads.emplace(hex(entry.hash), entry.bytes);
+            require(inserted || where->second == entry.bytes, "Inconsistent cross-group payload size");
+        }
+        return aggregate;
     }
 
     #include "replay-update-maps.h"

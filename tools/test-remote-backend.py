@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import ssl
 import struct
 import time
 import urllib.error
@@ -32,7 +33,7 @@ def main():
         process_before = live()
         assert process_before['active'] == 'active'
         assert process_before['sha256'] == process_before['process_sha256']
-    base = 'http://' + args.host + ':8085'
+    base = 'https://' + args.host + ':8443'
     checks = []
     private = ec.generate_private_key(ec.SECP256R1())
     numbers = private.public_key().public_numbers()
@@ -71,9 +72,10 @@ def main():
 
     first = login()
     user = struct.unpack_from('<Q', first, 56)[0]
-    with socket.create_connection((args.host, 8443), timeout=5) as tls:
-        tls.sendall(b'\x16\x03\x03\x00\x00')
-        assert tls.recv(7) == b'\x15\x03\x03\x00\x02\x02\x28'
+    with socket.create_connection((args.host, 8443), timeout=5) as transport:
+        with ssl.create_default_context().wrap_socket(transport, server_hostname=args.host) as tls:
+            assert tls.version() in ('TLSv1.2', 'TLSv1.3')
+            checks.append('Publicly trusted HTTPS certificate and server address verified')
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
         udp.settimeout(5)
         destination = socket.inet_aton(args.host) + struct.pack('<H', 3076)
@@ -96,7 +98,7 @@ def main():
         assert client.task(8, 3, profile_blob, structured=False) == b""
         profile = client.task(8, 1, u64(user), structured=False)
         assert profile == u64(user) + profile_blob
-    checks.extend(['signed auth response on native redirected route 8085', 'legacy account token binding',
+    checks.extend(['signed auth response on native HTTPS route 8443', 'legacy account token binding',
                    'encrypted 210 lobby handshake and CBC task transport', 'time task completion',
                    'native profile save/read exact bytes'])
     second = login()
@@ -106,7 +108,7 @@ def main():
     assert health['lobby_failures'] == 0
     receipt = dict(schema=1, passed=True, endpoint=args.host, checked_utc=time.time(), checks=checks,
                    issuer_sha256=hashlib.sha256((ROOT / 'data/platform-public.blob').read_bytes()).hexdigest(),
-                   health=health, native_game_verified=False, native_tls_supported=False)
+                   health=health, native_game_verified=False, native_tls_supported=True)
     if process_before is not None:
         process_after = live()
         assert process_before == process_after, 'Backend changed during public protocol checks'

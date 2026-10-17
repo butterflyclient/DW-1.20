@@ -108,9 +108,15 @@ archive = ROOT / "data/Replay-DW-Client-Test.zip"
 source = Path(readiness["source_root"])
 assets = json.loads((source / "generated/update-assets.json").read_bytes())
 maps = json.loads((source / "generated/update-maps.json").read_bytes())
-from dw_update_assets import extract, sha
-if sha(extract(image.read_bytes())) != assets["manifest_sha256"]:
+from dw_update_assets import extract, decode_groups, sha
+owned_manifest = extract(image.read_bytes())
+if sha(owned_manifest) != assets["manifest_sha256"]:
     raise RuntimeError("Client image does not bind its owned asset inventory")
+owned_groups = decode_groups(owned_manifest)
+if assets['entries'] != [entry for group in owned_groups for entry in group['entries']]:
+    raise RuntimeError('Owned asset inventory differs from the client image')
+owned_packages = [source / ('generated/bot-style-scripts' if group['owner'] == 1
+                            else 'generated/weapon-inspect-assets') for group in owned_groups]
 from dw_update_maps import extract as extract_maps, verify_record
 if maps is None or extract_maps(image.read_bytes()) != verify_record(maps):
     raise RuntimeError("Client image does not bind its explicitly published custom maps")
@@ -120,10 +126,11 @@ with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as pac
         package.writestr(name, data)
     for entry in assets["entries"]:
         relative = Path(assets["relative_paths"][entry["name"]])
-        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) > 2:
+        if (relative.is_absolute() or ".." in relative.parts or len(relative.parts) > 2
+                or relative.name != entry['name']):
             raise RuntimeError("Owned asset escaped its native zone folders")
         payload = Path(assets["payloads"][entry["sha256"]]["source"]).resolve()
-        if not payload.is_relative_to(source / "generated/bot-style-scripts"):
+        if not any(payload.is_relative_to(package) for package in owned_packages):
             raise RuntimeError("Owned package input escaped its frozen source")
         data = payload.read_bytes()
         if sha(data) != entry["sha256"] or len(data) != entry["size"]:

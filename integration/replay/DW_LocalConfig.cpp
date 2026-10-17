@@ -263,9 +263,11 @@ namespace
             Wide(s_wideHost, s_host);
             Wide(s_loginPath, "/platform/client/login");
             Wide(s_headers, "Content-Type: application/octet-stream\r\n");
-            Join(s_authUrl, "http://", s_host, ":8085/auth/");
+            const bool tls = DW_LocalConfig_UseTls(s_host);
+            Join(s_authUrl, tls ? "https://" : "http://", s_host, tls ? ":8443/auth/" : ":8085/auth/");
             Join(s_nativeAuthUrl, "https://", s_host, ":8443/auth/");
-            Join(s_legacyUrl, "http://", s_host, ":8085/v1.0/tokens/lsg/?client=replaylocal");
+            Join(s_legacyUrl, tls ? "https://" : "http://", s_host,
+                 tls ? ":8443/v1.0/tokens/lsg/?client=replaylocal" : ":8085/v1.0/tokens/lsg/?client=replaylocal");
             __atomic_store_n(&s_state, 2U, __ATOMIC_RELEASE);
         }
         else

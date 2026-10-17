@@ -163,14 +163,15 @@ namespace
                                  0));
         require(WinHttpSetTimeouts(session.value, 10000, 10000, 10000, 30000) != 0,
                 "Cannot set update timeouts");
-        Http connection(WinHttpConnect(session.value, host.c_str(), 8085, 0));
+        const bool tls = host != L"127.0.0.1";
+        Http connection(WinHttpConnect(session.value, host.c_str(), tls ? 8443 : 8085, 0));
         Http request(WinHttpOpenRequest(connection.value,
                                         body.empty() ? L"GET" : L"POST",
                                         path.c_str(),
                                         nullptr,
                                         WINHTTP_NO_REFERER,
                                         WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                        0));
+                                        tls ? WINHTTP_FLAG_SECURE : 0));
         DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
         require(WinHttpSetOption(
                     request.value, WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy)) != 0,

@@ -13,11 +13,13 @@ DWBotStyleScriptPackage package = DWBotStyleScripts::Package;
 DWBotStyleFastfileInfo captured[8], allocation[8];
 unsigned nativeCalls, seenCount, seenFlags, state, writes, moves, frees, messages, failure;
 unsigned reads, nativeMissing;
+unsigned backupMoves, restoreMoves;
 const char *regionCode = "ww", *languageCode = "eng";
 const char *regionDirectory = "worldwide", *languageDirectory = "english";
 bool seenServer, packagePresent = true;
 bool mapImages;
 unsigned mapImagesState, publishedState = 99;
+unsigned inspectionState = 99;
 const DWBotStyleFastfileInfo *seenPointer;
 bool sameWide(const wchar_t *a, const wchar_t *b)
 {
@@ -27,6 +29,25 @@ bool sameWide(const wchar_t *a, const wchar_t *b)
         ++b;
     }
     return *a == *b;
+}
+bool containsWide(const wchar_t *text, const wchar_t *part)
+{
+    for (unsigned at = 0; text[at]; ++at)
+    {
+        unsigned length = 0;
+        while (part[length] && text[at + length] == part[length])
+            ++length;
+        if (!part[length])
+            return true;
+    }
+    return false;
+}
+Entry *fileAt(const wchar_t *name)
+{
+    for (auto &file : files)
+        if (file.exists && sameWide(file.name, name))
+            return &file;
+    return nullptr;
 }
 void copyWide(wchar_t *a, const wchar_t *b)
 {
@@ -46,11 +67,13 @@ void clear()
     }
     nativeCalls = seenCount = seenFlags = state = writes = moves = frees = messages = failure = 0;
     reads = nativeMissing = 0;
+    backupMoves = restoreMoves = 0;
     package = DWBotStyleScripts::Package;
     packagePresent = true;
     mapImages = false;
     mapImagesState = 0;
     publishedState = 99;
+    inspectionState = 99;
 }
 void *__stdcall create(const wchar_t *name, unsigned long access, unsigned long, void *,
                        unsigned long disposition, unsigned long, void *)
@@ -112,7 +135,7 @@ int __stdcall writeFile(void *handle, void *input, unsigned long count, unsigned
 int __stdcall moveFile(const wchar_t *from, const wchar_t *to, unsigned long flags)
 {
     ++moves;
-    if (failure == 4 || flags != 9)
+    if (failure == 4 || (flags != 8 && flags != 9))
         return 0;
     Entry *source = nullptr, *dest = nullptr;
     for (auto &file : files)
@@ -124,9 +147,21 @@ int __stdcall moveFile(const wchar_t *from, const wchar_t *to, unsigned long fla
     }
     if (!source || !source->exists)
         return 0;
+    // Match MoveFileExW: WRITE_THROUGH alone never replaces an existing path.
+    if (dest && dest->exists && !(flags & 1))
+        return 0;
+    if (failure == 8 && containsWide(from, L".tmp-"))
+        return 0; // fail installation after preserving the original; allow rollback
+    const bool toBackup = containsWide(to, L"\\replay-dw-backups\\");
+    const bool fromBackup = containsWide(from, L"\\replay-dw-backups\\");
     if (dest)
+    {
         dest->name[0] = 0;
+        dest->exists = false;
+    }
     copyWide(source->name, to);
+    backupMoves += toBackup;
+    restoreMoves += fromBackup && !toBackup;
     return 1;
 }
 int __stdcall removeFile(const wchar_t *name)
@@ -254,6 +289,8 @@ extern "C"
             return mapImagesState;
         if (equal(name, DWMapImages::ZoneName))
             return publishedState;
+        if (equal(name, DWWeaponInspectPackage::Package.zoneName))
+            return inspectionState;
         return equal(name, package.zoneName) ? state : 99;
     }
     bool DW_MapImages_ZoneInstalled()
@@ -304,11 +341,14 @@ extern "C"
         if (count <= 8)
             for (unsigned i = 0; i < count; ++i)
                 captured[i] = info[i];
-        bool overlay = false;
-        for (unsigned i = 0; i < count; ++i)
-            overlay |= equal(info[i].name, package.zoneName);
-        if (overlay)
+        const DWBotStyleScriptPackage *resources[] = {&package, &DWWeaponInspectPackage::Package};
+        for (const auto *resource : resources)
         {
+            bool overlay = false;
+            for (unsigned i = 0; i < count; ++i)
+                overlay |= equal(info[i].name, resource->zoneName);
+            if (!overlay)
+                continue;
             // Model the native consumer's actual current-locale search path.
             const char *codes[] = {regionCode, languageCode};
             for (const char *code : codes)
@@ -317,7 +357,7 @@ extern "C"
                 unsigned at = 0;
                 for (unsigned i = 0; code[i]; ++i) name[at++] = code[i];
                 name[at++] = '_';
-                for (unsigned i = 0; package.zoneName[i]; ++i) name[at++] = package.zoneName[i];
+                for (unsigned i = 0; resource->zoneName[i]; ++i) name[at++] = resource->zoneName[i];
                 char path[512]{};
                 DWBSZ_BuildAbsPath(path, 512, equal(code, languageCode) ? 1 : 7, name, ".ff");
                 wchar_t expected[512]{};
@@ -365,9 +405,34 @@ extern "C"
             CHECK(reads == oldReads);
         }
         state = 0;
+        wchar_t stalePath[1200]{};
+        copyWide(stalePath, files[0].name);
+        CHECK(files[0].size == package.fastfileBytes && files[0].size > 100);
         files[0].bytes[100] ^= 0x40;
+        const unsigned oldMoves = moves;
         DW_BotStyleZone_LoadFastfiles(stock, 3, 1, false);
-        CHECK(seenCount == 4 && writes == oldWrites + 1);
+        CHECK(seenCount == 4 && writes == oldWrites + 1 && moves == oldMoves + 2 &&
+              backupMoves == 1 && !restoreMoves);
+        wchar_t backupPath[1200] = L"E:\\DW\\IW8\\data\\offline-zone-harness\\zone\\replay-dw-backups\\";
+        const wchar_t *basename = stalePath;
+        for (unsigned i = 0; stalePath[i]; ++i)
+            if (stalePath[i] == L'\\')
+                basename = &stalePath[i + 1];
+        unsigned backupAt = 0;
+        while (backupPath[backupAt]) ++backupAt;
+        for (unsigned i = 0; basename[i]; ++i) backupPath[backupAt++] = basename[i];
+        const wchar_t backupSuffix[] = L".original-0000007b-00";
+        for (unsigned i = 0; backupSuffix[i]; ++i) backupPath[backupAt++] = backupSuffix[i];
+        backupPath[backupAt] = 0;
+        Entry *retained = fileAt(backupPath);
+        Entry *repaired = fileAt(stalePath);
+        CHECK(retained && repaired && retained->size == package.fastfileBytes &&
+              repaired->size == package.fastfileBytes);
+        for (unsigned i = 0; i < package.fastfileBytes; ++i)
+        {
+            CHECK(retained->bytes[i] == (i == 100 ? uint8_t(package.fastfile[i] ^ 0x40) : package.fastfile[i]));
+            CHECK(repaired->bytes[i] == package.fastfile[i]);
+        }
         DWBotStyleFastfileInfo duplicate[] = {{"common_base_mp", 1, 2, 3, 4},
                                               {package.zoneName, 1, 2, 3, 4}};
         DW_BotStyleZone_LoadFastfiles(duplicate, 2, 15, true);
@@ -452,6 +517,17 @@ extern "C"
               equal(captured[2].name, "ui") && !writes);
         CHECK(captured[1].zoneFlags == 0x40 && captured[1].failureMode == 9 &&
               captured[1].priority == 77 && captured[1].reserved == 0x5555);
+        // The boot request's "common" record (flags 0x1, never unloaded) wins over
+        // ui (0x40, freed by the frontend unload at match start).
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        DWBotStyleFastfileInfo boot[] = {{"ui_boot", 0x40, 1, 2, 3}, {"common", 0x1, 4, 5, 6},
+                                         {"ui", 0x40, 9, 77, 0x5555}};
+        DW_BotStyleZone_LoadFastfiles(boot, 3, 2, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images") &&
+              equal(captured[2].name, "common") && captured[1].zoneFlags == 0x1 &&
+              captured[1].failureMode == 4 && captured[1].priority == 5);
         // Without ui or common_base_mp, a map or frontend zone (mp_*) anchors the
         // map art again once it has been unloaded (a match unloads it); a
         // transient mp_*_tr zone never does.
@@ -468,6 +544,71 @@ extern "C"
         DWBotStyleFastfileInfo transient[] = {{"mp_av_attachment_tr", 0x21, 2, 3, 4}};
         DW_BotStyleZone_LoadFastfiles(transient, 1, 1, false);
         CHECK(seenPointer == transient && seenCount == 1);
+        // Inspection resources use a small fixture descriptor in this harness;
+        // production compilation separately includes the real generated header.
+        clear();
+        packagePresent = false;
+        inspectionState = 0;
+        const auto &inspection = DWWeaponInspectPackage::Package;
+        CHECK(inspection.installationNameCount == 10 && inspection.fastfileBytes < 400000);
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 3, true);
+        CHECK(nativeCalls == 1 && seenCount == 4 && seenFlags == 3 && seenServer && frees == 1 &&
+              writes == 2 * inspection.installationNameCount && moves == writes && !nativeMissing);
+        CHECK(equal(captured[0].name, "before") && equal(captured[1].name, inspection.zoneName) &&
+              equal(captured[2].name, "common_base_mp") && equal(captured[3].name, "after"));
+        CHECK(captured[1].zoneFlags == stock[1].zoneFlags && captured[1].failureMode == stock[1].failureMode &&
+              captured[1].priority == stock[1].priority && captured[1].reserved == stock[1].reserved);
+        const unsigned inspectWrites = writes, inspectMoves = moves;
+        for (unsigned pending = 1; pending <= 4; ++pending)
+        {
+            inspectionState = pending;
+            const unsigned pendingReads = reads;
+            DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+            CHECK(seenPointer == stock && seenCount == 3 && reads == pendingReads &&
+                  writes == inspectWrites && moves == inspectMoves);
+        }
+        // Native unload returns0: queue it again, retaining already staged bytes.
+        inspectionState = 0;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 1, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, inspection.zoneName) &&
+              writes == inspectWrites && moves == inspectMoves && frees == 2 && !nativeMissing);
+        DWBotStyleFastfileInfo inspectDuplicate[] = {{"common_base_mp", 1, 2, 3, 4},
+                                                     {inspection.zoneName, 5, 6, 7, 8}};
+        const unsigned duplicateReads = reads;
+        DW_BotStyleZone_LoadFastfiles(inspectDuplicate, 2, 15, true);
+        CHECK(seenPointer == inspectDuplicate && seenCount == 2 && seenFlags == 15 && seenServer &&
+              reads == duplicateReads && writes == inspectWrites);
+        clear();
+        inspectionState = 0;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 3, true);
+        CHECK(seenCount == 5 && equal(captured[1].name, inspection.zoneName) &&
+              equal(captured[2].name, package.zoneName) && equal(captured[3].name, "common_base_mp") &&
+              writes == 2 * (inspection.installationNameCount + package.installationNameCount) && !nativeMissing);
+        CHECK(captured[1].zoneFlags == stock[1].zoneFlags && captured[2].zoneFlags == stock[1].zoneFlags &&
+              captured[1].failureMode == stock[1].failureMode && captured[1].priority == stock[1].priority &&
+              captured[1].reserved == stock[1].reserved && stock[1].reserved == 0x12345678);
+        clear();
+        packagePresent = false;
+        inspectionState = 0;
+        DW_BotStyleZone_LoadFastfiles(frontend, 3, 0, false);
+        CHECK(seenPointer == frontend && seenCount == 3 && !writes);
+        // If installation fails after moving a modified original into recovery,
+        // rollback must restore that original and keep the native request intact.
+        clear();
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        copyWide(stalePath, files[0].name);
+        files[0].bytes[100] ^= 0x20;
+        messages = 0;
+        failure = 8;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        retained = fileAt(stalePath);
+        CHECK(seenPointer == stock && seenCount == 3 && messages == 1 &&
+              backupMoves == 1 && restoreMoves == 1 && retained &&
+              retained->size == package.fastfileBytes);
+        for (unsigned i = 0; i < package.fastfileBytes; ++i)
+            CHECK(retained->bytes[i] == (i == 100 ? uint8_t(package.fastfile[i] ^ 0x20) : package.fastfile[i]));
+        for (const auto &file : files)
+            CHECK(!file.exists || !containsWide(file.name, L".tmp-"));
         // The executable's published map image zone: staged with every native
         // companion, then requested before the owner-built zone.
         clear();

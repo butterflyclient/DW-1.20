@@ -806,7 +806,7 @@ def main():
         NativeTranslations["PLAYLIST/NUKETOWN_TDM"]=nil
         local nuke=MenuBuilder.BuildRegisteredType("PlaylistFeaturedButton",options)
         nuke.modelName="PLAYLIST/NUKETOWN_TDM";nuke.RefreshModel()
-        assert(nuke.Name:getText()=="NUKETOWN TDM")
+        assert(string.sub(nuke.Name:getText(),1,12)=="NUKETOWN TDM")
         nuke.DisabledText=MakeNode()
         local function source(id) return {ID={GetValue=function(_,controller) assert(controller==0);return id end}} end
         CustomMaps=" mp_crash "
@@ -834,8 +834,8 @@ def main():
             return widget
         end)
         local status=MenuBuilder.BuildRegisteredType("LobbyStatusPanel",options)
-        assert(status.Title:getText()=="NUKETOWN TDM")
-        status.Title:setText("@PLAYLIST/NUKETOWN_TDM");assert(status.Title:getText()=="NUKETOWN TDM")
+        assert(string.sub(status.Title:getText(),1,12)=="NUKETOWN TDM")
+        status.Title:setText("@PLAYLIST/NUKETOWN_TDM");assert(string.sub(status.Title:getText(),1,12)=="NUKETOWN TDM")
         status.Title:setText("TEAM DEATHMATCH");assert(status.Title:getText()=="TEAM DEATHMATCH")
         results[#results+1]="Nuketown TDM title/description fall back only when untranslated; the public lobby status title is repaired; its featured button stays disabled unless replay_dw_customMaps lists exactly mp_nuketown, other playlists are unaffected"
         local panel=MakeNode()

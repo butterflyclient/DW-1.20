@@ -231,12 +231,30 @@ if 'assets' in new:
     assets=new['assets'];manifest=(incoming/'update-assets.bin').read_bytes()
     assert len(manifest)==assets['manifest_size'] and hashlib.sha256(manifest).hexdigest()==assets['manifest_sha256']
     magic,version,total,count,reserved,digest,bundle=struct.unpack_from('<16sIIII32s32s',manifest)
-    assert magic==b'REPLAYDWASSET01\0' and version==1 and reserved==0 and 0<count<=256
-    assert total==len(manifest)==96+136*count and count==assets['files']
+    legacy=magic==b'REPLAYDWASSET01\0' and version==1 and reserved==0
+    aggregate=magic==b'REPLAYDWASSET02\0' and version==2 and reserved==2
+    assert (legacy or aggregate) and 0<count<=256
+    assert total==len(manifest)==96+136*count+(80 if aggregate else 0) and count==assets['files']
     assert hashlib.sha256(bundle+manifest[96:]).digest()==digest
+    if aggregate:
+        offset=96;seen=0;descriptors=bytearray();catchup=None
+        for owner in (1,2):
+            descriptor=manifest[offset:offset+40]
+            actual,entries,identity=struct.unpack('<II32s',descriptor)
+            assert actual==owner and 0<entries<=count-seen
+            descriptors+=descriptor;offset+=40
+            group=manifest[offset:offset+136*entries]
+            assert len(group)==136*entries
+            if owner==1:
+                catchup=struct.pack('<16sIIII32s32s',b'REPLAYDWASSET01\0',1,96+len(group),entries,0,
+                                    hashlib.sha256(identity+group).digest(),identity)+group
+            offset+=len(group);seen+=entries
+        assert offset==len(manifest) and seen==count and hashlib.sha256(descriptors).digest()==bundle
     with (incoming/'update-assets.bin').open('rb') as f: os.fsync(f.fileno())
     with image.open('rb') as f,mmap.mmap(f.fileno(),0,access=mmap.ACCESS_READ) as mapped:
         at=mapped.find(manifest);assert at>=0 and mapped.find(manifest,at+len(manifest))<0
+        if aggregate:
+            at=mapped.find(catchup);assert at>=0 and mapped.find(catchup,at+len(catchup))<0
     for digest,size in assets['payloads'].items():
         assert len(digest)==64 and all(c in '0123456789abcdef' for c in digest) and 0<size<=64*1024*1024
         payload=incoming/'assets'/(digest+'.bin')

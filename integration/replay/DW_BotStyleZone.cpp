@@ -1,6 +1,7 @@
 #include "DW_BotStyleScriptPackage.h"
 #include "DW_BotStyleZoneBindings.h"
 #include "DW_MapImagesPackage.h"
+#include "DW_WeaponInspectPackage.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -189,10 +190,66 @@ bool writeAtomic(const Kernel &api, const wchar_t *path, const uint8_t *bytes, u
     const bool ok = api.write(handle, const_cast<uint8_t *>(bytes), size, &written, nullptr) &&
                     written == size && api.flush(handle);
     CloseHandle(handle);
-    const bool installed =
-        ok && verify(api, temporary, bytes, size) && api.move(temporary, path, 9);
-    if (!installed)
+    if (!ok || !verify(api, temporary, bytes, size))
+    {
         api.remove(temporary);
+        return false;
+    }
+    // Normally these content-addressed names do not exist yet. Preserve a
+    // modified copy before repairing it, including when an older updater has
+    // installed the EXE without its companion files. Never replace a backup.
+    wchar_t backup[640]{};
+    bool backedUp = false;
+    handle = api.file(path, 0, 7, nullptr, 3, 0x80, nullptr);
+    if (handle != reinterpret_cast<void *>(~uintptr_t{0}))
+    {
+        CloseHandle(handle);
+        size_t parent = 0;
+        for (size_t i = 0; path[i]; ++i)
+            if (path[i] == L'\\')
+                parent = i + 1;
+        wchar_t folder[640]{};
+        if (!parent || parent >= 640)
+        {
+            api.remove(temporary);
+            return false;
+        }
+        for (size_t i = 0; i < parent; ++i)
+            folder[i] = path[i];
+        if (!append(folder, 640, L"replay-dw-backups"))
+        {
+            api.remove(temporary);
+            return false;
+        }
+        api.directory(folder, nullptr);
+        for (unsigned attempt = 0; attempt < 16 && !backedUp; ++attempt)
+        {
+            backup[0] = 0;
+            wchar_t index[4] = { L'-', L"0123456789abcdef"[attempt >> 4],
+                                L"0123456789abcdef"[attempt & 15], 0 };
+            if (!append(backup, 640, folder) || !append(backup, 640, L"\\") ||
+                !append(backup, 640, path + parent) ||
+                !append(backup, 640, L".original-") || !append(backup, 640, suffix) ||
+                !append(backup, 640, index))
+                break;
+            backedUp = api.move(path, backup, 8) != 0;
+        }
+        if (!backedUp)
+        {
+            api.remove(temporary);
+            return false;
+        }
+    }
+    // No REPLACE_EXISTING: another process's file or a file we could not open
+    // must not be silently overwritten. Failed installation restores the old
+    // path when possible; its backup remains recoverable if restoration fails.
+    const bool installed = api.move(temporary, path, 8) != 0;
+    if (!installed)
+    {
+        api.remove(temporary);
+        if (backedUp)
+            api.move(backup, path, 8);
+    }
     return installed && verify(api, path, bytes, size);
 }
 
@@ -283,7 +340,8 @@ bool installationDirectory(const Kernel &api, const wchar_t *root, const char *n
     return true;
 }
 
-bool stage(const Kernel &api, const DWBotStyleScriptPackage &package)
+bool stage(const Kernel &api, const DWBotStyleScriptPackage &package,
+           const char *prefix = "dw_bot_styles_mp_")
 {
     if (!package.zoneName || !package.fastfile || !package.patch || !package.fastfileBytes ||
         !package.patchBytes || !package.emptyFastfile || !package.emptyFastfileBytes ||
@@ -298,10 +356,12 @@ bool stage(const Kernel &api, const DWBotStyleScriptPackage &package)
         if (length + 1 >= 80 || !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'))
             return false;
     }
-    const char prefix[] = "dw_bot_styles_mp_";
-    if (length != sizeof(prefix) - 1 + 16)
+    size_t prefixLength = 0;
+    while (prefix[prefixLength])
+        ++prefixLength;
+    if (length != prefixLength + 16)
         return false;
-    for (size_t i = 0; i < sizeof(prefix) - 1; ++i)
+    for (size_t i = 0; i < prefixLength; ++i)
         if (package.zoneName[i] != prefix[i])
             return false;
     wchar_t directory[512]{};
@@ -460,16 +520,22 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     static int s_publishedImages; // 0 not staged yet, 1 staged, -1 staging failed
     const char *const publishedImagesZone = DWMapImages::ZoneName;
     const DWBotStyleScriptPackage *package = DW_BotStyleScripts_GetPackage();
-    const DWBotStyleFastfileInfo *common = nullptr, *ui = nullptr;
+    const DWBotStyleScriptPackage &inspectPackage = DWWeaponInspectPackage::Package;
+    const DWBotStyleFastfileInfo *common = nullptr, *ui = nullptr, *boot = nullptr;
     bool supplied = false, imagesSupplied = false, publishedSupplied = false;
+    bool inspectSupplied = false;
     for (uint32_t i = 0; info && i < count; ++i)
     {
         if (equal(info[i].name, "common_base_mp"))
             common = &info[i];
         if (equal(info[i].name, "ui"))
             ui = &info[i];
+        if (equal(info[i].name, "common"))
+            boot = &info[i];
         if (package && equal(info[i].name, package->zoneName))
             supplied = true;
+        if (equal(info[i].name, inspectPackage.zoneName))
+            inspectSupplied = true;
         if (equal(info[i].name, kMapImagesZone))
             imagesSupplied = true;
         if (equal(info[i].name, publishedImagesZone))
@@ -485,7 +551,13 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     // 2026-10-16) and the frontend after a match never re-requests ui (white
     // lobby). Without ui or common_base_mp, a map or frontend zone (mp_*) of
     // the request anchors it; it is re-added whenever fully unloaded.
-    const DWBotStyleFastfileInfo *imageAnchor = ui ? ui : common;
+    // Logged requests (replay-dw-client.log, owner 2026-10-16): the boot request
+    // is "ui_boot:0x40 global:0x1 common:0x1 ui:0x40 ... mp_frontend3:0x80";
+    // ComFastFile's frontend unload frees the 0x40/0x80 zones at match start, so
+    // map art copied from ui's record was gone before the loading screen drew.
+    // The boot "common" record (0x1, like code_post_gfx) is never unloaded, and
+    // it shares ui's request, so the lobby still has the art at startup.
+    const DWBotStyleFastfileInfo *imageAnchor = boot ? boot : ui ? ui : common;
     for (uint32_t i = 0; !imageAnchor && info && i < count; ++i)
     {
         // Transient streaming zones (mp_*_tr) are never anchors.
@@ -501,18 +573,20 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     // A later unload returns state zero, allowing the next request to load the
     // same overlay again. No process-lifetime 'loaded' latch is used.
     bool bot = common && package && !supplied && DWBSZ_PollFastfileState(package->zoneName) == 0;
+    bool inspection = common && !inspectSupplied &&
+                      DWBSZ_PollFastfileState(inspectPackage.zoneName) == 0;
     const bool images = imageAnchor && !imagesSupplied && DW_MapImages_ZoneInstalled() &&
                         DWBSZ_PollFastfileState(kMapImagesZone) == 0;
     bool published = imageAnchor && !publishedSupplied && s_publishedImages >= 0 &&
                      DWBSZ_PollFastfileState(publishedImagesZone) == 0;
-    if (!bot && !images && !published)
+    if (!bot && !images && !published && !inspection)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     Kernel api{};
-    if (!resolve(api) || count >= UINT32_MAX - 3 ||
-        static_cast<size_t>(count) + 3 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
+    if (!resolve(api) || count >= UINT32_MAX - 4 ||
+        static_cast<size_t>(count) + 4 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
     {
         DWBSZ_Print(10, "DW: native overlay request failed; original zone request retained.\n");
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
@@ -524,6 +598,11 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             10, "DW: bot style native overlay staging failed; original zone request retained.\n");
         bot = false;
     }
+    if (inspection && !stage(api, inspectPackage, "dw_weapon_inspect_mp_"))
+    {
+        DWBSZ_Print(10, "DW: inspection animation staging failed; inspection unavailable.\n");
+        inspection = false;
+    }
     if (published && !s_publishedImages)
     {
         s_publishedImages = stageMapImages(api) ? 1 : -1;
@@ -531,14 +610,14 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             DWBSZ_Print(10, "DW: published map image zone staging failed; map images omitted.\n");
     }
     published = published && s_publishedImages > 0;
-    if (!bot && !images && !published)
+    if (!bot && !images && !published && !inspection)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     void *heap = api.heap();
     auto *augmented = static_cast<DWBotStyleFastfileInfo *>(
-        api.alloc(heap, 0, (static_cast<size_t>(count) + 3) * sizeof(DWBotStyleFastfileInfo)));
+        api.alloc(heap, 0, (static_cast<size_t>(count) + 4) * sizeof(DWBotStyleFastfileInfo)));
     if (!augmented)
     {
         DWBSZ_Print(10, "DW: native overlay request allocation failed.\n");
@@ -548,6 +627,13 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     uint32_t at = 0;
     for (uint32_t i = 0; i < count; ++i)
     {
+        if (&info[i] == common && inspection)
+        {
+            // Register real XAnims and their ANM names before the common
+            // module completes the native client/server constant-string map.
+            augmented[at] = info[i];
+            augmented[at++].name = inspectPackage.zoneName;
+        }
         if (&info[i] == common && bot)
         {
             // Same-group duplicates are discarded by native DB_LinkXAssetEntry.
@@ -576,6 +662,9 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     if (bot)
         DWBSZ_Print(10, "DW: native bot style overlay '%s' precedes common_base_mp.\n",
                     package->zoneName);
+    if (inspection)
+        DWBSZ_Print(10, "DW: inspection animation zone '%s' precedes common_base_mp.\n",
+                    inspectPackage.zoneName);
     if (published)
         DWBSZ_Print(10, "DW: published map image zone '%s' precedes %s.\n", publishedImagesZone,
                     imageAnchor->name);

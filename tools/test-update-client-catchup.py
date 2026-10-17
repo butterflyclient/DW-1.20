@@ -107,6 +107,34 @@ def map_fixture():
     return manifest, payloads, installed
 
 
+def owned_fixture(folder_rules):
+    """Metadata-only v1 catch-up plus v2 bot/inspection resources; no real FF."""
+    from dw_update_assets import encode, encode_groups, native_folder_policy, OWNERS
+    directories = {rule['name_prefix']: rule['directory'] for rule in folder_rules}
+    assert '' in directories and 'eng_' in directories
+    groups, payloads, installed, owners = [], {}, {}, {}
+    for owner in (1, 2):
+        resources = [f'harmless owned fixture group {owner} resource {index}\n'.encode() for index in range(4)]
+        bundle = sha(b''.join(resources)).hex()
+        zone = OWNERS[owner] + bundle[:16]
+        entries, policy_entries = [], []
+        for prefix, first in (('', 0), ('eng_', 2)):
+            for offset, suffix in enumerate(('.ff', '.fp')):
+                data = resources[first + offset]
+                digest, name = sha(data).hex(), prefix + zone + suffix
+                relative = (directories[prefix] + '/' if directories[prefix] else '') + name
+                entries.append(dict(name=name, sha256=digest, size=len(data)))
+                policy_entries.append(dict(name=name, relative_path=relative))
+                payloads[digest] = data
+                installed['zone/' + relative] = data
+                owners['zone/' + relative] = owner
+        native_folder_policy(dict(native_folder_rules=folder_rules, installation_manifest=policy_entries), owner)
+        groups.append(dict(owner=owner, entries=sorted(entries, key=lambda item: item['name']), bundle_sha256=bundle))
+    legacy = encode(groups[0]['entries'], groups[0]['bundle_sha256'])
+    aggregate = encode_groups(groups)
+    return legacy + aggregate, payloads, installed, owners, groups
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", type=Path, help="Canonical build directory or build-report.json")
@@ -152,6 +180,15 @@ def main():
                 source = ROOT / "integration/replay" / name
             shutil.copyfile(source, frozen / name)
         trust(frozen / "dw_local_trust.h", public_blob)
+        # Freeze both versions in the same referenced array. Historical helpers
+        # see one bot-only v1 record; the new helper must validate the aggregate
+        # and download the separately owned inspection group as well.
+        from dw_update_assets import extract, decode_groups, folder_header
+        metadata = json.loads((args.source_root.parent / 'generated/update-assets.json').read_bytes())
+        assert (frozen / 'DW_UpdateAssetPaths.h').read_bytes() == folder_header(metadata['native_folder_rules'])
+        owned_manifest, owned_payloads, owned_files, owned_owners, owned_groups = owned_fixture(metadata['native_folder_rules'])
+        assert decode_groups(extract(owned_manifest)) == owned_groups
+        byte_header(frozen / 'DW_UpdateAssetManifest.h', 's_dwUpdateAssetManifest', owned_manifest)
         byte_header(frozen / "DW_UpdateMapManifest.h", "s_dwUpdateMapManifest", map_manifest)
         spec = importlib.util.spec_from_file_location("fixture_embed", ROOT / "tools/embed-update-helper.py")
         embed = importlib.util.module_from_spec(spec); spec.loader.exec_module(embed)
@@ -219,10 +256,11 @@ target_compile_definitions(latest PRIVATE LATEST=1)
         cmake(launcher, root / "launcher-build")
         latest = (root / "launcher-build/Release/latest.exe").read_bytes()
         original_latest = latest
-        legacy_metadata = json.loads((args.source_root.parent / "generated/update-assets.json").read_bytes())
-        legacy_payloads = {digest: Path(item["source"]).read_bytes() for digest, item in legacy_metadata["payloads"].items()}
+        assert latest.count(owned_manifest) == 1, 'Signed harmless image lost its combined legacy/aggregate record'
+        inspection_digests = {item['sha256'] for item in owned_groups[1]['entries']}
         requests, nonces = [], set()
         corrupt = False
+        corrupt_inspection = False
         short_plan = False
         class Server(http.server.BaseHTTPRequestHandler):
             def log_message(self, *unused): pass
@@ -245,9 +283,10 @@ target_compile_definitions(latest PRIVATE LATEST=1)
                 prefix="/updates/v2/asset/"
                 assert self.path.startswith(prefix)
                 digest=self.path[len(prefix):]
-                data=(map_payloads|legacy_payloads)[digest]
-                requests.append(("map" if digest in map_payloads else "legacy",digest))
-                self.send(bytes([data[0]^1])+data[1:] if corrupt and digest in map_payloads else data)
+                data=(map_payloads|owned_payloads)[digest]
+                requests.append(("map" if digest in map_payloads else "inspect" if digest in inspection_digests else "bot",digest))
+                bad = (corrupt and digest in map_payloads) or (corrupt_inspection and digest in inspection_digests)
+                self.send(bytes([data[0]^1])+data[1:] if bad else data)
         server=http.server.ThreadingHTTPServer(("127.0.0.1",8085),Server)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         kernel=ctypes.WinDLL("kernel32",use_last_error=True)
@@ -262,7 +301,7 @@ target_compile_definitions(latest PRIVATE LATEST=1)
             log=Path(str(game)+".update/result.log")
             assert result.returncode==expected,(mode,result.returncode,log.read_text() if log.exists() else "no log")
 
-        def handoff(helper,game,mode="--apply"):
+        def handoff(helper,game,mode="--apply",expected_apply=0):
             directory=game.parent
             (directory/"hold").touch()
             for name in ("exit","parent-ready","new-launch-result"):
@@ -276,7 +315,9 @@ target_compile_definitions(latest PRIVATE LATEST=1)
                 assert kernel.WaitForSingleObject(event,30000)==0
                 assert parent.poll() is None and apply.poll() is None
                 (directory/"hold").unlink();(directory/"exit").touch()
-                assert parent.wait(timeout=10)==0 and apply.wait(timeout=45)==0
+                assert parent.wait(timeout=10)==0 and apply.wait(timeout=45)==expected_apply
+                if expected_apply:
+                    return expected_apply # Failure must roll back without relaunch.
                 for _ in range(600):
                     marker=directory/"new-launch-result"
                     if marker.exists():return int(marker.read_text())
@@ -295,27 +336,64 @@ target_compile_definitions(latest PRIVATE LATEST=1)
                 old_hash=sha(game.read_bytes());before=len(requests)
                 prepare(old_helper,game,20)
                 assert not any(x[0]=="map" for x in requests[before:])
+                assert not any(x[0]=="inspect" for x in requests[before:])
                 first_launch = handoff(old_helper,game)
                 assert first_launch == 20, (version, first_launch, Path(str(game)+".update/result.log").read_text(), requests[before:])
                 assert game.read_bytes()==latest
                 assert Path(str(game)+".updater.exe").read_bytes()==current_helper.read_bytes()
                 assert not (folder/"mods").exists()
                 assert any(x[0]=="map" for x in requests[before:])
+                assert any(x[0]=="inspect" for x in requests[before:])
                 assert (Path(str(game)+".update")/(old_hash.hex()+".backup.exe")).exists()
                 assert handoff(current_helper,game)==10
                 for relative,data in map_files.items():assert (folder/relative).read_bytes()==data
+                for relative,data in owned_files.items():assert (folder/relative).read_bytes()==data
                 before=len(requests);prepare(current_helper,game,10)
                 assert requests[before:]==[("check",True)]
                 checks.append(version+": real historical helper installs new EXE; first new launch stages maps using new embedded helper; asset-only apply then stays current")
+                checks.append(version+": old helper ignores v2 inspection; new embedded helper downloads and installs both hash-bound owned groups")
             folder=root/"current-repair";folder.mkdir();game=folder/"game.exe";game.write_bytes(latest)
             for relative,data in map_files.items():
                 p=folder/relative;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+            for relative,data in owned_files.items():
+                p=folder/relative;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+            inspection_files = [name for name in owned_files if owned_owners[name] == 2]
+            inspect_missing, inspect_corrupt = inspection_files[:2]
+            (folder/inspect_missing).unlink()
+            original_inspect = b'modified original inspection fixture\n'
+            (folder/inspect_corrupt).write_bytes(original_inspect)
             first,second=list(map_files)[:2]
             (folder/first).unlink();data=map_files[second];(folder/second).write_bytes(bytes([data[0]^1])+data[1:])
             prepare(current_helper,game,20,"--prepare-assets")
             assert handoff(current_helper,game,"--apply-assets")==10 and game.read_bytes()==latest
             for relative,data in map_files.items():assert (folder/relative).read_bytes()==data
+            for relative,data in owned_files.items():assert (folder/relative).read_bytes()==data
+            backup_root=Path(str(game)+'.update')/'asset-backups'/sha(latest).hex()
+            assert any(path.read_bytes()==original_inspect for path in backup_root.glob('*.bak'))
+            journal=(backup_root/'recovery.tsv').read_text()
+            assert inspect_corrupt in journal and sha(original_inspect).hex() in journal
             checks.append("Current EXE repairs missing and same-length corrupt map files without replacing its image")
+            checks.append('New aggregate helper repairs missing/modified inspection FF/FP, preserves modified originals and a verified recovery journal')
+            # Fail after replacing a bot file, while installing a later inspect
+            # entry. The shared native transaction must restore that bot file.
+            folder=root/'owned-rollback';folder.mkdir();game=folder/'game.exe';game.write_bytes(latest)
+            for relative,data in (map_files|owned_files).items():
+                p=folder/relative;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+            bot_file=next(name for name in owned_files if owned_owners[name]==1)
+            original_bot=b'original bot fixture before failed aggregate install\n'
+            (folder/bot_file).write_bytes(original_bot)
+            blocked_inspect=inspection_files[-1]
+            (folder/blocked_inspect).unlink();(folder/blocked_inspect).mkdir()
+            prepare(current_helper,game,20,'--prepare-assets')
+            assert handoff(current_helper,game,'--apply-assets',expected_apply=40)==40
+            assert game.read_bytes()==latest and (folder/bot_file).read_bytes()==original_bot
+            assert (folder/blocked_inspect).is_dir() and not (folder/'new-launch-result').exists()
+            for relative,data in (map_files|owned_files).items():
+                if relative not in (bot_file,blocked_inspect):assert (folder/relative).read_bytes()==data
+            backup_root=Path(str(game)+'.update')/'asset-backups'/sha(latest).hex()
+            assert any(path.read_bytes()==original_bot for path in backup_root.glob('*.bak'))
+            assert bot_file in (backup_root/'recovery.tsv').read_text()
+            checks.append('Inspection destination failure rolls back earlier bot replacement, retains original backup/journal and never relaunches')
             folder=root/"bypass";folder.mkdir();game=folder/"game.exe";game.write_bytes(latest+b"custom fixture edit")
             (folder/"bypass").touch();custom=game.read_bytes()
             prepare(current_helper,game,20,"--prepare-assets")
@@ -335,6 +413,17 @@ target_compile_definitions(latest PRIVATE LATEST=1)
             corrupt=True;prepare(current_helper,game,40);corrupt=False
             assert not (folder/"mods").exists() and game.read_bytes()==latest
             checks.append("Corrupt compressed payload is rejected before asset or EXE installation")
+            folder=root/'corrupt-inspection';folder.mkdir();game=folder/'game.exe';game.write_bytes(latest)
+            for relative,data in (map_files|owned_files).items():
+                if owned_owners.get(relative)==2:continue
+                p=folder/relative;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+            before=len(requests);corrupt_inspection=True
+            try:prepare(current_helper,game,40,'--prepare-assets')
+            finally:corrupt_inspection=False
+            assert any(item[0]=='inspect' for item in requests[before:]) and game.read_bytes()==latest
+            assert all(not (folder/relative).exists() for relative in inspection_files)
+            assert not (Path(str(game)+'.update')/'asset-backups').exists()
+            checks.append('Corrupt v2 inspection payload is rejected before replacement or backup of installed assets')
             folder=root/"expired";folder.mkdir();game=folder/"game.exe";game.write_bytes(latest)
             short_plan=True;prepare(current_helper,game,20,"--prepare-assets");short_plan=False
             time.sleep(2);before=len(requests)
@@ -346,6 +435,8 @@ target_compile_definitions(latest PRIVATE LATEST=1)
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps({"passed":True,"checks":checks,"historical_helpers":old_proofs,
         "build_proof":build_proof,
+        "owned_fixture_versions":[1,2],"owned_fixture_groups":[1,2],
+        "owned_fixture_manifest_sha256":sha(owned_manifest).hex(),
         "fixture_only":True,"fixture_key_only":True,"game_executed":False,"public_host_used":False,
         "installed_game_modified":False,"private_fixture_removed":True},indent=2)+"\n")
     print("PASS",len(checks),"historical helper/new-launch asset catch-up cases")

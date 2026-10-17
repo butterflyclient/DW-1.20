@@ -17,3 +17,13 @@ extern "C"
     unsigned DW_LocalConfig_Rank();
     bool DW_LocalConfig_ResetProgression();
 }
+
+// Production endpoints require TLS; only exact loopback retains local HTTP.
+inline bool DW_LocalConfig_UseTls(const char *host = DW_LocalConfig_Host())
+{
+    constexpr char loopback[] = "127.0.0.1";
+    for (unsigned i = 0; i < sizeof(loopback); ++i)
+        if (host[i] != loopback[i])
+            return true;
+    return false;
+}

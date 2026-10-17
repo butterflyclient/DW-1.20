@@ -212,6 +212,37 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def inspection_fixture_header(policy):
+    """Tiny owned descriptor for the OS-boundary harness, never production."""
+    zone = "dw_weapon_inspect_mp_0123456789abcdef"
+    rules = policy["installation_folder_rules"]
+    names = [row["name_prefix"] + zone for row in rules]
+    directories = [row["directory"] for row in rules]
+    assert len(names) == len(set(names)) == 10 and names.count(zone) == 1
+    return "\n".join([
+        "#pragma once",
+        '#include "DW_BotStyleScriptPackage.h"',
+        "// Harness fixture only; production uses the snapshot's real inspection resources.",
+        "namespace DWWeaponInspectPackage {",
+        "inline const uint8_t Fastfile[] = {0x31,0x32,0x33,0x34};",
+        "inline const uint8_t Patch[] = {0x41,0x42};",
+        "inline const uint8_t EmptyFastfile[] = {0x51,0x52};",
+        "inline const uint8_t EmptyPatch[] = {0x61};",
+        "inline const char *const InstallationNames[] = {",
+        *("    " + json.dumps(name) + "," for name in names),
+        "};",
+        "inline const char *const InstallationDirectories[] = {",
+        *("    " + json.dumps(directory) + "," for directory in directories),
+        "};",
+        "inline const DWBotStyleScriptPackage Package = {" + json.dumps(zone) +
+        ", Fastfile, sizeof(Fastfile), Patch, sizeof(Patch), EmptyFastfile, sizeof(EmptyFastfile), "
+        "EmptyPatch, sizeof(EmptyPatch), InstallationNames, InstallationDirectories, "
+        "sizeof(InstallationNames)/sizeof(*InstallationNames), 0};",
+        "}",
+        "",
+    ])
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--snapshot", type=Path, required=True)
@@ -291,6 +322,14 @@ def main():
         folder = Path(temporary)
         obj = folder / "test.obj"
         dll = folder / "test.dll"
+        fixture = folder / "inspection-fixture"
+        fixture.mkdir()
+        fixture_header = fixture / "DW_WeaponInspectPackage.h"
+        fixture_header.write_text(inspection_fixture_header(policy), encoding="utf-8")
+        fixture_sha256 = sha(fixture_header)
+        production_inspection_header = snapshot / "src/DW_WeaponInspectPackage.h"
+        assert production_inspection_header.is_file(), "Prepare the real native inspection package before the approved build gate"
+        production_inspection_header_sha256 = sha(production_inspection_header)
         flags = [
             "--target=x86_64-pc-windows-msvc",
             "-std=c++20",
@@ -305,12 +344,13 @@ def main():
             "-Wall",
             "-Wextra",
             "-Werror",
-            "-I" + str(snapshot / "src"),
         ]
+        production_flags = [*flags, "-I" + str(snapshot / "src")]
+        harness_flags = [*flags, "-I" + str(fixture), "-I" + str(snapshot / "src")]
         subprocess.run(
             [
                 str(LLVM / "clang++.exe"),
-                *flags,
+                *production_flags,
                 "-c",
                 str(ROOT / "integration/replay/DW_BotStyleZone.cpp"),
                 "-o",
@@ -321,7 +361,7 @@ def main():
         subprocess.run(
             [
                 str(LLVM / "clang++.exe"),
-                *flags,
+                *harness_flags,
                 "-c",
                 str(ROOT / "tools/bot_style_zone_harness.cpp"),
                 "-o",
@@ -361,6 +401,9 @@ def main():
         modeled_native_lifecycle_states_checked=True,
         exact_resource_comparison_checked=True,
         stale_resource_repaired=True,
+        modified_original_backed_up=True,
+        failed_install_restores_modified_original=True,
+        nonreplacement_move_semantics_checked=True,
         partial_write_and_move_failures_checked=True,
         original_request_unchanged_on_failure=True,
         inherited_hardlink_outputs_remain_unchanged=True,
@@ -371,6 +414,14 @@ def main():
         native_locale_folder_cases=locale_cases,
         native_locale_files_available_before_queueing=True,
         native_pending_load_performs_no_staging_reads=True,
+        inspection_fixture_descriptor_used_for_harness_only=True,
+        inspection_fixture_header_sha256=fixture_sha256,
+        inspection_production_header_sha256=production_inspection_header_sha256,
+        inspection_staging_lifecycle_checked=True,
+        inspection_companion_file_count=20,
+        inspection_inherits_common_record=True,
+        inspection_no_duplicate_loads=True,
+        inspection_pending_load_performs_no_staging_reads=True,
         original_native_path_classification_cases=native_path_cases,
         original_native_duplicate_policy_cases=duplicate_cases,
         game_modified=False,

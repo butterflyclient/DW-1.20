@@ -19,11 +19,16 @@ mode.add_argument(
     "--publish-validated", type=Path, metavar="JOB",
     help="Publish an unchanged verified production job after backend activation",
 )
+parser.add_argument('--skip-gameplay-checks', action='store_true',
+                    help='Explicit owner override: retain build/update integrity, skip gameplay regression checks')
+parser.add_argument('--pending-map-record', type=Path,
+                    help='Build an explicitly requested frozen map candidate; publication waits for its matching live catalog')
 args = parser.parse_args()
 with dw_client.pipeline_lock():
     if args.publish_validated:
         dw_client.publish_validated(args.publish_validated)
     else:
-        directory = dw_client.prepare()
+        directory = dw_client.prepare(pending_map_record=args.pending_map_record)
         if not args.prepare_only:
-            dw_client.build(directory, publish_ready=not args.validate_only)
+            dw_client.build(directory, publish_ready=not args.validate_only,
+                            gameplay_checks=not args.skip_gameplay_checks)

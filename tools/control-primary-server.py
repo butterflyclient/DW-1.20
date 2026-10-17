@@ -17,7 +17,7 @@ def main():
     current = live()
     if current['active'] == 'active':
         current['health'] = json.load(urllib.request.urlopen(
-            'http://162.243.115.160:8085/health', timeout=10))
+            'https://162.243.115.160:8443/health', timeout=10))
     print(json.dumps(current, indent=2))
 
 

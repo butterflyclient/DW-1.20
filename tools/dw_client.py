@@ -275,7 +275,7 @@ def initialize():
     return manifest
 
 
-def prepare():
+def prepare(pending_map_record=None):
     config, state, base = settings()
     subprocess.run(
         [sys.executable, "-B", str(ROOT / "tools/generate-bot-names.py"), "--check"],
@@ -308,6 +308,7 @@ def prepare():
             "test-ui-focus-lifetime.py",
             "prepare-bot-profile-ownership.py",
             "prepare-noclip-integration.py",
+            "test-noclip.py", "noclip_harness.cpp",
             "prepare-alt-killcam-integration.py", "prepare-alt-killcam-render.py",
             "alt_killcam_native.json", "alt_killcam_render_native.json",
             "replay_owned_clone.py", "alt_killcam_render_reference.cpp",
@@ -315,16 +316,35 @@ def prepare():
             "test-alt-killcam.py", "test-alt-killcam-render.py",
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
+            "test-bot-style-zone.py", "bot_style_zone_harness.cpp",
             "bot_style_paths.py", "prepare-map-images-package.py",
             "prepare-join-in-progress.py",
             "prepare-dw-verifier.py",
             "prepare-bot-rank-integration.py",
+            "prepare-weapon-inspect.py", "prepare-weapon-inspect-input.py",
+            "prepare-weapon-inspect-assets.py", "test-weapon-inspect-ui.py",
+            "test-update-assets-groups.py", "test-weapon-inspect-wire.py", "test-weapon-inspect.py",
+            "test-weapon-inspect-runtime.py", "weapon_inspect_harness.cpp",
+            "prepare-weapon-inspect-blend.py", "test-weapon-inspect-blend.py",
+            "weapon_inspect_blend_harness.cpp",
+            "prepare-weapon-inspect-crosshair.py", "test-weapon-inspect-crosshair.py",
+            "prepare-slide-view.py", "test-slide-view.py", "slide_view_harness.cpp",
             "dw_update_assets.py", "dw_update_maps.py", "embed-update-helper.py", "replay-update-client.rc",
             "replay-update-client.cpp", "replay-update-assets.h", "replay-update-maps.h",
             "test-update-maps.py", "update_maps_harness.cpp",
             "test-update-client-catchup.py", "test-map-publication.py",
         )
     ]
+    # A hash of the live helper alone does not freeze the helper itself. Keep
+    # the declared tools in this private job so deferred checks use the same
+    # preparers, validators and harnesses as the source receipt.
+    for item in tool_inputs:
+        authored = inside(ROOT / item["source"])
+        frozen = source / item["source"]
+        frozen.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(authored, frozen)
+        if digest(authored) != item["source_sha256"] or digest(frozen) != item["source_sha256"]:
+            raise ValueError("Tool changed while freezing: " + item["source"])
     overlays = dict(manifest["overlays"])
     for root in config["authored_source_roots"]:
         # Host replacements acquire their native bindings below. Other authored
@@ -341,6 +361,12 @@ def prepare():
             "DW_AltKillcam.cpp", "DW_AltKillcam.h",
             "DW_AltKillcamRender.cpp", "DW_AltKillcamRender.h",
             "DW_MapVoting.h",
+            "DW_WeaponInspect.cpp", "DW_WeaponInspect.h",
+            "DW_WeaponInspectInput.cpp", "DW_WeaponInspectInput.h",
+            "DW_WeaponInspectUI.lua",
+            "DW_WeaponInspectBlend.cpp", "DW_WeaponInspectBlend.h",
+            "DW_WeaponInspectCrosshair.cpp", "DW_WeaponInspectCrosshair.h",
+            "DW_SlideView.cpp", "DW_SlideView.h",
         }
         for path in sorted(inside(ROOT / root).iterdir()):
             if root != "integration/host-scale" and path.name not in replay_additions:
@@ -446,10 +472,24 @@ def prepare():
     killcam.prepare(source)
     killcam_render = load_module("dw_alt_killcam_render", ROOT / "tools/prepare-alt-killcam-render.py")
     killcam_render.prepare(source)
+    # The actual donor XAnims are repacked and reread through the original
+    # Replay loader before either the animation owners or updater may use them.
+    inspect_assets = load_module("dw_inspect_assets", ROOT / "tools/prepare-weapon-inspect-assets.py")
+    inspect_assets.prepare(source)
+    inspect_input = load_module("dw_inspect_input", ROOT / "tools/prepare-weapon-inspect-input.py")
+    inspect_input.prepare(source)
+    inspection = load_module("dw_inspect_runtime", ROOT / "tools/prepare-weapon-inspect.py")
+    inspection.prepare(source, source / "generated/weapon-inspect-assets/recipe")
+    inspect_blend = load_module("dw_inspect_blend", ROOT / "tools/prepare-weapon-inspect-blend.py")
+    inspect_blend.prepare(source)
+    inspect_crosshair = load_module("dw_inspect_crosshair", ROOT / "tools/prepare-weapon-inspect-crosshair.py")
+    inspect_crosshair.prepare(source)
+    slide_view = load_module("dw_slide_view", ROOT / "tools/prepare-slide-view.py")
+    slide_view.prepare(source)
     assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
     assets.prepare(source)
     maps = load_module("dw_update_maps", ROOT / "tools/dw_update_maps.py")
-    maps.prepare(source)
+    maps.prepare(source, pending_record=pending_map_record)
     helper_header = source / "generated-updater/DW_UpdateHelper.h"
     subprocess.run([
         sys.executable, "-B", str(ROOT / "tools/embed-update-helper.py"),
@@ -502,7 +542,10 @@ def prepare():
     cpp[clone_source.relative_to(source).as_posix()] = digest(clone_source)
     noclip_clone = source / "src/DW_Noclip_Native.cpp"
     cpp[noclip_clone.relative_to(source).as_posix()] = digest(noclip_clone)
-    for name in ("DW_AltKillcam_Native.cpp", "DW_AltKillcamRender_Native.cpp"):
+    for name in ("DW_AltKillcam_Native.cpp", "DW_AltKillcamRender_Native.cpp",
+                 "DW_WeaponInspect_Native.cpp", "DW_WeaponInspectInput_Native.cpp",
+                 "DW_WeaponInspectBlend_Native.cpp", "DW_WeaponInspectCrosshair_Native.cpp",
+                 "DW_SlideView_Native.cpp"):
         clone = source / "src" / name
         cpp[clone.relative_to(source).as_posix()] = digest(clone)
     receipt = dict(
@@ -537,7 +580,7 @@ def prepare():
     return directory
 
 
-def build(directory, publish_ready=True):
+def build(directory, publish_ready=True, gameplay_checks=True):
     directory = inside(directory)
     receipt = read(directory / "source-receipt.json")
     source = inside(receipt["snapshot"])
@@ -584,10 +627,10 @@ def build(directory, publish_ready=True):
     report_path = (
         directory / "builds" / ("build-workstation-" + job["id"]) / "build-report.json"
     )
-    verify(directory, report_path, publish_ready=publish_ready)
+    verify(directory, report_path, publish_ready=publish_ready, gameplay_checks=gameplay_checks)
 
 
-def verify(directory, report_path, publish_ready=True):
+def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     """Bind every gate to the freshly compiled image, never a revision alias."""
     config, state, _ = settings()
     report = read(report_path)
@@ -644,6 +687,11 @@ def verify(directory, report_path, publish_ready=True):
         ("test-bot-rank.py", ["--snapshot", str(source)], "bot-ranks.json"),
         ("test-bot-style-scripts.py", ["--snapshot", str(source)], "bot-style-scripts.json"),
         ("test-bot-style-zone.py", ["--snapshot", str(source)], "bot-style-zone.json"),
+        ("test-weapon-inspect.py", [], "weapon-inspect.json"),
+        ("test-weapon-inspect-runtime.py", [], "weapon-inspect-runtime.json"),
+        ("test-weapon-inspect-blend.py", [], "weapon-inspect-blend.json"),
+        ("test-weapon-inspect-crosshair.py", [], "weapon-inspect-crosshair.json"),
+        ("test-slide-view.py", [], "slide-view.json"),
         ("test-matchmaking-assignments.py", ["--snapshot", str(source)], "matchmaking-assignments.json"),
         ("test-join-in-progress.py", ["--snapshot", str(source)], "join-in-progress.json"),
         ("test-dw-verifier.py", ["--snapshot", str(source)], "dw-verifier.json"),
@@ -651,6 +699,10 @@ def verify(directory, report_path, publish_ready=True):
         ("test-alt-killcam.py", ["--snapshot", str(source)], "alt-killcam.json"),
         ("test-alt-killcam-render.py", ["--snapshot", str(source)], "alt-killcam-render.json"),
     )
+    if not gameplay_checks:
+        # An explicit maintainer override skips gameplay regressions, retaining
+        # fresh build identity and the exact embedded updater checks.
+        checks = tuple(item for item in checks if item[0] == 'test-executable-update-integration.py')
     identity = dict(
         source_receipt_sha256=digest(directory / "source-receipt.json"),
         build_report_sha256=digest(report_path),
@@ -717,6 +769,8 @@ def verify(directory, report_path, publish_ready=True):
         source_receipt=str(directory / "source-receipt.json"),
         source_receipt_sha256=digest(directory / "source-receipt.json"),
         game_runs_performed=False,
+        gameplay_checks_run=gameplay_checks,
+        gameplay_checks_waived_by_owner=not gameplay_checks,
     )
     save(directory / "local-readiness.json", local)
     if not publish_ready:

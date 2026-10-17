@@ -3,6 +3,9 @@
 #include "com_debugstates.h"
 #include "replay_dvar.h"
 
+extern "C" void func_1413E9BE0(void *, const char *); // Dvar_SetString_Internal (as DW_ExecutableUpdate.cpp)
+static dvar_t *s_customMapsDvar;
+
 extern "C"
 {
     bool DW_LocalBackend_IsEnabled();
@@ -14,6 +17,7 @@ extern "C"
     void DW_MatchmakingAssignments_PrepareLaunch(const void *);
     void DW_PlaylistUI_Frame();
     const char *DW_MapAvailability_InstalledIds(); // " id1 id2 ... " of custom map packages
+    void DW_MapAvailability_EnsureScanned();
     void DW_LocalBackend_LogLine(const char *); // DW_LocalBackend_Frame.cpp
     dvar_t *Dvar_RegisterString(const char *, const char *, uint32_t, const char *);
     uint64_t DW_LobbyControls_StartMatchInternalNative(void *, const void *);
@@ -473,6 +477,7 @@ extern "C" void DW_LobbyControls_Frame()
     BotSetupLimits();
     if (!s_start)
     {
+        DW_MapAvailability_EnsureScanned();
         Dvar_BeginPermanentRegistration();
         s_start = Dvar_RegisterInt(
             "replay_dw_forceStart", 0, 0, 1, 0, "DW operator native lobby start request");
@@ -497,7 +502,7 @@ extern "C" void DW_LobbyControls_Frame()
         s_autoAck = Dvar_RegisterInt("replay_dw_autoFillAck", 0, 0, 0x7FFFFFFF, 0,
                                     "Accepted host automatic fill request token");
         // Com_GameInfo_Init scanned the custom map packages before any frame.
-        Dvar_RegisterString("replay_dw_customMaps", DW_MapAvailability_InstalledIds(), 0,
+        s_customMapsDvar = Dvar_RegisterString("replay_dw_customMaps", DW_MapAvailability_InstalledIds(), 0,
                             "Installed custom map packages; playlists of other maps are hidden");
         DW_BotPolicy_Register();
         dwMapVoting::Register();
@@ -527,6 +532,10 @@ extern "C" void DW_LobbyControls_Frame()
                 line[used++] = ids[i];
             line[used] = 0;
             DW_LocalBackend_LogLine(line);
+            // The scan can follow the first frame's registration (logged
+            // 2026-10-16: an empty list first): keep the string current.
+            if (s_customMapsDvar)
+                func_1413E9BE0(s_customMapsDvar, ids);
         }
         for (unsigned at = 0; ids && ids[at];)
         {

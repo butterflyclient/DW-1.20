@@ -122,6 +122,17 @@ extern "C" uint8_t func_1420E34D0(DWNativeHttp *http,
     bool ok = option(41, 0) && option(20094, reinterpret_cast<uintptr_t>(&func_1420E31A0)) &&
               option(10010, reinterpret_cast<uintptr_t>(http->headerData)) &&
               option(10002, reinterpret_cast<uintptr_t>(url));
+    if (local && DW_LocalConfig_UseTls())
+    {
+        // The native sender enables FOLLOWLOCATION later. Restrict protocols
+        // here so its redirects cannot downgrade TLS or use another scheme.
+        constexpr char scheme[] = "https://";
+        for (unsigned i = 0; i < sizeof(scheme) - 1; ++i)
+            if (url[i] != scheme[i])
+                ok = false;
+        ok = ok && option(64, 1) && option(81, 2) &&
+             option(181, 2) && option(182, 2);
+    }
     switch (method)
     {
     case 1:
@@ -159,7 +170,7 @@ extern "C" uint8_t func_1420E34D0(DWNativeHttp *http,
     if (ok && reinterpret_cast<Check>(http->vtable[9])(http, timeout))
     {
         if (url != nativeUrl)
-            DW_LocalPlatform_RecordStage("DW_LOCAL_HTTP_READY native loopback request initialized");
+            DW_LocalPlatform_RecordStage("DW_LOCAL_HTTP_READY native request initialized");
         return 1;
     }
     func_1420E3780(http);

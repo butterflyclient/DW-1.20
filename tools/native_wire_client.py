@@ -113,7 +113,8 @@ class NativeClient:
         self.pushes = []
         if not isinstance(port_offset, int) or not 0 <= port_offset <= 40000:
             raise ValueError("Invalid local fixture port offset")
-        base = f"http://{host}:{8085 + port_offset}"
+        secure = host != '127.0.0.1'
+        base = f"{'https' if secure else 'http'}://{host}:{(8443 if secure else 8085) + port_offset}"
 
         def post(path, value):
             data = value if isinstance(value, bytes) else json.dumps(value).encode()

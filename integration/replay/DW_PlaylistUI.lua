@@ -385,7 +385,10 @@ local function playlistTitle(text)
         return "BR STIMULUS SOLOS"
     end
     if text == "PLAYLIST/NUKETOWN_TDM" or text == "@PLAYLIST/NUKETOWN_TDM" then
-        return "NUKETOWN TDM"
+        -- A guarded (locked) Nuketown says so in its title, with what the guard
+        -- read; a padlock without this suffix is a native lock, not the guard.
+        local status = state.mapGuardStatus and state.mapGuardStatus("mp_nuketown")
+        return status and "NUKETOWN TDM (NEEDS MAP)" or "NUKETOWN TDM"
     end
     return text
 end
@@ -403,6 +406,17 @@ local function customMapInstalled(map)
     end
     local installed = Dvar.DHEEJCCJBH and Dvar.DHEEJCCJBH("replay_dw_customMaps")
     return type(installed) == "string" and string.find(installed, " " .. map .. " ", 1, true) ~= nil
+end
+
+-- nil when installed, else a short diagnostic of the two dvar reads.
+state.mapGuardStatus = function(map)
+    if customMapInstalled(map) then
+        return nil
+    end
+    local ok, flag = pcall(Dvar.IBEGCHEFE, "replay_dw_map_" .. map)
+    local installed = Dvar.DHEEJCCJBH and Dvar.DHEEJCCJBH("replay_dw_customMaps")
+    return "b=" .. tostring(ok) .. "/" .. tostring(flag) .. " s=" ..
+        (type(installed) == "string" and tostring(#installed) or type(installed))
 end
 
 local function guardRequiredMap(widget, options)

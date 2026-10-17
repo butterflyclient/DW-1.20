@@ -181,6 +181,11 @@ the client updater. It checks for missing required files even when the EXE is
 current. Map publication is separate from EXE releases, and previous server map
 packages are backed up before replacement. See [custom map updates](docs/CUSTOM_MAP_UPDATES.txt).
 
+The available published custom maps are **Nuketown** (`mp_nuketown`) and
+**Nuketown Classic** (`mp_nuketown_c`). The current client obtains their required
+files through its normal startup updater. Keep `bypass_update_restart=0` for
+automatic EXE, companion-file, and map updates; `1` is an intentional opt-out.
+
 ## Development
 
 The Replay client has one production target: `game_dx12_ship_replay_dw.exe`.

@@ -276,7 +276,7 @@ def publish(record, output, upload=False):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     group=parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--source-directory', type=Path, help='Explicit current custom-map directory; never inferred by EXE publication')
+    group.add_argument('--source-directory', type=Path, nargs='+', help='Explicit current custom-map directories; never inferred by EXE publication')
     group.add_argument('--package-record', type=Path, help='Previously frozen immutable package record')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--upload', action='store_true')
@@ -285,8 +285,12 @@ def main():
     if not output.is_relative_to((ROOT/'data').resolve()):
         raise ValueError('Custom-map staging must stay in the DW data directory')
     if args.source_directory:
-        from dw_update_maps import freeze_package
-        record=freeze_package(args.source_directory, output/'package')
+        from dw_update_maps import freeze_package, merge_packages
+        if len(args.source_directory) == 1:
+            record=freeze_package(args.source_directory[0], output/'package')
+        else:
+            records=[freeze_package(path, output/'map-inputs'/path.name) for path in args.source_directory]
+            record=merge_packages(records, output/'package')
     else:
         record=json.loads(args.package_record.read_bytes())
     receipt=publish(record,output,args.upload)

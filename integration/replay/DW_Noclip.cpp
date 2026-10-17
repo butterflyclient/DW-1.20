@@ -1,5 +1,6 @@
 #include "DW_Noclip.h"
 #include "DW_NoclipBindings.h"
+#include "DW_WeaponInspect.h"
 
 namespace
 {
@@ -39,7 +40,8 @@ extern "C" bool DW_Noclip_StringCommand(DWNoclip::ServerClient *client, void *me
 extern "C" void DW_Noclip_ClientCommand(int clientNumber)
 {
     const char *command = NC_Argv(0);
-    if (!Equal(command, "noclip") && !Equal(command, "mw_noclip"))
+    const bool inspection = Equal(command, "dw_inspect");
+    if (!inspection && !Equal(command, "noclip") && !Equal(command, "mw_noclip"))
     {
         NC_ClientCommandNative(clientNumber);
         return;
@@ -56,7 +58,19 @@ extern "C" void DW_Noclip_ClientCommand(int clientNumber)
     if (player->clientNumber != clientNumber || player->connectionState != 2 ||
         player->sessionState != 0 || entity->health <= 0)
     {
-        Reply(client, "e \"Noclip requires a living player in the match.\"");
+        if (!inspection)
+            Reply(client, "e \"Noclip requires a living player in the match.\"");
+        return;
+    }
+    if (inspection)
+    {
+        // The existing reliable-command decoder authenticates this sender.
+        // Queue only this validated player's state; no caller-supplied player
+        // number, animation, weapon, duration or memory address is accepted.
+        const char *extra = NC_Argv(1);
+        const char *trailing = NC_Argv(2);
+        if (extra && !*extra && trailing && !*trailing)
+            DW_WeaponInspect_ServerRequest(clientNumber, player);
         return;
     }
     // The host is the server's authenticated local connection, never a local

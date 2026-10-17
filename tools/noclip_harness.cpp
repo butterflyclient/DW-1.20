@@ -1,5 +1,6 @@
 #include "DW_Noclip.h"
 #include "DW_NoclipBindings.h"
+#include "DW_WeaponInspect.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +18,9 @@ namespace {
     DWNoclip::PlayerClient players[3]{};
     dvar_t cheats{};
     bool loaded, local[3], dvarPresent;
-    unsigned delegates, nativeCalls, replies;
+    unsigned delegates, nativeCalls, replies, inspections;
+    int inspectedClient;
+    void *inspectedState;
     std::string args[3], message;
     const uintptr_t *table;
     void Reply(DWNoclip::ServerClient *client, int reliability, const char *text) {
@@ -30,6 +33,7 @@ namespace {
         static const uintptr_t vtable[]{0, reinterpret_cast<uintptr_t>(&Reply)};
         table = vtable; NC_Entities = entities; NC_ClientCount = 3;
         loaded = dvarPresent = true; delegates = nativeCalls = replies = 0;
+        inspections = 0; inspectedClient = -1; inspectedState = nullptr;
         message.clear(); args[0] = "noclip"; args[1].clear(); args[2].clear();
         for (unsigned i = 0; i < 3; ++i) {
             entities[i].number = int16_t(i); entities[i].health = 100;
@@ -46,6 +50,9 @@ extern "C" bool NC_ServerLoaded() { return loaded; }
 extern "C" bool NC_IsLocalClient(int index) { assert(index >= 0 && index < 3); return local[index]; }
 extern "C" const dvar_t *NC_FindDvar(const char *name) { assert(!strcmp(name, "NTPNRQTKNP")); return dvarPresent ? &cheats : nullptr; }
 extern "C" void NC_ClientCommandNative(int) { ++delegates; }
+extern "C" void DW_WeaponInspect_ServerRequest(int clientNumber, void *playerState) {
+    ++inspections; inspectedClient = clientNumber; inspectedState = playerState;
+}
 extern "C" bool NC_StringCommandNative(DWNoclip::ServerClient *client, void *messagePointer, int sequence, bool old) {
     assert(client == &clients[2] && messagePointer == &cheats && sequence == 37 && old);
     ++nativeCalls; return true;
@@ -67,8 +74,10 @@ int main() {
         const bool wanted = !strcmp(value, "1") || !strcmp(value, "on") || !strcmp(value, "ON");
         assert(players[2].flags == (wanted ? 0x4a1u : 0x4a0u)); ++cases;
     }
+    for (bool inspection : {false, true})
     for (unsigned invalid = 0; invalid < 16; ++invalid) {
         Reset();
+        if (inspection) args[0] = "dw_inspect";
         switch (invalid) {
         case 0: loaded = false; break;
         case 1: NC_ClientCount = 0; break;
@@ -88,7 +97,17 @@ int main() {
         case 15: args[1] = "-1"; break;
         }
         DW_Noclip_ClientCommand(2);
-        assert(players[2].flags == 0x4a0 && !delegates); ++cases;
+        assert(players[2].flags == 0x4a0 && !delegates && !inspections); ++cases;
+    }
+    // Inspection uses the same authenticated living-player checks, without
+    // requiring cheats or granting any server movement permissions.
+    for (unsigned slot = 0; slot < 3; ++slot) {
+        Reset(); args[0] = "dw_inspect"; dvarPresent = false;
+        DW_Noclip_ClientCommand(int(slot));
+        assert(inspections == 1 && inspectedClient == int(slot) &&
+               inspectedState == &players[slot] && !replies && !delegates);
+        for (const auto &player : players) assert(player.flags == 0x4a0);
+        ++cases;
     }
     for (int index : {-1, 3, 200, 0x7fffffff}) {
         Reset(); DW_Noclip_ClientCommand(index); assert(!replies && !delegates); ++cases;

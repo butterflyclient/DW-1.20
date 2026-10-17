@@ -271,6 +271,43 @@ def freeze_package(source_directory, output_directory):
     return record
 
 
+def merge_packages(records, output_directory):
+    """Bind explicitly selected maps into the single client map inventory."""
+    output = Path(output_directory).resolve()
+    if not output.is_relative_to(ROOT / 'data'):
+        raise ValueError('Map publication output must remain in the DW data workspace')
+    records = sorted(records, key=lambda item: item['map_ids'])
+    ids, files, chunks, payloads, sources = set(), [], [], {}, []
+    for record in records:
+        verify_record(record)
+        if ids.intersection(record['map_ids']):
+            raise ValueError('Duplicate custom map identifier')
+        ids.update(record['map_ids'])
+        offset = len(chunks)
+        files.extend(dict(item, first_chunk=item['first_chunk'] + offset) for item in record['files'])
+        chunks.extend(record['chunks'])
+        payloads.update(record['payloads'])
+        sources.extend(record['source_files'])
+    blob = encode(files, chunks)
+    folder = output / 'payloads'
+    folder.mkdir(parents=True, exist_ok=True)
+    for digest, item in list(payloads.items()):
+        target = folder / (digest + '.bin')
+        if not target.exists():
+            os.link(item['source'], target)
+        payloads[digest] = dict(source=str(target), size=item['size'])
+    manifest = output / 'map-manifest.bin'
+    manifest.write_bytes(blob)
+    record = dict(schema='replay120-custom-map-package-v1', **decode(blob),
+                  manifest_sha256=sha(blob), manifest_size=len(blob), manifest_path=str(manifest),
+                  payloads=payloads, source_files=sources, map_ids=sorted(ids),
+                  transport_bytes=sum(item['size'] for item in payloads.values()),
+                  codec='xpress_huff', chunk_bytes=CHUNK_BYTES)
+    verify_record(record)
+    (output / 'package.json').write_text(json.dumps(record, indent=2) + '\n')
+    return record
+
+
 def verify_record(record):
     blob = Path(record['manifest_path']).read_bytes()
     decoded = decode(blob)
@@ -287,18 +324,20 @@ def verify_record(record):
     return blob
 
 
-def prepare(snapshot):
+def prepare(snapshot, pending_record=None):
     snapshot = Path(snapshot).resolve()
     if not snapshot.is_relative_to(ROOT / 'data'):
         raise ValueError('Map manifests require a private source snapshot')
-    declaration = ROOT / 'data/custom-map-publication.json'
+    declaration = Path(pending_record).resolve(strict=True) if pending_record else ROOT / 'data/custom-map-publication.json'
+    if not declaration.is_relative_to(ROOT / 'data'):
+        raise ValueError('Explicit map candidates must stay in the DW data workspace')
     header = snapshot / 'src/DW_UpdateMapManifest.h'
     destination = snapshot / 'generated/custom-maps'
     destination.mkdir(parents=True, exist_ok=True)
     record = None
     if declaration.exists():
         record = json.loads(declaration.read_bytes())
-        if not record.get('published'):
+        if not record.get('published') and not pending_record:
             raise ValueError('An unpublished map package cannot enter an ordinary EXE release')
         blob = verify_record(record)
         payload_folder = destination / 'payloads'
@@ -311,6 +350,7 @@ def prepare(snapshot):
         manifest.write_bytes(blob)
         record['manifest_path'] = str(manifest)
         record['publication_receipt_sha256'] = file_sha(declaration)
+        record['pending_explicit_publication'] = bool(pending_record)
         (destination / 'package.json').write_text(json.dumps(record, indent=2) + '\n')
     else:
         blob = b'\0'
@@ -336,7 +376,10 @@ def publication(image, source, output):
         raise ValueError('EXE does not bind its last explicitly published map package')
     declaration = ROOT / 'data/custom-map-publication.json'
     current = json.loads(declaration.read_bytes())
-    if file_sha(declaration) != record['publication_receipt_sha256'] or current['package_hash'] != record['package_hash']:
+    if (not current.get('published') or current['package_hash'] != record['package_hash']
+            or current['manifest_sha256'] != record['manifest_sha256']
+            or (not record.get('pending_explicit_publication') and
+                file_sha(declaration) != record['publication_receipt_sha256'])):
         raise ValueError('Explicit map publication changed during client compilation')
     output.mkdir(parents=True, exist_ok=True)
     (output / 'update-maps.bin').write_bytes(blob)

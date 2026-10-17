@@ -370,15 +370,19 @@ extern "C" bool DW_LocalPlatform_Post(
         auto headers = reinterpret_cast<Headers>(GetProcAddress(library, "WinHttpQueryHeaders"));
         auto read = reinterpret_cast<Read>(GetProcAddress(library, "WinHttpReadData"));
         auto close = reinterpret_cast<Close>(GetProcAddress(library, "WinHttpCloseHandle"));
+        using Option = int (__stdcall *)(Handle, unsigned long, void *, unsigned long);
+        auto option = reinterpret_cast<Option>(GetProcAddress(library, "WinHttpSetOption"));
+        const bool tls = DW_LocalConfig_UseTls();
+        unsigned long redirectPolicy = 0; // WINHTTP_OPTION_REDIRECT_POLICY_NEVER
         if (open && connect && request && timeouts && send && receive && headers && read && close)
         {
             Handle session = open(L"IW8-Replay-LocalPlatform/1", 1, nullptr, nullptr, 0);
             Handle connection = nullptr, message = nullptr;
             if (session && timeouts(session, 10000, 10000, 10000, 10000))
-                connection = connect(session, DW_LocalConfig_WideHost(), 8085, 0);
+                connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
             if (connection)
-                message = request(connection, L"POST", path, nullptr, nullptr, nullptr, 0);
-            if (message &&
+                message = request(connection, L"POST", path, nullptr, nullptr, nullptr, tls ? 0x00800000 : 0);
+            if (message && option && option(message, 88, &redirectPolicy, sizeof(redirectPolicy)) &&
                 send(message, DW_LocalConfig_Headers(), ~0UL, body, bodySize, bodySize, 0) &&
                 receive(message, nullptr))
             {

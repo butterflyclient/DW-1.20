@@ -859,7 +859,7 @@ try:
         )
     backend_host = deployment.get("remote_backend", {}).get("host", "127.0.0.1")
     with urllib.request.urlopen(
-        f"http://{backend_host}:8085/status", timeout=10
+        f"{'http' if backend_host == '127.0.0.1' else 'https'}://{backend_host}:{8085 if backend_host == '127.0.0.1' else 8443}/status", timeout=10
     ) as response:
         status = json.load(response)
     client_path = path.parent / "replay-dw-client.log"

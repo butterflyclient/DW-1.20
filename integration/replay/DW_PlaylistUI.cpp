@@ -1,6 +1,7 @@
 #include "com_debugstates.h"
 #include "DW_ProgressionBindings.h"
 #include "DW_PlaylistUI_Source.h"
+#include "DW_WeaponInspectUI_Source.h"
 
 extern "C"
 {
@@ -54,6 +55,11 @@ extern "C" void DW_PlaylistUI_Frame()
             ok = Execute(vm, dwPlaylistUISource, sizeof(dwPlaylistUISource) - 1, installed);
         if (ok && installed == 1)
         {
+            // The retained installer retries until the stock options helpers
+            // exist. Its closure belongs to this VM's registered UI state.
+            double inspectInstalled = 0;
+            ok = Execute(vm, dwWeaponInspectUISource,
+                         sizeof(dwWeaponInspectUISource) - 1, inspectInstalled);
             char voteState[1024]{}, update[1400]{};
             if (DW_MapVoting_UIState(voteState, sizeof(voteState)) > 0)
             {
@@ -61,12 +67,14 @@ extern "C" void DW_PlaylistUI_Frame()
                     "MenuBuilder.m_types.replaydwplaylistfillstate().RefreshMapVote(%s); return 1", voteState);
                 double refreshed = 0;
                 if (length > 0 && unsigned(length) < sizeof(update))
-                    ok = Execute(vm, update, unsigned(length), refreshed);
+                    ok = Execute(vm, update, unsigned(length), refreshed) && ok;
             }
             if (s_reportedVM != vm)
                 Com_Printf(25, "DW_PLAYLIST_UI native playlist bot-fill toggle installed.\n");
             s_reportedVM = vm;
-            s_reportedFailure = false;
+            if (!ok && !s_reportedFailure)
+                Com_Printf(25, "DW_PLAYLIST_UI refresh failed; waiting to retry.\n");
+            s_reportedFailure = !ok;
         }
         else if (!ok && !s_reportedFailure)
         {

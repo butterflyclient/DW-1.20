@@ -20,9 +20,9 @@ def prepare(snapshot, output, source=None):
         raise ValueError("Never regenerate a sealed completed client snapshot")
     destination = snapshot / "src/DW_PlaylistUI_Source.h"
     frozen_lua = snapshot / "src/DW_PlaylistUI.lua"
-    # Check both destinations before writing either; a shared Lua source must
-    # not cause rejection after the header has already been replaced.
-    for path in (destination, frozen_lua):
+    inspect_destination = snapshot / "src/DW_WeaponInspectUI_Source.h"
+    # Preflight every input and private destination before writing any header.
+    for path in (destination, frozen_lua, inspect_destination):
         if path.exists() and path.stat().st_nlink != 1:
             raise ValueError("Playlist generated inputs must be independent private copies: " + str(path))
     source = Path(source or ROOT / "integration/replay/DW_PlaylistUI.lua").resolve(strict=True)
@@ -34,8 +34,23 @@ def prepare(snapshot, output, source=None):
     header = ("#pragma once\n// Generated from DW_PlaylistUI.lua during compilation.\n"
               'inline constexpr char dwPlaylistUISource[] = R"' + delimiter + "(" +
               text + ")" + delimiter + '";\n').encode()
+    inspect_lua = snapshot / "src/DW_WeaponInspectUI.lua"
+    inspect_text = inspect_lua.read_text(encoding="utf-8")
+    inspect_chunk = (
+        "local state=MenuBuilder.m_types.replaydwplaylistfillstate(); "
+        "if not state.InstallWeaponInspect then "
+        "state.InstallWeaponInspect=(function()\n" + inspect_text +
+        "\nend)() end; return state.InstallWeaponInspect() and 1 or 0\n"
+    )
+    if ")" + delimiter + '"' in inspect_chunk:
+        raise ValueError("Inspect UI source contains its C++ literal delimiter")
+    inspect_header = (
+        '#pragma once\ninline constexpr char dwWeaponInspectUISource[] = R"' +
+        delimiter + "(" + inspect_chunk + ")" + delimiter + '";\n'
+    ).encode("utf-8")
     destination.write_bytes(header)
     frozen_lua.write_bytes(data)
+    inspect_destination.write_bytes(inspect_header)
     receipt = dict(passed=True, source=str(source), source_sha256=hashlib.sha256(data).hexdigest(),
                    generated_header=str(destination), header_sha256=hashlib.sha256(header).hexdigest(),
                    main_preference="replay_dw_autoFillBots", localize_key="PLAYLIST/BRSOLOSTIM_NAME2",
@@ -46,6 +61,10 @@ def prepare(snapshot, output, source=None):
     receipt["warzone_featured_title_element"] = "GamemodeName"
     receipt["frozen_lua"] = str(frozen_lua)
     receipt["generator_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    receipt["weapon_inspect_ui"] = dict(
+        source=str(inspect_lua), source_sha256=hashlib.sha256(inspect_lua.read_bytes()).hexdigest(),
+        header_sha256=hashlib.sha256(inspect_header).hexdigest(),
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(receipt, indent=2) + "\n")
     return receipt

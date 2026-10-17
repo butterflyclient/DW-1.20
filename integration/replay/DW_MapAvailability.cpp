@@ -705,6 +705,19 @@ namespace
 }
 
 // DW_BotStyleZone.cpp loads the image zone with the common zones when installed.
+// The first DW frame runs before Com_GameInfo_Init's scan (logged 2026-10-16:
+// an empty list at the first frame, the full one later), and the frontend
+// playlist buttons are built in between. Scanning here first lets the
+// required-map guard see the installed packages; Com_GameInfo_Init rescans.
+extern "C" void DW_MapAvailability_EnsureScanned()
+{
+    static bool s_scanned;
+    if (s_scanned || s_customMapCount)
+        return;
+    s_scanned = true;
+    ScanCustomMaps();
+}
+
 extern "C" const char *DW_MapAvailability_InstalledIds()
 {
     return s_installedIds;
