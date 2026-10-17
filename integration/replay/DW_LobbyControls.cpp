@@ -13,6 +13,9 @@ extern "C"
     void DW_BotPolicy_CaptureRoster();
     void DW_MatchmakingAssignments_PrepareLaunch(const void *);
     void DW_PlaylistUI_Frame();
+    const char *DW_MapAvailability_InstalledIds(); // " id1 id2 ... " of custom map packages
+    void DW_LocalBackend_LogLine(const char *); // DW_LocalBackend_Frame.cpp
+    dvar_t *Dvar_RegisterString(const char *, const char *, uint32_t, const char *);
     uint64_t DW_LobbyControls_StartMatchInternalNative(void *, const void *);
     bool DW_LobbyControls_ReadyToLaunchNative(const void *, const void *);
     void replay_rva_00ca2070();                 // BG_GameStateInfo_ClearBotData
@@ -493,10 +496,73 @@ extern "C" void DW_LobbyControls_Frame()
                                          "Authoritative automatic fill publication revision");
         s_autoAck = Dvar_RegisterInt("replay_dw_autoFillAck", 0, 0, 0x7FFFFFFF, 0,
                                     "Accepted host automatic fill request token");
+        // Com_GameInfo_Init scanned the custom map packages before any frame.
+        Dvar_RegisterString("replay_dw_customMaps", DW_MapAvailability_InstalledIds(), 0,
+                            "Installed custom map packages; playlists of other maps are hidden");
         DW_BotPolicy_Register();
         dwMapVoting::Register();
         Dvar_EndPermanentRegistration();
         Cmd_AddCommandInternal("fill_lobby", FillLobby_f, &s_fillCommand);
+    }
+    {
+        // replay_dw_map_<id> (bool, true) per installed custom map package, for
+        // the playlist UI's required-map guard. The string dvar above is fixed at
+        // its first registration; these follow every later scan (owner 2026-10-16:
+        // Nuketown TDM showed locked with the package installed).
+        static char s_mapDvarNames[64][40];
+        static unsigned s_mapDvarCount;
+        static unsigned s_mapIdsLength = ~0u;
+        const char *ids = DW_MapAvailability_InstalledIds();
+        unsigned idsLength = 0;
+        while (ids && ids[idsLength])
+            ++idsLength;
+        if (idsLength == s_mapIdsLength)
+            ids = nullptr; // unchanged since the last frame
+        else
+        {
+            s_mapIdsLength = idsLength;
+            char line[1100] = "DW_CUSTOM_MAPS installed:";
+            unsigned used = 25;
+            for (unsigned i = 0; ids[i] && used + 1 < sizeof(line); ++i)
+                line[used++] = ids[i];
+            line[used] = 0;
+            DW_LocalBackend_LogLine(line);
+        }
+        for (unsigned at = 0; ids && ids[at];)
+        {
+            while (ids[at] == ' ')
+                ++at;
+            unsigned end = at;
+            while (ids[end] && ids[end] != ' ')
+                ++end;
+            if (end > at && end - at < 24 && s_mapDvarCount < 64)
+            {
+                char name[40] = "replay_dw_map_";
+                unsigned used = 14;
+                for (unsigned i = at; i < end; ++i)
+                    name[used++] = ids[i];
+                name[used] = 0;
+                bool known = false;
+                for (unsigned i = 0; i < s_mapDvarCount && !known; ++i)
+                {
+                    unsigned c = 0;
+                    while (name[c] && name[c] == s_mapDvarNames[i][c])
+                        ++c;
+                    known = !name[c] && !s_mapDvarNames[i][c];
+                }
+                if (!known)
+                {
+                    for (unsigned c = 0; c <= used; ++c)
+                        s_mapDvarNames[s_mapDvarCount][c] = name[c];
+                    Dvar_BeginPermanentRegistration();
+                    Dvar_RegisterBool(s_mapDvarNames[s_mapDvarCount], true, 0,
+                                      "Installed custom map package");
+                    Dvar_EndPermanentRegistration();
+                    ++s_mapDvarCount;
+                }
+            }
+            at = end;
+        }
     }
     if (!s_start->current.integer)
         s_started = false;

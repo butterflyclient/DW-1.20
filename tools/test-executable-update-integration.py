@@ -102,10 +102,13 @@ def check_initial_update(pe, base, symbols, updater_state):
             vm.reg_write(reg.UC_X86_REG_RSP, stack)
             vm.emu_start(symbols["DW_ExecutableUpdate_Frame"], stop, count=10000)
             assert vm.reg_read(reg.UC_X86_REG_RIP) == stop
-        expected = [] if not enabled else ["thread", "close"] if thread_succeeds else ["thread"]
-        assert calls == expected, (enabled, thread_succeeds, calls)
+        # bypass_update_restart=1 never starts the worker: no helper, no
+        # update check and no download of any executable, asset or map.
+        expected = [] if not enabled or bypass else ["thread", "close"] if thread_succeeds else ["thread"]
+        assert calls == expected, (enabled, thread_succeeds, bypass, calls)
         state = struct.unpack("<I", vm.mem_read(updater_state, 4))[0]
-        assert state == (1 if enabled and thread_succeeds else 40 if enabled else 0)
+        assert state == (50 if enabled and bypass else 1 if enabled and thread_succeeds else 40 if enabled else 0)
+        assert any("bypass_update_restart=1" in stage for stage in stages) == (enabled and bypass), stages
         cases.append({"enabled": enabled, "thread_creation_succeeds": thread_succeeds,
                       "bypass_update_restart": bypass, "bypass_logged": any("bypass_update_restart=1" in stage for stage in stages),
                       "compiled_initial_state": initial, "frames": 2, "worker_starts": calls.count("thread"), "final_state": state,
@@ -116,7 +119,8 @@ def check_initial_update(pe, base, symbols, updater_state):
 def check_worker(pe, base, symbols, updater_state, initial_checks, helper):
     """Execute the native worker; model only Win32 file/process boundaries."""
     results = []
-    for bypass in (False, True):
+    # Only installations without the bypass ever run the worker.
+    for bypass in (False,):
         callback = next(row["worker_callback"] for row in initial_checks
                         if row["enabled"] and row["thread_creation_succeeds"] and row["bypass_update_restart"] == bypass)
         for existing in ("exact", "older", "trailing"):
@@ -210,7 +214,7 @@ def check_worker(pe, base, symbols, updater_state, initial_checks, helper):
                         vm.mem_write(d, struct.pack("<I", c)); returned(1)
                     elif address == api["CreateProcessW"]:
                         assert text(a, True) == "E:\\fixture\\game.exe.updater.exe"
-                        mode = "--prepare-assets" if bypass else "--prepare"
+                        mode = "--prepare"
                         assert text(b, True) == '"E:\\fixture\\game.exe.updater.exe" ' + mode + ' "E:\\fixture\\game.exe" fixture-host'
                         rsp = machine.reg_read(reg.UC_X86_REG_RSP)
                         assert struct.unpack("<I", read(rsp + 48, 4))[0] == 0x08000000
@@ -239,7 +243,7 @@ def check_worker(pe, base, symbols, updater_state, initial_checks, helper):
                                           hex(vm.reg_read(reg.UC_X86_REG_RCX)), hex(vm.reg_read(reg.UC_X86_REG_RDX)), calls)) from error
                 assert vm.reg_read(reg.UC_X86_REG_RIP) == stop
                 final_state = struct.unpack("<I", read(updater_state, 4))[0]
-                assert final_state == (50 if bypass and helper_exit == 10 else helper_exit)
+                assert final_state == helper_exit
                 assert calls.count("rewrite-helper") == int(existing != "exact")
                 results.append({"bypass_update_restart": bypass, "existing_helper": existing,
                                 "helper_exit": helper_exit, "state": final_state, "calls": calls})
@@ -470,7 +474,6 @@ def main():
                     "native_prerequisite_passes": True,
                     "restart_route_correct": True,
                     "native_data_restart_preserved": not (enabled and state == 20),
-                    "asset_repair_restart_under_bypass": enabled and bypass and state == 20,
                     "asset_failure_fence": enabled and state == 40,
                 }
             )
@@ -479,6 +482,7 @@ def main():
             {
                 "schema": 1,
                 "passed": True,
+                "bypass_skips_updater": True,
                 "game_sha256": report["sha256"],
                 "focused_owner": owner_proof,
                 "checks": checks,
@@ -499,7 +503,7 @@ def main():
         + "\n"
     )
     print(
-        "PASS: compiled asset scheduling under EXE bypass, 240 linked patch-state cases, asset failure/restart and native data restart routing"
+        "PASS: compiled updater scheduling (bypass starts nothing), 240 linked patch-state cases, asset failure/restart and native data restart routing"
     )
 
 

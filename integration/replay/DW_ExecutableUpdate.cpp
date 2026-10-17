@@ -71,7 +71,7 @@ namespace
     void *s_kernel;
     wchar_t s_exe[1024]{}, s_helper[1060]{}, s_directory[1024]{}, s_eventName[80]{};
     // 0 unstarted, 1 checking, 10 current, 20 staged, 30 unknown, 40 failed,
-    // 50 EXE bypassed and the authenticated owned asset inventory is current.
+    // 50 bypass_update_restart=1: no update check, download or file change.
     unsigned s_state = 0, s_reported = 0;
     bool s_restartRequested = false, s_restarting = false;
     void *s_apply = nullptr, *s_ready = nullptr;
@@ -182,9 +182,7 @@ namespace
                     goto finished;
             }
             Process process{};
-            const bool assetsOnly = DW_LocalConfig_BypassUpdateRestart();
-            if (!spawn(assetsOnly ? L"--prepare-assets" : L"--prepare",
-                       DW_LocalConfig_WideHost(), process))
+            if (!spawn(L"--prepare", DW_LocalConfig_WideHost(), process))
                 goto finished;
             CloseHandle(process.thread);
             // Blocking work belongs to this worker, never the game frame.
@@ -194,7 +192,7 @@ namespace
             {
                 unsigned long exit = 40;
                 if (code(process.process, &exit) && (exit == 10 || exit == 20 || exit == 30))
-                    result = assetsOnly && exit == 10 ? 50 : exit;
+                    result = exit;
             }
             CloseHandle(process.process);
         }
@@ -205,20 +203,25 @@ namespace
 
     unsigned state()
     {
-        // Configuration is fixed for this process. Every launch checks owned
-        // assets; the worker chooses whether EXE replacement is permitted.
+        // Configuration is fixed for this process. bypass_update_restart=1
+        // keeps the installation exactly as the owner left it: no helper, no
+        // update check, no executable, asset or map download and no repair.
         unsigned current = __atomic_load_n(&s_state, __ATOMIC_ACQUIRE);
-        if (!current && __atomic_compare_exchange_n(
-                            &s_state, &current, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+        if (current)
+            return current;
+        const unsigned initial = DW_LocalConfig_BypassUpdateRestart() ? 50U : 1U;
+        if (!__atomic_compare_exchange_n(
+                &s_state, &current, initial, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+            return current;
+        if (initial == 1)
         {
             void *worker = CreateThread(nullptr, 0, check, nullptr, 0, nullptr);
             if (worker)
                 CloseHandle(worker);
             else
                 __atomic_store_n(&s_state, 40U, __ATOMIC_RELEASE);
-            current = 1;
         }
-        return current;
+        return initial;
     }
 } // namespace
 
@@ -235,12 +238,10 @@ extern "C" void DW_ExecutableUpdate_Frame()
         DW_LocalPlatform_RecordStage(
             current == 1    ? "DW_EXE_UPDATE checking"
             : current == 10 ? "DW_EXE_UPDATE current"
-            : current == 20 ? (DW_LocalConfig_BypassUpdateRestart()
-                                   ? "DW_EXE_UPDATE verified owned assets staged; restart required; EXE unchanged"
-                                   : "DW_EXE_UPDATE verified update staged; restart required")
+            : current == 20 ? "DW_EXE_UPDATE verified update staged; restart required"
             : current == 30 ? "DW_EXE_UPDATE unknown executable; no patch applied"
-            : current == 50 ? "DW_EXE_UPDATE bypass_update_restart=1; EXE replacement bypassed; "
-                              "authenticated owned assets current; publisher/data updates remain native"
+            : current == 50 ? "DW_EXE_UPDATE bypass_update_restart=1; updater bypassed; no executable, "
+                              "asset or map update was checked or downloaded"
                             : "DW_EXE_UPDATE failed; installed executable unchanged; inspect "
                               ".update/result.log");
     }
@@ -264,8 +265,7 @@ extern "C" void DW_ExecutableUpdate_Frame()
         for (unsigned i = 0; ascii[i]; ++i)
             extra[i] = ascii[i];
         Process process{};
-        if (spawn(DW_LocalConfig_BypassUpdateRestart() ? L"--apply-assets" : L"--apply",
-                  extra, process))
+        if (spawn(L"--apply", extra, process))
         {
             CloseHandle(process.thread);
             s_apply = process.process;

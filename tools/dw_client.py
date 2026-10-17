@@ -315,7 +315,7 @@ def prepare():
             "test-alt-killcam.py", "test-alt-killcam-render.py",
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
-            "bot_style_paths.py",
+            "bot_style_paths.py", "prepare-map-images-package.py",
             "prepare-join-in-progress.py",
             "prepare-dw-verifier.py",
             "prepare-bot-rank-integration.py",
@@ -423,6 +423,17 @@ def prepare():
     scripts.prepare(source)
     zones = load_module("dw_bot_style_zones", ROOT / "tools/prepare-bot-style-zone.py")
     zones.prepare(source)
+    # Published custom maps' lobby/loading images, embedded as dw_map_images.
+    map_images = load_module("dw_map_images", ROOT / "tools/prepare-map-images-package.py")
+    map_images.prepare(source, directory / "map-images-package.json")
+    # The embedded bytes come from these files; editing them requires a new build.
+    map_images_header = digest(source / "src/DW_MapImagesPackage.h")
+    for image_input in sorted((ROOT / "data/custom-map-images").iterdir()):
+        if image_input.is_file():
+            source_inputs.append(dict(source="data/custom-map-images/" + image_input.name,
+                                      source_sha256=digest(image_input),
+                                      compiled_source="src/DW_MapImagesPackage.h",
+                                      compiled_sha256=map_images_header))
     verifier = load_module("dw_image_verifier", ROOT / "tools/prepare-dw-verifier.py")
     verifier.prepare(source)
     assignments = load_module("dw_matchmaking_assignments", ROOT / "tools/prepare-matchmaking-assignments.py")
@@ -540,6 +551,9 @@ def build(directory, publish_ready=True):
         REPLAY_GAME_ROOT=local["game"],
         REPLAY_SQLITE=local["sqlite"],
         REPLAY_WORKSTATION_CACHE=local["cache"],
+        # Filtered Clang AST results keyed by exact compiler, options, source and
+        # header hashes; shared by every job so unchanged units are not re-parsed.
+        REPLAY_AST_CACHE=str(ROOT / "data/dw-client/ast-cache"),
     )
     sys.path[:0] = [str(source), str(source / "tools")]
     from workstation.project import Project

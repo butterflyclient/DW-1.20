@@ -195,7 +195,9 @@ def main():
             for item in files:
                 staged = stage / 'asset-staging' / sha(target) / ('map-' + item['sha256'] + '.bin')
                 assert maps.file_sha(staged) == item['sha256'] and staged.stat().st_size == item['size']
-            checks.append('Actual XPRESS_HUFF helper restores every exact streamed file hash and size')
+            staging_root = stage / 'asset-staging' / sha(target)
+            assert not list(staging_root.glob('chunk-*.bin')) and not list(staging_root.glob('partial-*.bin'))
+            checks.append('Actual XPRESS_HUFF helper restores every exact streamed file hash and size and deletes the downloaded chunks')
             unicode_prefix = 'deep_é_地图_'
             deep_folder = root / (unicode_prefix + 'd' * (125 - len(str(root)) - 1 - len(unicode_prefix)))
             deep_folder.mkdir()
@@ -263,11 +265,21 @@ def main():
                 target = b'MZ' + bytes(62) + overlay_blob + unchecked(altered_files, altered_chunks)
                 failure_exe = root / failure / 'game.exe'; failure_exe.parent.mkdir()
                 failure_exe.write_bytes(b'MZprior-release-fixture')
-                run(failure_exe, '--prepare', 40)
+                before = len(requests)
+                run(failure_exe, '--prepare', 20)
+                # Executable first: an outdated client stages only the signed EXE
+                # and downloads no asset or map data.
                 assert failure_exe.read_bytes() == b'MZprior-release-fixture'
+                assert (Path(str(failure_exe) + '.update') / 'next.exe').read_bytes() == target
+                assert not any(item[0] == 'asset' for item in requests[before:])
                 assert not (failure_exe.parent / 'mods').exists() and not (failure_exe.parent / 'zone').exists()
-                assert not (Path(str(failure_exe) + '.update') / 'next.exe').exists()
-                checks.append('Signed target still rejects ' + failure + ' before writing any installed destination')
+                # Once that EXE is the one running, its own data staging rejects the map.
+                failure_exe.write_bytes(target)
+                run(failure_exe, '--prepare', 40)
+                assert failure_exe.read_bytes() == target
+                assert not (failure_exe.parent / 'mods').exists() and not (failure_exe.parent / 'zone').exists()
+                checks.append('Outdated client stages only the signed EXE; the latest EXE then rejects ' + failure +
+                              ' before writing any installed destination')
 
         finally:
             server.shutdown(); server.server_close(); thread.join(timeout=5)

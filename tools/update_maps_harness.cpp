@@ -161,6 +161,8 @@ int wmain(int argc, wchar_t **argv)
                 {
                     session.commit();
                     require(!session.needed(), "Map fixture commit lost files");
+                    require(!fs::exists(game / "game.exe.update/asset-staging" / hex(identity.data())),
+                            "Commit left staged downloads");
                 }
                 else
                 {

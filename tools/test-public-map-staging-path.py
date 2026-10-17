@@ -77,12 +77,11 @@ def main():
             path = staging / ('map-' + entry['sha256'] + '.bin')
             assert len(str(path)) > 260 and path.stat().st_size == entry['size']
             assert sha(path) == entry['sha256']
-        for digest, entry in maps['payloads'].items():
-            path = staging / ('chunk-' + digest + '.bin')
-            assert path.stat().st_size == entry['size'] and sha(path) == digest
+        # Compressed transport chunks are deleted once every map file is staged.
+        assert not list(staging.glob('chunk-*.bin')) and not list(staging.glob('partial-*.bin'))
         assert not (game / 'mods').exists()
         assert not (Path(str(image) + '.update') / 'next.exe').exists()
-        checks.append('Exact freshly embedded candidate helper downloads and verifies every published compressed map chunk and complete native file beyond MAX_PATH')
+        checks.append('Exact freshly embedded candidate helper downloads and verifies every published compressed map chunk and complete native file beyond MAX_PATH, then deletes the transport chunks')
         checks.append('Asset-only staging preserves candidate EXE and creates no installed map files')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(dict(passed=True, checks=checks,

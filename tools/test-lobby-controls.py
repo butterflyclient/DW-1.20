@@ -172,6 +172,7 @@ def main():
     )
     command = dict(callback=None, argc=2)
     calls, registered, checks, pool_calls, map_calls = [], {}, [], [], []
+    diagnostics = []
     lua = dict(top=2, locked=False, limits={}, now=10000)
     names = (
         "DW_LocalBackend_IsEnabled",
@@ -182,6 +183,9 @@ def main():
         "Dvar_EndPermanentRegistration",
         "Dvar_RegisterInt",
         "Dvar_RegisterBool",
+        "Dvar_RegisterString",
+        "DW_MapAvailability_InstalledIds",
+        "DW_LocalBackend_LogLine",
         "DW_BotPolicy_Register",
         "DW_BotPolicy_Prepare",
         "DW_BotPolicy_ResetRoster",
@@ -408,10 +412,26 @@ def main():
             assert key in (
                 *map_boolean_names,
                 "replay_dw_autoFillBots", "replay_dw_autoFillBotsActive", "replay_dw_autoFillBotsComplete",
-                "lui_dwIntroVideos", "lui_dwTutorialPrompts")
-            assert values[1:3] == [0, 0] and key not in registered
+                "lui_dwIntroVideos", "lui_dwTutorialPrompts", "replay_dw_map_mp_nuketown")
+            default = int(key == "replay_dw_map_mp_nuketown")
+            # The native bool argument occupies DL; upper RDX bits are unspecified.
+            assert [values[1] & 0xFF, values[2]] == [default, 0] and key not in registered, (key, values[:4], default)
             pointer = arena + 0x70000 + len(registered) * 0x100
             write(pointer + 29, 0, "<B")
+            write(pointer + 40, default, "<B")
+            registered[key] = pointer
+            returned(pointer)
+        elif name == "DW_LocalBackend_LogLine":
+            diagnostics.append(string(values[0]))
+            returned()
+        elif name == "DW_MapAvailability_InstalledIds":
+            vm.mem_write(arena + 0x5200, b" mp_nuketown \0")
+            returned(arena + 0x5200)
+        elif name == "Dvar_RegisterString":
+            key = string(values[0])
+            assert key == "replay_dw_customMaps" and key not in registered
+            assert string(values[1]) == " mp_nuketown " and values[2] == 0
+            pointer = arena + 0x70000 + len(registered) * 0x100
             registered[key] = pointer
             returned(pointer)
         elif name in ("DW_BotPolicy_ResetRoster", "DW_BotPolicy_CaptureRoster", "DW_PlaylistUI_Frame"):
@@ -567,6 +587,12 @@ def main():
         assert read(registered[key] + 29, "<B") == 0
         assert read(registered[key] + 40, "<B") == 0
     checks.append("Intro videos and automatic Warzone tutorial prompts register as native booleans disabled by default")
+    assert "replay_dw_customMaps" in registered
+    checks.append("replay_dw_customMaps registers once with the scanned custom map package ids")
+    assert "replay_dw_map_mp_nuketown" in registered
+    assert read(registered["replay_dw_map_mp_nuketown"] + 40, "<B") == 1
+    assert diagnostics == ["DW_CUSTOM_MAPS installed: mp_nuketown "]
+    checks.append("The scanned Nuketown package registers its enabled per-map flag and bounded diagnostic; later frames do not register it again")
     assert read(arena + 0x3000 + 40) == 2
     write(dvars["gl_14D386840"] + 40, 152)
     write(registered["replay_dw_botCount"] + 40, 7)

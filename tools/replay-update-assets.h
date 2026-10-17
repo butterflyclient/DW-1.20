@@ -54,6 +54,39 @@ namespace update_assets
                 "Update path is not an absolute Windows file path");
         return fs::path(L"\\\\?\\" + value);
     }
+    // Best-effort removal of transient download files. Only plain files directly
+    // inside the directory are deleted (optionally by name prefix); reparse points
+    // are never followed. With no prefix the emptied directory is removed too.
+    inline void purgeStaging(const fs::path &directoryPath, std::wstring_view prefix = {}) noexcept
+    {
+        try
+        {
+            const auto native = nativePath(directoryPath);
+            const auto flags = GetFileAttributesW(native.c_str());
+            if (flags == INVALID_FILE_ATTRIBUTES || !(flags & FILE_ATTRIBUTE_DIRECTORY) ||
+                (flags & FILE_ATTRIBUTE_REPARSE_POINT))
+                return;
+            std::vector<fs::path> victims;
+            std::error_code error;
+            for (fs::directory_iterator item(native, error), end; !error && item != end; item.increment(error))
+            {
+                const auto name = item->path().filename().wstring();
+                if (!prefix.empty() && !name.starts_with(prefix))
+                    continue;
+                const auto itemFlags = GetFileAttributesW(item->path().c_str());
+                if (itemFlags != INVALID_FILE_ATTRIBUTES &&
+                    !(itemFlags & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)))
+                    victims.push_back(item->path());
+            }
+            for (const auto &victim : victims)
+                DeleteFileW(victim.c_str());
+            if (prefix.empty())
+                RemoveDirectoryW(native.c_str());
+        }
+        catch (...)
+        {
+        }
+    }
     inline std::wstring hex(const uint8_t *bytes)
     {
         std::wstring result;
@@ -400,6 +433,10 @@ namespace update_assets
                 }
             }
             verifyStage();
+            // Compressed chunks are only transport; the verified raw blobs remain
+            // until installation.
+            purgeStaging(cache, L"chunk-");
+            purgeStaging(cache, L"partial-");
         }
         void verifyStage() const
         {
@@ -488,6 +525,33 @@ namespace update_assets
             }
             undo.clear();
         }
-        void commit() { committed = true; undo.clear(); }
+        void commit()
+        {
+            committed = true;
+            undo.clear();
+            discardStaging();
+        }
+        // Drops every staged download (this target and stale older targets).
+        // Backups under asset-backups are recovery data and are kept.
+        void discardStaging() const noexcept
+        {
+            try
+            {
+                const auto root = nativePath(folder / "asset-staging");
+                const auto flags = GetFileAttributesW(root.c_str());
+                if (flags == INVALID_FILE_ATTRIBUTES || !(flags & FILE_ATTRIBUTE_DIRECTORY) ||
+                    (flags & FILE_ATTRIBUTE_REPARSE_POINT))
+                    return;
+                std::vector<fs::path> targets;
+                std::error_code error;
+                for (fs::directory_iterator item(root, error), end; !error && item != end; item.increment(error))
+                    targets.push_back(item->path());
+                for (const auto &target : targets)
+                    purgeStaging(target);
+            }
+            catch (...)
+            {
+            }
+        }
     };
 } // namespace update_assets

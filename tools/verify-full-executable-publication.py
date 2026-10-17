@@ -146,20 +146,38 @@ def main():
         assert result.returncode == 20, "Embedded helper must stage the full update"
         staged = Path(str(base) + ".update") / "next.exe"
         assert sha(staged) == catalog["latest"] and sha(base) == base_hash
-        old_payloads = staged_companions(base)
-        checks.append("Actual embedded Windows helper verifies and stages exact published EXE; installed older bytes remain unchanged")
-        # Retain authenticated transport chunks for the missing-current-files
-        # case. One complete network download proves the public transport;
-        # subsequent cases exercise assembly without redownloading a large map.
+        # EXE first (owner rule 2026-10-13): an outdated EXE stages only the new
+        # EXE; the new EXE's own helper stages companions (checked below).
+        old_cache = Path(str(base) + '.update') / 'asset-staging' / catalog['latest']
+        assert not old_cache.exists() or not any(old_cache.iterdir()),             'Outdated EXE staged companions before installing the latest EXE'
+        old_payloads = []
+        checks.append("Actual embedded Windows helper verifies and stages exact published EXE first, without companions; installed older bytes remain unchanged")
         current = folder / "current-release.exe"
+        local_payloads = None
         if maps:
+            # The helper deletes its transport chunks once every map file is staged.
             old_cache = Path(str(base) + '.update') / 'asset-staging' / catalog['latest']
-            new_cache = Path(str(current) + '.update') / 'asset-staging' / catalog['latest']
-            new_cache.mkdir(parents=True)
+            assert not list(old_cache.glob('chunk-*.bin')) and not list(old_cache.glob('partial-*.bin')),                 'Helper retained downloaded map chunks after staging'
+            checks.append('Embedded helper deletes downloaded map transport chunks after staging')
+            # One complete network download proves the public transport; later
+            # cases are seeded from the explicitly frozen local package (same
+            # immutable hashes) instead of redownloading a large map.
+            for record in sorted((ROOT / 'data/custom-map-releases').glob('*/package/package.json')):
+                if json.loads(record.read_bytes()).get('package_hash') == maps['package_hash']:
+                    local_payloads = record.parent / 'payloads'
+                    break
+
+        def seed_chunks(executable):
+            if not maps or local_payloads is None:
+                return
+            cache = Path(str(executable) + '.update') / 'asset-staging' / catalog['latest']
+            cache.mkdir(parents=True, exist_ok=True)
             for chunk in {item['payload_sha256']: item for item in maps['chunks']}.values():
-                payload = old_cache / ('chunk-' + chunk['payload_sha256'] + '.bin')
+                payload = local_payloads / (chunk['payload_sha256'] + '.bin')
                 assert sha(payload) == chunk['payload_sha256'] and payload.stat().st_size == chunk['payload_size']
-                shutil.copyfile(payload, new_cache / payload.name)
+                shutil.copyfile(payload, cache / ('chunk-' + chunk['payload_sha256'] + '.bin'))
+
+        seed_chunks(current)
         # These isolated bytes are no longer needed after verification. Reclaim
         # them before the current-version check to bound fixture disk usage.
         assert staged.resolve().is_relative_to(folder) and base.resolve().parent == folder
@@ -189,6 +207,7 @@ def main():
         if maps:
             # Legacy companions are now present while maps are still absent.
             # An EXE upgraded by an older helper must still repair the missing maps.
+            seed_chunks(current)
             result = subprocess.run([str(runner), '--prepare', str(current), args.host],
                                     cwd=folder, creationflags=subprocess.CREATE_NO_WINDOW, timeout=900)
             assert result.returncode == 20 and sha(current) == catalog['latest']

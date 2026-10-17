@@ -395,6 +395,12 @@ end
 local requiredMaps = { [65] = { map = "mp_nuketown", label = "Nuketown" } }
 
 local function customMapInstalled(map)
+    -- replay_dw_map_<id> (bool) follows every package scan; the list string is
+    -- fixed when first registered.
+    local ok, flag = pcall(Dvar.IBEGCHEFE, "replay_dw_map_" .. map)
+    if ok and flag == true then
+        return true
+    end
     local installed = Dvar.DHEEJCCJBH and Dvar.DHEEJCCJBH("replay_dw_customMaps")
     return type(installed) == "string" and string.find(installed, " " .. map .. " ", 1, true) ~= nil
 end

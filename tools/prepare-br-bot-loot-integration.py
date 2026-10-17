@@ -141,6 +141,10 @@ def prepare(snapshot, replace_owned=False):
     spec = importlib.util.spec_from_file_location('private_br_loot_catalog', snapshot / 'tools/source_catalog.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    shim = importlib.util.spec_from_file_location("dw_catalog", Path(__file__).resolve().with_name("dw_catalog.py"))
+    shim_module = importlib.util.module_from_spec(shim)
+    shim.loader.exec_module(shim_module)
+    shim_module.share_catalog(module)  # one catalog parse, not one per binding
     associations = json.loads((snapshot / 'source-units.json').read_bytes())
     existing = {row['symbol']: row['symbol_id'] for row in associations.get('imports', [])}
     for proof in result['proofs']:

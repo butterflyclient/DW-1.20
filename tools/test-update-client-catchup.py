@@ -28,9 +28,11 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 ROOT = Path(__file__).resolve().parents[1]
 FLAGS = subprocess.CREATE_NO_WINDOW
+# The original jobs/ snapshots were pruned; data/dw-client/historical-helpers/
+# reconstruct.py rebuilds both projects from git (see its docstring).
 HISTORICAL = {
-    "pre-assets": ROOT / "data/dw-client/jobs/1791731914707990700/source/generated-updater/helper-source",
-    "release29": ROOT / "data/dw-client/jobs/1791857394598514500/source/generated-updater/helper-source",
+    "pre-assets": ROOT / "data/dw-client/historical-helpers/pre-assets",
+    "release29": ROOT / "data/dw-client/historical-helpers/release29",
 }
 
 

@@ -24,7 +24,10 @@ def verify_updater(path, target_hash):
     cases = proof.get("initial_update_checks", [])
     has_bypass = any("bypass_update_restart" in case for case in cases)
     checks = proof.get("checks", [])
-    repairs_under_bypass = ('worker_checks' in proof or any(
+    # bypass_skips_updater: bypass_update_restart=1 starts no worker and never
+    # downloads; the worker (and its asset repair) runs only without it.
+    skips = proof.get("bypass_skips_updater") is True
+    repairs_under_bypass = not skips and ('worker_checks' in proof or any(
         'asset_repair_restart_under_bypass' in case or 'asset_failure_fence' in case
         for case in checks))
     expected = {
@@ -44,12 +47,14 @@ def verify_updater(path, target_hash):
         key = (case["enabled"], case["thread_creation_succeeds"], bypass)
         if key in observed:
             raise ValueError("Duplicate compiled updater startup case")
-        if has_bypass and case.get("bypass_logged") is not (bypass and not repairs_under_bypass):
+        if has_bypass and case.get("bypass_logged") is not (bypass and not repairs_under_bypass and
+                                                            (case["enabled"] or not skips)):
             raise ValueError("Compiled updater bypass logging does not verify")
-        if repairs_under_bypass:
+        if repairs_under_bypass or skips:
             callback = case.get('worker_callback')
-            if (case['enabled'] and (type(callback) is not int or callback <= 0)
-                    or not case['enabled'] and callback is not None):
+            runs = case['enabled'] and not (skips and bypass)
+            if (runs and (type(callback) is not int or callback <= 0)
+                    or not runs and callback is not None):
                 raise ValueError('Compiled updater worker callback does not verify')
         observed[key] = (case["worker_starts"], case["final_state"])
     if observed != expected:
@@ -65,7 +70,10 @@ def verify_updater(path, target_hash):
         if (key in observed_fences or not case.get("native_prerequisite_passes")
                 or not case.get("restart_route_correct") or case.get("getter_cases") != 10
                 or (has_bypass and case.get("native_data_restart_preserved") is not
-                    (not (case['enabled'] and case['state'] == 20) if repairs_under_bypass else bypass))
+                    (not (case['enabled'] and case['state'] == 20) if repairs_under_bypass or skips
+                     else bypass))
+                or (skips and case.get('asset_failure_fence') is not
+                    (case['enabled'] and case['state'] == 40))
                 or (repairs_under_bypass and
                     (case.get('asset_repair_restart_under_bypass') is not
                      (case['enabled'] and bypass and case['state'] == 20)
@@ -75,13 +83,14 @@ def verify_updater(path, target_hash):
         observed_fences.add(key)
     if observed_fences != expected_fences:
         raise ValueError("Compiled update fence matrix is incomplete")
-    if repairs_under_bypass:
+    if repairs_under_bypass or skips:
         if not has_bypass or not re.fullmatch('[0-9a-f]{64}', proof.get('embedded_helper_sha256', '')):
             raise ValueError('Compiled asset repair helper proof is missing')
-        if len({case['worker_callback'] for case in cases if case['enabled']}) != 1:
+        if len({case['worker_callback'] for case in cases
+                if case['enabled'] and case['worker_callback'] is not None}) != 1:
             raise ValueError('Compiled startup cases disagree on the worker callback')
         expected_workers = {(bypass, helper, exit_code)
-                            for bypass in (False, True)
+                            for bypass in ((False,) if skips else (False, True))
                             for helper, exit_code in (('exact', 10), ('older', 10),
                                                        ('older', 20), ('older', 40), ('trailing', 10))}
         observed_workers = set()

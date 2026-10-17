@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -399,11 +400,26 @@ namespace
                     "Downloaded executable failed verification");
             // This file is evidence of the signed target in asset-only mode; it is never installed.
         }
+        if (!assetsOnly && p.status == 1)
+        {
+            // Executable first: an outdated client stages only the signed latest
+            // EXE. That EXE stages its owned assets and map data itself once it is
+            // the one running (its first check reports status 0).
+            update_assets::manifest(assetIO, target);
+            update_assets::mapManifest(assetIO, target); // reject a malformed target now
+            write(stage(exe) / "next.exe", target);
+            require(matches(read(exe), reply.plan.baseHash), "Installed executable changed during staging");
+            savePlan(exe, host, false, reply);
+            return 20;
+        }
         if (assetsOnly && p.status == 1)
             frozenAssetsMatch(target);
         update_assets::Session assets(assetIO, exe, stage(exe), target, p.targetHash);
         if ((assetsOnly || p.status == 0) && !assets.needed())
+        {
+            assets.discardStaging();
             return 10;
+        }
         assets.stage(host);
         if (p.status == 1)
             write(stage(exe) / (assetsOnly ? "verified-target.exe" : "next.exe"), target);
@@ -447,8 +463,15 @@ namespace
             frozenAssetsMatch(target);
         const auto refreshed = freshPlan(read(exe), context.host);
         unchangedTarget(refreshed, reply); reply = refreshed;
-        update_assets::Session assets(assetIO, exe, stage(exe), target, reply.plan.targetHash);
-        assets.verifyStage();
+        // An executable update installs only the EXE (see prepare); asset and
+        // map changes are applied by a later update from the latest EXE.
+        const bool executableOnly = !assetsOnly && reply.plan.status == 1;
+        std::optional<update_assets::Session> assets;
+        if (!executableOnly)
+        {
+            assets.emplace(assetIO, exe, stage(exe), target, reply.plan.targetHash);
+            assets->verifyStage();
+        }
         Handle ready(OpenEventW(EVENT_MODIFY_STATE, FALSE, eventName.c_str()));
         require(ready.value && SetEvent(ready.value), "Cannot acknowledge the restart handoff");
         require(WaitForSingleObject(process.value, 86400000) == WAIT_OBJECT_0,
@@ -461,7 +484,8 @@ namespace
         update_assets::safePath(exe); update_assets::safePath(next);
         require(reply.plan.status == 0 || matches(read(next), reply.plan.targetHash),
                 "Staged target changed while waiting for the game to exit");
-        assets.install(); // All original overlay bytes backed up before replacement.
+        if (assets)
+            assets->install(); // All original overlay bytes backed up before replacement.
         if (!assetsOnly && reply.plan.status == 1)
         {
             const auto backup = stage(exe) / (hex(reply.plan.baseHash) + L".backup.exe");
@@ -510,7 +534,10 @@ namespace
                     "Final verification failed; restored the previous EXE without launching it");
             }
         }
-        assets.commit();
+        if (assets)
+            assets->commit();
+        if (assetsOnly && reply.plan.status == 1)
+            DeleteFileW(update_assets::nativePath(next).c_str()); // downloaded evidence copy only
         std::wstring command = L"\"" + exe.wstring() + L"\"";
         STARTUPINFOW startup{sizeof(startup)};
         PROCESS_INFORMATION child{};

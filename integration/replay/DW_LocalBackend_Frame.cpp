@@ -290,6 +290,14 @@ extern "C" void DW_LocalBackend_Frame()
             Dvar_SetVariant(tutorial, &value, 0);
         }
     }
+    // online_tournament_enabled: the MP play menu builds its tournament entry
+    // only while this is set; DW has no tournaments and needs the menu row.
+    if (auto* tournament = Dvar_FindVarByName("NLPONNQNRS")) {
+        if (tournament->type == 0 && tournament->current.enabled) {
+            DvarValue value{};
+            Dvar_SetVariant(tournament, &value, 0);
+        }
+    }
     DW_LocalProgression_Frame();
     DW_ExecutableUpdate_Frame();
     DW_LobbyControls_Frame();
@@ -312,4 +320,10 @@ extern "C" void DW_LocalBackend_Frame()
         s_reported = state;
         DW_LocalBackend_Status_f();
     }
+}
+
+// One line appended to replay-dw-client.log (zone and map diagnostics).
+extern "C" void DW_LocalBackend_LogLine(const char *message)
+{
+    WriteLog(message);
 }

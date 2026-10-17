@@ -211,6 +211,10 @@ int DW_Progression_LuaCall(void *, int, int, int);
     module = importlib.util.module_from_spec(spec)
     sys.path.insert(0, str(snapshot / "tools"))
     spec.loader.exec_module(module)
+    shim = importlib.util.spec_from_file_location("dw_catalog", Path(__file__).resolve().with_name("dw_catalog.py"))
+    shim_module = importlib.util.module_from_spec(shim)
+    shim.loader.exec_module(shim_module)
+    shim_module.share_catalog(module)  # one catalog parse, not one per binding
     bindings = []
     for alias, name in (("DW_Progression_StatsSource", "q_LiveStorage_GetActiveStatsSource"),
                         ("DW_Progression_ResetStats", "sub_1412A39C0"),

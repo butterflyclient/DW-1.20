@@ -5,7 +5,7 @@ namespace
 struct Entry
 {
     wchar_t name[1200];
-    uint8_t bytes[50000];
+    uint8_t bytes[400000]; // the published map image zone is ~320 KB
     unsigned size, cursor;
     bool exists;
 } files[128];
@@ -16,6 +16,8 @@ unsigned reads, nativeMissing;
 const char *regionCode = "ww", *languageCode = "eng";
 const char *regionDirectory = "worldwide", *languageDirectory = "english";
 bool seenServer, packagePresent = true;
+bool mapImages;
+unsigned mapImagesState, publishedState = 99;
 const DWBotStyleFastfileInfo *seenPointer;
 bool sameWide(const wchar_t *a, const wchar_t *b)
 {
@@ -46,6 +48,9 @@ void clear()
     reads = nativeMissing = 0;
     package = DWBotStyleScripts::Package;
     packagePresent = true;
+    mapImages = false;
+    mapImagesState = 0;
+    publishedState = 99;
 }
 void *__stdcall create(const wchar_t *name, unsigned long access, unsigned long, void *,
                        unsigned long disposition, unsigned long, void *)
@@ -245,7 +250,15 @@ extern "C"
     }
     unsigned DWBSZ_PollFastfileState(const char *name)
     {
+        if (equal(name, "mw120r_map_images"))
+            return mapImagesState;
+        if (equal(name, DWMapImages::ZoneName))
+            return publishedState;
         return equal(name, package.zoneName) ? state : 99;
+    }
+    bool DW_MapImages_ZoneInstalled()
+    {
+        return mapImages;
     }
     const char *DWBSZ_CurrentRegionCode()
     {
@@ -276,6 +289,9 @@ extern "C"
     void DWBSZ_Print(int, const char *, ...)
     {
         ++messages;
+    }
+    void DW_LocalBackend_LogLine(const char *)
+    {
     }
     void DW_BotStyleZone_LoadFastfilesNative(const DWBotStyleFastfileInfo *info, uint32_t count,
                                              uint32_t flags, bool server)
@@ -389,6 +405,90 @@ extern "C"
         clear();
         DW_BotStyleZone_LoadFastfiles(nullptr, 0, 1, false);
         CHECK(!seenPointer && seenCount == 0 && !writes);
+        // Installed custom map image zone: after the overlay, before common_base_mp,
+        // with common_base_mp's record; only while native polling reports it absent.
+        clear();
+        mapImages = true;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 3, true);
+        CHECK(nativeCalls == 1 && seenCount == 5 && frees == 1 && !nativeMissing);
+        CHECK(equal(captured[0].name, "before") && equal(captured[1].name, package.zoneName) &&
+              equal(captured[2].name, "mw120r_map_images") &&
+              equal(captured[3].name, "common_base_mp") && equal(captured[4].name, "after"));
+        CHECK(captured[2].zoneFlags == stock[1].zoneFlags && captured[2].failureMode == 7 &&
+              captured[2].priority == 88 && captured[2].reserved == 0x12345678);
+        state = 1;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images"));
+        mapImagesState = 1;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        CHECK(seenPointer == stock && seenCount == 3);
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images") && !writes);
+        clear();
+        mapImages = true;
+        failure = 1;
+        DW_BotStyleZone_LoadFastfiles(stock, 3, 0, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images") && messages == 2);
+        clear();
+        DWBotStyleFastfileInfo supplied[] = {{"mw120r_map_images", 1, 2, 3, 4},
+                                             {"common_base_mp", 1, 2, 3, 4}};
+        mapImages = true;
+        packagePresent = false;
+        DW_BotStyleZone_LoadFastfiles(supplied, 2, 0, false);
+        CHECK(seenPointer == supplied && seenCount == 2);
+        // Map art loads with the frontend UI zones when a request names "ui",
+        // with that record's flags, failure mode and priority.
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        DWBotStyleFastfileInfo frontend[] = {{"before", 3, 4, 5, 6},
+                                             {"ui", 0x40, 9, 77, 0x5555},
+                                             {"after", 9, 10, 11, 12}};
+        DW_BotStyleZone_LoadFastfiles(frontend, 3, 1, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images") &&
+              equal(captured[2].name, "ui") && !writes);
+        CHECK(captured[1].zoneFlags == 0x40 && captured[1].failureMode == 9 &&
+              captured[1].priority == 77 && captured[1].reserved == 0x5555);
+        // Without ui or common_base_mp, a map or frontend zone (mp_*) anchors the
+        // map art again once it has been unloaded (a match unloads it); a
+        // transient mp_*_tr zone never does.
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        DWBotStyleFastfileInfo match[] = {{"mp_nuketown", 0x21, 2, 3, 4}, {"after", 9, 10, 11, 12}};
+        DW_BotStyleZone_LoadFastfiles(match, 2, 1, false);
+        CHECK(seenCount == 3 && equal(captured[0].name, "mw120r_map_images") &&
+              equal(captured[1].name, "mp_nuketown") && captured[0].zoneFlags == 0x21);
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        DWBotStyleFastfileInfo transient[] = {{"mp_av_attachment_tr", 0x21, 2, 3, 4}};
+        DW_BotStyleZone_LoadFastfiles(transient, 1, 1, false);
+        CHECK(seenPointer == transient && seenCount == 1);
+        // The executable's published map image zone: staged with every native
+        // companion, then requested before the owner-built zone.
+        clear();
+        mapImages = true;
+        packagePresent = false;
+        publishedState = 0;
+        DW_BotStyleZone_LoadFastfiles(frontend, 3, 1, false);
+        constexpr unsigned publishedEntries =
+            sizeof(DWMapImages::InstallationNames) / sizeof(*DWMapImages::InstallationNames);
+        CHECK(publishedEntries == 10 && writes == 2 * publishedEntries);
+        CHECK(seenCount == 5 && equal(captured[1].name, DWMapImages::ZoneName) &&
+              equal(captured[2].name, "mw120r_map_images") && equal(captured[3].name, "ui"));
+        CHECK(captured[1].zoneFlags == 0x40 && captured[1].failureMode == 9);
+        // Loaded or pending: not requested again; staging is not repeated.
+        publishedState = 2;
+        const unsigned stagedWrites = writes;
+        DW_BotStyleZone_LoadFastfiles(frontend, 3, 1, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, "mw120r_map_images") &&
+              writes == stagedWrites);
+        CHECK(DW_MapImages_PublishedListed(DWMapImages::MapIds[0]) &&
+              !DW_MapImages_PublishedListed("mp_not_published"));
         return 0;
 #undef CHECK
     }
