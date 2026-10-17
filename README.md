@@ -4,48 +4,112 @@ Replay DW is a community Demonware-compatible backend for a compatible Call of D
 
 The repository contains the C++ server, Replay client integration, configuration and deployment tools, and technical guides. Support is build-specific and continues to evolve. Not every game service or mode is implemented, and a successful server build does not mean every in-game feature is ready. Check the feature guides and known limitations in [`docs/`](docs/) before planning a session.
 
-## What you need
+## Local play on Windows (server and game on the same PC)
 
-- A compatible Replay game installation and client package. This repository does not distribute game files.
-- Windows 10/11 and Visual Studio 2022 C++ build tools for the included Windows build script; or CMake 3.24+, a C++20 compiler, and OpenSSL 3 development files to build on Linux.
-- PowerShell for the Windows helper scripts.
+These steps build the **backend server** and connect an existing compatible DW client to it. You need a matching Replay 1.20 game installation and DW client package from your package provider. This source download does not include the game, and building the server does not create the game executable.
 
-## Build the server
+**Local-play prerequisite:** the client embeds trusted server public keys. A newly initialized server creates its own keys, so changing a production client's `host` alone does not make it trust your server. Before attempting step 6, obtain a client prepared for your own server's public keys from the client maintainer. The public source download does not currently provide a standalone client bootstrap workflow. You can complete steps 1–5 to build and check the backend independently; they do not by themselves enable in-game local play. Never solve a key mismatch by copying the production server's private keys.
 
-On Windows, open PowerShell in this repository and run:
+### 1. Install the build tools
+
+- Install **Visual Studio 2022** or **Build Tools for Visual Studio 2022**.
+- In Visual Studio Installer, select **Desktop development with C++**, including the MSVC x64/x86 tools and a Windows SDK.
+- Install **CMake 3.24 or newer** and select its option to add CMake to PATH.
+- Open a new PowerShell window after installation.
+
+Python is not required for the server build or the direct local launch below.
+
+### 2. Open the source folder
+
+Extract the source ZIP into a folder such as `C:\Games\DW-1.20-main`. Keep it separate from the game installation. In PowerShell, change to that folder, replacing this example with your actual path:
 
 ```powershell
-./build-server.ps1
+Set-Location -LiteralPath 'C:\Games\DW-1.20-main'
 ```
 
-The Release server is written to `build/Release/iw8-dw-server.exe`. The script configures the project with CMake and compiles it; it also prints the resulting executable's SHA-256 hash.
+This folder must contain `CMakeLists.txt`, `build-server.ps1`, and `src`.
 
-On Linux, build with CMake:
+### 3. Build the backend server
+
+```powershell
+.\build-server.ps1
+```
+
+Wait for the command to finish without errors. It builds only `iw8-dw-server` and prints the SHA-256 hash of `build\Release\iw8-dw-server.exe`.
+
+If PowerShell blocks the script, use the equivalent CMake commands below. Run each command separately and continue only when it succeeds:
+
+```powershell
+cmake -S . -B build -A x64
+cmake --build build --config Release --target iw8-dw-server --parallel 2
+```
+
+Do not run `build-game.ps1` for this step. That is the maintainer's game-client build and publication pipeline, and requires private compiler inputs absent from a source download.
+
+### 4. Start your local server
+
+From the same source folder, run:
+
+```powershell
+.\build\Release\iw8-dw-server.exe .\data\local-play
+```
+
+Leave this PowerShell window open. The server creates its own local accounts, keys, logs, and saved state in `data\local-play`. With no `network.json` in that folder, it uses loopback networking for this PC. Keep this folder between sessions so your server identity and progress persist; do not copy another server's runtime data into it.
+
+This command runs the local executable directly. It does not publish to or control the project's remote server. The separate `start-server.ps1` helper can select remote administration when `data/primary-backend.json` exists, so it is not used in this walkthrough.
+
+### 5. Check that it is ready
+
+Open a second PowerShell window and run:
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8085/health'
+```
+
+The response should identify the server as `iw8-dw`. You can also open [the local dashboard](http://127.0.0.1:8085/stats) in your browser. A healthy backend confirms server startup; the next step checks the game.
+
+### 6. Connect your DW game client
+
+Complete this step only with a client prepared to trust this local server's keys, as described above.
+
+1. Close the game before editing its configuration.
+2. In the **game folder**, back up `game_dx12_ship_replay_dw.ini`, then open it in a text editor. If it does not exist, create it beside `game_dx12_ship_replay_dw.exe`. Make sure it is not saved as `.ini.txt`.
+3. Set the existing `host` entry to `host=127.0.0.1`, or add that line if absent.
+4. Keep the package's other required settings. A package configured for a remote guest may need a local-compatible identity/configuration from its provider; remote credentials are not automatically accounts on your new server.
+5. Start the matching client using its supplied `Run_Replay_DW.cmd` from the game folder, with the local server still running.
+6. Once signed in, enter Multiplayer and create a private match using a map included in your installation. Use the available bot controls if desired.
+
+The executable-specific INI takes precedence over `replay-dw.ini`. Restart the client after changing it. This walkthrough is for one PC; LAN or internet play needs the additional setup in [remote hosting](docs/remote-host-test.md). No router port forwarding is needed for same-PC loopback play.
+
+### 7. Stop and restart
+
+Close the game, then press **Ctrl+C** in the server window to stop the server. Next time, repeat step 4 and launch your client. Rebuild only after changing or updating the source. Back up `data\local-play` while the server is stopped. Runtime data is private and excluded from Git.
+
+### Common build and startup problems
+
+| Message or symptom | What to do |
+| --- | --- |
+| `cmake` is not recognized | Install CMake, add it to PATH, and open a new PowerShell window. |
+| No Visual Studio compiler found | Install the C++ workload and Windows SDK from step 1. |
+| Missing `data/current-remote-deployment.json` | You ran the game-client pipeline. Use the server build in step 3. |
+| Missing `DW_UpdateAssetPaths.h` | Use this updated source and the explicit `--target iw8-dw-server` command. The updater needs separate generated client inputs. |
+| C2026 in `public_dashboard.h` | Update that header from this source; its dashboard is split into MSVC-compatible string literals. |
+| CMake reports a different source directory or generator | Do not reuse a build folder copied from another machine. Rename that `build` folder, then configure again. |
+| Server exits or health check fails | Read the server window and `data/local-play/server.log`. Check for another server using the same ports before starting a second copy. |
+| Health check passes but the game cannot sign in | Check the matching client package, executable-specific INI, game working folder, and server log. A successful build does not prove client compatibility. |
+| `server-platform-reply-signature-or-expiry` or an untrusted-key login error | Confirm that the client was prepared for this server's public keys. Changing `host` does not change the keys embedded in the client. Keep the local server's keys between runs. |
+
+## Build the server on Linux
+
+Install CMake 3.24+, a C++20 compiler, and OpenSSL 3 development files, then run:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release --parallel
+cmake --build build --config Release --target iw8-dw-server --parallel
+./build/iw8-dw-server ./data/local-play
 ```
 
-The server requires a runtime data directory. Keep that directory private and backed up; it may contain signing keys, account state, player data, and logs. Runtime data is intentionally excluded from Git.
-
-## Run locally
-
-On Windows, start the server from PowerShell:
-
-```powershell
-./start-server.ps1
-```
-
-The helper starts the built server, creates the local runtime data directory, and checks its health endpoint. By default, the server is intended for local use. The included status, stop, and start scripts are `status-server.ps1`, `stop-server.ps1`, and `start-server.ps1`.
-
-The local statistics page is served at `http://127.0.0.1:8085/stats`. It reports operational summaries and public lobby information; it does not provide server administration. Do not expose the server or dashboard to the internet unless you have reviewed the network and security guidance in this repository.
-
-## Connect a Replay client
-
-Use a client package that matches the server's supported Replay build. Follow the package's included launcher and INI instructions. The client INI selects the backend host; use `127.0.0.1` when the client and server run on the same computer. Restart the client after changing its INI.
-
-For a private remote session, configure the host's advertised and local addresses, firewall, router forwarding, and each player's client settings as described in [`docs/remote-host-test.md`](docs/remote-host-test.md). Do not share server signing keys, runtime data, or another player's identity/profile files. Remote play requires compatible network configuration and is separate from local server startup.
+The game-client instructions above are for Windows. A server on a different machine requires the [remote hosting configuration](docs/remote-host-test.md).
 
 ## Features and compatibility
 
@@ -61,9 +125,12 @@ packages are backed up before replacement. See [custom map updates](docs/CUSTOM_
 ## Development
 
 The Replay client has one production target: `game_dx12_ship_replay_dw.exe`.
-Build it with `./build-game.ps1`, then install the verified result with
-`./deploy-game.ps1`. The current bot and host optimizations are always included;
-`com_optimized` selects their behavior at runtime and defaults to `1`.
+Its `build-game.ps1` / `deploy-game.ps1` workflow is for the configured maintainer
+environment. It needs private recovered-game/compiler inputs and verified build
+records that are not committed. The normal client build also publishes through
+the configured remote release pipeline; it is not a standalone public build
+command. Copying a deployment JSON alone does not supply the missing inputs.
+The server build and direct local launch above do not invoke this workflow.
 Client code lives in `integration/replay/` and `integration/host-scale/` as one
 source set. See [the client build guide](docs/DW_CLIENT_BUILD.txt) for source
 ownership, compilation evidence and the retirement of older revision targets.
