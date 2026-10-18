@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "passed": true,
+  "checked_utc": "2026-10-18T20:38:35.746956+00:00",
+  "canonical_receipt": "data/droplet-deployment.json",
+  "canonical_receipt_sha256": "36121035cd7aa6e3409ed25a6a64d75205e81d5ad0dbcdf7078badcceee88b26",
+  "previous_receipt": {
+    "path": "data/tls-deadline-candidate-20261018T201209Z/previous-droplet-deployment.json",
+    "sha256": "f924acc827df188c3bf15a32ec99d6b8d7c2d4596ac35bdba7b9ff33990a05db"
+  },
+  "server_sha256": "2cf35140c6622edf80ee35b28a0991479a64470ca0afa4f067ec3e6f8045afdb",
+  "live_pid": 525836,
+  "remote_backend_verify_passed": true,
+  "verification_contract": "Every current protocolproof passed andbinds exactserverSHA; activebinary/process/path matchcanonicalreceipt",
+  "current_proof_count": 4,
+  "protocol_evidence": [
+    {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/public-protocol-current.json",
+      "sha256": "a903fbae8d5ef531b4552b3a3f0badcdbfd4d38249b013fa76baf4f86a6ac18b"
+    },
+    {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/connection-budget.json",
+      "sha256": "3d9d5d73d95ee9faef4e9f6f0e84870af647e185e23c0304881fa6aad03a71a2"
+    },
+    {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/strict-policy-current.json",
+      "sha256": "2d00ddbf49a86ae408886dc5a1dbe2fa7c02e8650023d867c6a867dc63c3eb24"
+    },
+    {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/tls-full-suite-proof.json",
+      "sha256": "1ba277c2eccf376c5121bae9f3fce2a6e6053c23fddeb5be4b7e0af92d3282e5"
+    }
+  ],
+  "fresh_public_auth_transport_checks": 13,
+  "fresh_public_strict_policy_checks": 4,
+  "exact_binary_loopback_tls_checks": 11,
+  "exact_binary_loopback_budget_checks": 10,
+  "reused_unchanged_cng_verifier_sha256": "f7e4eb18b8de7a98997a2d3207e6940ef2d14809c74a2eb09b83a4d2eb2f661b",
+  "rebuilt": false,
+  "restarted": false,
+  "actual_game_login_verified": false
+}

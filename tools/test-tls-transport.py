@@ -87,10 +87,18 @@ def main():
                 except ConnectionResetError:
                     pass
             checks.append("HTTPS listener never falls back to plaintext")
-            with socket.create_connection(("127.0.0.1", https_port), timeout=5) as idle:
+            with socket.create_connection(("127.0.0.1", https_port), timeout=10) as delayed:
+                time.sleep(4)
+                with context.wrap_socket(delayed, server_hostname="127.0.0.1") as secure:
+                    secure.sendall(b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                    assert secure.recv(4096).startswith(b"HTTP/1.1 200")
+            checks.append("Verified TLS client delayed beyond the former three-second budget succeeds")
+            with socket.create_connection(("127.0.0.1", https_port), timeout=12) as idle:
                 start = time.perf_counter()
                 assert idle.recv(1) == b""
-                assert time.perf_counter() - start < 4.5
+                elapsed = time.perf_counter() - start
+                assert 8.5 <= elapsed < 11
+            assert "TLS handshake rejected: deadline" in (data / "server.log").read_text()
             checks.append("Idle TLS handshake closed within its absolute deadline")
             # A TCP timeout alone cannot bound SSL_read: a peer can drip pieces
             # of one encrypted record without ever producing application bytes.

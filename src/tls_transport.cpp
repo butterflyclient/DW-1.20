@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #include <openssl/ssl.h>
 #include <poll.h>
+#include <openssl/err.h>
 #endif
 
 namespace tls_transport
@@ -133,22 +134,47 @@ namespace tls_transport
         // Bound the entire handshake, including a peer trickling individual records.
         const int flags = fcntl(socket, F_GETFL, 0);
         bool accepted = false;
+        std::string failure = "socket-setup";
         if (flags >= 0 && SSL_set_fd(ssl, socket) == 1 &&
             fcntl(socket, F_SETFL, flags | O_NONBLOCK) == 0)
         {
-            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+            // Leave room for certificate validation/network scheduling within the
+            // client's ten-second request budget; still bound silent/trickling peers.
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(9);
+            ERR_clear_error();
             while (std::chrono::steady_clock::now() < deadline)
             {
+                errno = 0;
                 const int result = SSL_accept(ssl);
+                const int socketError = errno;
                 if (result == 1) { accepted = true; break; }
-                if (!waitFor(socket, SSL_get_error(ssl, result), deadline))
+                const int error = SSL_get_error(ssl, result);
+                if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE)
+                {
+                    failure = error == SSL_ERROR_ZERO_RETURN ||
+                              (error == SSL_ERROR_SYSCALL && result == 0 && socketError == 0) ? "peer-closed" :
+                              error == SSL_ERROR_SYSCALL ? "socket" : "openssl";
+                    failure += " ssl_error=" + std::to_string(error);
+                    if (error == SSL_ERROR_SYSCALL)
+                        failure += " socket_error=" + std::to_string(socketError);
+                    const auto reason = ERR_peek_last_error();
+                    if (reason)
+                        failure += " openssl_reason=" + std::to_string(ERR_GET_REASON(reason));
                     break;
+                }
+                if (!waitFor(socket, error, deadline))
+                {
+                    failure = std::chrono::steady_clock::now() >= deadline ? "deadline" : "socket-wait";
+                    break;
+                }
             }
+            if (!accepted && std::chrono::steady_clock::now() >= deadline)
+                failure = "deadline";
         }
         if (!accepted)
         {
             SSL_free(ssl);
-            throw std::runtime_error("TLS handshake rejected");
+            throw std::runtime_error("TLS handshake rejected: " + failure);
         }
         session = current = ssl;
         currentSocket = socket;

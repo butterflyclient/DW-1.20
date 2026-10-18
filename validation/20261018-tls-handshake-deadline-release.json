@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "activated": true,
+  "verified_utc": "2026-10-18T20:28:29.985723+00:00",
+  "release": "/opt/replay-dw/releases/20261018T202708Z-tls-deadline-2cf35140c662",
+  "previous_release": "/opt/replay-dw/releases/20261017-native-tls-6bb53d365c0d",
+  "server_sha256": "2cf35140c6622edf80ee35b28a0991479a64470ca0afa4f067ec3e6f8045afdb",
+  "pid": 525836,
+  "source_baseline_commit": "13896a53151688f453f808664b8715c0c0c2f881",
+  "production_changed_files": [
+    "src/tls_transport.cpp"
+  ],
+  "tls_source_sha256": "7a37f6f4e8f97561e227f29069d9a782c1965ba05553122dd39eb3ee7c9002ad",
+  "compile_passed": true,
+  "fresh_compiled_translation_units": 48,
+  "retained_objects": 0,
+  "tls_checks_passed": 11,
+  "connection_budget_checks_passed": 10,
+  "public_https_health": 200,
+  "preactivation_activity": {
+    "online_players": 0,
+    "matches": 0,
+    "parties": 0,
+    "player_rows": 0,
+    "utc": "2026-10-18T20:26:51.042975+00:00"
+  },
+  "fresh_mutable_backup": {
+    "path": "/var/backups/replay-dw/state-pre-tls-deadline-20261018T202708Z.tar.gz",
+    "size": 77873850,
+    "sha256": "2a4a97cd2abd77937a0af5c0a5ef2e4fc57d169dd1cec3b8492c70b666a18856",
+    "sidecar_matches": true
+  },
+  "updater_map_asset_manifests_verified_unchanged": 20,
+  "manifest_digest": "98c5f82f77d5fca0bdd2db63d87b735aa65211f9f2320cbdb0c16c2035b67249",
+  "activation_script_sha256": "2b52a4a6690e031955f1de144bdcfa62c5ac1725309e9d2df0a88fb1e591c3a1",
+  "rollback_required": false,
+  "native_client_probe_status": "Standalone nativeWinHTTPhealthandephemeralchallengeverified; actualgameloginnotyetverified",
+  "incident_caveat": "R19receiveWinHTTP12002/http0 remainsseparatefromTLSdeadline; oldSSLrejectmessagecouldnotproveuniquecause.",
+  "evidence_directory": "data/tls-deadline-candidate-20261018T201209Z",
+  "receipts": {
+    "review-readiness.json": "f72caea4176f676b1179a3898da4987f5e3ddda87f79a8c6cd1e35291962a72a",
+    "validation-rerun-receipt.json": "51be6a1ba4d74698b93ea8dc1b0e1fb30b68e3168676eaa0b9c41700317dcb75",
+    "activation-preflight.json": "e79fa5b3823db4dbd109a89ca04c17455dcfcca0da9f079bf709bffaf4e0d9f4",
+    "activation-result.json": "386c8b4f85a748b0bdaff93934b326059fcf4b1d8deefb4eda4dea53e7055589",
+    "activation-verification.json": "dc6e056ca808ebff292f1ef76ecb4b64d2f6f2816a7051152cc3414059b862ae"
+  },
+  "native_winhttp_transport_verified": true,
+  "native_winhttp_evidence": {
+    "winhttp-health-after.json": {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/winhttp-health-after.json",
+      "sha256": "65611aac30cf1787557b1c0f61c5e74c02663fa45b2417bd2a2e6a82be0fef97",
+      "results": [
+        {
+          "timeout_ms": 1000,
+          "elapsed_ms": 261.961,
+          "payload_length": 770,
+          "http_status": 200,
+          "read_complete": true
+        },
+        {
+          "timeout_ms": 10000,
+          "elapsed_ms": 197.584,
+          "payload_length": 770,
+          "http_status": 200,
+          "read_complete": true
+        }
+      ]
+    },
+    "winhttp-challenge-after.json": {
+      "path": "data/tls-deadline-candidate-20261018T201209Z/winhttp-challenge-after.json",
+      "sha256": "56249e8ecd38f4620be4336caa22891cf3be3ebbc7ee4a552abc231a0876bf82",
+      "results": [
+        {
+          "timeout_ms": 10000,
+          "elapsed_ms": 226.832,
+          "payload_length": 32,
+          "http_status": 200,
+          "read_complete": true
+        }
+      ]
+    }
+  },
+  "actual_game_login_verified": false,
+  "actual_game_login_status": "Ownerretryreported sameconnectionerror; standaloneWinHTTPtransportpass doesnotestablishgame-loginfix"
+}
