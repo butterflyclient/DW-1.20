@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "phase": "R21 prebuild source/hardware validation",
+  "ready_for_full_build": true,
+  "live_runtime_verified": false,
+  "profile": {
+    "samples": 200,
+    "duration_ms": 8015,
+    "consistent_vm_samples": 36,
+    "native_raycast_and_matching_script_chain": 21,
+    "limitation": "Read-only sequential PSS and VM observations; residence evidence, not call rates or exclusive CPU percentages."
+  },
+  "change": "GPU chooses connected native graph-node BR roaming destinations before random ground-ray and nearest-point chain; script request coalescing, stable goals, latest safe-circle validation, fair native admission, owned fallback and one-use vector handoff. CPU physics remains native.",
+  "sampling": "Seeded connected graph-node selection, not uniform circle-area sampling.",
+  "gpu_off": "Retains existing host-scale behavior, including its historical nearest-point budget.",
+  "validation": "D3D12 oracle/stress, compiled native/bridge/coordinator fixtures, exact native priority mapper, original script reconstruction and fresh decompilation; linked build and owner playtest are separate gates.",
+  "build_scheduler": "Four-worker dynamic scheduler retains all checks and ordered prefix checkpoints; static-lane 40-gate comparison passed, actual dynamic full run pending.",
+  "evidence": [
+    {
+      "path": "data/live-10836-r20-script-attribution.json",
+      "sha256": "75bb6d6e17087b57efa37d424aaf427e9e7064bbc667a3c33b504ffb41112763"
+    },
+    {
+      "path": "data/br-roam-native-integration-readiness.json",
+      "sha256": "7ea69bf742e8fe3188c11a499e2c38d8e9766cb312ca9a508519d1eec9f08b7d"
+    },
+    {
+      "path": "tools/build/br-roam-script-check.json",
+      "sha256": "5add44dc223dde697461b9af27bd029f281f3e42c6bdcb9d3fc5e7e979881593"
+    },
+    {
+      "path": "tools/build/script-method-new7-compat.json",
+      "sha256": "46899a99a39f676ded7ad0cf30d367bc21a99b393b851c81cf49c42e98ceb2e3"
+    },
+    {
+      "path": "tools/build/bot-style-new7-compat.json",
+      "sha256": "23cfae4aa6d63e4931ed2b2ac20b29c0c58ef8f0239bdd674fd7fd582c5ef219"
+    },
+    {
+      "path": "validation/host-bot-gpu/hardware-proof.json",
+      "sha256": "f800bbb3e689502f35076e45dfc9f4adb45c91f1ef7250fe92f76fdd58dcc3bf"
+    },
+    {
+      "path": "data/r21-planner-metrics-probe/result.json",
+      "sha256": "802b0c0db9bb5c7183916acd5a2ea95edf86c58deccae4b4a038b6cb1b9fa10b"
+    },
+    {
+      "path": "data/parallel-validation-benchmark-1792360338595740100/semantic-comparison.json",
+      "sha256": "b1be82fa60ccbe1b695951b668a146c248d65127d814123137a06c27ef69c0ac"
+    },
+    {
+      "path": "validation/dw-validation-scheduler.json",
+      "sha256": "eb05b0a95a313b8c7d8ce1e3c433535e5b1c6d90c7a564ea0d982568c5f870fa"
+    }
+  ]
+}

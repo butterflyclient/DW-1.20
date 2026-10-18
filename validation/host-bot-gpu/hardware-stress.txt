@@ -1,5 +1,5 @@
 HARDWARE vendor=0x10de device=0x2d05 luid=00000000:00012cb2 timestamp_hz=1000000000
 STRESS batches=120 bots_per_batch=200 nodes=256 edges=960 checked_routes=24000
-TIMING submit_cpu_us_avg=106.039 max=1799.500 submit_to_readback_us_avg=1291.687 max=10466.400 gpu_dispatch_us_avg=797.583 max=808
+TIMING submit_cpu_us_avg=40.347 max=921.600 submit_to_readback_us_avg=902.838 max=1519.100 gpu_dispatch_us_avg=792.517 max=810
 METRICS submitted=128 completed=128 busy=1 pending=0 device_failures=0 timeouts=0
 PASS: real hardware weighted Dijkstra, 200 bots, immutable graph and identity, 120-batch stress, weighted route lookahead

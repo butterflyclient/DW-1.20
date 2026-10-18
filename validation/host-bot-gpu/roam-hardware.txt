@@ -1,0 +1,2 @@
+ROAM hardware_checks=8202 randomized_batches=40 randomized_requests=8000 mixed_route_requests=2000 circle_flags_layers=PASS min_distance_boundary=PASS noeligible=PASS seeded_variation=PASS unsupported=PASS invalid_inputs=PASS
+ROAM_TIMING last_gpu_us=5 max_gpu_us=147 device_failures=0 timeouts=0

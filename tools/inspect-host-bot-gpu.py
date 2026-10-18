@@ -138,6 +138,59 @@ def planner_addresses(report, image):
     return result
 
 
+def planner_work_fields(report, image):
+    """Prove named fields from the value-only getter, without calling the game.
+
+    The public result uses uint64 fields; some source counters are uint32 and
+    are zero-extended by the compiler. Retain their actual read width so that
+    interval deltas handle rollover correctly. Legacy builds use the older
+    verified status-printer recognizer above.
+    """
+    address = report['symbols'].get('SV_HostBotGpu_GetPlannerWork')
+    if address is None:
+        return {name: (rva, 4) for name, rva in planner_addresses(report, image).items()}
+    names = (
+        'queued', 'solved', 'committed', 'native_commits', 'rejected',
+        'unsupported_graph', 'search_budget', 'no_route', 'stale', 'gas_routes',
+        'pending_batches', 'last_gpu_us', 'device_failures', 'captured_nodes',
+        'roam_coalesced', 'roam_queued', 'roam_candidates', 'roam_accepted',
+        'roam_rejected', 'roam_native_fallbacks', 'roam_cancelled',
+        'roam_validation_ticks', 'capture_ticks',
+    )
+    decoder = Cs(CS_ARCH_X86, CS_MODE_64)
+    decoder.detail = True
+    registers, fields = {}, {}
+
+    def family(instruction, register):
+        name = instruction.reg_name(register)
+        if name.startswith('e'):
+            return 'r' + name[1:]
+        return name.removesuffix('d')
+
+    for instruction in decoder.disasm(image.get_data(address, 1024), address):
+        if instruction.mnemonic == 'ret':
+            break
+        operands = instruction.operands
+        if instruction.mnemonic != 'mov' or len(operands) != 2:
+            registers.clear()
+            continue
+        target, source = operands
+        if (target.type == X86_OP_REG and source.type == X86_OP_MEM and
+                source.mem.base == X86_REG_RIP and source.size in (4, 8)):
+            registers[family(instruction, target.reg)] = (
+                instruction.address + instruction.size + source.mem.disp, source.size)
+        elif (target.type == X86_OP_MEM and target.mem.base == X86_REG_RCX and
+                target.size == 8 and source.type == X86_OP_REG):
+            key = family(instruction, source.reg)
+            assert key in registers, 'Unproven planner getter value'
+            assert target.mem.disp not in fields, 'Duplicate planner getter field'
+            fields[target.mem.disp] = registers.pop(key)
+        else:
+            registers.clear()
+    assert set(fields) == set(range(0, len(names) * 8, 8)), 'Planner getter layout changed'
+    return {name: fields[index * 8] for index, name in enumerate(names)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pid', type=int, required=True)
@@ -179,13 +232,7 @@ def main():
                  'adapter_luid_low', 'adapter_luid_high', 'gpu_timestamp_frequency',
                  'last_gpu_microseconds', 'max_gpu_microseconds')
         metrics = dict(zip(names, values))
-        planner = {}
-        for name, rva in planner_addresses(report, image).items():
-            block = c.create_string_buffer(4)
-            done = c.c_size_t()
-            assert kernel.ReadProcessMemory(process, modules[0] + rva, block, 4, c.byref(done))
-            assert done.value == 4
-            planner[name] = int.from_bytes(block.raw, 'little')
+        planner_fields = planner_work_fields(report, image)
         def read_value(address, format):
             size = struct.calcsize(format)
             block = c.create_string_buffer(size)
@@ -194,6 +241,12 @@ def main():
                 raise c.WinError(c.get_last_error())
             assert done.value == size
             return struct.unpack(format, block.raw)[0]
+
+        def sample_planner():
+            return {name: read_value(modules[0] + address, '<Q' if width == 8 else '<I')
+                    for name, (address, width) in planner_fields.items()}
+
+        planner = sample_planner()
 
         # These offsets are the same target-bound views used by the compiled
         # scheduler, not an inference from the lobby's displayed player count.
@@ -255,10 +308,12 @@ def main():
             assert kernel.QueryPerformanceFrequency(c.byref(frequency))
             before = sample_counters()
             sight_before = sample_sight()
+            planner_before = sample_planner()
             start = time.perf_counter()
             time.sleep(args.frame_seconds)
             after = sample_counters()
             sight_after = sample_sight()
+            planner_after = sample_planner()
             seconds = time.perf_counter() - start
             delta = [end - begin for begin, end in zip(before, after)]
             frames = dict(seconds=seconds, frames=delta[0], simulation_fps=delta[0] / seconds,
@@ -266,6 +321,16 @@ def main():
                           bot_think_ms_per_frame=delta[3] * 1000 / frequency.value / max(delta[0], 1),
                           bot_move_ms_per_frame=delta[4] * 1000 / frequency.value / max(delta[0], 1),
                           scope='Native bot frame counters; think excludes other server work, move includes GPU submission.')
+            planner_delta = {
+                name: (planner_after[name] - planner_before[name]) & ((1 << (width * 8)) - 1)
+                for name, (_, width) in planner_fields.items()
+                if name not in ('pending_batches', 'last_gpu_us')
+            }
+            for counter in ('capture_ticks', 'roam_validation_ticks'):
+                if counter in planner_delta:
+                    planner_delta[counter.removesuffix('_ticks') + '_cpu_ms_per_frame'] = (
+                        planner_delta[counter] * 1000 / frequency.value / max(delta[0], 1))
+            frames['planner'] = planner_delta
             if sight_addresses:
                 sight_delta = {name: (sight_after[name] - sight_before[name]) & ((1 << 64) - 1)
                                for name in sight_addresses}

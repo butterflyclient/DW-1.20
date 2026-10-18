@@ -314,9 +314,18 @@ def main():
         assert hashlib.sha256((snapshot / "src/DW_BotStyleScripts.cpp").read_bytes()).hexdigest() in {
             row["source_sha256"] for row in build["cpp"]
         }
-    spec = importlib.util.spec_from_file_location(
-        "script_prepare", ROOT / "tools/prepare-bot-style-scripts.py"
-    )
+    registry = json.loads(
+        (snapshot / "generated/bot-style-method-integration.json").read_bytes()
+    )["registry"]
+    preparer = ROOT / "tools/prepare-bot-style-scripts.py"
+    if not any(row["id"] == 0x878B for row in registry):
+        # Retained four-method snapshots use their own hash-bound policy generator.
+        preparer = snapshot / "tools/prepare-bot-style-scripts.py"
+        frozen = json.loads(
+            (snapshot / "generated/bot-style-scripts-integration.json").read_bytes()
+        )
+        assert hashlib.sha256(preparer.read_bytes()).hexdigest() == frozen["generator_sha256"]
+    spec = importlib.util.spec_from_file_location("script_prepare", preparer)
     module = importlib.util.module_from_spec(spec)
     import sys
 
@@ -363,11 +372,18 @@ def main():
         assert hashlib.sha256(Path(fresh["path"]).read_bytes()).hexdigest() == fresh["sha256"]
         if result["inserted_survival_method_id"]:
             assert result["inserted_survival_method_id"] == 0x8788
-            assert len(result["function_edits"]) == 2 and len(result["source_insertions"]) == 3
+            assert len(result["function_edits"]) == 2
+            if not result.get("br_roam_policy"):
+                assert len(result["source_insertions"]) == 3
+            else:
+                roam = result["br_roam_policy"]
+                assert roam["authored_current_circle_radius"] and roam["ready_checks_defined"]
+                assert roam["typed_control_rewrites"] == 1
+                assert roam["fresh_structured_decompile"]
             # Gas now publishes the authoritative circles directly. Only the
             # armor policy retains a local bot_is_in_gas call; the former
             # random-destination calls are deliberately absent.
-            references = result["inserted_references"]
+            references = [row for row in result["inserted_references"] if row["kind"] == "local"]
             gas_function = module.exported(
                 "scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_is_in_gas"
             )[3]

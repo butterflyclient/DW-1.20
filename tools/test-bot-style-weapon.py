@@ -102,6 +102,10 @@ def main():
             "DW_BotBindings.h",
         ]
     }
+    if '"SV_HostBotGpuPlanner.h"' in (snapshot / "src/DW_BotStyleWeapon.cpp").read_text():
+        hashes["SV_HostBotGpuPlanner.h"] = hashlib.sha256(
+            (snapshot / "src/SV_HostBotGpuPlanner.h").read_bytes()
+        ).hexdigest()
     assert (
         hashes["DW_BotStyleData.h"] == data["generated_header_sha256"]
         and hashes["DW_BotStyleSelection.h"] == data["selector_sha256"]

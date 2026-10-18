@@ -46,12 +46,16 @@ METHOD_ID = 0x8787
 SURVIVAL_METHOD_ID = 0x8788
 MP_CLASS_METHOD_ID = 0x8789
 GAS_STATE_METHOD_ID = 0x878A
+ROAM_REQUEST_METHOD_ID = 0x878B
+ROAM_GOAL_METHOD_ID = 0x878C
+ROAM_CANCEL_METHOD_ID = 0x878D
 ORIGINAL_HASHES = {
     "1827.gscbin": "b6ede9e3437161cd6eafa3de808d69a1d9e724e4f04b93d8a71fecf53ea28be2",
     "scripts/mp/bots/bots_gametype_br.gsc.gscbin": "e3abf284c279a21d6567dc93cc47f1e9d927ec92924af0cc1f6043e4dc62a58a",
     "scripts/mp/gametypes/br_weapons.gsc.gscbin": "06cead66afa73d00b678733f22d1d262ad95538c03eed3717f744072d97c7971",
 }
 POLICY_SOURCE_HASHES = {
+    "scripts/mp/gametypes/br_circle.gsc.gscbin": "278488a449e5078e45c424fbc3ef32420d838d5ee2f890eeedbff2ffb31bfb25",
     "2398.gscbin": "d34e9aa31ab93df67fed860fe508dea76103868bac82bbbb28225d7c016d25ae",
     "scripts/mp/gametypes/war.gsc.gscbin": "ca9a7e0f355dbc0c0d5be834a56f3e206a4f3fd3f88410c87b147f706c947234",
     "scripts/mp/gametypes/br.gsc.gscbin": "a45cb419d3a47fca11244ed273f515bd3d3a45fc62b1b1f45ff4cfaf0592d596",
@@ -69,6 +73,16 @@ class Reference:
 
 
 @dataclass(frozen=True)
+class ControlRewrite:
+    original_opcode: int
+    original_operand: int
+    original_width: int
+    original_target: int
+    replacement_operand: int
+    replacement_width: int
+
+
+@dataclass(frozen=True)
 class Edit:
     offset: int
     old: bytes
@@ -77,6 +91,7 @@ class Edit:
     function_token: int | str | None = None
     source: bytes = b""
     references: tuple[Reference, ...] = ()
+    control_rewrites: tuple[ControlRewrite, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -317,6 +332,129 @@ def survival_edits():
     return publish, armor_fragment()
 
 
+
+def roam_edits():
+    """Preserve stock locals/imports while admitting one asynchronous BR goal."""
+    bot = exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", 0x2039)
+    start = int(bot[3]["function_at"], 16)
+    gas = exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_is_in_gas")
+    expectations = {
+        0x248: "724401",
+        0x26A: "721d01",
+        0x359: "755043c2",
+        0x35D: "5b19",
+        0x360: "3a",
+        0x364: "5b1a",
+        0x388: "0303",
+    }
+    for offset, expected in expectations.items():
+        wanted = bytes.fromhex(expected)
+        if bot[1][start + offset : start + offset + len(wanted)] != wanted:
+            raise ValueError("Stock BR roam splice boundary changed: " + hex(offset))
+    state_token = bytes.fromhex("ffffffff")
+    state_source = struct.pack("<I", 0) + b"dw_roam_state\0"
+
+    def cancel(offset, purpose):
+        return Edit(
+            offset,
+            b"",
+            b"\x3a\x7e" + struct.pack("<H", ROAM_CANCEL_METHOD_ID) + b"\x58",
+            purpose,
+            function_token=0x2039,
+        )
+
+    code, source, references = bytearray(), bytearray(), []
+
+    def emit(value, consumed=b""):
+        code.extend(value)
+        source.extend(consumed)
+
+    def external_branch(opcode, offset, width=2):
+        emit(bytes([opcode]) + bytes(width))
+        references.append(
+            Reference(len(code) - width, width, start + offset, 1, "roam-control")
+        )
+
+    def state():
+        emit(b"\x3c" + state_token, state_source)
+
+    # Copy the exact stock authored-radius expression, not the interpolated
+    # entity radius: br_circleradii[br_circle.circleindex + 1].
+    circle = exported("scripts/mp/gametypes/br_circle.gsc.gscbin", 0x5AA8)
+    for offset in (0xA, 0xF, 0x10, 0x15, 0x17, 0x18, 0x1D, 0x1E, 0x23):
+        instruction, consumed, _ = stock_instruction(circle, offset)
+        emit(instruction, consumed)
+    instruction, consumed, _ = stock_instruction(gas, 0x1)
+    emit(instruction, consumed)
+    emit(b"\x3a\x80" + struct.pack("<H", ROAM_REQUEST_METHOD_ID))
+    emit(b"\x18" + state_token, state_source)
+    state()
+    emit(bytes.fromhex("160110"))
+    external_branch(0x0E, 0x388)  # Pending: same cleanup as original false var_19.
+    state()
+    emit(bytes.fromhex("160210"))
+    # Ready reuses the original var_25 slot for a single cached getter result.
+    # Both defined and undefined results remove that local before continuing.
+    ready_condition = len(code)
+    emit(b"\x72" + bytes(2))
+    emit(b"\x3a\x7e" + struct.pack("<H", ROAM_GOAL_METHOD_ID))
+    emit(b"\x5b\x19\x3e\xa7")  # var_25 = cached goal; isdefined(var_25).
+    defined_condition = len(code)
+    emit(b"\x72" + bytes(2))
+    emit(b"\x3f\x77\x1a\x1a")  # !stationary, undefined, undefined.
+    for offset in (0x36F, 0x374):
+        instruction, consumed, _ = stock_instruction(bot, offset)
+        emit(instruction, consumed)  # Original hunt string and radius1024.
+    emit(b"\x3e")  # Defined cached var_25, without requesting again.
+    for offset in (0x378, 0x379, 0x37D, 0x37E, 0x381):
+        instruction, consumed, _ = stock_instruction(bot, offset)
+        emit(instruction, consumed)  # Exact native setter and timer update.
+    struct.pack_into("<h", code, defined_condition + 1, len(code) - defined_condition - 3)
+    emit(b"\x03\x01")
+    external_branch(0x94, 0x388, 4)
+    struct.pack_into("<h", code, ready_condition + 1, len(code) - ready_condition - 3)
+    request = Edit(
+        0x359,
+        b"",
+        bytes(code),
+        "GPU BR roam tri-state before stock random ground query",
+        function_token=0x2039,
+        source=bytes(source),
+        references=tuple(references),
+    )
+
+    def denied_gate(offset, passed, denied):
+        fragment = bytearray(b"\x0e" + bytes(2))
+        refs = [Reference(1, 2, start + passed, 1, "roam-gate-pass")]
+        fragment.extend(
+            b"\x3a\x7e" + struct.pack("<H", ROAM_CANCEL_METHOD_ID) + b"\x58"
+        )
+        fragment.extend(b"\x94" + bytes(4))
+        rewrite = ControlRewrite(0x72, 1, 2, start + denied, len(fragment) - 4, 4)
+        return Edit(
+            offset,
+            bot[1][start + offset : start + offset + 3],
+            bytes(fragment),
+            "Cancel roaming only on denied native ownership gate",
+            function_token=0x2039,
+            references=tuple(refs),
+            control_rewrites=(rewrite,),
+        )
+
+    return (
+        request,
+        cancel(0x38F, "Cancel roaming when circle or native mesh is unavailable"),
+        denied_gate(0x26A, 0x26D, 0x38A),
+        cancel(0x45, "Cancel stale roam state when BR thinker starts"),
+        cancel(0x5E, "Cancel roaming during grace-period ownership"),
+        cancel(0x89, "Cancel roaming before incomplete practice infiltration"),
+        cancel(0xB6, "Cancel roaming during aircraft infiltration"),
+        cancel(0x218, "Cancel roaming before Gulag ownership"),
+        cancel(0x28F, "Cancel roaming before airborne parachute movement"),
+        cancel(0x2B5, "Cancel roaming while waiting for infiltration completion"),
+    )
+
+
 def custom_loadout_gate():
     # Stock game::allowclasschoice owns mode callbacks, skiploadout, infiltration
     # and the gametype table. The match-rules switch independently forbids CAC.
@@ -406,6 +544,7 @@ def plans(method_id):
                     "Style bot random weapon before its existing cached store",
                 ),
                 *survival_edits(),
+                *roam_edits(),
             ),
         ),
         Plan(
@@ -638,6 +777,25 @@ def transform(plan, method_id, bound=False):
     ranges = [(int(f["function_at"], 16), int(f["function_at"], 16) + int(f["size"], 16))
               for f in selected.values()]
     for operand, width, target, scale, kind in reference_fields(code, ranges):
+        rewritten = [(edit, rewrite) for edit in edits for rewrite in edit.control_rewrites
+                     if edit.offset + rewrite.original_operand == operand]
+        if rewritten:
+            if len(rewritten) != 1:
+                raise ValueError("Ambiguous typed control rewrite")
+            edit, rewrite = rewritten[0]
+            if (code[edit.offset] != rewrite.original_opcode or width != rewrite.original_width or
+                target != rewrite.original_target or scale != 1 or kind != "short_forward" or
+                len(edit.old) != 1 + width):
+                raise ValueError("Original typed control rewrite contract changed")
+            new_operand = target_map(edit.offset) + rewrite.replacement_operand
+            new_target = target_map(target)
+            new_width = rewrite.replacement_width
+            value = new_target - new_operand - new_width
+            output_code[new_operand:new_operand + new_width] = value.to_bytes(new_width, "little", signed=True)
+            relocations.append(dict(kind=kind, old_operand=operand, new_operand=new_operand,
+                                    width=width, replacement_width=new_width, old_target=target,
+                                    new_target=new_target, changed=True, typed_control_rewrite=True))
+            continue
         allowed_targets = boundaries | (
             {pc + 1 for pc, op, _ in decoded if op == 0x56}
             if kind == "switch_table"
@@ -788,6 +946,16 @@ def transform(plan, method_id, bound=False):
         function_edits=function_sizes,
         source_insertions=source_insertions,
         inserted_references=inserted_references,
+        br_roam_policy=dict(request_method=ROAM_REQUEST_METHOD_ID,
+            goal_method=ROAM_GOAL_METHOD_ID, cancel_method=ROAM_CANCEL_METHOD_ID,
+            request_state_field="self.dw_roam_state", fallback_state=0, pending_state=1, ready_state=2,
+            stock_goal_radius=1024, stock_goal_type="hunt", current_danger_circle=True,
+            authored_current_circle_radius=True, circle_source_sha256=POLICY_SOURCE_HASHES["scripts/mp/gametypes/br_circle.gsc.gscbin"],
+            ready_getter_calls=1, ready_checks_defined=True, reuses_original_goal_local=True, pending_preserves_survival=True,
+            cancellation_sites=[0x45, 0x5E, 0x89, 0xB6, 0x218, 0x26A, 0x28F, 0x2B5, 0x38F],
+            typed_control_rewrites=sum(bool(edit.control_rewrites) for edit in edits),
+            no_added_vm_locals=True, fallback_original_chain_preserved=True)
+            if any(edit.purpose == "GPU BR roam tri-state before stock random ground query" for edit in edits) else None,
         inserted_survival_method_id=SURVIVAL_METHOD_ID if any(e.function_token == 0x2039 for e in edits) else None,
         mp_class_refresh=dict(method_id=MP_CLASS_METHOD_ID, grant_token=0x5CF8,
                               fresh_stock_clone=True, native_preload_before_grant=True)
@@ -929,7 +1097,7 @@ def method_binding(snapshot):
         or bounds.get("extended_count") != 1927 + len(registry)
         or bounds.get("extended_end") != 0x8000 + 1927 + len(registry)
         or registered_ids != list(range(0x8787, 0x8787 + len(registry)))
-        or len(registry) != 4
+        or len(registry) != 7
     ):
         raise ValueError(
             "Custom method array bounds do not include the expected registered ID"
@@ -960,6 +1128,18 @@ def method_binding(snapshot):
         gas[0].get("result") != "bool" or gas[0].get("opcode") != 0x83 or
         gas[0].get("callback_symbol") != "DW_BotGasStateMethod"):
         raise ValueError("Gas state requires the exact five-argument scalar bool registry")
+    roam_contracts = (
+        (ROAM_REQUEST_METHOD_ID, "dw_bot_roam_request", 2, "int", 0x80, "DW_BotRoamRequestMethod"),
+        (ROAM_GOAL_METHOD_ID, "dw_bot_roam_goal", 0, "vector", 0x7E, "DW_BotRoamGoalMethod"),
+        (ROAM_CANCEL_METHOD_ID, "dw_bot_roam_cancel", 0, "bool", 0x7E, "DW_BotRoamCancelMethod"),
+    )
+    for identifier, name, arguments, result, opcode, callback in roam_contracts:
+        methods = [entry for entry in registry if entry.get("id") == identifier]
+        if (len(methods) != 1 or methods[0].get("name") != name or
+            methods[0].get("argument_count") != arguments or methods[0].get("result") != result or
+            methods[0].get("receiver") != "entity" or methods[0].get("opcode") != opcode or
+            methods[0].get("callback_symbol") != callback):
+            raise ValueError("BR roaming method registry contract changed: " + name)
     owner = snapshot / receipt["source"]
     if sha(owner.read_bytes()) != receipt["source_sha256"]:
         raise ValueError(
@@ -975,6 +1155,8 @@ def method_binding(snapshot):
         survival_method_id=SURVIVAL_METHOD_ID,
         survival_argument_count=0,
         survival_result="bool",
+        roam_methods=[ROAM_REQUEST_METHOD_ID, ROAM_GOAL_METHOD_ID, ROAM_CANCEL_METHOD_ID],
+        roam_state_result="int:0=fallback,1=pending,2=ready",
     )
 
 
@@ -1007,6 +1189,15 @@ def compile_package(snapshot, binding):
                                          tool_sha256=tool_record["sha256"],
                                          builtin_names_from_tool_table=True,
                                          actual_custom_method_binding=binding)
+        if result.get("br_roam_policy"):
+            main = fresh.split("bot_br_think()\n{", 1)[1].split("\nbot_parachute_into_map()", 1)[0]
+            if ("__asm" in main or main.count("self.dw_roam_state = ") != 1 or
+                "self.dw_roam_state == 1" not in main or "self.dw_roam_state == 2" not in main or
+                main.count("getrandompointincurrentcircle()") != 1 or
+                main.count("getclosestreachablepointonnavmesh( var_25 )") != 1 or
+                main.count(" botsetscriptgoal(") != 2):
+                raise ValueError("Fresh decompile does not preserve structured BR roaming branches")
+            result["br_roam_policy"]["fresh_structured_decompile"] = True
         if result["inserted_survival_method_id"]:
             if not all(value in fresh for value in ("dw_survival_next_ms", "playerusehealslot",
                        "dw_gas_sample_ms", "gettime() + 500", "!bot_is_in_gas()")):

@@ -152,9 +152,21 @@ bool Valid(const Graph &graph, const Request *requests, uint32_t count)
             graph.edges[e].cost > 1.0e20f)
             return false;
     for (uint32_t r = 0; r < count; ++r)
-        if (requests[r].slot >= MaxBots || requests[r].startNode >= graph.nodeCount ||
-            requests[r].goalNode >= graph.nodeCount)
+    {
+        const auto &request = requests[r];
+        if (request.slot >= MaxBots || request.startNode >= graph.nodeCount ||
+            (request.mode == RouteMode && request.goalNode >= graph.nodeCount))
             return false;
+        if (request.mode == RoamMode &&
+            (!(request.circleRadius > 0.0f) || request.circleRadius > 1.0e10f ||
+             !(request.minDistance >= MinimumRoamDistance) || request.minDistance > 1.0e10f ||
+             !(request.circleX >= -1.0e10f && request.circleX <= 1.0e10f) ||
+             !(request.circleY >= -1.0e10f && request.circleY <= 1.0e10f) ||
+             !(request.originX >= -1.0e10f && request.originX <= 1.0e10f) ||
+             !(request.originY >= -1.0e10f && request.originY <= 1.0e10f) ||
+             !(request.originZ >= -1.0e10f && request.originZ <= 1.0e10f)))
+            return false;
+    }
     return true;
 }
 } // namespace
@@ -426,7 +438,10 @@ void Disable()
 {
     metrics.enabled = 0;
 }
-static_assert(sizeof(Node) == 24 && sizeof(Edge) == 12 && sizeof(Request) == 24 &&
-                  sizeof(Result) == 32,
+static_assert(sizeof(Node) == 24 && sizeof(Edge) == 12 && sizeof(Request) == 60 &&
+                  sizeof(Result) == 36,
               "CPU/HLSL structured buffer layout mismatch");
+static_assert(offsetof(Request, mode) == 24 && offsetof(Request, circleX) == 32 &&
+              offsetof(Request, originX) == 48 && offsetof(Result, destinationNode) == 32,
+              "CPU/HLSL field offset mismatch");
 } // namespace HostBotGpu

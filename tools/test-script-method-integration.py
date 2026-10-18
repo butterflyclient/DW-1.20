@@ -48,6 +48,13 @@ class Harness:
             stop + 128 if not edited or not report
             else base + report["symbols"]["DW_BotGasStateMethod"]
         )
+        self.roam_callbacks = {
+            name: (base + report["symbols"][name] if edited and report else stop + 160 + index * 32)
+            for index, name in enumerate(
+                row["callback_symbol"] for row in proof["registry"]
+                if row["callback_symbol"].startswith("DW_BotRoam")
+            )
+        }
         self.vm = Uc(UC_ARCH_X86, UC_MODE_64)
         self.pages = set()
         self.trace = []
@@ -103,6 +110,7 @@ class Harness:
         }
         external = {
             **self.aliases,
+            **self.roam_callbacks,
             "DW_BotStyleWeaponMethod": self.callback,
             "DW_BotSurvivalAllowedMethod": self.survival,
             "DW_BotMPClassReadyMethod": self.mp_class,
@@ -320,7 +328,7 @@ def run_checks():
             captured = []
 
             def reached(vm, address, size, data):
-                expected_callback = {"DW_BotStyleWeaponMethod": edited.callback,
+                expected_callback = {**edited.roam_callbacks, "DW_BotStyleWeaponMethod": edited.callback,
                                      "DW_BotSurvivalAllowedMethod": edited.survival,
                                      "DW_BotMPClassReadyMethod": edited.mp_class,
                                      "DW_BotGasStateMethod": edited.gas_state}

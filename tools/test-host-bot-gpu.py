@@ -48,6 +48,16 @@ def verify(build, output):
         for dependency in row['dependencies']:
             assert digest(dependency['path'])==dependency['sha256'], ('Dependency changed',dependency['path'])
         assert row['dependencies'], ('No tracked dependencies',name)
+        if name in ('SV_HostBotGpu.cpp', 'SV_HostBotGpuPlanner.cpp'):
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('gpu_coff', snapshot/'tools/coff.py')
+            coff = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(coff)
+            object_data = coff.read(Path(row['object']))
+            sections = [section['name'] for section in object_data['sections']]
+            assert not any(section.startswith('.CRT') for section in sections), (
+                'Freestanding GPU object requires unsupported startup initializers', name, sections
+            )
         checked.append(dict(source=name,sha256=row['source_sha256'],object_sha256=row['object_sha256'],dependencies=len(row['dependencies'])))
     header=snapshot/'src/SV_HostBotGpuShader.h'
     assert digest(header)==receipt['header_sha256']
@@ -126,6 +136,16 @@ def verify(build, output):
         assert hardware['source_sha256']['integration/host-scale/'+name]==digest(snapshot/'src'/name), ('Hardware proof stale',name)
     assert hardware['shader_bytecode_sha256']==receipt['bytecode_sha256']
     assert hardware['hardware_execution'] is True and hardware['verified_stress_routes']>=200
+    assert receipt['shader_abi_version'] == 2
+    assert receipt['structured_buffer_strides'] == {'t0':24,'t1':12,'t2':60,'u0':36}
+    assert hardware['shader_abi_version'] == receipt['shader_abi_version']
+    assert hardware['structured_buffer_strides'] == receipt['structured_buffer_strides']
+    assert hardware['roam']['verified_requests'] >= 8202
+    assert hardware['roam']['randomized_mixed_requests'] >= 8000
+    for name in ('host_bot_gpu_roam_harness.cpp', 'host_bot_gpu_reference.h'):
+        assert digest(snapshot/'tools'/name) == receipt['fixtures'][name]
+        assert digest(snapshot/'tools'/name) == hardware['source_sha256']['tools/'+name]
+
     result=dict(schema=1,passed=True,build=str(build),image_sha256=report['sha256'],objects=checked,
                 shader_bytecode_sha256=receipt['bytecode_sha256'],native_iat_rvas=resolved,
                 navigation_graph=dict(actual_frozen_exporter=True,fixture_sha256=nav_hash,

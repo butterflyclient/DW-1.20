@@ -9,11 +9,13 @@
   "graph_nodes": 256,
   "graph_edges": 960,
   "source_sha256": {
-    "integration/host-scale/SV_HostBotGpu.h": "80d37638cb3a3bfd39b34f4fe9813b244382816b250aeb1aa4f17226eb66d21c",
-    "integration/host-scale/SV_HostBotGpu.cpp": "0d9e61a5e9ab73ece681d5ca07c87ab1bfd5cf752adb8a766433a0c71b4887d2",
-    "integration/host-scale/SV_HostBotGpu.hlsl": "56a16c62229469e246666227910d6cee305216f2267a1cc60cf3265a71d6a099",
-    "tools/prepare-host-bot-gpu.py": "d7c0a9884db122794a960025e3801bc7caf4390f64066c34d2d36c1489a5ca57",
-    "tools/host_bot_gpu_harness.cpp": "3fe538b65a79b12fcc5979ba14bbb95da923d1389d8d01c2ff87046fbb3801e5"
+    "integration/host-scale/SV_HostBotGpu.h": "36d6973143f8d38b5e55d9efeaf71a584637321982128d040ef7872029590292",
+    "integration/host-scale/SV_HostBotGpu.cpp": "9cff49535e63da48b7c1bf4c018a6682449a14939942c2713abfacfccedc81f8",
+    "integration/host-scale/SV_HostBotGpu.hlsl": "2b2577ac88d56a99e186bf1b6b2883709b8277e2399e554ce820ac192480506c",
+    "tools/prepare-host-bot-gpu.py": "ad69bc76d436a0af4ab822df785638a02a490c6fd4332d0a1999325aa981ef72",
+    "tools/host_bot_gpu_harness.cpp": "c246f2a8c023a906ffd11df4f433ce039b8aa6827cdcbd0d73c7fd1d3cafd3bb",
+    "tools/host_bot_gpu_roam_harness.cpp": "33b1ed2dc4cb63f8eebaf9d9577ec1f6ca9b0bd17ae6375272fc94e7f44aec56",
+    "tools/host_bot_gpu_reference.h": "0fd894e228167120719201cdbbaf2f73323fc3622dd8ce1c57b49485bbadd82f"
   },
   "stdout": "hardware-stress.txt",
   "freestanding_compile": "PASS -ffreestanding -fno-stack-protector -funwind-tables -ffunction-sections -fdata-sections -O2 -std=c++20 -Wall -Wextra -Werror -fno-exceptions -fno-rtti",
@@ -30,28 +32,29 @@
   "untested": [
     "actual device removal",
     "actual hung GPU timeout",
-    "in-game/native graph integration"
+    "in-game BR goal-generation integration",
+    "stock uniform-circle sampling equivalence (not claimed)"
   ],
   "lookahead_tests": {
     "zero": "all existing first-hop checks unchanged",
     "weighted_branch_1_5": "cost3 shortest route0->2->1->3 returnsnode1",
     "beyond_goal_512": "same route returnsgoal3"
   },
-  "shader_bytecode_sha256": "2687f73f8ba7d8c13f9b441842c76f93fc57d750fb374bc4865d6b74b2186112",
-  "hardware_executable_sha256": "d5c47e657f17164ea6baf0886bf5b3b5dfd62a1994dc2298068641c2b94e2cb7",
-  "hardware_stdout_sha256": "3f0a7de9c6916ceae3ae013cb88f3c0afc30becedc37e56568eb9b79ab583c24",
+  "shader_bytecode_sha256": "16dad61f21c19c39f2ba487904f5375d6c1b169393af38e67b704f3fb18229b9",
+  "hardware_executable_sha256": "e8f9f23710faa06ef7630d76715b7ada95aef666e91600cd89c1178d8657389c",
+  "hardware_stdout_sha256": "ad63680d9a8aa394c06250010414847b0a280f7dd9db8a25a24da873580be313",
   "coff_directives": [],
-  "freestanding_object_sha256": "31dbc49d069b1e0562029692cc850ddd7d3b423ba7b2e68101850d07d0c4c90c",
+  "freestanding_object_sha256": "9613d9a3feb27a149925ab26bda3b6e4753a1620700b8287e9b5f1ca65cc8def",
   "no_drectve_section": true,
-  "shader_header_sha256": "a0e949bdb8d2deaae03c1ad32979aa46127af9349163062a94f3eb583d97cb6d",
-  "shader_header_source": "Fixed R5 shader header; byte-for-byte verified against original R5 snapshot",
+  "shader_header_sha256": "cb822468781040a2f61b7f2aee5238de47ea990b16d1ee97fb46586d1e999bad",
+  "shader_header_source": "Fresh FXC cs_5_0 ABI2 shader, reflection strides verified",
   "measured_timing_microseconds": {
-    "submit_cpu_average": 106.039,
-    "submit_cpu_maximum": 1799.5,
-    "submit_to_readback_average": 1291.687,
-    "submit_to_readback_maximum": 10466.4,
-    "gpu_dispatch_average": 797.583,
-    "gpu_dispatch_maximum": 808.0
+    "submit_cpu_average": 40.347,
+    "submit_cpu_maximum": 921.6,
+    "submit_to_readback_average": 902.838,
+    "submit_to_readback_maximum": 1519.1,
+    "gpu_dispatch_average": 792.517,
+    "gpu_dispatch_maximum": 810.0
   },
   "measured_adapter": {
     "vendor": "0x10de",
@@ -64,6 +67,36 @@
     "completed": 128,
     "busy": 1,
     "pending": 0,
+    "device_failures": 0,
+    "timeouts": 0
+  },
+  "shader_abi_version": 2,
+  "structured_buffer_strides": {
+    "t0": 24,
+    "t1": 12,
+    "t2": 60,
+    "u0": 36
+  },
+  "shader_reflection_sha256": "e7ee4ee1ea41e132304f8e7ca477a50c6431994c445d2103e2715fb6c4935126",
+  "roam": {
+    "verified_requests": 8202,
+    "randomized_mixed_requests": 8000,
+    "fixed_route_randomized_requests": 2000,
+    "randomized_batches": 40,
+    "seed": 1112688464,
+    "minimum_distance": 1056,
+    "strict_minimum_distance_boundary": true,
+    "circle_boundary": true,
+    "flags_and_graph_layer_masks": true,
+    "no_eligible_and_budget_exhaustion": true,
+    "unsupported_mode": true,
+    "invalid_input_rejection": true,
+    "independent_serial_cpu_oracle": true,
+    "node_sampling": "Seeded selection among settled native node centers; not uniform circle area",
+    "hardware_executable_sha256": "54ed9f69b4f1c58f5bffa5366a6e6cbda5534c391fb0004735638faf7df4f44b",
+    "stdout_sha256": "572554db30a789fc4c3f72fd3c6d86563c50c5e392897abf30a5140c77e4031a",
+    "last_gpu_microseconds": 5,
+    "max_gpu_microseconds": 147,
     "device_failures": 0,
     "timeouts": 0
   }

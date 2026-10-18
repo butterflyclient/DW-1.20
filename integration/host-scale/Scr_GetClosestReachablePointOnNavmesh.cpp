@@ -1,5 +1,6 @@
 #include "sv_host_navigation.h"
 #include "sv_host_bot_equipment.h"
+#include "SV_HostBotGpuPlanner.h"
 
 namespace
 {
@@ -53,6 +54,21 @@ extern "C" void Scr_GetClosestReachablePointOnNavmesh(void *context, uint32_t re
             "GetClosestReachablePointOnNavmesh : Entity %d does not have a navigator.", entity->number));
     Vec3 requested{}, result{};
     SVHS_ScriptGetVector(context, 0, &requested);
+    const unsigned fallbackSlot = uint16_t(entity->number);
+    if (SVHS_IsBotEntity(entity) &&
+        HostBotPlanner::ConsumeNativeRoamFallback(fallbackSlot, entity->client, navigator, context))
+    {
+        // A single admitted BR fallback must execute the real reachable query.
+        // A projection onto the caller's current area is not a new far goal.
+        const bool acquired = SV_HostNav_BeginBot();
+        const bool previous = SV_HostNav_SuspendClosest(true);
+        Native(navigator, requested, result);
+        SV_HostNav_SuspendClosest(previous);
+        if (acquired)
+            SV_HostNav_EndBot();
+        SVHS_ScriptAddVector(context, &result);
+        return;
+    }
     const unsigned population = Enabled() ? Population() : 0;
     const unsigned slot = uint16_t(entity->number);
     auto *view = static_cast<Nav2DQueryView *>(navigator);

@@ -83,7 +83,7 @@ class Runner:
             symbols = {k: mapped(v) for k,v in symbols.items()}
             entries = {k: self.base+self.report["symbols"][k] for k in entries}
             entries.update({k:self.base+v for k,v in self.report["symbols"].items()
-                            if k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "?RecordBotFrame"))})
+                            if k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "SV_HostBot_RequestRoamGoal", "SV_HostBot_CancelRoamGoal", "?RecordBotFrame"))})
         vm.symbols = symbols
         vm.entries = entries
         hooks = {symbols[r["name"]]:r["name"] for r in self.proof["bindings"] if r["kind"] == "function"}
@@ -96,6 +96,7 @@ class Runner:
                   "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map",
                   "DW_BotPolicy_ProfileSeed":"mapped-profile"}
         common["sqrtf"] = "sqrtf"
+        common["?Clock@HostScale@@YA_KXZ"] = "host-clock"
         common.update({"SV_HostBot_GasEvacuationRequired":"gas-required",
                        "SV_HostBot_GetGasGoal":"gas-goal", "SV_HostBot_GetGasState":"gas-state"})
         planner_names = self.report["symbols"] if self.report else {
@@ -160,7 +161,7 @@ class Runner:
                             raise AssertionError(kind)
                     if data:
                         vm.put(start,bytes(data))
-            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "?RecordBotFrame"))})
+            entries.update({k:v for k,v in externals.items() if k in SOURCES or k.startswith(("SV_HostNav_", "SV_HostScale_", "SV_HostBot_UpdateTravelUrgency", "SV_HostBot_RequestRoamGoal", "SV_HostBot_CancelRoamGoal", "?RecordBotFrame"))})
         vm.hooks = hooks
         vm.mode,vm.population = mode,population
         vm.put(symbols["SVHS_LevelTime"],0,"<i")
@@ -232,6 +233,7 @@ class Machine:
         if kind is None:return
         a,b,c,d = (self.uc.reg_read(r) for r in (UC_X86_REG_RCX,UC_X86_REG_RDX,UC_X86_REG_R8,UC_X86_REG_R9))
         if kind=="thread-id":self.ret(self.thread)
+        elif kind=="host-clock":self.ret(getattr(self, "clock_ticks", 1))
         elif kind=="mode":self.ret(self.mode!=0)
         elif kind=="population":self.ret(self.population)
         elif kind == 'sqrtf':

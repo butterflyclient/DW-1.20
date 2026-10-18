@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "passed": true,
+  "executable_sha256": "98ddb209e3eea284ccacb5a42abf1ecfd3d1bf9474388d670b49ccf4998c45da",
+  "compiled_cpp_units": 142,
+  "unresolved_symbols": 0,
+  "all_required_checks": 45,
+  "local_deployment_verified": true,
+  "owned_companion_files_verified": 60,
+  "debug_artifacts": [
+    {
+      "kind": "pdb",
+      "path": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.pdb",
+      "sha256": "a9a23ef9583056af499bcebc75bfd219ddafc879eeddcf99e7add9c272d3cf8c"
+    },
+    {
+      "kind": "map",
+      "path": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.map",
+      "sha256": "9b75b102a5b5ba5fbefa1f75ad1c46e86c97d22a8cbcd841def2e7280663d656"
+    }
+  ],
+  "ini_preserved": true,
+  "published_to_server": false,
+  "game_tests_performed": false,
+  "full_round_performance_verified": false,
+  "successful_build_seconds": 937.445145,
+  "build_timing_limit": "Different load/cache conditions from preceding builds; excludes failed initial compile and development/preflight time.",
+  "initial_compile_failure": "Implicit request-array startup constructor rejected by freestanding linker; fixed explicit zero initialization and added actual COFF no-CRT checks.",
+  "scope": "GPU BR destination selection before repeated script ground-ray/navigation work, stable pending goals, native final validation, latest stock circle ownership, fair fallback. Native CPU physics is retained.",
+  "rollback_directory": "E:\\IW8\\Builds\\1.20-replay\\replay-dw-backups\\local-test-20261018T224648.602304Z",
+  "evidence": [
+    {
+      "path": "data\\dw-client\\jobs\\1792362645219548000\\local-readiness.json",
+      "sha256": "5791b385c9601a961bd91c0f96760f70d7a8d37c92d2ba54b30c3e67bd8a302b"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1792362645219548000\\local-deployment.json",
+      "sha256": "0d248ffd0a3732658ea20f49c17660eb08b45d2af7637ca072a4260178a91204"
+    },
+    {
+      "path": "data\\r21-linked-metrics-decoder.json",
+      "sha256": "590d7c070f00a46b9f23054bc768d7e021108cfde8a1a54b8569010a1eff76c9"
+    },
+    {
+      "path": "data\\r21-static-initialization-check\\result.json",
+      "sha256": "a66e1dc2a499555fd9aa111618c1b47f46ab1f6806ae30a1609ff9194eea1a55"
+    },
+    {
+      "path": "validation\\host-bot-gpu\\hardware-proof.json",
+      "sha256": "a8d57ec29564be8b29fbc24808e2e8a497f6678860271daf80af6fb9accd6c69"
+    },
+    {
+      "path": "data\\parallel-validation-benchmark-1792360338595740100\\semantic-comparison.json",
+      "sha256": "b1be82fa60ccbe1b695951b668a146c248d65127d814123137a06c27ef69c0ac"
+    }
+  ]
+}

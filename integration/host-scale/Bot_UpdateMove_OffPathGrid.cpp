@@ -674,3 +674,93 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
         statics = previous;
     }
 }
+
+// Script bridge: values only. The native VM invokes this on the server thread.
+// 0 preserves stock fallback, 1 coalesces pending work, 2 supplies a validated far goal.
+extern "C" unsigned SV_HostBot_RequestRoamGoal(void *data, const HostScale::Vec3 *circle,
+                                               float radius, HostScale::Vec3 *out,
+                                               void *scriptContext)
+{
+    using namespace HostScale;
+    auto *bot = static_cast<BotNavigationView *>(data);
+    uint64_t profile = 0;
+    if (!circle || !out || !bot || !CurrentMappedBot(bot, &profile))
+        return 0;
+    const unsigned slot = uint16_t(bot->entity->number);
+    auto *nav = bot->navigator;
+    if (!HostBotPlanner::Enabled())
+    {
+        HostBotPlanner::CancelRoam(slot);
+        return 0;
+    }
+    if (!MeshAreaReady(nav) || bot->entity->health <= 0 || bot->traversal || Locked(bot) ||
+        bot->scriptGoalType >= uint32_t(HostBotPlanner::ScriptGoalPriority::Guard) ||
+        SV_HostBot_InGulag(bot) || SV_HostBot_GasEvacuationRequired(bot) ||
+        Field<uint16_t>(bot->playerState, 626) == 2047 ||
+        Field<uint8_t>(bot->playerState, 12072) != 0 || !__builtin_isfinite(circle->x) ||
+        !__builtin_isfinite(circle->y) || !__builtin_isfinite(circle->z) ||
+        !__builtin_isfinite(radius) || radius <= 32.0f)
+    {
+        HostBotPlanner::CancelRoam(slot);
+        return 0;
+    }
+    NavSearchSpec spec{};
+    __builtin_memcpy(&spec, nav->pathConfiguration, sizeof(spec));
+    BotGasState gas{};
+    const uint32_t gasGeneration = SV_HostBot_GetGasState(&gas) ? gas.generation : 0;
+    Vec3 destination{};
+    const auto result = HostBotPlanner::RequestRoam(
+        slot, bot, bot->playerState, nav, profile, nav->currentArea, spec, bot->entity->origin,
+        *circle, radius - 32.0f, gasGeneration, bot->scriptGoalType, bot->scriptGoalPosition,
+        SVHS_NavHasPath(nav), destination);
+    if (result != HostBotPlanner::RouteState::Ready)
+    {
+        if (result == HostBotPlanner::RouteState::Fallback)
+            HostBotPlanner::BindNativeRoamFallback(slot, bot, bot->playerState, nav, scriptContext);
+        return result == HostBotPlanner::RouteState::Pending ? 1u : 0u;
+    }
+    if (!HostBotPlanner::AdmitRoamValidation(slot))
+        return 1;
+    const uint64_t begin = Clock();
+    const bool acquiredBotScope = SV_HostNav_BeginBot();
+    const bool previous = SV_HostNav_SuspendClosest(true);
+    NavAreaHandle area{};
+    SVHS_NavClosestArea(&area, &destination, &nav->currentArea, nav->pathConfiguration);
+    bool accepted = area.reference && *area.reference && area.space;
+    Vec3 snapped{};
+    if (accepted)
+    {
+        SVHS_NavProjectArea(&area, &snapped, &destination, nullptr);
+        accepted =
+            HostBotPlanner::RoamCandidateAllowed(bot->entity->origin, snapped, *circle,
+                                                 radius - 32.0f, !HostBotPlanner::RoamRepair(slot));
+    }
+    SVHS_NavDestroyArea(&area);
+    if (accepted)
+    {
+        // Match BotThink's verified BgStatic contract even when invoked from
+        // a script thread outside its native brain scope. Preserve the caller.
+        auto *slots = reinterpret_cast<uintptr_t *>(__readgsqword(0x58));
+        auto &statics = *reinterpret_cast<void **>(slots[SVHS_BotTlsIndex] + 16);
+        void *previousStatics = statics;
+        statics = SVHS_GameStatics;
+        accepted = SVHS_BotPathToGoal(bot, &snapped, 1024.0f, "BR GPU roam") != 0;
+        statics = previousStatics;
+    }
+    SV_HostNav_SuspendClosest(previous);
+    if (acquiredBotScope)
+        SV_HostNav_EndBot();
+    HostBotPlanner::RecordRoamValidation(Clock() - begin);
+    HostBotPlanner::FinishRoam(slot, accepted, accepted ? &snapped : nullptr);
+    if (!accepted)
+        return 1;
+    *out = snapped;
+    return 2;
+}
+
+extern "C" void SV_HostBot_CancelRoamGoal(void *data)
+{
+    auto *bot = static_cast<BotNavigationView *>(data);
+    if (bot && bot->entity)
+        HostBotPlanner::CancelRoam(uint16_t(bot->entity->number));
+}

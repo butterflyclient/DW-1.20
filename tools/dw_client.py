@@ -322,6 +322,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "prepare-workstation-performance.py", "workstation_preparation_context.py",
             "preparation_instruction_source.py", "verifier_performance.py", "native_relocation_performance.py",
             "dw_client.py", "dw_catalog.py", "dw_sqlite_snapshot.py", "dw_debug_symbols.py", "test-dw-debug-symbols.py",
+            "dw_validation_scheduler.py", "test-dw-validation-scheduler.py",
             "test-network-diagnostics.py",
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "test-playlist-ui.py",
@@ -331,6 +332,11 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "prepare-host-bot-gpu.py", "prepare-host-nav-graph.py",
             "test-host-bot-gpu.py", "host_bot_gpu_harness.cpp",
             "host_bot_gpu_planner_harness.cpp", "test-host-nav-graph.cpp",
+            "host_bot_gpu_reference.h", "host_bot_gpu_roam_harness.cpp",
+            "test-host-br-roam.py", "host_bot_br_roam_harness.cpp",
+            "test-host-br-roam-movement.py", "test-bot-br-roam-script.py",
+            "test-bot-roam-bridge.py", "bot_roam_bridge_harness.cpp",
+            "test-bot-style-weapon.py", "bot_style_weapon_harness.cpp",
             "test-host-gpu-movement.py", "test-host-navigation.py",
             "test-host-sight-scheduling.py", "host_sight_schedule_harness.cpp",
             "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
@@ -345,6 +351,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "alt_killcam_harness.cpp", "alt_killcam_render_harness.cpp",
             "test-alt-killcam.py", "test-alt-killcam-render.py",
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
+            "test-script-method-integration.py", "test-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "test-bot-style-zone.py", "bot_style_zone_harness.cpp",
             "prepare-gulag-navigation-package.py", "test-gulag-navigation-package.py",
@@ -790,6 +797,8 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
         ("test-host-bot-gpu.py", [], "host-bot-gpu.json"),
         ("test-host-gpu-movement.py", ["--snapshot", str(source)], "host-gpu-movement.json"),
+        ("test-host-br-roam.py", ["--snapshot", str(source)], "host-br-roam.json"),
+        ("test-host-br-roam-movement.py", ["--snapshot", str(source)], "host-br-roam-movement.json"),
         ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
         ("test-host-command-ownership.py", ["--snapshot", str(source)], "host-command-ownership.json"),
         ("test-bot-behavior.py", ["--snapshot", str(source)], "bot-behavior.json"),
@@ -821,8 +830,10 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         ("test-bot-style-selection.py", ["--snapshot", str(source)], "bot-styles.json"),
         ("test-script-method-integration.py", ["--snapshot", str(source)], "script-methods.json"),
         ("test-bot-style-weapon.py", ["--snapshot", str(source)], "bot-style-weapons.json"),
+        ("test-bot-roam-bridge.py", ["--snapshot", str(source)], "bot-roam-bridge.json"),
         ("test-bot-rank.py", ["--snapshot", str(source)], "bot-ranks.json"),
         ("test-bot-style-scripts.py", ["--snapshot", str(source)], "bot-style-scripts.json"),
+        ("test-bot-br-roam-script.py", ["--snapshot", str(source)], "bot-br-roam-script.json"),
         ("test-bot-style-zone.py", ["--snapshot", str(source)], "bot-style-zone.json"),
         ("test-gulag-integration.py", [], "gulag-navigation.json"),
         ("test-weapon-inspect.py", [], "weapon-inspect.json"),
@@ -856,21 +867,21 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         completed = progress["proofs"]
         if len(completed) > len(checks):
             raise ValueError("Validation progress has extra checks")
-    proofs = []
-    for index, (checker, extra, name) in enumerate(checks):
+    def validate_completed(index, check, proof):
+        checker, _, name = check
         output = directory / name
-        if index < len(completed):
-            proof = completed[index]
-            if (
-                proof["checker"] != checker
-                or Path(proof["path"]) != output
-                or digest(output) != proof["sha256"]
-                or digest(tools / checker) != proof["checker_sha256"]
-                or not read(output)["passed"]
-            ):
-                raise ValueError("Completed validation check changed: " + checker)
-            proofs.append(proof)
-            continue
+        if (
+            proof["checker"] != checker
+            or Path(proof["path"]) != output
+            or digest(output) != proof["sha256"]
+            or digest(tools / checker) != proof["checker_sha256"]
+            or not read(output)["passed"]
+        ):
+            raise ValueError("Completed validation check changed: " + checker)
+
+    def run_one(index, check):
+        checker, extra, name = check
+        output = directory / name
         subprocess.run(
             [
                 sys.executable,
@@ -888,15 +899,19 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         proof = read(output)
         if not proof["passed"]:
             raise ValueError("DW client gate failed: " + checker)
-        proofs.append(
-            dict(
-                path=str(output),
-                sha256=digest(output),
-                checker=checker,
-                checker_sha256=digest(tools / checker),
-            )
+        return dict(
+            path=str(output),
+            sha256=digest(output),
+            checker=checker,
+            checker_sha256=digest(tools / checker),
         )
-        save(progress_path, dict(**identity, proofs=proofs))
+
+    scheduler = load_module("dw_validation_scheduler", tools / "dw_validation_scheduler.py")
+    proofs = scheduler.run_checks(
+        checks, run_one,
+        lambda prefix: save(progress_path, dict(**identity, proofs=prefix)),
+        completed=completed, validate_completed=validate_completed, max_workers=4,
+    )
     compiled = Path(report["executable"])
     # A second editor can change source while compilation/linked checks run.
     # Catch that before publishing, not only at local deployment afterward.

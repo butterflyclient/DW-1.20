@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "cases": [
+    "debug barrier, host/sight dependency, max four workers, single network owner, ordered checkpoints",
+    "failure stops new launches, drains active peer, no complete checkpoint/readiness result",
+    "resume validates prefix before work; missing or failed hash validator rejects",
+    "invalid worker limits, duplicate checkers/outputs and invalid barriers reject before work",
+    "empty schedule completes without invoking callbacks"
+  ],
+  "helper_sha256": "92234d78bdd41b5f90f19a2b63fb7674c927487343b7c6c92ec4f6fb9d7efd48",
+  "process_execution": false,
+  "game_execution": false
+}

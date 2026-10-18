@@ -5,6 +5,7 @@
 #include "SV_HostBotLootBindings.h"
 #include "sv_host_bot_equipment.h"
 #include "sv_host_bot_loot.h"
+#include "SV_HostBotGpuPlanner.h"
 #include <stddef.h>
 
 extern "C" bool DW_BotPolicy_IsBattleRoyale();
@@ -296,4 +297,96 @@ extern "C" void DW_BotMPClassReadyMethod(void *context, uint64_t self)
                   DW_BotPolicy_ProfileSeed(uint32_t(self), &profile);
     }
     SM_AddBool(context, allowed ? 1 : 0);
+}
+
+namespace
+{
+    // A Ready result is consumed synchronously by the next method in the same
+    // script invocation. This is a value handoff, not a second planner request.
+    struct ScriptRoamResult
+    {
+        void *context;
+        void *bot;
+        const HostScale::Entity *entity;
+        const void *player;
+        uint64_t profile;
+        int32_t time;
+        HostScale::Vec3 destination;
+        bool ready;
+    };
+    ScriptRoamResult s_roamResults[200]{};
+
+    bool RoamReceiver(uint64_t self, HostScale::Entity *&entity, void *&bot,
+                      uint64_t &profile)
+    {
+        const unsigned slot = uint32_t(self);
+        if (((self >> 32) & 0xff) || slot >= 200 || slot >= SVHS_ClientCount ||
+            !DW_BotPolicy_IsBattleRoyale())
+            return false;
+        entity = static_cast<HostScale::Entity *>(SM_GetEntity(self));
+        if (!DWBot_IsCurrentEntity(slot, entity) ||
+            !DW_BotPolicy_ProfileSeed(slot, &profile))
+            return false;
+        // This is the existing target-verified SvClientMP embedded bot_data_t.
+        bot = static_cast<uint8_t *>(SVHS_Clients[slot]) + 1368;
+        return true;
+    }
+}
+
+extern "C" void DW_BotRoamRequestMethod(void *context, uint64_t self)
+{
+    if (!((self >> 32) & 0xff) && uint32_t(self) < 200)
+        s_roamResults[uint32_t(self)].ready = false;
+    unsigned state = 0;
+    HostScale::Entity *entity = nullptr;
+    void *bot = nullptr;
+    uint64_t profile = 0;
+    if (SM_GetNumParam(context) == 2 && RoamReceiver(self, entity, bot, profile))
+    {
+        auto &result = s_roamResults[uint32_t(self)];
+        result.ready = false;
+        HostScale::Vec3 center{}, destination{};
+        SM_GetVector(context, 0, &center);
+        const float radius = SM_GetFloat(context, 1);
+        state = SV_HostBot_RequestRoamGoal(bot, &center, radius, &destination, context);
+        if (state == 2)
+            result = {context, bot, entity, entity->client, profile, SVHS_LevelTime,
+                      destination, true};
+    }
+    SM_AddInt(context, int32_t(state));
+}
+
+extern "C" void DW_BotRoamGoalMethod(void *context, uint64_t self)
+{
+    if (((self >> 32) & 0xff) || uint32_t(self) >= 200)
+        return;
+    const ScriptRoamResult result = s_roamResults[uint32_t(self)];
+    s_roamResults[uint32_t(self)].ready = false;
+    HostScale::Entity *entity = nullptr;
+    void *bot = nullptr;
+    uint64_t profile = 0;
+    if (SM_GetNumParam(context) != 0 || !RoamReceiver(self, entity, bot, profile))
+        return; // Native method result remains undefined; the script checks it.
+    const bool ready = result.ready && result.context == context && result.bot == bot &&
+        result.entity == entity && result.player == entity->client &&
+        result.profile == profile && result.time == SVHS_LevelTime;
+    if (ready)
+        SVHS_ScriptAddVector(context, &result.destination);
+}
+
+extern "C" void DW_BotRoamCancelMethod(void *context, uint64_t self)
+{
+    if (!((self >> 32) & 0xff) && uint32_t(self) < 200)
+        s_roamResults[uint32_t(self)].ready = false;
+    HostScale::Entity *entity = nullptr;
+    void *bot = nullptr;
+    uint64_t profile = 0;
+    const bool valid = SM_GetNumParam(context) == 0 &&
+        RoamReceiver(self, entity, bot, profile);
+    if (valid)
+    {
+        s_roamResults[uint32_t(self)].ready = false;
+        SV_HostBot_CancelRoamGoal(bot);
+    }
+    SM_AddBool(context, valid ? 1 : 0);
 }

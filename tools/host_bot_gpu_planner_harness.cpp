@@ -26,12 +26,14 @@ bool Queue(unsigned slot) { return HostBotPlanner::Queue(slot,Owner(slot),Player
 HostBotPlanner::RouteState Take(unsigned slot) { HostScale::Vec3 output{}; auto state=HostBotPlanner::Take(slot,Owner(slot),Player(slot),Nav(slot),77,start,origin,output); if(state==HostBotPlanner::RouteState::Ready) Require(output.x==600,"copied graph waypoint"); return state; }
 void Complete(HostBotGpu::Status status=HostBotGpu::Route,unsigned waypoint=1) {
     resultCount=submittedCount;
-    for(unsigned i=0;i<resultCount;++i) { const auto &r=requests[i]; results[i]={r.slot,r.generation,r.tick,copiedVersion,waypoint,status,1200,3}; }
+    for(unsigned i=0;i<resultCount;++i) { const auto &r=requests[i]; results[i]={r.slot,r.generation,r.tick,copiedVersion,waypoint,status,1200,3,2}; }
     ready=true;
 }
 }
 extern "C" {
 int32_t SVHS_LevelTime=100;
+int32_t SVHS_FrameDuration=50;
+uint32_t SVHS_ClientCount=200;
 void *SVHS_GameStatics=reinterpret_cast<void *>(0x90000);
 bool Sys_IsMainThread() { return Fixture::mainThread; }
 void Com_Printf(int,const char *,...) {}

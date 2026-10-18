@@ -232,6 +232,22 @@ extern "C" void SM_AddBool(void *ctx, int32_t value)
     current->returnedBool = value;
 }
 
+// BR roaming is checked independently by bot_roam_bridge_harness.cpp. Keep
+// the existing weapon/resource suite linked while modeling this new boundary.
+extern "C" int32_t SVHS_LevelTime = 1000;
+extern "C" unsigned SV_HostBot_RequestRoamGoal(void *, const HostScale::Vec3 *, float,
+                                               HostScale::Vec3 *, void *)
+{
+    return 0;
+}
+extern "C" void SV_HostBot_CancelRoamGoal(void *) {}
+extern "C" void SM_AddInt(void *ctx, int32_t value)
+{
+    CheckContext(ctx);
+    assert(value >= 0 && value <= 2);
+}
+extern "C" void SVHS_ScriptAddVector(void *, const void *) {}
+
 int main()
 {
     unsigned profiles = 0, preserved = 0;

@@ -219,6 +219,15 @@ Client code lives in `integration/replay/` and `integration/host-scale/` as one
 source set. See [the client build guide](docs/DW_CLIENT_BUILD.txt) for source
 ownership, compilation evidence and the retirement of older revision targets.
 
+The client defaults `sv_botGpuNavigation` to `1`. Its D3D12 compute planner
+searches bounded native navigation graphs and selects BR roaming destinations
+before the repeated script ground-ray queries. Pending requests retain their
+goal; accepted destinations still require native projection and path validation.
+Combat, Gulag, airborne, and higher-priority script goals keep their own behavior.
+`sv_botGpuStatus` reports queued, accepted, coalesced, and native-fallback work.
+This moves navigation work to the GPU; server physics and script execution still
+run on the CPU. Hardware fixture results alone do not establish match frame rate.
+
 The server is C++20 and built with CMake. Source lives under [`src/`](src/); Replay-specific integration is under [`integration/replay/`](integration/replay/). Start with [`CMakeLists.txt`](CMakeLists.txt), the feature guides in [`docs/`](docs/), and the existing contract tools under [`tools/`](tools/). On Windows, `format-backend.ps1 -Check` checks the C++ formatting without changing files.
 
 Please keep runtime data, credentials, private keys, player identities, game files, and generated build outputs out of commits. Before submitting a change, build the affected target and run the focused checks documented with that feature. Clearly distinguish fixture results from tests using the actual game client.
