@@ -1,5 +1,7 @@
 """Prepare complete target-verified Replay script method registration."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse, hashlib, json, struct, shutil, importlib.util, sys
 from pathlib import Path
 import pefile
@@ -156,11 +158,11 @@ BODIES = {
 
 def derive(exe, catalog, output):
     assert hashlib.file_digest(exe.open("rb"), "sha256").hexdigest() == TARGET
-    cat = json.loads(catalog.read_bytes())
+    cat = cached_input_json(catalog)
     assert cat["image_sha256"] == TARGET
     byid = {r["id"]: r for r in cat["functions"]}
     byva = {cat["image_base"] + r["rva"]: r for r in cat["functions"]}
-    pe = pefile.PE(str(exe), fast_load=True)
+    pe = shared_original_pe(str(exe), fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
     cs = Cs(CS_ARCH_X86, CS_MODE_64)
     cs.detail = True
@@ -610,7 +612,7 @@ def prepare(snapshot, replace_owned=False):
         ROOT / "integration/replay/DW_ScriptMethods.cpp",
         snapshot / "src/DW_ScriptMethods.cpp",
     )
-    cat = json.loads(catalog.read_bytes())
+    cat = cached_input_json(catalog)
     symbols = cat["functions"] + cat["symbols"]
     byid = {r["id"]: r for r in symbols}
     sys.dont_write_bytecode = True

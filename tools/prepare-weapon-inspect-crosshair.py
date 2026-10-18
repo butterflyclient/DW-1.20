@@ -4,6 +4,8 @@
 deferred to an authorized future canonical source preparation/build.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import json
@@ -44,12 +46,12 @@ def workspace_for(snapshot, catalog, cache):
 def inspect(snapshot):
     raw = IMAGE.read_bytes()
     assert sha(raw) == IMAGE_SHA
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     assert catalog["image_sha256"] == IMAGE_SHA
     functions = {row["rva"]: row for row in catalog["functions"]}
     row = functions[OWNER_RVA]
     assert row["id"] == "fn_f964a37b43ace2fa" and not row.get("quarantined")
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])
     assert sha(pe.get_data(OWNER_RVA, OWNER_SIZE)) == OWNER_SHA
     records = [entry.struct for entry in pe.DIRECTORY_ENTRY_EXCEPTION

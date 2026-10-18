@@ -1,9 +1,57 @@
 #include "sv_host_scale.h"
+#include "SightDiscoverySchedule.h"
 #include <xmmintrin.h>
 
 namespace
 {
     using namespace HostScale;
+    SightDiscoverySchedule s_discovery;
+    SightWorkCounters s_work{};
+
+    struct SightServerClientView
+    {
+        uint8_t opaque0[8];
+        uint8_t state;
+        uint8_t opaque9[271];
+        Entity *entity;
+        uint8_t opaque288[214468];
+        int32_t clientKind;
+    };
+#pragma pack(push, 4)
+    struct SightPlayerView
+    {
+        uint8_t opaque0[12];
+        int32_t movementType, movementTime;
+        uint64_t movementFlags;
+        uint8_t opaque28[22308];
+        uint32_t gameExtraInfo;
+        uint8_t opaque22340[1676];
+        uint32_t freezeFlags;
+    };
+#pragma pack(pop)
+    static_assert(offsetof(SightServerClientView, state) == 8);
+    static_assert(offsetof(SightServerClientView, entity) == 280);
+    static_assert(offsetof(SightServerClientView, clientKind) == 214756);
+    static_assert(offsetof(SightPlayerView, movementFlags) == 20);
+    static_assert(offsetof(SightPlayerView, gameExtraInfo) == 22336);
+    static_assert(offsetof(SightPlayerView, freezeFlags) == 24016);
+
+    bool CurrentQueuedOwner(unsigned slot, uintptr_t entityIdentity, uintptr_t playerIdentity)
+    {
+        if (slot >= SVHS_ClientCount || slot >= 200)
+            return false;
+        const auto *client = static_cast<const SightServerClientView *>(SVHS_Clients[slot]);
+        if (!client || client->state < 5 || client->clientKind != 2)
+            return false;
+        auto *entity = client->entity;
+        if (!entity || uintptr_t(entity) != entityIdentity || uint16_t(entity->number) != slot ||
+            uintptr_t(entity->client) != playerIdentity || !entity->client || entity->health <= 0)
+            return false;
+        // These native early-return states do not call the AI sight update.
+        const auto *player = reinterpret_cast<const SightPlayerView *>(entity->client);
+        return uint32_t(player->movementType) <= 1 && !(player->movementFlags & 0x8000) &&
+               !(player->freezeFlags & 4) && (player->gameExtraInfo & 0x600) != 0x200;
+    }
 
     SentientInfo &Info(AICommon *ai, const Sentient *sentient)
     {
@@ -26,6 +74,24 @@ namespace
         const float fov = getFov(self, other);
         SVHS_CanSeeEntity(self, other, fov, fovZ, distanceSquared);
         return true;
+    }
+    bool EvaluateTracked(AIInterface *self, const SightCandidate &candidate, bool urgent)
+    {
+        const uint32_t before = self->ai->traceCount;
+        const uint64_t started = Clock();
+        const bool evaluated = Evaluate(self, candidate);
+        const uint32_t traceDelta = self->ai->traceCount - before;
+        const uint64_t elapsed = Clock() - started;
+        if (evaluated)
+        {
+            __atomic_fetch_add(urgent ? &s_work.urgentEvaluations : &s_work.backgroundEvaluations,
+                               uint64_t(1), __ATOMIC_RELAXED);
+            __atomic_fetch_add(urgent ? &s_work.urgentNativeTraceDelta : &s_work.backgroundNativeTraceDelta,
+                               uint64_t(traceDelta), __ATOMIC_RELAXED);
+            __atomic_fetch_add(urgent ? &s_work.urgentClockTicks : &s_work.backgroundClockTicks,
+                               elapsed, __ATOMIC_RELAXED);
+        }
+        return evaluated;
     }
 }
 
@@ -96,6 +162,10 @@ extern "C" void AICommon_UpdateSight(HostScale::AIInterface *self)
 
     const unsigned population = Enabled() ? Population() : 0;
     const bool budgeted = population > 20 && SVHS_IsBotEntity(self->ai->entity);
+    if (population <= 100)
+        s_discovery.Reset();
+    const bool sharedBackground = budgeted && population > 100;
+    bool human[272]{};
     unsigned evaluations = 0, deferred = 0;
     const uint32_t originalTraceCount = self->ai->traceCount;
     const uint16_t target = self->ai->sentient->targetHandle;
@@ -107,28 +177,65 @@ extern "C" void AICommon_UpdateSight(HostScale::AIInterface *self)
         for (unsigned i = 0; i < count; ++i)
             if (unsigned(uint16_t(candidates[i].sentient->entity->number)) + 1u == target)
             {
-                evaluations += Evaluate(self, candidates[i]);
+                evaluations += sharedBackground ? EvaluateTracked(self, candidates[i], true) :
+                                                 Evaluate(self, candidates[i]);
                 focused = i;
                 break;
             }
     }
-    const unsigned budget = population > 100 ? 4 : population > 64 ? 6 : 8;
+    if (sharedBackground)
+    {
+        // Human candidates remain on the native latency/FOV/visibility path.
+        // They cannot wait behind background bot-versus-bot discovery.
+        for (unsigned i = 0; i < count; ++i)
+        {
+            auto *entity = candidates[i].sentient->entity;
+            human[i] = entity->client && !SVHS_IsBotEntity(entity);
+            if (human[i] && i != focused)
+                evaluations += EvaluateTracked(self, candidates[i], true);
+        }
+    }
+    SightDiscoverySchedule::Reservation reservation{};
+    if (sharedBackground)
+    {
+        __atomic_fetch_add(&s_work.sharedCalls, uint64_t(1), __ATOMIC_RELAXED);
+        const auto *entity = self->ai->entity;
+        reservation = s_discovery.Reserve(uint16_t(entity->number), SVHS_ClientCount, SVHS_LevelTime,
+            uintptr_t(SVHS_GameStatics), uintptr_t(entity), uintptr_t(entity->client),
+            uintptr_t(self->ai), CurrentQueuedOwner);
+        if (reservation.count)
+            __atomic_fetch_add(&s_work.admittedVisits, uint64_t(1), __ATOMIC_RELAXED);
+    }
+    const unsigned budget = sharedBackground ? reservation.count : population > 64 ? 6 : 8;
     unsigned background = 0;
     for (unsigned i = 0; i < count; ++i)
     {
-        if (budgeted && i == focused)
+        if (budgeted && (i == focused || human[i]))
             continue;
         if (budgeted && background >= budget)
         {
-            deferred = count - i - (focused > i && focused < count ? 1u : 0u);
+            if (sharedBackground)
+            {
+                for (unsigned j = i; j < count; ++j)
+                    deferred += j != focused && !human[j];
+            }
+            else
+                deferred = count - i - (focused > i && focused < count ? 1u : 0u);
             break;
         }
-        const bool evaluated = Evaluate(self, candidates[i]);
+        const bool evaluated = sharedBackground ? EvaluateTracked(self, candidates[i], false) :
+                                                  Evaluate(self, candidates[i]);
         evaluations += evaluated;
         background += evaluated;
         if (!budgeted && self->ai->traceCount != originalTraceCount &&
             (!SVHS_IsBotEntity(self->ai->entity) || !nearby))
             break;
+    }
+
+    if (sharedBackground)
+    {
+        s_discovery.Finish(reservation, background);
+        __atomic_fetch_add(&s_work.backgroundDeferred, uint64_t(deferred), __ATOMIC_RELAXED);
     }
 
     // Preserve the native sorted-prefix rule even when its radius ordering is
@@ -142,4 +249,21 @@ extern "C" void AICommon_UpdateSight(HostScale::AIInterface *self)
             perfectInfo(self, candidates[i].sentient, 18);
     }
     RecordSight(count, evaluations, deferred);
+}
+
+// Value-only diagnostics. Inspectors may locate these counters from this getter;
+// no native AI, entity, geometry, or visibility pointer escapes through them.
+extern "C" void SV_HostSight_GetWork(HostScale::SightWorkCounters *out)
+{
+    if (!out)
+        return;
+    out->urgentEvaluations = __atomic_load_n(&s_work.urgentEvaluations, __ATOMIC_RELAXED);
+    out->urgentNativeTraceDelta = __atomic_load_n(&s_work.urgentNativeTraceDelta, __ATOMIC_RELAXED);
+    out->backgroundEvaluations = __atomic_load_n(&s_work.backgroundEvaluations, __ATOMIC_RELAXED);
+    out->backgroundNativeTraceDelta = __atomic_load_n(&s_work.backgroundNativeTraceDelta, __ATOMIC_RELAXED);
+    out->backgroundDeferred = __atomic_load_n(&s_work.backgroundDeferred, __ATOMIC_RELAXED);
+    out->sharedCalls = __atomic_load_n(&s_work.sharedCalls, __ATOMIC_RELAXED);
+    out->admittedVisits = __atomic_load_n(&s_work.admittedVisits, __ATOMIC_RELAXED);
+    out->urgentClockTicks = __atomic_load_n(&s_work.urgentClockTicks, __ATOMIC_RELAXED);
+    out->backgroundClockTicks = __atomic_load_n(&s_work.backgroundClockTicks, __ATOMIC_RELAXED);
 }

@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "checks": [
+    "top-level JSON mutation",
+    "nested JSON mutation",
+    "nested list mutation",
+    "consumed input changed at boundary",
+    "function priority preserved over data alias",
+    "ambiguous catalog identities",
+    "SQLite commit during symbol resolution",
+    "SQLite commit before final boundary",
+    "job lifetime reset releases cached buffers",
+    "aggregate preserves exact upstream core verifier bytes",
+    "actual frozen helper in same directory prepares without SameFileError",
+    "aggregate transformed-file and native-linker receipt hashes match",
+    "aggregate finish validates and releases job context",
+    "sealed snapshot rejected",
+    "unreviewed native ownership implementation",
+    "native linker remains outside all sixteen pinned recovery inputs"
+  ],
+  "game_runs_performed": false
+}

@@ -5,6 +5,8 @@ uses replay_owned_clone for complete original fallback bodies and their unwind
 metadata, then registers the replacement owners in the canonical manifests.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import json
@@ -136,11 +138,11 @@ def unwind_family(pe, rva):
 
 
 def inspect(snapshot):
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     assert catalog["image_sha256"] == IMAGE_SHA
     raw = IMAGE.read_bytes()
     assert sha(raw) == IMAGE_SHA
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(
         directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
     )

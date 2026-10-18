@@ -1,5 +1,7 @@
 """Bind profile receiver ownership to original Replay client count and table."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import hashlib
 import json
 from pathlib import Path
@@ -55,10 +57,10 @@ def configure(snapshot):
     snapshot = Path(snapshot).resolve(strict=True)
     assert snapshot.is_relative_to(ROOT / "data")
     assert not (snapshot.parent / "client-readiness.json").exists(), "Finished snapshot"
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     raw = IMAGE.read_bytes()
     assert hashlib.sha256(raw).hexdigest() == TARGET == catalog["image_sha256"]
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     base = pe.OPTIONAL_HEADER.ImageBase
     by_id = {

@@ -5,6 +5,8 @@ real Win64 unwind metadata. The wrapper owns its original function identity;
 the clone has a fresh symbol and cannot recurse through that identity.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import hashlib
 import json
 import re
@@ -123,10 +125,10 @@ def prepare(snapshot, replace_owned=False):
 
     output = snapshot / "generated/bot-style-zone"
     output.mkdir(parents=True, exist_ok=True)
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     if catalog["image_sha256"] != IMAGE_SHA or sha(IMAGE.read_bytes()) != IMAGE_SHA:
         raise ValueError("Original Replay image binding changed")
-    pe = pefile.PE(str(IMAGE), fast_load=True)
+    pe = shared_original_pe(str(IMAGE), fast_load=True)
     workspace = SourceWorkspace(snapshot, output / "cache")
     workspace._catalog = catalog
     workspace._state = lambda: {"sources": {}}

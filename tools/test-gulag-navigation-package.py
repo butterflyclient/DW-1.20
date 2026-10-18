@@ -86,6 +86,9 @@ def main():
             "PASS existing-package geometry guard rejects stale or untracked geometry"
         )
         return
+    assert isinstance(
+        proof.get("script_string_contract"), dict
+    ), "Package lacks the native script-string contract proof"
     assert (
         proof["asset_name"] == "maps/mp/dw_gulag.d3dbsp" and proof["asset_type"] == 27
     )
@@ -152,7 +155,37 @@ def main():
     assert digest(bundle) == proof["resource_bundle_sha256"]
     body = unpack_replay_uncompressed(Path(main_ff["source"]).read_bytes())
     assert digest(body) == proof["body_sha256"]
-    assert struct.unpack_from("<IIQ", body, 32) == (27, 0, 0xFFFFFFFFFFFFFFFE)
+    layout = proof["layout"]
+    assert struct.unpack_from("<IIQ", body, layout["root_offset"] - 16) == (
+        27,
+        0,
+        0xFFFFFFFFFFFFFFFE,
+    )
+    # Empty language/server companions have no assets and no script-string
+    # consumers; their all-zero, count-zero header remains valid.
+    for row in installation:
+        if row["companion"] and row["name"].endswith(".ff"):
+            assert unpack_replay_uncompressed(
+                Path(row["source"]).read_bytes()
+            ) == bytes(32)
+    helper = Path(__file__).with_name("test-gulag-script-string-contract.py")
+    binding = [
+        row
+        for row in proof["source_inputs"]
+        if Path(row["path"]).resolve() == helper.resolve()
+    ]
+    assert len(binding) == 1 and binding[0]["sha256"] == file_digest(
+        helper
+    ), "Native script-string regression helper is not bound to the package"
+    spec = importlib.util.spec_from_file_location("gulag_script_string_recheck", helper)
+    contract_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(contract_module)
+    recorded_contract = proof["script_string_contract"]
+    assert recorded_contract["native_regression"]["conversion_hooked"] is False
+    fresh_contract = contract_module.verify_package_contract(body, layout)
+    assert (
+        fresh_contract == recorded_contract
+    ), "Fresh native script-string proof differs"
     resource_report = json.loads(Path(proof["resource_report"]).read_bytes())
     resource = Path(resource_report["output"]).read_bytes()
     loader = proof["native_reader"]
@@ -258,6 +291,10 @@ def main():
         production_ready=proof["production_ready"],
         synthetic_format_fixture=proof["synthetic_format_fixture"],
         native_trace_rechecked=True,
+        native_script_string_contract_rechecked=True,
+        script_string_contract=fresh_contract,
+        empty_companions_have_no_script_string_consumers=True,
+        native_reader_script_string_conversion_is_noop=True,
         game_execution=False,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

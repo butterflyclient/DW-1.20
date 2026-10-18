@@ -1,0 +1,76 @@
+{
+  "passed": true,
+  "scope": "Actual canonical Post function compiled with injected WinHTTP callbacks; no network or game",
+  "cases": [
+    {
+      "scenario": "complete",
+      "accepted": true,
+      "diagnostic": ""
+    },
+    {
+      "scenario": "open",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=open win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "timeouts",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=timeouts win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "connect",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=connect win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "open-request",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=open-request win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "redirect-policy",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=redirect-policy win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "send",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=send win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "receive",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=receive win32=12002 http=0 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "query-status",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=query-status win32=12002 http=200 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "http-status",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=http-status win32=0 http=503 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "read",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=read win32=12002 http=200 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "short-response",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=short-response win32=0 http=200 received=0 expected=32 extra=0"
+    },
+    {
+      "scenario": "read-eof",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=read-eof win32=12002 http=200 received=32 expected=32 extra=0"
+    },
+    {
+      "scenario": "long-response",
+      "accepted": false,
+      "diagnostic": "DW_LOCAL_POST_FAILED stage=long-response win32=0 http=200 received=32 expected=32 extra=1"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+import dw_sqlite_snapshot
 
 if os.name == "nt":
     import msvcrt
@@ -34,6 +35,8 @@ def digest(path):
 
 def require_current_sources(receipt):
     """Reject a frozen job superseded by edits to its authored source owners."""
+    if receipt.get("sqlite_snapshot"):
+        dw_sqlite_snapshot.verify_binding(receipt["sqlite_snapshot"])
     for item in receipt["source_inputs"] + receipt.get("tool_inputs", []):
         # Older receipts also captured release-only tools here. They never
         # affect compiler bytes; their current hashes are bound separately to
@@ -276,6 +279,20 @@ def initialize():
 
 
 def prepare(pending_map_record=None):
+    _, state, base = settings()
+    initialize()
+    directory = inside(state / "jobs" / str(time.time_ns()))
+    directory.mkdir(parents=True, exist_ok=False)
+    local = read(base / "replay-project.local.json")
+    live_database = Path(os.environ.get("REPLAY_SQLITE") or local["sqlite"])
+    print("Pinning complete analysis SQLite snapshot:", live_database, flush=True)
+    binding = dw_sqlite_snapshot.create_snapshot(live_database, directory / "inputs/analysis.sqlite")
+    print("Pinned analysis SQLite:", binding["sha256"], flush=True)
+    with dw_sqlite_snapshot.scoped_sqlite(binding["path"]):
+        return _prepare(directory, binding, pending_map_record)
+
+
+def _prepare(directory, sqlite_snapshot, pending_map_record=None):
     config, state, base = settings()
     subprocess.run(
         [sys.executable, "-B", str(ROOT / "tools/generate-bot-names.py"), "--check"],
@@ -285,7 +302,6 @@ def prepare(pending_map_record=None):
     for item in manifest["files"]:
         if digest(base / item["path"]) != item["sha256"]:
             raise ValueError("Compiler base changed unexpectedly: " + item["path"])
-    directory = inside(state / "jobs" / str(time.time_ns()))
     source = directory / "source"
     # Updater build products contain absolute CMake paths and old objects.
     # Regenerate them from the current authored helper and frozen client inputs.
@@ -293,11 +309,19 @@ def prepare(pending_map_record=None):
         base, source,
         ignore=lambda folder, names: ["generated-updater"] if Path(folder) == base else [],
     )
+    # load_paths gives local metadata priority over the environment. Set this
+    # before any preparation helper opens its SourceWorkspace/context.
+    early_local = read(source / "replay-project.local.json")
+    early_local["sqlite"] = sqlite_snapshot["path"]
+    early_local["sqlite_snapshot_receipt"] = sqlite_snapshot["proof"]
+    save(source / "replay-project.local.json", early_local)
     source_inputs = []
     tool_inputs = [
         dict(source="tools/" + name, source_sha256=digest(ROOT / "tools" / name))
         for name in (
-            "dw_client.py", "dw_catalog.py",
+            "prepare-workstation-performance.py", "workstation_preparation_context.py",
+            "preparation_instruction_source.py", "verifier_performance.py", "native_relocation_performance.py",
+            "dw_client.py", "dw_catalog.py", "dw_sqlite_snapshot.py", "dw_debug_symbols.py", "test-dw-debug-symbols.py",
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "test-playlist-ui.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
@@ -307,6 +331,7 @@ def prepare(pending_map_record=None):
             "test-host-bot-gpu.py", "host_bot_gpu_harness.cpp",
             "host_bot_gpu_planner_harness.cpp", "test-host-nav-graph.cpp",
             "test-host-gpu-movement.py", "test-host-navigation.py",
+            "test-host-sight-scheduling.py", "host_sight_schedule_harness.cpp",
             "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
             "test-map-voting-client.py", "map_vote_harness.cpp",
             "test-ui-focus-lifetime.py",
@@ -322,6 +347,7 @@ def prepare(pending_map_record=None):
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "test-bot-style-zone.py", "bot_style_zone_harness.cpp",
             "prepare-gulag-navigation-package.py", "test-gulag-navigation-package.py",
+            "test-gulag-script-string-contract.py",
             "test-gulag-zone-lifecycle.py", "test-gulag-integration.py",
             "test-native-bfx-consumer.py",
             "generate-native-nav-resource.py",
@@ -353,6 +379,10 @@ def prepare(pending_map_record=None):
         shutil.copyfile(authored, frozen)
         if digest(authored) != item["source_sha256"] or digest(frozen) != item["source_sha256"]:
             raise ValueError("Tool changed while freezing: " + item["source"])
+    # Optimize the private compiler workspace after all helper bytes are frozen.
+    sys.path.insert(0, str(source / "tools"))
+    performance = load_module("dw_preparation_performance", source / "tools/prepare-workstation-performance.py")
+    performance.prepare(source)
     overlays = dict(manifest["overlays"])
     for root in config["authored_source_roots"]:
         # Host replacements acquire their native bindings below. Other authored
@@ -404,6 +434,9 @@ def prepare(pending_map_record=None):
     # Freeze current validators with the job, including remote TLS expectations.
     # The compiler template may contain older endpoint or overlay rules.
     validators = {
+        "dw_debug_symbols.py": "dw_debug_symbols.py",
+        "dw_sqlite_snapshot.py": "dw_sqlite_snapshot.py",
+        "test-dw-debug-symbols.py": "test-dw-debug-symbols.py",
         "verify_debug_states.py": "verify_debug_states.py",
         "verify_spatial.py": "verify_spatial.py",
         "verify-dw-endpoints.py": "verify_dw_endpoints.py",
@@ -420,6 +453,29 @@ def prepare(pending_map_record=None):
                  compiled_source="tools/" + frozen_name,
                  compiled_sha256=digest(validation_target))
         )
+    load_module("dw_debug_preparation", ROOT / "tools/dw_debug_symbols.py").prepare_audit(source)
+    # Emit PDB/MAP and embed their RSDS association inside the linker process,
+    # before workstation verification and every publication hash are computed.
+    linker = source / "tools/build.py"
+    linker_text = linker.read_text(encoding="utf-8")
+    anchor = '    print(f"Linked {executable}\\nSHA256 {report[\'sha256\']}", flush=True)'
+    if linker_text.count(anchor) != 1:
+        raise ValueError("Cannot locate the final custom-linker report boundary")
+    catalog_anchor = "    backend_inputs += source_provenance.snapshots([catalog_path, Path(sqlite_provenance['catalog_rows_path'])])"
+    if linker_text.count(catalog_anchor) != 1:
+        raise ValueError("Cannot locate the prelink SQLite snapshot boundary")
+    linker_text = linker_text.replace(catalog_anchor, catalog_anchor + '\n'
+        '    from dw_debug_symbols import snapshot_sqlite_names\n'
+        '    debug_sqlite_snapshot = snapshot_sqlite_names(source_catalog.database_path(), manifest, sqlite_provenance, output / "catalog-snapshot/sqlite-debug-names.json")\n'
+        '    backend_inputs += source_provenance.snapshots([ROOT / "tools/dw_debug_symbols.py", Path(debug_sqlite_snapshot["path"])])\n')
+    linker.write_text(linker_text.replace(anchor,
+        '    from dw_debug_symbols import emit as emit_debug_symbols\n'
+        '    report["debug_sqlite_snapshot"] = debug_sqlite_snapshot\n'
+        '    (output / "build-report.json").write_text(json.dumps(report, indent=2) + "\\n")\n'
+        '    emit_debug_symbols(output / "build-report.json")\n'
+        '    subprocess.run([sys.executable, str(ROOT / "tools/test-dw-debug-symbols.py"), "--build", str(output)], check=True)\n'
+        '    report = json.loads((output / "build-report.json").read_text())\n' + anchor),
+        encoding="utf-8")
     # Keep the supplied name corpus tied to the generated compiled pool.
     names = ROOT / "integration/replay/DW_BotNames.txt"
     names_target = source / "src/DW_BotNames.txt"
@@ -540,6 +596,9 @@ def prepare(pending_map_record=None):
     ], cwd=ROOT, check=True)
     shutil.copyfile(helper_header, source / "src/DW_UpdateHelper.h")
     units = sync_cpp_revisions(source)
+    # Recheck every shared recovered input before the recovery manifest changes.
+    performance_boundary = performance.finish(source)
+    save(source / "generated/preparation-performance-boundary.json", performance_boundary)
     recovery_path = source / "generated/manifest.json"
     recovery = read(recovery_path)
     approved_root = Path(manifest["bootstrap_original_source_root"])
@@ -595,6 +654,7 @@ def prepare(pending_map_record=None):
         schema=1,
         target=config["target"],
         snapshot=str(source),
+        sqlite_snapshot=sqlite_snapshot,
         source_inputs=source_inputs,
         tool_inputs=tool_inputs,
         cpp_sources=cpp,
@@ -624,6 +684,17 @@ def prepare(pending_map_record=None):
 
 
 def build(directory, publish_ready=True, gameplay_checks=True):
+    directory = inside(directory)
+    receipt = read(directory / "source-receipt.json")
+    database = dw_sqlite_snapshot.verify_binding(receipt["sqlite_snapshot"])
+    local = read(Path(receipt["snapshot"]) / "replay-project.local.json")
+    if Path(local["sqlite"]).resolve() != database:
+        raise ValueError("Frozen compiler metadata points to another SQLite database")
+    with dw_sqlite_snapshot.scoped_sqlite(database):
+        return _build(directory, publish_ready, gameplay_checks)
+
+
+def _build(directory, publish_ready=True, gameplay_checks=True):
     directory = inside(directory)
     receipt = read(directory / "source-receipt.json")
     source = inside(receipt["snapshot"])
@@ -674,12 +745,28 @@ def build(directory, publish_ready=True, gameplay_checks=True):
 
 
 def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
+    directory = inside(directory)
+    receipt = read(directory / "source-receipt.json")
+    database = dw_sqlite_snapshot.verify_binding(receipt["sqlite_snapshot"])
+    with dw_sqlite_snapshot.scoped_sqlite(database):
+        return _verify(directory, report_path, publish_ready, gameplay_checks)
+
+
+def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     """Bind every gate to the freshly compiled image, never a revision alias."""
     config, state, _ = settings()
     report = read(report_path)
     build_path = Path(report_path).parent
     source = Path(report["source_root"])
     receipt = read(directory / "source-receipt.json")
+    pinned_database = Path(receipt["sqlite_snapshot"]["path"]).resolve()
+    if (Path(report["source_root"]).resolve() != Path(receipt["snapshot"]).resolve()
+            or Path(report["function_catalog_snapshot"]["sqlite"]["path"]).resolve() != pinned_database):
+        raise ValueError("Linked source/SQLite provenance differs from the prepared job")
+    if report.get("debug_sqlite_snapshot"):
+        names = read(report["debug_sqlite_snapshot"]["path"])
+        if Path(names["database"]).resolve() != pinned_database:
+            raise ValueError("Debugger names came from a different SQLite database")
     expected = dict(receipt["cpp_sources"])
     for item in receipt["source_inputs"]:
         if Path(item["compiled_source"]).suffix in (".cpp", ".c"):
@@ -694,7 +781,9 @@ def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         raise ValueError("Fresh compilation/source/image gate failed")
     tools = ROOT / "tools"
     checks = (
+        ("test-dw-debug-symbols.py", [], "debug-symbols.json"),
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
+        ("test-host-sight-scheduling.py", ["--snapshot", str(source)], "host-sight.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
         ("test-host-bot-gpu.py", [], "host-bot-gpu.json"),
         ("test-host-gpu-movement.py", ["--snapshot", str(source)], "host-gpu-movement.json"),
@@ -748,7 +837,8 @@ def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     if not gameplay_checks:
         # An explicit maintainer override skips gameplay regressions, retaining
         # fresh build identity and the exact embedded updater checks.
-        checks = tuple(item for item in checks if item[0] == 'test-executable-update-integration.py')
+        checks = tuple(item for item in checks if item[0] in (
+            'test-executable-update-integration.py', 'test-dw-debug-symbols.py'))
     identity = dict(
         source_receipt_sha256=digest(directory / "source-receipt.json"),
         build_report_sha256=digest(report_path),

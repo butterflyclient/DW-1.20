@@ -5,6 +5,8 @@ or compiling anything. Native clone assembly occurs only in a later authorized
 canonical preparation/build. No game image or database is modified.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import json
@@ -55,12 +57,12 @@ def compiler_workspace(snapshot, catalog, cache):
 def inspect(snapshot):
     raw = IMAGE.read_bytes()
     assert sha(raw) == IMAGE_SHA
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     assert catalog["image_sha256"] == IMAGE_SHA
     functions = {row["rva"]: row for row in catalog["functions"]}
     row = functions[OWNER_RVA]
     assert not row.get("quarantined")
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(
         directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
     )

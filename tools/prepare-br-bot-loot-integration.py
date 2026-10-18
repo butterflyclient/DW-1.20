@@ -1,4 +1,6 @@
 """Bind BR bot looting to the original Replay player-use/scriptable ABI."""
+
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
 import hashlib
 import importlib.util
 import json
@@ -43,10 +45,10 @@ void SVHBL_UpdateDirection(void *, HostScale::UserCmd *);
 def inspect(snapshot):
     snapshot = Path(snapshot).resolve()
     assert snapshot.is_relative_to(ROOT / 'data')
-    catalog = json.loads((snapshot / 'generated/function-catalog.json').read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     raw = Path('E:/IW8/Builds/1.20-replay/game_dx12_ship_replay.exe').read_bytes()
     assert hashlib.sha256(raw).hexdigest() == catalog['image_sha256'] == IMAGE_HASH
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     decoder = Cs(CS_ARCH_X86, CS_MODE_64)
     groups = {}

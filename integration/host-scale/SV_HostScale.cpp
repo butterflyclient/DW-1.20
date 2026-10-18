@@ -3,6 +3,7 @@
 #include "com_debugstates.h"
 #include "sv_host_navigation.h"
 #include "SV_HostBotGpuPlanner.h"
+#include "SightDiscoverySchedule.h"
 
 extern "C"
 {
@@ -42,6 +43,21 @@ namespace
             Read(s_sightCalls), Read(s_candidates), Read(s_evaluations), Read(s_deferred));
         const auto frames = Read(s_botFrames);
         const auto frequency = __atomic_load_n(&s_frequency, __ATOMIC_RELAXED);
+        HostScale::SightWorkCounters sight{};
+        SV_HostSight_GetWork(&sight);
+        Com_Printf(15,
+            "Shared sight: %llu urgent / %llu background evaluations; "
+            "native trace-counter deltas %llu / %llu; %llu admitted visits / %llu updates\n",
+            sight.urgentEvaluations, sight.backgroundEvaluations,
+            sight.urgentNativeTraceDelta, sight.backgroundNativeTraceDelta,
+            sight.admittedVisits, sight.sharedCalls);
+        if (frequency)
+        {
+            const double milliseconds = 1000.0 / double(frequency);
+            Com_Printf(15, "Shared sight CPU totals: urgent %.3f ms, background %.3f ms\n",
+                double(sight.urgentClockTicks) * milliseconds,
+                double(sight.backgroundClockTicks) * milliseconds);
+        }
         if (frames && frequency)
         {
             const double milliseconds = 1000.0 / double(frequency);

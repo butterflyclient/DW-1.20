@@ -84,12 +84,18 @@ class Runner:
             address &= -4096
             if address in pages:
                 return
-            vm.mem_map(address, 4096)
-            if self.base <= address < self.base + pe.OPTIONAL_HEADER.SizeOfImage:
+            # Fixture memory has no intentional inaccessible guard pages: the
+            # original missing-memory callback maps every requested page.
+            # Batch zeroed fixture pages only; image pages retain exact loading.
+            image_page = self.base <= address < self.base + pe.OPTIONAL_HEADER.SizeOfImage
+            begin = address if image_page else address & -65536
+            length = 4096 if image_page else 65536
+            vm.mem_map(begin, length)
+            if image_page:
                 data = pe.get_data(address - self.base, 4096)
                 if data:
                     vm.mem_write(address, data)
-            pages.add(address)
+            pages.update(range(begin, begin + length, 4096))
 
         def put(address, data, fmt=None):
             if fmt:
@@ -277,12 +283,23 @@ class Runner:
                 if case.get("zero_distance") and i == 1:
                     xyz = (0.0, 0.0, 0.0)
                 put(ent + 304, struct.pack("<fff", *xyz)); put(sent, ent, "<Q")
+                if i in case.get("humans", []):
+                    player = 0x58000000 + i * 0x8000
+                    put(ent + 336, player, "<Q")
+                    put(player + 21368, 2, "<i")
                 put(sent + 16, 2 if i == 0 else 1, "<I")
                 put(info + i * 64 + 4, now if case.get("cached") else 100 + i * 3, "<i")
                 if case.get("mixed") and i and i % 9 == 0:
                     put(ent + 440, 0, "<i")
                 if case.get("mixed") and i and i % 11 == 0:
                     put(ent + 8, 5, "<H")
+            if case.get("sight_owner"):
+                put(symbols["SVHS_Clients"], clients, "<Q")
+                put(clients + 8, 5, "<B")
+                put(clients + 280, entities, "<Q")
+                put(clients + 214756, 2, "<i")
+                put(entities + 336, players, "<Q")
+                put(players, bytes(24020))
             put(sentients + 72, case.get("target", 0), "<H")
             put(sentients + 156, int(case.get("neutral", False)), "<B")
             vm.reg_write(UC_X86_REG_RCX, interface)
@@ -377,7 +394,7 @@ class Runner:
             if kind == "__security_check_cookie":
                 returned(); return
             if kind in ("?Enabled@HostScale@@YA_NXZ", "optimized-policy"):
-                returned(case.get("mode", 0) != 0); return
+                returned(case.get("mode_by_frame", [])[frame] != 0 if case.get("mode_by_frame") else case.get("mode", 0) != 0); return
             if kind == "?Population@HostScale@@YAIXZ":
                 returned(case.get("population", 20)); return
             if kind == "DW_BotPolicy_IsBattleRoyale":
@@ -471,7 +488,8 @@ class Runner:
                 rows.sort(key=lambda data: struct.unpack_from("<I", data, 8)[0], reverse=True)
                 put(a, b''.join(rows)); returned(); return
             if kind == "SVHS_IsBotEntity":
-                returned(case.get("bot", True)); return
+                returned(case.get("bot", True) and
+                         (a - entities) // 1440 not in case.get("humans", [])); return
             if kind == "DW_LocalBackend_IsEnabled":
                 returned(0); return
             if kind == "SV_HostBot_StampQueuedCommand":
@@ -526,6 +544,23 @@ class Runner:
         callback = vm.hook_add(UC_HOOK_CODE, boundary)
         try:
             for frame in range(case.get("frames", 1)):
+                if routine == "AICommon_UpdateSight":
+                    vm.reg_write(UC_X86_REG_RCX, interface)
+                    now = case.get("time", 10000) + frame * case.get("frame_ms", 16)
+                    put(symbols["SVHS_LevelTime"], now, '<i')
+                    if frame == case.get("invalidate_sight_at"):
+                        failure = case["sight_failure"]
+                        if failure == "null-client": put(symbols["SVHS_Clients"], 0, '<Q')
+                        elif failure == "disconnected": put(clients + 8, 2, '<B')
+                        elif failure == "not-bot": put(clients + 214756, 0, '<i')
+                        elif failure == "entity-reuse": put(clients + 280, entities + 1440, '<Q')
+                        elif failure == "slot-mismatch": put(entities, 1, '<h')
+                        elif failure == "player-reuse": put(entities + 336, players + 0x8000, '<Q')
+                        elif failure == "dead": put(entities + 440, 0, '<i')
+                        elif failure == "frozen": put(players + 24016, 4, '<I')
+                        elif failure == "jail": put(players + 22336, 0x200, '<I')
+                        elif failure == "movement": put(players + 12, 6, '<i')
+                        else: raise AssertionError(failure)
                 if routine == "SV_BotUpdateBots":
                     now = case.get("time", 10000) + frame * case.get("frame_ms", 16)
                     if frame >= case.get("rewind_at", 1000000):
@@ -666,6 +701,55 @@ def waiting_jail_cases(runner):
                 live_game_execution=False,jail_phase=0x200,arena_phase=0x400,max_idle_think_ms=64,cases=rows)
 
 
+
+def install_validation_dependency(snapshot):
+    """Package this checker for post-build imports without altering frozen inputs."""
+    snapshot = snapshot.resolve()
+    jobs = (ROOT / "data/dw-client/jobs").resolve()
+    relative = snapshot.relative_to(jobs)
+    if len(relative.parts) != 2 or relative.parts[1] != "source":
+        raise ValueError("Validation dependency requires a project job/source directory")
+    source_receipt = snapshot.parent / "source-receipt.json"
+    source_bytes = source_receipt.read_bytes()
+    frozen = json.loads(source_bytes)
+    if Path(frozen["snapshot"]).resolve() != snapshot:
+        raise ValueError("Source receipt does not identify this snapshot")
+    name = "tools/test-host-scale.py"
+    for entry in frozen["files"]:
+        if entry["path"].replace("\\", "/").casefold() == name:
+            raise ValueError("Cannot install a validation dependency over a frozen input")
+    for entry in frozen.get("source_inputs", []) + frozen.get("tool_inputs", []):
+        if any(isinstance(value, str) and value.replace("\\", "/").casefold() == name
+               for value in entry.values()):
+            raise ValueError("Checker is bound as a compiler/tool input")
+    destination = snapshot / name
+    if destination.resolve().parent != (snapshot / "tools").resolve():
+        raise ValueError("Validation dependency escapes snapshot tools directory")
+    content = Path(__file__).resolve().read_bytes()
+    digest = hashlib.sha256(content).hexdigest()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as stream:
+            stream.write(content)
+    except FileExistsError:
+        if destination.read_bytes() != content:
+            raise ValueError("Existing validation dependency differs; refusing overwrite")
+    if hashlib.sha256(destination.read_bytes()).hexdigest() != digest:
+        raise ValueError("Installed validation dependency hash mismatch")
+    proof = dict(schema=1, path=name, sha256=digest,
+                 purpose="Validation-only fixture imported by linked sight scheduling checker; not compiler input",
+                 source_receipt_sha256=hashlib.sha256(source_bytes).hexdigest())
+    proof_path = snapshot.parent / "host-scale-validation-dependency.json"
+    encoded = (json.dumps(proof, indent=2) + "\n").encode()
+    try:
+        with proof_path.open("xb") as stream:
+            stream.write(encoded)
+    except FileExistsError:
+        if proof_path.read_bytes() != encoded:
+            raise ValueError("Existing validation dependency proof differs; refusing overwrite")
+    return proof
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", type=Path, required=True)
@@ -673,9 +757,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument('--jail-only', action='store_true', help='Focused actual scheduler instruction regression')
     args = parser.parse_args()
+    validation_dependency = install_validation_dependency(args.snapshot) if args.build else None
     runner = Runner(args.snapshot, args.build, {'SV_BotUpdateBots'} if args.jail_only else None)
     if args.jail_only:
         receipt = waiting_jail_cases(runner)
+        receipt["validation_dependency"] = validation_dependency
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(receipt, indent=2)+'\n')
         print('PASS waiting jail instruction cases', receipt['scenarios'], flush=True)
@@ -828,7 +914,7 @@ def main():
                 assert compiled['all_setup'] == expected, (case, compiled)
                 total += 1
     print('PASS individual/combined collision release acknowledgements', total, flush=True)
-    receipt = dict(passed=True, cases=total, original_image_sha256=runner.proof["image_sha256"],
+    receipt = dict(passed=True, cases=total, validation_dependency=validation_dependency, original_image_sha256=runner.proof["image_sha256"],
                    linked_executable_sha256=runner.report["sha256"] if runner.report else None,
                    modeled_150_client_visibility_evaluations=reductions,
                    modeled_bot_decision_cadence=scheduling,

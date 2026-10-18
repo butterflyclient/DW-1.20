@@ -1,5 +1,7 @@
 """Bind the opt-in host-scaling replacements to verified Replay instructions."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import hashlib
 import importlib.util
 import json
@@ -37,11 +39,11 @@ def prepare(snapshot, replace_owned=False):
     snapshot = Path(snapshot).resolve()
     if not snapshot.is_relative_to(ROOT / "data"):
         raise ValueError("Host-scaling integration requires a private DW compiler snapshot")
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     image = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe")
     raw = image.read_bytes()
     assert hashlib.sha256(raw).hexdigest() == IMAGE_HASH == catalog["image_sha256"]
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     base = pe.OPTIONAL_HEADER.ImageBase
     entries = {e.struct.BeginAddress: e for e in pe.DIRECTORY_ENTRY_EXCEPTION}

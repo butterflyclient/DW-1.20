@@ -10,7 +10,7 @@ import time
 
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-from capstone.x86_const import X86_OP_MEM, X86_OP_REG, X86_REG_RAX, X86_REG_RIP
+from capstone.x86_const import X86_OP_MEM, X86_OP_REG, X86_REG_RAX, X86_REG_RCX, X86_REG_RIP
 
 
 def digest(path):
@@ -46,6 +46,41 @@ def metrics_address(report, image):
             pending = None
     assert len(bases) == 1 and copied == set(range(104)), 'GPU getter layout changed'
     return bases.pop()
+
+
+def sight_work_addresses(report, image):
+    """Resolve each counter from the built value-only getter's output stores."""
+    address = report['symbols'].get('SV_HostSight_GetWork')
+    if address is None:
+        return {}
+    names = ('urgent_evaluations', 'urgent_native_trace_delta',
+             'background_evaluations', 'background_native_trace_delta',
+             'background_deferred', 'shared_calls', 'admitted_visits',
+             'urgent_clock_ticks', 'background_clock_ticks')
+    decoder = Cs(CS_ARCH_X86, CS_MODE_64)
+    decoder.detail = True
+    pending = None
+    fields = {}
+    for instruction in decoder.disasm(image.get_data(address, 256), address):
+        if instruction.mnemonic == 'ret':
+            break
+        operands = instruction.operands
+        if instruction.mnemonic != 'mov' or len(operands) != 2:
+            pending = None
+            continue
+        target, source = operands
+        if (target.type == X86_OP_REG and source.type == X86_OP_MEM and
+                source.mem.base == X86_REG_RIP and source.size == 8):
+            pending = (target.reg, instruction.address + instruction.size + source.mem.disp)
+        elif (pending and target.type == X86_OP_MEM and target.mem.base == X86_REG_RCX and
+              target.size == 8 and source.type == X86_OP_REG and source.reg == pending[0]):
+            assert target.mem.disp not in fields, 'Duplicate sight getter field'
+            fields[target.mem.disp] = pending[1]
+            pending = None
+        else:
+            pending = None
+    assert set(fields) == set(range(0, 72, 8)), 'Sight getter layout changed'
+    return {name: fields[index * 8] for index, name in enumerate(names)}
 
 
 def planner_addresses(report, image):
@@ -190,6 +225,11 @@ def main():
             except OSError:
                 population['read_failures'] += 1
         frames = None
+        sight_addresses = sight_work_addresses(report, image)
+        def sample_sight():
+            return {name: read_value(modules[0] + address, '<Q')
+                    for name, address in sight_addresses.items()}
+        sight = sample_sight()
         if args.frame_seconds:
             assert 0 < args.frame_seconds <= 30
             recorder = report['symbols']['?RecordBotFrame@HostScale@@YAXII_K0@Z']
@@ -214,9 +254,11 @@ def main():
             frequency = c.c_int64()
             assert kernel.QueryPerformanceFrequency(c.byref(frequency))
             before = sample_counters()
+            sight_before = sample_sight()
             start = time.perf_counter()
             time.sleep(args.frame_seconds)
             after = sample_counters()
+            sight_after = sample_sight()
             seconds = time.perf_counter() - start
             delta = [end - begin for begin, end in zip(before, after)]
             frames = dict(seconds=seconds, frames=delta[0], simulation_fps=delta[0] / seconds,
@@ -224,10 +266,18 @@ def main():
                           bot_think_ms_per_frame=delta[3] * 1000 / frequency.value / max(delta[0], 1),
                           bot_move_ms_per_frame=delta[4] * 1000 / frequency.value / max(delta[0], 1),
                           scope='Native bot frame counters; think excludes other server work, move includes GPU submission.')
+            if sight_addresses:
+                sight_delta = {name: (sight_after[name] - sight_before[name]) & ((1 << 64) - 1)
+                               for name in sight_addresses}
+                for group in ('urgent', 'background'):
+                    sight_delta[group + '_cpu_ms_per_frame'] = (
+                        sight_delta[group + '_clock_ticks'] * 1000 / frequency.value / max(delta[0], 1))
+                frames['sight'] = sight_delta
         result = dict(read_only=True, atomic_snapshot=False, pid=args.pid,
                       executable=path.value, executable_sha256=report['sha256'],
                       metrics_rva=metrics_rva, metrics=metrics,
                       planner=planner,
+                      sight_work=sight,
                       population=population,
                       frame_interval=frames,
                       hardware_initialized=bool(metrics['enabled'] and metrics['gpu_timestamp_frequency']),

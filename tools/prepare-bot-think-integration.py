@@ -1,4 +1,6 @@
 """Reconstruct the complete Replay Bot_Think through verified native boundaries."""
+
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
 import hashlib
 import importlib.util
 import json
@@ -69,10 +71,10 @@ def prepare(snapshot, replace_owned=False):
                      "src/SV_BotThinkBindings.h"):
         path = snapshot / relative
         assert not path.exists() or path.stat().st_nlink == 1, "Shared immutable snapshot file"
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     raw = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe").read_bytes()
     assert hashlib.sha256(raw).hexdigest() == IMAGE_HASH == catalog["image_sha256"]
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     base = pe.OPTIONAL_HEADER.ImageBase
     functions = {f["id"]: f for f in catalog["functions"] if not f.get("quarantined")}

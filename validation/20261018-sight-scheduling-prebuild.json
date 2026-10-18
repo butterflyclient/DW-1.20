@@ -1,0 +1,177 @@
+{
+  "passed": true,
+  "authored_prebuild": true,
+  "linked_build_tested": false,
+  "executable_sha256": null,
+  "schedule_header_sha256": "f4d3229c8ca4c3ce6bbfa892b72d5553378c621be2a88832c2afd9f359bdb9a3",
+  "scheduler": {
+    "cases": [
+      {
+        "slots": 150,
+        "frames": 100,
+        "think_stride": 1,
+        "evaluations": 6336,
+        "old_background_evaluations": 60000,
+        "max_frame_evaluations": 64,
+        "min_visits_per_slot": 9,
+        "max_service_gap_frames": 10
+      },
+      {
+        "slots": 200,
+        "frames": 100,
+        "think_stride": 1,
+        "evaluations": 6336,
+        "old_background_evaluations": 80000,
+        "max_frame_evaluations": 64,
+        "min_visits_per_slot": 7,
+        "max_service_gap_frames": 13
+      },
+      {
+        "slots": 150,
+        "frames": 220,
+        "think_stride": 11,
+        "evaluations": 1216,
+        "old_background_evaluations": 12000,
+        "max_frame_evaluations": 64,
+        "min_visits_per_slot": 1,
+        "max_service_gap_frames": 110
+      },
+      {
+        "slots": 150,
+        "frames": 100,
+        "think_stride": 1,
+        "evaluations": 6336,
+        "old_background_evaluations": 60000,
+        "max_frame_evaluations": 64,
+        "min_visits_per_slot": 10,
+        "max_service_gap_frames": 10
+      }
+    ],
+    "checks": [
+      "duplicate caller receives no second visit in one frame",
+      "invalid pending owners removed using fresh roster eligibility",
+      "map identity resets pending admission",
+      "clock rollback resets pending admission",
+      "slot capacity resets pending admission",
+      "out-of-range slot rejected",
+      "identity-valid abandoned head requests expire after 1000ms",
+      "signed clock boundary resets and unsigned wrap retains fresh requests"
+    ]
+  },
+  "integration": [
+    {
+      "kind": "disabled_native_equivalence",
+      "population": 1
+    },
+    {
+      "kind": "disabled_native_equivalence",
+      "population": 20
+    },
+    {
+      "kind": "disabled_native_equivalence",
+      "population": 64
+    },
+    {
+      "kind": "disabled_native_equivalence",
+      "population": 100
+    },
+    {
+      "kind": "existing_low_population_policy",
+      "population": 20,
+      "evaluations": 149
+    },
+    {
+      "kind": "existing_low_population_policy",
+      "population": 64,
+      "evaluations": 8
+    },
+    {
+      "kind": "existing_low_population_policy",
+      "population": 100,
+      "evaluations": 6
+    },
+    {
+      "kind": "urgent_candidates_bypass_deferred_background",
+      "target": 50,
+      "humans": [],
+      "visibility_calls": [
+        49
+      ],
+      "threat_updates": 149
+    },
+    {
+      "kind": "urgent_candidates_bypass_deferred_background",
+      "target": 0,
+      "humans": [
+        1,
+        2
+      ],
+      "visibility_calls": [
+        2,
+        1
+      ],
+      "threat_updates": 149
+    },
+    {
+      "kind": "urgent_candidates_bypass_deferred_background",
+      "target": 50,
+      "humans": [
+        49
+      ],
+      "visibility_calls": [
+        49
+      ],
+      "threat_updates": 149
+    },
+    {
+      "kind": "live_roster_owner_admitted_next_frame",
+      "evaluations": 4
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "null-client"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "disconnected"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "not-bot"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "entity-reuse"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "slot-mismatch"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "player-reuse"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "dead"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "frozen"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "jail"
+    },
+    {
+      "kind": "actual_typed_queued_owner_invalidated",
+      "failure": "movement"
+    },
+    {
+      "kind": "disabled_mode_clears_pending_admission",
+      "native_evaluations": 149
+    }
+  ],
+  "game_runs_performed": false,
+  "scope": "Compiled scheduling and instruction/ABI checks; evaluation counts are not native ray counts or live frame timings"
+}

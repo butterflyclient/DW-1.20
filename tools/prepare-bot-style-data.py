@@ -1,4 +1,6 @@
 """Generate bot Gunsmith style data from original, target-proven Replay tables."""
+
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
 import argparse
 import collections
 import csv
@@ -259,7 +261,7 @@ def prepare(snapshot):
     snapshot = Path(snapshot).resolve()
     if not snapshot.is_relative_to((ROOT / "data").resolve()):
         raise ValueError("Bot style data requires a private DW snapshot")
-    assert json.loads((snapshot / "generated/function-catalog.json").read_bytes())["image_sha256"] == TARGET
+    assert cached_input_json(snapshot / 'generated/function-catalog.json')["image_sha256"] == TARGET
     catalog = read_catalog()
     header, counts = render(catalog)
     # Authored selection has one canonical owner; generated arrays exist only in

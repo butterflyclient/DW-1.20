@@ -5,6 +5,8 @@ process, existing zone, stock navigation asset, registration hook or deployment.
 --format-fixture is explicitly non-production and never certifies real geometry.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import importlib.util
@@ -19,6 +21,11 @@ IMAGE_SHA = "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
 ACTS = Path(r"D:\mw124\atian-cod-tools\build-workstation\bin\Release\acts.exe")
 ASSET_NAME = "maps/mp/dw_gulag.d3dbsp"
 FOLLOW = 0xFFFFFFFFFFFFFFFE
+# Replay XAssetList: ScriptStringList occupies bytes 0..15 (count u32,
+# padding u32, XString* at +8); assetCount/padding/XAsset* occupy +16..31.
+# Load_ScriptStringCustom always indexes this table, including index zero.
+SCRIPT_STRING_NULL_INDEX = 0
+SCRIPT_STRING_COUNT = 1
 REFERENCE = Path(
     r"D:\mw124\mw120rproxy\iw8-zonetool\src\zonetool\iw8\replay_navigation.cpp"
 )
@@ -45,7 +52,13 @@ def serialize_resource(payload, bounds, canonical_nav=None):
     minimum, maximum = bounds[:3], bounds[3:]
     half = [(maximum[i] - minimum[i]) / 2 for i in range(3)]
     mid = [(maximum[i] + minimum[i]) / 2 for i in range(3)]
-    body = bytearray(struct.pack("<IIQIIQ", 0, 0, 0, 1, 0, FOLLOW))
+    body = bytearray(
+        struct.pack("<IIQIIQ", SCRIPT_STRING_COUNT, 0, FOLLOW, 1, 0, FOLLOW)
+    )
+    # A real table containing the null XString makes resource name index zero
+    # convertible by the unchanged native loader. A null TABLE is not valid.
+    script_string_table_at = len(body)
+    body.extend(struct.pack("<Q", 0))
     body.extend(struct.pack("<IIQ", 27, 0, FOLLOW))
     root = bytearray(168)
     exposure = 1
@@ -63,7 +76,7 @@ def serialize_resource(payload, bounds, canonical_nav=None):
     body.extend(root)
     name = ASSET_NAME.encode("ascii") + b"\0"
     body.extend(name)
-    virtual = 16 + len(name)
+    virtual = SCRIPT_STRING_COUNT * 8 + 16 + len(name)
     virtual = (virtual + 7) & ~7
     record_at = len(body)
     for data in payloads:
@@ -99,6 +112,10 @@ def serialize_resource(payload, bounds, canonical_nav=None):
             type_id=27,
             model_index=-1,
             version=19,
+            script_string_count=SCRIPT_STRING_COUNT,
+            script_string_table_offset=script_string_table_at,
+            script_string_table_bytes=SCRIPT_STRING_COUNT * 8,
+            resource_name_script_string_index=SCRIPT_STRING_NULL_INDEX,
         ),
     )
 
@@ -323,7 +340,7 @@ def prepare(
         )
     import pefile
 
-    original = pefile.PE(str(IMAGE), fast_load=True)
+    original = shared_original_pe(str(IMAGE), fast_load=True)
     callback = struct.unpack("<Q", original.get_data(0x23FCFF0 + 27 * 8, 8))[0]
     require(callback == 0x140F5F020, "Replay XAsset27 registration callback differs")
     thunk = original.get_data(callback - original.OPTIONAL_HEADER.ImageBase, 5)
@@ -353,6 +370,13 @@ def prepare(
         max(row["bounds"][i] for row in validations) for i in range(3, 6)
     ]
     body, streams, layout = serialize_resource(payloads, bounds, canonical_data)
+    script_string_helper = ROOT / "tools/test-gulag-script-string-contract.py"
+    script_string_spec = importlib.util.spec_from_file_location(
+        "gulag_native_script_string_contract", script_string_helper
+    )
+    script_string_module = importlib.util.module_from_spec(script_string_spec)
+    script_string_spec.loader.exec_module(script_string_module)
+    script_string_contract = script_string_module.verify_package_contract(body, layout)
     packed = ff.pack_replay_uncompressed(body, streams)
     require(
         ff.unpack_replay_uncompressed(packed) == body, "FF physical roundtrip differs"
@@ -502,6 +526,7 @@ def prepare(
         native_empty_reader=empty_native,
         layout=layout,
         stream_reservations=streams,
+        script_string_contract=script_string_contract,
         native_destination_high_water=actual,
         native_owned_exports=dict(
             root_sha256=sha(root_export),
@@ -523,6 +548,8 @@ def prepare(
                 IMAGE,
                 ACTS,
                 REFERENCE,
+                Path(__file__).resolve(),
+                script_string_helper,
                 ROOT / "tools/generate-native-nav-resource.py",
                 Path(ff.__file__),
                 Path(native_reader.__file__),

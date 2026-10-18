@@ -1,0 +1,55 @@
+{
+  "executable": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.exe",
+  "executable_sha256": "d7e66936e91eff1af9c395b593a4ea55ae814dc49f22f27556c471c95505706e",
+  "build_report": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1792320263897161400\\builds\\build-workstation-f0dd609388a3423a\\build-report.json",
+  "build_report_sha256": "fdb37b2f8f54300440f00d4907fa45439fea37a771a804adf299684a432b75ae",
+  "reported_address": "0x1411cdcae",
+  "reported_exception": "0xc0000005",
+  "resolved_function": "Load_ScriptStringCustom",
+  "function_offset": 14,
+  "original_address": "0x1411b2cae",
+  "instructions": [
+    {
+      "address": "0x1411cdca0",
+      "mnemonic": "mov",
+      "operands": "rax, qword ptr [rip + 0x4bc6821]"
+    },
+    {
+      "address": "0x1411cdca7",
+      "mnemonic": "movsxd",
+      "operands": "r8, dword ptr [rcx]"
+    },
+    {
+      "address": "0x1411cdcaa",
+      "mnemonic": "mov",
+      "operands": "rdx, qword ptr [rax + 8]"
+    },
+    {
+      "address": "0x1411cdcae",
+      "mnemonic": "mov",
+      "operands": "eax, dword ptr [rdx + r8*8]"
+    },
+    {
+      "address": "0x1411cdcb2",
+      "mnemonic": "mov",
+      "operands": "dword ptr [rcx], eax"
+    },
+    {
+      "address": "0x1411cdcb4",
+      "mnemonic": "ret",
+      "operands": ""
+    }
+  ],
+  "final_zone_log": [
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_ZONE_REQUEST load=0x00000000 mp_donetsk:0x00000900",
+    "DW_GULAG_NAV added before load=0x00000000 mp_donetsk:0x00000900"
+  ],
+  "diagnosis": "E:\\DW\\IW8\\data\\gulag-r11-scriptstring-abi-diagnosis.json",
+  "live_capture_available": false,
+  "game_process_closed_before_stack_capture": true
+}

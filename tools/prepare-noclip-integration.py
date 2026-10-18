@@ -1,4 +1,6 @@
 """Prepare a server-authoritative noclip command and complete native ABI clone."""
+
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
 import argparse, hashlib, json, struct, subprocess, sys, tempfile, os
 from pathlib import Path
 import pefile
@@ -60,10 +62,10 @@ def prepare(snapshot, replace_owned=False):
     for parent in (snapshot, snapshot.parent):
         for marker in ('client-readiness.json', 'readiness.json', 'local-readiness.json', 'source-receipt.json'):
             if (parent / marker).exists(): raise ValueError('Noclip snapshot is sealed: ' + marker)
-    catalog = json.loads((snapshot / 'generated/function-catalog.json').read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     raw = IMAGE.read_bytes()
     assert sha(raw) == catalog['image_sha256'] == TARGET
-    pe = pefile.PE(data=raw)
+    pe = shared_original_pe(data=raw)
     byid = {r['id']: r for r in catalog['functions'] + catalog.get('symbols', [])}
     rows = {r['rva']: r for r in catalog['functions'] if not r.get('quarantined')}
     decoder = Cs(CS_ARCH_X86, CS_MODE_64); decoder.detail = True

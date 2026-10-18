@@ -1,0 +1,81 @@
+{
+  "read_only": true,
+  "executable_sha256": "659f6b1034da43e71bf4f493f2c5dcfca7bf5bdc13cd80ce26ec923b42796932",
+  "installed_by_this_task": false,
+  "population": {
+    "slots": 150,
+    "connected_bots": 149,
+    "health_positive_bots": 127,
+    "jail_bots": 47,
+    "arena_bots": 7,
+    "transition_bots": 0,
+    "read_failures": 0
+  },
+  "measured_interval": {
+    "seconds": 5.000180699993507,
+    "frames": 76,
+    "simulation_fps": 15.199450691871734,
+    "full_decisions": 9241,
+    "reused_commands": 441,
+    "bot_think_ms_per_frame": 10.164618421052632,
+    "bot_move_ms_per_frame": 0.867046052631579,
+    "scope": "Native bot frame counters; think excludes other server work, move includes GPU submission."
+  },
+  "gpu": {
+    "submitted": 893,
+    "completed": 893,
+    "busy": 0,
+    "invalid": 0,
+    "timeouts": 0,
+    "device_failures": 0,
+    "pending": 0,
+    "enabled": 1,
+    "last_error": 0,
+    "adapter_vendor": 4318,
+    "adapter_device": 11525,
+    "adapter_luid_low": 76978,
+    "adapter_luid_high": 0,
+    "gpu_timestamp_frequency": 1000000000,
+    "last_gpu_microseconds": 408,
+    "max_gpu_microseconds": 10254
+  },
+  "server_thread_id": 4724,
+  "captured_stacks": 180,
+  "inclusive_stack_samples": {
+    "bot_think": 45,
+    "sight": 38,
+    "havok_raycast": 35,
+    "physics_script_raycast": 0
+  },
+  "cause_supported": "Native bot sight invokes collision raycasts repeatedly at high population",
+  "change": "Bound and fairly rotate background sight admission while retaining native target and human visibility checks",
+  "limitations": [
+    "Stack sample counts are inclusive and are not CPU percentages",
+    "Counter reads are sequential; this is not a controlled before/after benchmark",
+    "The running file was the recorded pre-debug-finalization R17 image",
+    "No post-fix game test or simulation FPS improvement is claimed",
+    "GPU timing excludes host capture, submission and readback work"
+  ],
+  "evidence": [
+    {
+      "path": "data/live-150-r17-gpu-1.json",
+      "sha256": "1785f9ecdd02776d6045f5f6ca542fe6d097c80efb2cb43989fb72ccedbb4c57"
+    },
+    {
+      "path": "data/live-r17-predebug-observation/identity.json",
+      "sha256": "bc4c31c414feabda745b32779a1ba32ba0feea6a56744b69f47812a5d7b80cbb"
+    },
+    {
+      "path": "data/live-8096-server-stack-analysis.json",
+      "sha256": "281f154f052844ddfc0e56fa33f250d590254c98616ee7c9e277ef0be0552951"
+    },
+    {
+      "path": "data/live-8096-native-server-thread.json",
+      "sha256": "639888cb137b71d1b2141b522af96fe2e635b95dca3bb13bc9ce52171044e3fc"
+    },
+    {
+      "path": "data/live-8096-full-sight-body-identity.json",
+      "sha256": "6e0df312a1df318b19714150ff6717dc29fc2c5631ef140ac225f912bac2e2ae"
+    }
+  ]
+}

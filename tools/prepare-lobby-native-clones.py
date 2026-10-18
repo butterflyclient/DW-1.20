@@ -1,4 +1,6 @@
 """Prepare byte-faithful PartyHost native clones and guarded-root bindings in a fresh private DW snapshot."""
+
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
 import argparse
 import hashlib
 import json
@@ -39,7 +41,7 @@ from build import LLVM
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
-catalog = json.loads((SNAPSHOT / "generated/function-catalog.json").read_text())
+catalog = cached_input_json(SNAPSHOT / 'generated/function-catalog.json')
 workspace = SourceWorkspace(SNAPSHOT, HERE / "cache")
 workspace._catalog = catalog
 workspace._state = lambda: {"sources": {}}
@@ -51,7 +53,7 @@ results, rendered, derived_fixups = [], [], {}
 assert catalog["image_sha256"] == "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
 original_path = args.original_image.resolve(strict=True)
 assert digest(original_path) == catalog["image_sha256"]
-original_pe = pefile.PE(str(original_path), fast_load=True)
+original_pe = shared_original_pe(str(original_path), fast_load=True)
 decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 decoder.detail = True
 for identity, helper in targets:

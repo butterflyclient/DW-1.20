@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "check_count": 20,
+  "checks": [
+    "concurrent_writer_completed",
+    "pinned_transactions_are_consistent",
+    "all_rows_preserved",
+    "complete_schema_preserved",
+    "snapshot_uses_delete_journal",
+    "readonly_reopen_keeps_signature",
+    "live_source_advanced_without_journal_change",
+    "binding_verifies",
+    "same_source_destination_rejected",
+    "existing_destination_rejected",
+    "incorrect_snapshot_hash_rejected",
+    "incorrect_proof_hash_rejected",
+    "nested_scope_active_True",
+    "environment_restored_True",
+    "nested_scope_active_False",
+    "environment_restored_False",
+    "build_exception_restores_environment",
+    "verify_exception_restores_environment",
+    "prepare_exception_restores_environment",
+    "source_receipt_binds_snapshot"
+  ],
+  "concurrent_commits": 14,
+  "pinned_epoch": 0,
+  "snapshot_sha256": "ff5a6f9573ae7a01fef56eb24be8f8e10af8aaf7c691d268263d6f2e2250bc5d",
+  "proof_sha256": "26487627d1443acdf5222fc2f5fb847a02577391b22c4d573b88253cb4aca252",
+  "helper_sha256": "8f9ab703725e689bfc6f3e25c3fd54f41a3e72f6483ffb9f3cad88c1b0415f5d",
+  "game_execution": false,
+  "fixture_cleanup": true
+}

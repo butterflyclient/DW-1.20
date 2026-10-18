@@ -1,4 +1,5 @@
 #include "sv_host_navigation.h"
+#include "sv_host_bot_equipment.h"
 
 namespace
 {
@@ -55,7 +56,13 @@ extern "C" void Scr_GetClosestReachablePointOnNavmesh(void *context, uint32_t re
     const unsigned population = Enabled() ? Population() : 0;
     const unsigned slot = uint16_t(entity->number);
     auto *view = static_cast<Nav2DQueryView *>(navigator);
-    if (population <= 20 || slot >= 200 || !SVHS_IsBotEntity(entity) ||
+    // Gulag's normal fight script requests a reachable opponent goal only every
+    // three seconds. Frame admission can repeatedly miss that query and return
+    // a projection onto the fighter's own area, leaving its guard goal at spawn.
+    // Preserve the complete native query for jail/arena transitions and fights.
+    const auto *player = reinterpret_cast<const BotEquipmentPlayer *>(entity->client);
+    const bool gulag = player && (player->gameExtraInfo & 0x600);
+    if (gulag || population <= 20 || slot >= 200 || !SVHS_IsBotEntity(entity) ||
         view->vtable[45] != reinterpret_cast<uintptr_t>(&SVHS_Nav2DClosest) || !Valid(view->currentArea))
     {
         if (slot < 200)

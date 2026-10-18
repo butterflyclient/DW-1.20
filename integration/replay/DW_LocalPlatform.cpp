@@ -86,6 +86,7 @@ extern "C"
     __declspec(dllimport) int __stdcall ReadFile(
         void *, void *, unsigned long, unsigned long *, void *);
     __declspec(dllimport) uint64_t __stdcall GetTickCount64();
+    __declspec(dllimport) unsigned long __stdcall GetLastError();
 }
 
 namespace
@@ -358,7 +359,22 @@ extern "C" bool DW_LocalPlatform_Post(
     using Read = int(__stdcall *)(Handle, void *, unsigned long, unsigned long *);
     using Close = int(__stdcall *)(Handle);
     bool ok = false;
+    const char *stage = "arguments";
+    unsigned long error = 0, status = 0;
+    unsigned used = 0, extraBytes = 0;
+    auto checked = [&](const char *operation, int success)
+    {
+        stage = operation;
+        if (!success)
+            error = GetLastError();
+        return success != 0;
+    };
     auto library = LoadLibraryA("winhttp.dll");
+    if (!library)
+    {
+        stage = "load-library";
+        error = GetLastError();
+    }
     if (library && path && body && bodySize && output && outputSize)
     {
         auto open = reinterpret_cast<Open>(GetProcAddress(library, "WinHttpOpen"));
@@ -374,43 +390,61 @@ extern "C" bool DW_LocalPlatform_Post(
         auto option = reinterpret_cast<Option>(GetProcAddress(library, "WinHttpSetOption"));
         const bool tls = DW_LocalConfig_UseTls();
         unsigned long redirectPolicy = 0; // WINHTTP_OPTION_REDIRECT_POLICY_NEVER
-        if (open && connect && request && timeouts && send && receive && headers && read && close)
+        stage = "resolve-api";
+        if (open && connect && request && timeouts && send && receive && headers && read &&
+            close && option)
         {
-            Handle session = open(L"IW8-Replay-LocalPlatform/1", 1, nullptr, nullptr, 0);
-            Handle connection = nullptr, message = nullptr;
-            if (session && timeouts(session, 10000, 10000, 10000, 10000))
-                connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
-            if (connection)
-                message = request(connection, L"POST", path, nullptr, nullptr, nullptr, tls ? 0x00800000 : 0);
-            if (message && option && option(message, 88, &redirectPolicy, sizeof(redirectPolicy)) &&
-                send(message, DW_LocalConfig_Headers(), ~0UL, body, bodySize, bodySize, 0) &&
-                receive(message, nullptr))
+            Handle session = nullptr, connection = nullptr, message = nullptr;
+            do
             {
-                unsigned long status = 0, size = sizeof(status);
-                if (headers(message, 0x20000013, nullptr, &status, &size, nullptr) && status == 200)
+                session = open(L"IW8-Replay-LocalPlatform/1", 1, nullptr, nullptr, 0);
+                if (!checked("open", session != nullptr) ||
+                    !checked("timeouts", timeouts(session, 10000, 10000, 10000, 10000)))
+                    break;
+                connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
+                if (!checked("connect", connection != nullptr))
+                    break;
+                message = request(connection, L"POST", path, nullptr, nullptr, nullptr,
+                                  tls ? 0x00800000 : 0);
+                if (!checked("open-request", message != nullptr) ||
+                    !checked("redirect-policy", option(message, 88, &redirectPolicy, sizeof(redirectPolicy))) ||
+                    !checked("send", send(message, DW_LocalConfig_Headers(), ~0UL, body, bodySize, bodySize, 0)) ||
+                    !checked("receive", receive(message, nullptr)))
+                    break;
+                unsigned long size = sizeof(status);
+                if (!checked("query-status", headers(message, 0x20000013, nullptr, &status, &size, nullptr)))
+                    break;
+                stage = "http-status";
+                if (status != 200)
+                    break;
+                bool complete = true;
+                while (used < outputSize)
                 {
-                    unsigned used = 0;
-                    bool complete = true;
-                    while (used < outputSize)
-                    {
-                        unsigned long received = 0;
-                        if (!read(message,
-                                  reinterpret_cast<uint8_t *>(output) + used,
-                                  outputSize - used,
-                                  &received) ||
-                            !received)
-                        {
-                            complete = false;
-                            break;
-                        }
-                        used += received;
-                    }
-                    uint8_t extra = 0;
                     unsigned long received = 0;
-                    ok = complete && used == outputSize && read(message, &extra, 1, &received) &&
-                         !received;
+                    if (!checked("read", read(message, reinterpret_cast<uint8_t *>(output) + used,
+                                              outputSize - used, &received)))
+                    {
+                        complete = false;
+                        break;
+                    }
+                    if (!received)
+                    {
+                        stage = "short-response";
+                        complete = false;
+                        break;
+                    }
+                    used += received;
                 }
-            }
+                if (!complete)
+                    break;
+                uint8_t extra = 0;
+                unsigned long received = 0;
+                if (!checked("read-eof", read(message, &extra, 1, &received)))
+                    break;
+                extraBytes = received;
+                stage = received ? "long-response" : "complete";
+                ok = !received;
+            } while (false);
             if (message)
                 close(message);
             if (connection)
@@ -418,9 +452,41 @@ extern "C" bool DW_LocalPlatform_Post(
             if (session)
                 close(session);
         }
+        else
+            error = GetLastError();
     }
     if (library)
         FreeLibrary(library);
+    if (!ok)
+    {
+        // Transport metadata only: never request paths, payloads, identities or tokens.
+        char diagnostic[256]{};
+        unsigned length = 0;
+        auto text = [&](const char *value)
+        {
+            while (*value && length + 1 < sizeof(diagnostic))
+                diagnostic[length++] = *value++;
+        };
+        auto number = [&](unsigned long value)
+        {
+            char digits[16];
+            unsigned count = 0;
+            do
+            {
+                digits[count++] = static_cast<char>('0' + value % 10);
+                value /= 10;
+            } while (value);
+            while (count && length + 1 < sizeof(diagnostic))
+                diagnostic[length++] = digits[--count];
+        };
+        text("DW_LOCAL_POST_FAILED stage="); text(stage);
+        text(" win32="); number(error);
+        text(" http="); number(status);
+        text(" received="); number(used);
+        text(" expected="); number(outputSize);
+        text(" extra="); number(extraBytes);
+        Log(diagnostic);
+    }
     return ok;
 }
 

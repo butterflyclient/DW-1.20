@@ -1,5 +1,7 @@
 """Bind complete Replay team/squad updates and their native party setters."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import hashlib
 import json
 import os
@@ -53,10 +55,10 @@ def write_private(path, data):
 
 
 def inspect_native(snapshot):
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     if catalog["image_sha256"] != IMAGE_SHA or sha(IMAGE.read_bytes()) != IMAGE_SHA:
         raise ValueError("Original Replay image binding changed")
-    pe = pefile.PE(str(IMAGE), fast_load=True)
+    pe = shared_original_pe(str(IMAGE), fast_load=True)
     pe.parse_data_directories(directories=[3])
     byid = {row["id"]: row for row in catalog["functions"] + catalog.get("symbols", [])}
     by_rva = {row["rva"]: row for row in catalog["functions"]}

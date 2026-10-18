@@ -1,0 +1,69 @@
+{
+  "passed": true,
+  "build_directory": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1792353364624965900\\builds\\build-workstation-9a7385325a174c24",
+  "executable": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1792353364624965900\\builds\\build-workstation-9a7385325a174c24\\game_dx12_ship_replay_recompiled.exe",
+  "executable_sha256": "251739f17ea6325bd1b93b9bc355a328d50602a65fcb1e858ecffb8c52242b5b",
+  "pdb": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1792353364624965900\\builds\\build-workstation-9a7385325a174c24\\game_dx12_ship_replay_dw.pdb",
+  "pdb_sha256": "3b076b20f6301e75aee32b51210b053735ce53fdde5a824642b84c547edf1c39",
+  "guid": "B95A2C23-964D-48D3-9A35-0427A7909C9E",
+  "age": 1,
+  "method": "Windows DbgHelp SymLoadModuleExW/SymFromAddr",
+  "game_execution": false,
+  "network_symbol_paths": false,
+  "exact_symbols_required": true,
+  "symbol_search_path": "E:\\DW\\IW8\\data\\dw-client\\jobs\\1792353364624965900\\builds\\build-workstation-9a7385325a174c24",
+  "symbol_options": "0x80606",
+  "independent_symbol_gate_passed": true,
+  "independent_symbol_gate_sha256": "926111ea51492dfb3a00faba82afb077f74561f22073487175106349a867ea1a",
+  "rows": [
+    {
+      "requested": "Load_ScriptStringCustom",
+      "address": "0x1411cdcae",
+      "resolved": "Load_ScriptStringCustom",
+      "displacement": 14
+    },
+    {
+      "requested": "DW_LocalBackend_Frame",
+      "address": "0x15384d450",
+      "resolved": "DW_LocalBackend_Frame",
+      "displacement": 0
+    },
+    {
+      "requested": "SV_HostSight_GetWork",
+      "address": "0x1423a3f90",
+      "resolved": "SV_HostSight_GetWork",
+      "displacement": 0
+    }
+  ],
+  "static_sight_counter_decoder": {
+    "passed": true,
+    "method": "Capstone decode of R19 SV_HostSight_GetWork RIP-relative loads and output stores",
+    "getter_rva": "0x23a3f90",
+    "field_count": 9,
+    "output_offsets": [
+      0,
+      8,
+      16,
+      24,
+      32,
+      40,
+      48,
+      56,
+      64
+    ],
+    "counter_rvas": {
+      "urgent_evaluations": "0x13850990",
+      "urgent_native_trace_delta": "0x13850998",
+      "background_evaluations": "0x138509a0",
+      "background_native_trace_delta": "0x138509a8",
+      "background_deferred": "0x138509b0",
+      "shared_calls": "0x138509b8",
+      "admitted_visits": "0x138509c0",
+      "urgent_clock_ticks": "0x138509c8",
+      "background_clock_ticks": "0x138509d0"
+    },
+    "all_counters_in_writable_image_sections": true,
+    "inspector_sha256": "7888f152dd638f33311b66192e61d34dcd17bd2ce0952918b02ab6dc8372f48d",
+    "runtime_memory_read": false
+  }
+}

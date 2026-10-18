@@ -1,0 +1,81 @@
+{
+  "passed": true,
+  "client_published": false,
+  "executable_sha256": "251739f17ea6325bd1b93b9bc355a328d50602a65fcb1e858ecffb8c52242b5b",
+  "compiled_cpp_units": 142,
+  "unresolved_symbols": 0,
+  "validation_gates": 40,
+  "checks": [
+    "test-dw-debug-symbols.py",
+    "test-host-scale.py",
+    "test-host-sight-scheduling.py",
+    "test-host-navigation.py",
+    "test-host-bot-gpu.py",
+    "test-host-gpu-movement.py",
+    "test-host-safety.py",
+    "test-host-command-ownership.py",
+    "test-bot-behavior.py",
+    "test-bot-slide-cancel.py",
+    "test-lobby-controls.py",
+    "test-map-voting-client.py",
+    "test-native-bot-roster.py",
+    "test-playlist-ui-native.py",
+    "test-playlist-ui.py",
+    "test-ui-focus-lifetime.py",
+    "test-lobby-native-clones.py",
+    "test-executable-update-integration.py",
+    "test-update-maps.py",
+    "test-update-client-catchup.py",
+    "test-map-publication.py",
+    "test-compiled-unlock-progression.py",
+    "test-bot-style-selection.py",
+    "test-script-method-integration.py",
+    "test-bot-style-weapon.py",
+    "test-bot-rank.py",
+    "test-bot-style-scripts.py",
+    "test-bot-style-zone.py",
+    "test-gulag-integration.py",
+    "test-weapon-inspect.py",
+    "test-weapon-inspect-runtime.py",
+    "test-weapon-inspect-blend.py",
+    "test-weapon-inspect-crosshair.py",
+    "test-slide-view.py",
+    "test-matchmaking-assignments.py",
+    "test-join-in-progress.py",
+    "test-dw-verifier.py",
+    "test-noclip.py",
+    "test-alt-killcam.py",
+    "test-alt-killcam-render.py"
+  ],
+  "readiness_sha256": "a66137edaf1b850fd7e459f23ff209eaf29862cf94420307e0d050e8b88416cf",
+  "deployment_sha256": "68e85c2834325d8ba3ecddba8ce0927dffccf6d9f8ba9e4682fc201f27f9fcda",
+  "installed_owned_files": 60,
+  "owner_ini_preserved": true,
+  "debug_artifacts": [
+    {
+      "kind": "pdb",
+      "path": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.pdb",
+      "sha256": "3b076b20f6301e75aee32b51210b053735ce53fdde5a824642b84c547edf1c39"
+    },
+    {
+      "kind": "map",
+      "path": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay_dw.map",
+      "sha256": "8f56d79376dfc2b828022533dbb46faefe7a5cdf4ef8c39fa924e6822bffad8c"
+    }
+  ],
+  "runtime": {
+    "owner_confirmed_online_menu": true,
+    "native_platform_signed_in_observed": true,
+    "successful_login_game_pid": 21268,
+    "radmin_adapter_disabled_during_success": true,
+    "owner_requested_radmin_disabled_for_playtest": true,
+    "high_population_performance_not_yet_tested": true,
+    "gulag_movement_not_yet_tested": true
+  },
+  "limitations": [
+    "The runtime network failure was isolated using packet metadata and controlled adapter testing; no launcher causality was established.",
+    "The shared sight budget limits background visibility evaluations, not every native raycast or total simulation time.",
+    "Debug symbols provide known public code/data names, not reconstructed local variables or source lines.",
+    "Validation-only shared fixture packaging was corrected without rebuilding or changing the frozen executable."
+  ]
+}

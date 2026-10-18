@@ -1,6 +1,6 @@
 """Install one locally verified DW job without publishing an updater release.
 
-The EXE and its owned native animation/script overlays form one transaction.
+The EXE, matching debug symbols and owned native overlays form one transaction.
 Existing changed files are retained for rollback; the owner's INI and maps are
 never part of this transaction.
 """
@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 
 import dw_client
 
@@ -27,6 +28,70 @@ def sha(path):
 
 def read(path):
     return json.loads(path.read_bytes())
+
+
+def reviewed_image_association(target, previous_image, previous):
+    """Accept only a retained final image or its explicitly recorded pre-debug body."""
+    before = sha(target)
+    final_hash = previous["sha256"]
+    assert sha(previous_image) == final_hash, "Reviewed final artifact changed"
+    assert not previous["unresolved_symbols"]
+    if before == final_hash:
+        return "reviewed-final-image"
+    debug = previous.get("debug_symbols", {})
+    assert (
+        debug.get("pre_debug_image_sha256") == before
+    ), "Installed image is not the recorded pre-debug image"
+
+    def layout(data):
+        assert data[:2] == b"MZ"
+        pe = struct.unpack_from("<I", data, 60)[0]
+        assert data[pe : pe + 4] == b"PE\0\0"
+        count, optional_size = (
+            struct.unpack_from("<H", data, pe + 6)[0],
+            struct.unpack_from("<H", data, pe + 20)[0],
+        )
+        optional = pe + 24
+        assert struct.unpack_from("<H", data, optional)[0] == 0x20B
+        entry, size = (
+            struct.unpack_from("<I", data, optional + 16)[0],
+            struct.unpack_from("<I", data, optional + 56)[0],
+        )
+        sections = []
+        for i in range(count):
+            offset = optional + optional_size + 40 * i
+            name = data[offset : offset + 8].rstrip(b"\0").decode("ascii")
+            _, rva, raw_size, raw_offset = struct.unpack_from("<IIII", data, offset + 8)
+            assert raw_offset + raw_size <= len(data)
+            sections.append(
+                dict(
+                    name=name,
+                    rva=rva,
+                    raw_offset=raw_offset,
+                    raw_size=raw_size,
+                    sha256=hashlib.sha256(
+                        data[raw_offset : raw_offset + raw_size]
+                    ).hexdigest(),
+                )
+            )
+        return entry, size, sections
+
+    entry, size, sections = layout(target.read_bytes())
+    final_entry, _, final_sections = layout(previous_image.read_bytes())
+    preserved = debug["preserved_sections"]
+    assert (
+        preserved and sections == preserved
+    ), "Installed pre-debug section body/layout changed"
+    assert (
+        final_sections[: len(preserved)] == preserved
+    ), "Final artifact does not preserve the recorded body"
+    assert (
+        len(final_sections) == len(preserved) + 1
+        and final_sections[-1]["name"] == ".debug"
+    )
+    assert size == debug["pre_debug_image_size"]
+    assert entry == final_entry == previous["entry_rva"]
+    return "reviewed-recorded-pre-debug-image"
 
 
 def deploy(job, replace_reviewed_build=None):
@@ -74,13 +139,14 @@ def deploy(job, replace_reviewed_build=None):
         if not previous_image.is_absolute():
             previous_image = previous_report.parent / previous_image
         previous_image = dw_client.inside(previous_image.resolve(strict=True))
-        assert not previous["unresolved_symbols"] and previous["sha256"] == before
-        assert (
-            sha(previous_image) == before
-        ), "Reviewed retained build does not match the installed EXE"
+        association = reviewed_image_association(target, previous_image, previous)
         retained_previous = dict(
             sha256=before,
+            installed_executable=str(target),
+            association_kind=association,
+            final_artifact_sha256=previous["sha256"],
             executable=str(previous_image),
+            executable_sha256=previous["sha256"],
             build_report=str(previous_report),
             build_report_sha256=sha(previous_report),
             reason="Owner-authorized replacement of the retained validated local candidate",
@@ -153,6 +219,21 @@ def deploy(job, replace_reviewed_build=None):
         assert source.is_relative_to(snapshot)
         assert source.stat().st_size == entry["size"] and sha(source) == entry["sha256"]
         records.append((source, path, entry["sha256"]))
+    owned_files = len(records)
+    debug_artifacts = []
+    debug = report.get("debug_symbols")
+    if debug is not None:
+        for kind in ("pdb", "map"):
+            artifact = Path(debug[kind]).resolve(strict=True)
+            expected = debug[kind + "_sha256"]
+            assert artifact.is_relative_to(report_path.parent)
+            assert artifact.suffix.casefold() == "." + kind
+            assert sha(artifact) == expected
+            destination = target.with_suffix("." + kind)
+            records.append((artifact, destination, expected))
+            debug_artifacts.append(
+                dict(kind=kind, path=str(destination), sha256=expected)
+            )
     records.append((image, target, ready["sha256"]))
     assert len({str(path).casefold() for _, path, _ in records}) == len(records)
 
@@ -240,7 +321,8 @@ def deploy(job, replace_reviewed_build=None):
         readiness_sha256=sha(ready_path),
         owner_ini_preserved=True,
         ini_sha256=ini_hash,
-        owned_files_verified=len(records) - 1,
+        owned_files_verified=owned_files,
+        debug_artifacts=debug_artifacts,
         changed_files=changes,
         backup_root=str(backup_root) if changes else None,
         game_runs_performed=False,

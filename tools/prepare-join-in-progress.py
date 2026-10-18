@@ -1,5 +1,7 @@
 """Bind the complete Replay anonymous-member reservation and bot slot preference."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import json
@@ -41,9 +43,9 @@ def write_private(path, data):
 
 
 def inspect_native(snapshot):
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     assert catalog["image_sha256"] == IMAGE_SHA == sha(IMAGE.read_bytes())
-    pe = pefile.PE(str(IMAGE), fast_load=True)
+    pe = shared_original_pe(str(IMAGE), fast_load=True)
     pe.parse_data_directories(directories=[3])
     byid = {row["id"]: row for row in catalog["functions"]}
     by_rva = {row["rva"]: row for row in catalog["functions"]}

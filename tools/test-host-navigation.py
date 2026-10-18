@@ -442,6 +442,8 @@ def spatial(vm,seed,loose=0,children=0):
 def script(vm,bot=True,other=False):
     entity,navigator,vtable=0x51000000,0x51100000,0x51200000
     vm.put(entity,bytes(1440));vm.put(entity+336,0x54000000,"<Q")
+    # The client view includes gameExtraInfo used for Gulag navigation.
+    vm.put(0x54000000, bytes(22340))
     vm.put(navigator,bytes(1384));vm.put(navigator,vtable,"<Q");vm.put(vtable,bytes(400))
     target=vm.symbols["SVHS_Nav2DClosest"]
     if other:target=0x180fa0040;vm.hooks[target]="other-navigator"
@@ -1011,6 +1013,24 @@ def main():
         vm=runner.machine(True,mode,population);script(vm,bot,other)
         vm.call("Scr_GetClosestReachablePointOnNavmesh",0x58000000,0)
         assert struct.unpack("<fff",vm.output)==(91.,92.,93.);total+=1
+    # Arena queries run every three seconds in stock GSC, so a frame-based
+    # admission schedule must never replace the opponent goal with the current
+    # area. Exercise admitted/deferred timestamps and every Gulag phase.
+    for phase in (0x200, 0x400, 0x600):
+        vm = runner.machine(True, 1, 150)
+        script(vm)
+        vm.put(0x54000000 + 22336, phase, '<I')
+        admission_calls = []
+        vm.uc.hook_add(UC_HOOK_CODE, lambda uc, address, size, data:
+                      admission_calls.append(address) if address == vm.entries['SV_HostNav_Begin'] else None)
+        for now in (0, 16, 3000, 6000):
+            vm.put(vm.symbols['SVHS_LevelTime'], now, '<i')
+            vm.call('Scr_GetClosestReachablePointOnNavmesh', 0x58000000, 0)
+            assert struct.unpack('<fff', vm.output) == (91., 92., 93.)
+        assert vm.events.count(('native',)) == 4
+        assert not admission_calls
+        assert not any(event[0] == 'closest' for event in vm.events)
+        total += 4
     vm=runner.machine(True,1,150);script(vm)
     vm.call("Scr_GetClosestReachablePointOnNavmesh",0x58000000,0)
     assert struct.unpack("<fff",vm.output)==vm.request

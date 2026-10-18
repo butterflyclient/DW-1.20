@@ -1,5 +1,7 @@
 """Bind the complete Replay setrank method and its pre-script bot rank handoff."""
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import json
@@ -21,10 +23,10 @@ def sha(data):
 
 
 def inspect_native(snapshot):
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     raw = IMAGE.read_bytes()
     assert sha(raw) == catalog["image_sha256"] == IMAGE_SHA
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     byid = {r["id"]: r for r in catalog["functions"] + catalog["symbols"]}
     by_rva = {r["rva"]: r for r in catalog["functions"]}

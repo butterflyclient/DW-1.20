@@ -1,0 +1,83 @@
+{
+  "passed": true,
+  "original_job": "data\\dw-client\\jobs\\1792347669151417400",
+  "optimized_job": "data\\dw-client\\jobs\\1792349530076148800",
+  "identical_source_files": 251,
+  "differing_source_files": [
+    {
+      "path": "src\\DW_UpdateHelper.h",
+      "old_sha256": "b4a0d10a6bb6d8c8ad51cdd8239544e28c6d50162793e5a6dc9b310ca51c3477",
+      "new_sha256": "387b204076c07d79330679c60274a9148a4a02d510d3b19d2e5b0bf65a2270a3"
+    }
+  ],
+  "cpp_sources_identical": true,
+  "cpp_source_count": 142,
+  "original_preparation_seconds": 620.383,
+  "optimized_preparation": {
+    "started_utc": "2026-10-18T18:52:07.5855768Z",
+    "elapsed_seconds": 313.2691293,
+    "exit_code": 0
+  },
+  "limitation": "Optimized run shared the machine with a live 150-player game and was lowered to BelowNormal priority.",
+  "updater_helper_section_comparison": [
+    {
+      "name": ".text",
+      "same": true
+    },
+    {
+      "name": ".rdata",
+      "same": false
+    },
+    {
+      "name": ".data",
+      "same": true
+    },
+    {
+      "name": ".pdata",
+      "same": true
+    },
+    {
+      "name": ".fptable",
+      "same": true
+    },
+    {
+      "name": ".rsrc",
+      "same": true
+    },
+    {
+      "name": ".reloc",
+      "same": true
+    }
+  ],
+  "updater_helper_timestamps": [
+    1792348258,
+    1792349806
+  ],
+  "updater_helper_timestamp_fields": [
+    [
+      [
+        264,
+        4,
+        "COFF.TimeDateStamp"
+      ],
+      [
+        417396,
+        4,
+        "DEBUG.TimeDateStamp"
+      ]
+    ],
+    [
+      [
+        264,
+        4,
+        "COFF.TimeDateStamp"
+      ],
+      [
+        417396,
+        4,
+        "DEBUG.TimeDateStamp"
+      ]
+    ]
+  ],
+  "updater_helper_identical_excluding_pe_timestamps": true
+}

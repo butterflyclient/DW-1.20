@@ -4,6 +4,8 @@
 Normal preparation preserves the entire native nine-argument fallback owner.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 import argparse
 import hashlib
 import importlib.util
@@ -60,9 +62,9 @@ def helper(snapshot):
 
 def inspect(snapshot):
     snapshot = Path(snapshot).resolve(strict=True)
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     assert catalog["image_sha256"] == IMAGE_SHA and file_sha(IMAGE) == IMAGE_SHA
-    pe = pefile.PE(str(IMAGE), fast_load=True)
+    pe = shared_original_pe(str(IMAGE), fast_load=True)
     pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])
     functions = {row["rva"]: row for row in catalog["functions"]}
     data = {row["rva"]: row for row in catalog["symbols"]
@@ -116,7 +118,7 @@ def inspect(snapshot):
     assert 70 not in struct.unpack("<14I", pe.get_data(0x251C3E8, 56))
     # Pin the native later policy, not a source-engine constant or guessed enum.
     assert file_sha(LATER_IMAGE) == LATER_SHA
-    later = pefile.PE(str(LATER_IMAGE), fast_load=True)
+    later = shared_original_pe(str(LATER_IMAGE), fast_load=True)
     later_table = later.get_data(0x70B77C0, 193 * 24)
     assert sha(later_table) == "89381c33fcba9966d366e1bbfffc8ac3d57a8ab971a3b44078e0fe908bd007a2"
     pairs = [struct.unpack_from("<IIffQ", later_table, i * 24) for i in range(193)]

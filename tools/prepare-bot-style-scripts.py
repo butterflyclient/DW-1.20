@@ -5,6 +5,8 @@ A known stock method is usable ONLY for offline structural probes. Publication
 requires the custom native method's verified binding receipt.
 """
 
+from workstation_preparation_context import cached_input_json, shared_original_pe, source_context
+
 from dataclasses import dataclass, replace
 import hashlib
 import json
@@ -850,10 +852,10 @@ def inspect_native(snapshot):
 
     image = Path("E:/IW8/Builds/1.20-replay/game_dx12_ship_replay.exe")
     raw = image.read_bytes()
-    catalog = json.loads((snapshot / "generated/function-catalog.json").read_bytes())
+    catalog = cached_input_json(snapshot / 'generated/function-catalog.json')
     if sha(raw) != IMAGE_HASH or catalog["image_sha256"] != IMAGE_HASH:
         raise ValueError("Original Replay executable identity mismatch")
-    pe = pefile.PE(data=raw, fast_load=True)
+    pe = shared_original_pe(data=raw, fast_load=True)
     pe.parse_data_directories(directories=[3])
     groups = {}
     for entry in pe.DIRECTORY_ENTRY_EXCEPTION:
