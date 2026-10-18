@@ -67,6 +67,8 @@ def behavior(pe, symbols):
     vm.mem_map(arena, 0x10000)
     pages, events, state = set(), [], {}
     stop, stack = arena + 0xFFF0, arena + 0xF008
+    # End the translated block before decoding beyond the mapped stop page.
+    vm.mem_write(stop, b"\xcc")
     pointers = (arena + 0x1000, arena + 0x3000)
     boundaries = {base + symbols[name]: name for name in
                   (HELPER, "DW_LocalBackend_IsEnabled", "DW_WeaponInspect_IsActive")}
