@@ -59,6 +59,16 @@ session, authentication, and operator requests remain blocked. Update signatures
 and file hashes are checked before installation. The intentional
 `bypass_update_restart=1` override still skips automatic updating.
 
+If an existing production player cannot sign in and their log still reports
+`platform/auth HTTP=8085` together with `bypass_update_restart=1`, they are running
+an older client with its updater disabled. Close the game, change that setting
+to `0`, launch again, and allow the verified update and requested restart. The
+old public update route remains available even though plaintext login is blocked.
+Alternatively, replace only the EXE with the current release and keep the INI.
+The current client logs `remote HTTPS=8443`. A deliberate bypass can remain `1`
+when installing updates manually. Keep the separate loopback local-client setup
+and its own keys/settings separate from this production update procedure.
+
 Leave `require_remote_tls` enabled for normal use. Setting it to `false` is only
 a temporary migration setting and permits remote plaintext authentication.
 Without `tls.json`, the server still permits local HTTP and rejects remote
