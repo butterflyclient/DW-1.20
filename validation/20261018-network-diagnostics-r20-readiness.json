@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "release": "R20 local diagnostics",
+  "sha256": "ff43dc29fc53802cd3b587e6ed6e186cdb277646378123378d769882c7fc7d0b",
+  "fresh_cpp_units": 142,
+  "unresolved_symbols": 0,
+  "required_checks_passed": 41,
+  "published": false,
+  "auth_issue_resolution": "Radmin adapter disabled for owner playtest after controlled routing comparison; network diagnostics improve future attribution, not a proven auth repair",
+  "runtime_scope": "Owner ran exact candidate and reached online BR; no claim of high-population performance resolution",
+  "local_install": {
+    "executable_already_installed_by_owner": true,
+    "only_debug_sidecars_changed": true,
+    "runtime_files_verified": 60,
+    "ini_preserved": true,
+    "processes_stopped": false
+  },
+  "evidence": [
+    {
+      "path": "data\\dw-client\\jobs\\1792357452365508200\\local-readiness.json",
+      "sha256": "10d0b360fe145cab9d2c2d58dcd83155c678efe799cb25d57eb45a9ef3f9610f"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1792357452365508200\\local-deployment.json",
+      "sha256": "f647437bb6f1f797757f6e12ded1559329132bddef5889d11c12073e8fab6f4c"
+    },
+    {
+      "path": "data\\dw-client\\jobs\\1792357452365508200\\network-diagnostics.json",
+      "sha256": "00e376dc56deeb823eb466764648c8402727dc07b6dbaee1cf944f99eccb8c78"
+    },
+    {
+      "path": "validation\\local-deploy-running-sidecars.json",
+      "sha256": "4c3244d57e9548fb16c3eb19f7b75ea4e69ccf782adf4619d27daf9c20dce7a2"
+    },
+    {
+      "path": "build\\network-diagnostics-r20-timing.json",
+      "sha256": "36d2fd0d3ce2dfda857505721736f48d762a10af16941f5a9eda62eb8fe8c08b"
+    }
+  ]
+}

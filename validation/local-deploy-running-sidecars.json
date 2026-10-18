@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "deployer_sha256": "df8c54d246649c9e613d69c9a791a50b8a469274e8ce2b522b141cdca9b9ded1",
+  "cases": [
+    {
+      "case": "matching-runtime",
+      "passed": true,
+      "error": null
+    },
+    {
+      "case": "runtime-mismatch",
+      "passed": true,
+      "error": "DW game is running and runtime files differ; close it before deployment"
+    },
+    {
+      "case": "game-started-during-staging",
+      "passed": true,
+      "error": "DW game started during staging; runtime deployment deferred"
+    }
+  ],
+  "scope": "Exact guard/transaction source slice; fixtures replace running-process detection and source gate. Full deployer provenance/package preconditions are outside this focused test.",
+  "live_game_writes": false,
+  "temporary_fixtures_cleaned": true
+}

@@ -1,0 +1,52 @@
+{
+  "executable_sha256": "251739f17ea6325bd1b93b9bc355a328d50602a65fcb1e858ecffb8c52242b5b",
+  "read_only_live_samples": true,
+  "game_process_written_or_suspended": false,
+  "sample_intervals": [
+    {
+      "players": 150,
+      "bots": 149,
+      "simulation_fps": 34.995,
+      "bot_think_ms_per_frame": 8.419,
+      "bot_move_ms_per_frame": 1.216,
+      "urgent_sight_ms_per_frame": 0.455,
+      "background_sight_ms_per_frame": 0.097
+    },
+    {
+      "players": 150,
+      "bots": 149,
+      "simulation_fps": 59.593,
+      "bot_think_ms_per_frame": 6.458,
+      "bot_move_ms_per_frame": 0.356,
+      "urgent_sight_ms_per_frame": 0.452,
+      "background_sight_ms_per_frame": 0.232
+    }
+  ],
+  "gpu": {
+    "busy_rejections": 0,
+    "timeouts": 0,
+    "device_failures": 0,
+    "pending_at_sample_boundaries": 0,
+    "last_batch_microseconds_second_sample": 157
+  },
+  "cpu_stack_capture": {
+    "samples": 100,
+    "recovered_multiframe_chains": 36,
+    "server_cpu_milliseconds": 9500,
+    "wall_interval_approximately_seconds": 10,
+    "vm_execute_chains": 15,
+    "bot_update_chains": 7,
+    "bot_think_chains": 6,
+    "closest_area_tree_chains": 6,
+    "script_driven_native_raycast_chains": 3,
+    "limits": "Inclusion counts are not exclusive CPU percentages. These sequential intervals are not a controlled before/after benchmark."
+  },
+  "remaining_work": {
+    "stable_60_fps_at_150_players_proven": false,
+    "gpu_planner_stall_observed": false,
+    "gsc_query_callsite_attribution_complete": false,
+    "subsequent_200_sample_capture_observed_target_query": false,
+    "small_radius_native_query_experiment_shipped": false,
+    "reason_small_radius_experiment_not_shipped": "Only 71-188 native instruction executions saved on nine interior winners; misses add 327-3128 instructions before fallback. Full space/layer/dynamic/tie semantics and live hit rate remain unproven."
+  }
+}

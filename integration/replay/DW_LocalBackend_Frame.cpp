@@ -4,6 +4,7 @@
 #include "replay_dvar.h"
 #include "DW_LocalConfig.h"
 #include "DW_LocalProgression.h"
+#include "DW_NetworkDiagnostics.h"
 
 extern "C"
 {
@@ -22,6 +23,9 @@ extern "C"
         const char *, unsigned long, unsigned long, void *, unsigned long, unsigned long, void *);
     __declspec(dllimport) int __stdcall WriteFile(
         void *, const void *, unsigned long, unsigned long *, void *);
+    __declspec(dllimport) uint64_t __stdcall GetTickCount64();
+    __declspec(dllimport) unsigned long __stdcall GetLastError();
+    __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
 }
 
 // The native Replay getter instructions and buildAuthReq access establish this
@@ -119,11 +123,29 @@ namespace
             Handle, unsigned long, const wchar_t *, void *, unsigned long *, unsigned long *);
         using Read = int(__stdcall *)(Handle, void *, unsigned long, unsigned long *);
         using Close = int(__stdcall *)(Handle);
-        void *library = LoadLibraryA("winhttp.dll");
+        using Stage = DWNetworkDiagnostics::Stage;
+        const bool tls = DW_LocalConfig_UseTls();
+        DWNetworkDiagnostics::Request diagnostic(
+            DWNetworkDiagnostics::Operation::Health,
+            DW_LocalConfig_Host(), tls ? 8443 : 8085, WriteLog, GetTickCount64,
+            GetCurrentProcessId());
         bool ok = false;
+        unsigned long error = 0, status = 0;
+        unsigned used = 0;
+        auto checked = [&](int success)
+        {
+            if (!success)
+                error = GetLastError();
+            diagnostic.End(success != 0, error, status, used, 0);
+            return success != 0;
+        };
+        diagnostic.Begin(Stage::LoadLibrary);
+        void *library = LoadLibraryA("winhttp.dll");
+        checked(library != nullptr);
         s_response[0] = 0;
         if (library)
         {
+            diagnostic.Begin(Stage::ResolveApi);
             auto open = reinterpret_cast<Open>(GetProcAddress(library, "WinHttpOpen"));
             auto connect = reinterpret_cast<Connect>(GetProcAddress(library, "WinHttpConnect"));
             auto request = reinterpret_cast<Request>(GetProcAddress(library, "WinHttpOpenRequest"));
@@ -138,47 +160,80 @@ namespace
             auto close = reinterpret_cast<Close>(GetProcAddress(library, "WinHttpCloseHandle"));
             using Option = int (__stdcall *)(Handle, unsigned long, void *, unsigned long);
             auto option = reinterpret_cast<Option>(GetProcAddress(library, "WinHttpSetOption"));
-            const bool tls = DW_LocalConfig_UseTls();
+            auto callback = reinterpret_cast<DWNetworkDiagnostics::SetCallback>(
+                GetProcAddress(library, "WinHttpSetStatusCallback"));
             unsigned long redirectPolicy = 0; // WINHTTP_OPTION_REDIRECT_POLICY_NEVER
-            if (open && connect && request && timeouts && send && receive && headers && read &&
-                close)
+            if (checked(open && connect && request && timeouts && send && receive && headers &&
+                        read && close && option))
             {
-                Handle session = open(L"IW8-Replay-LocalDW/1", 1, nullptr, nullptr, 0);
-                Handle connection = nullptr, message = nullptr;
-                if (session && timeouts(session, 1000, 1000, 1000, 1000))
-                    connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
-                if (connection)
-                    message = request(connection, L"GET", L"/health", nullptr, nullptr, nullptr, tls ? 0x00800000 : 0);
-                if (message && option && option(message, 88, &redirectPolicy, sizeof(redirectPolicy)) && send(message, nullptr, 0, nullptr, 0, 0, 0) &&
-                    receive(message, nullptr))
+                Handle session = nullptr;
+                Handle connection = nullptr;
+                Handle message = nullptr;
+                do
                 {
-                    unsigned long status = 0, statusSize = sizeof(status);
-                    if (headers(message, 0x20000013, nullptr, &status, &statusSize, nullptr) &&
-                        status == 200)
+                    diagnostic.Begin(Stage::Open);
+                    session = open(L"IW8-Replay-LocalDW/1", 1, nullptr, nullptr, 0);
+                    if (!checked(session != nullptr))
+                        break;
+                    diagnostic.Begin(Stage::Timeouts);
+                    if (!checked(timeouts(session, 1000, 1000, 1000, 1000)))
+                        break;
+                    diagnostic.Begin(Stage::Connect);
+                    connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
+                    if (!checked(connection != nullptr))
+                        break;
+                    diagnostic.Begin(Stage::OpenRequest);
+                    message = request(connection, L"GET", L"/health", nullptr, nullptr, nullptr,
+                                      tls ? 0x00800000 : 0);
+                    if (!checked(message != nullptr))
+                        break;
+                    diagnostic.Attach(message, option, callback);
+                    diagnostic.Begin(Stage::RedirectPolicy);
+                    if (!checked(option(message, 88, &redirectPolicy, sizeof(redirectPolicy))))
+                        break;
+                    diagnostic.Begin(Stage::Send);
+                    if (!checked(send(message, nullptr, 0, nullptr, 0, 0, diagnostic.Context())))
+                        break;
+                    diagnostic.Begin(Stage::Receive);
+                    if (!checked(receive(message, nullptr)))
+                        break;
+                    diagnostic.Begin(Stage::QueryStatus);
+                    unsigned long statusSize = sizeof(status);
+                    if (!checked(headers(message, 0x20000013, nullptr, &status, &statusSize, nullptr)))
+                        break;
+                    diagnostic.Begin(Stage::HttpStatus);
+                    diagnostic.End(status == 200, 0, status, used, 0);
+                    if (status != 200)
+                        break;
+
+                    bool complete = false;
+                    while (used < sizeof(s_response) - 1)
                     {
-                        unsigned used = 0;
-                        bool complete = false;
-                        while (used < sizeof(s_response) - 1)
+                        unsigned long received = 0;
+                        diagnostic.Begin(Stage::Read);
+                        const bool readOk = checked(read(
+                            message, s_response + used,
+                            static_cast<unsigned long>(sizeof(s_response) - 1 - used), &received));
+                        if (!readOk)
+                            break;
+                        if (!received)
                         {
-                            unsigned long received = 0;
-                            if (!read(message,
-                                      s_response + used,
-                                      static_cast<unsigned long>(sizeof(s_response) - 1 - used),
-                                      &received))
-                                break;
-                            if (!received)
-                            {
-                                complete = true;
-                                break;
-                            }
-                            used += received;
+                            complete = true;
+                            break;
                         }
-                        s_response[used] = 0;
-                        ok = complete && Contains(s_response, "\"server\":\"iw8-dw\"") &&
-                             Contains(s_response, "\"build\":\"replay120\"") &&
-                             Contains(s_response, "\"stage\":\"transport-ready\"");
+                        used += received;
                     }
-                }
+                    s_response[used] = 0;
+                    ok = complete && Contains(s_response, "\"server\":\"iw8-dw\"") &&
+                         Contains(s_response, "\"build\":\"replay120\"") &&
+                         Contains(s_response, "\"stage\":\"transport-ready\"");
+                    if (!error)
+                    {
+                        diagnostic.Begin(Stage::ValidateBody);
+                        diagnostic.End(ok, 0, status, used, 0);
+                    }
+                } while (false);
+                diagnostic.Detach();
                 if (message)
                     close(message);
                 if (connection)
@@ -188,6 +243,7 @@ namespace
             }
             FreeLibrary(library);
         }
+        diagnostic.Complete(ok, error, status, used, 0, 0);
         WriteEndpointLog(ok ? "DW_LOCAL_PROBE_OK host=" : "DW_LOCAL_PROBE_FAILED host=",
                          ok ? " backend health reached; native authentication/tasks pending"
                             : " backend health unavailable; check this endpoint's server "

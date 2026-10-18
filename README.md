@@ -116,6 +116,25 @@ should show `host=127.0.0.1`, followed by `DW_LOCAL_PLATFORM_VERIFIED` when the
 signed platform reply is accepted. That marker confirms the platform trust step;
 native authentication and loading a match are subsequent checks.
 
+Clients with the expanded network diagnostics also write `DW_NETWORK` records.
+Group their `begin`, `stage`, `end`, and `event` lines by both `process` and
+`request`. Each group identifies the health, challenge, login, or renewal
+exchange, public endpoint, elapsed milliseconds, Windows error, HTTP status,
+and response byte counts. `expected=0` means the response has variable length,
+as with the health check. Event records describe observed WinHTTP notifications;
+a `connected` event alone does not establish successful TLS authentication.
+Event collection is best effort under contention; a missing event is not proof
+that its network stage never occurred.
+The diagnostics do not include credentials, raw URLs, request/response bodies,
+nonces, or keys.
+
+For a connection report, include the latest launch's `DW_NETWORK` groups and
+platform result lines. If a standalone health request works while the game
+times out, check the game's actual network path as well: VPN adapters and
+application-specific interface-routing software can treat it differently.
+Correlate client timing with server handshake errors before changing timeouts
+or firewall rules.
+
 The setup workflow has been checked against a real DW executable and fresh server
 signatures using the actual game crypto verifier. Full game login and match play
 still need testing on your installation. For failures, send the latest client log

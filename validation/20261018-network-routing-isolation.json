@@ -1,0 +1,41 @@
+{
+  "issue": "The game failed platform sign-in while standalone WinHTTP requests succeeded.",
+  "client_executable_sha256": "251739f17ea6325bd1b93b9bc355a328d50602a65fcb1e858ecffb8c52242b5b",
+  "observations": {
+    "client_errors": [12002, 12152],
+    "server_handshake_deadline_correlated_with_game_port": true,
+    "public_endpoint_and_headers_read_from_live_game_correct": true,
+    "game_post_body_matches_compiled_report": true,
+    "checked_windows_network_export_hooks_found": false,
+    "packet_metadata_showed_game_acknowledgments_on_radmin_adapter": true,
+    "inbound_server_tls_packets_arrived_over_physical_ethernet": true,
+    "ordinary_ipv4_default_route_preferred_physical_ethernet": true
+  },
+  "controlled_changes": [
+    {
+      "change": "Disable Intel Killer MultiInterfaceSmartRedirection for this game executable only.",
+      "backup_retained": true,
+      "configuration_bytes_changed": 1,
+      "resolved_game_login": false
+    },
+    {
+      "change": "Temporarily disable the Radmin VPN adapter without changing Ethernet or firewall rules.",
+      "resolved_game_login": true,
+      "owner_confirmed_success": true,
+      "native_signed_session_and_platform_signin_observed": true
+    }
+  ],
+  "final_state": {
+    "radmin_adapter_disabled_for_playtest_at_explicit_owner_request": true,
+    "automatic_diagnostic_restore_cancelled_at_owner_request": true,
+    "firewall_rules_changed": false,
+    "normal_ethernet_retained": true,
+    "game_specific_killer_redirection_disabled": true
+  },
+  "limits": [
+    "The comparison isolates the failure to the local VPN/interface-routing path; it does not establish a launcher regression.",
+    "Inspection absorb is a generic transport event, not proof that a particular WFP filter blocked a packet.",
+    "The exact vendor callout responsible for the routing behavior was not uniquely identified.",
+    "This machine-specific network configuration is not distributed with the game or backend."
+  ]
+}

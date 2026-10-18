@@ -151,9 +151,6 @@ def deploy(job, replace_reviewed_build=None):
             build_report_sha256=sha(previous_report),
             reason="Owner-authorized replacement of the retained validated local candidate",
         )
-    if dw_client.running_games():
-        raise RuntimeError("DW game is running; close it before local deployment")
-
     # Validate the frozen helper's manifest against both native package proofs.
     spec = importlib.util.spec_from_file_location(
         "local_deploy_owned_assets", snapshot / "tools/dw_update_assets.py"
@@ -236,6 +233,16 @@ def deploy(job, replace_reviewed_build=None):
             )
     records.append((image, target, ready["sha256"]))
     assert len({str(path).casefold() for _, path, _ in records}) == len(records)
+    debug_paths = {Path(item["path"]) for item in debug_artifacts}
+    running_debug_only = bool(dw_client.running_games())
+    if running_debug_only:
+        # An owner can already have installed this exact image. Debugger sidecars
+        # are safe to refresh while it runs only when every runtime file matches.
+        for _, path, expected in records:
+            if path not in debug_paths and (not path.exists() or sha(path) != expected):
+                raise RuntimeError(
+                    "DW game is running and runtime files differ; close it before deployment"
+                )
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     backup_root = game / "replay-dw-backups" / ("local-test-" + stamp)
@@ -266,9 +273,11 @@ def deploy(job, replace_reviewed_build=None):
             )
         assert sha(ini) == ini_hash and sha(target) == before
         if dw_client.running_games():
-            raise RuntimeError(
-                "DW game started during staging; local deployment deferred"
-            )
+            running_debug_only = True
+            if any(Path(change["path"]) not in debug_paths for change in changes):
+                raise RuntimeError(
+                    "DW game started during staging; runtime deployment deferred"
+                )
         # Recheck every destination before changing the first one.
         for change in changes:
             path = Path(change["path"])
@@ -327,6 +336,7 @@ def deploy(job, replace_reviewed_build=None):
         backup_root=str(backup_root) if changes else None,
         game_runs_performed=False,
         game_processes_stopped=False,
+        running_game_debug_sidecars_only=running_debug_only,
     )
     dw_client.save(job / "local-deployment.json", evidence)
     print(json.dumps(evidence, indent=2))

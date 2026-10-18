@@ -322,6 +322,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "prepare-workstation-performance.py", "workstation_preparation_context.py",
             "preparation_instruction_source.py", "verifier_performance.py", "native_relocation_performance.py",
             "dw_client.py", "dw_catalog.py", "dw_sqlite_snapshot.py", "dw_debug_symbols.py", "test-dw-debug-symbols.py",
+            "test-network-diagnostics.py",
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
             "test-playlist-ui.py",
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
@@ -399,6 +400,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "DW_AltKillcam.cpp", "DW_AltKillcam.h",
             "DW_AltKillcamRender.cpp", "DW_AltKillcamRender.h",
             "DW_MapVoting.h",
+            "DW_NetworkDiagnostics.h",
             "DW_WeaponInspect.cpp", "DW_WeaponInspect.h",
             "DW_WeaponInspectInput.cpp", "DW_WeaponInspectInput.h",
             "DW_WeaponInspectUI.lua",
@@ -782,6 +784,7 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     tools = ROOT / "tools"
     checks = (
         ("test-dw-debug-symbols.py", [], "debug-symbols.json"),
+        ("test-network-diagnostics.py", [], "network-diagnostics.json"),
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
         ("test-host-sight-scheduling.py", ["--snapshot", str(source)], "host-sight.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),

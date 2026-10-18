@@ -4,6 +4,13 @@
 #include "dw_platform_protocol.h"
 #include "replay_dvar.h"
 #include "DW_LocalConfig.h"
+#include "DW_NetworkDiagnostics.h"
+
+namespace DWNetworkDiagnostics::Detail
+{
+    Slot slots[SlotCount]{};
+    uintptr_t nextId = 0;
+}
 
 extern "C"
 {
@@ -87,6 +94,7 @@ extern "C"
         void *, void *, unsigned long, unsigned long *, void *);
     __declspec(dllimport) uint64_t __stdcall GetTickCount64();
     __declspec(dllimport) unsigned long __stdcall GetLastError();
+    __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
 }
 
 namespace
@@ -334,46 +342,50 @@ namespace
     }
 } // namespace
 
-// Both provider exchanges use bounded, proxy-free localhost HTTP on the worker
+// Provider exchanges use bounded, proxy-free HTTP(S) on the worker
 // thread. Read exactly the expected size and reject a trailing response byte.
-extern "C" bool DW_LocalPlatform_Post(
-    const wchar_t *path, void *body, unsigned bodySize, void *output, unsigned outputSize)
+extern "C" bool DW_LocalPlatform_Post(const wchar_t *path, void *body, unsigned bodySize,
+                                      void *output, unsigned outputSize)
 {
     using Handle = void *;
-    using Open = Handle(__stdcall *)(
-        const wchar_t *, unsigned long, const wchar_t *, const wchar_t *, unsigned long);
+    using Open = Handle(__stdcall *)(const wchar_t *, unsigned long, const wchar_t *,
+                                     const wchar_t *, unsigned long);
     using Connect = Handle(__stdcall *)(Handle, const wchar_t *, unsigned short, unsigned long);
-    using Request = Handle(__stdcall *)(Handle,
-                                        const wchar_t *,
-                                        const wchar_t *,
-                                        const wchar_t *,
-                                        const wchar_t *,
-                                        const wchar_t **,
-                                        unsigned long);
+    using Request = Handle(__stdcall *)(Handle, const wchar_t *, const wchar_t *, const wchar_t *,
+                                        const wchar_t *, const wchar_t **, unsigned long);
     using Timeouts = int(__stdcall *)(Handle, int, int, int, int);
-    using Send = int(__stdcall *)(
-        Handle, const wchar_t *, unsigned long, void *, unsigned long, unsigned long, uintptr_t);
+    using Send = int(__stdcall *)(Handle, const wchar_t *, unsigned long, void *, unsigned long,
+                                  unsigned long, uintptr_t);
     using Receive = int(__stdcall *)(Handle, void *);
-    using Headers = int(__stdcall *)(
-        Handle, unsigned long, const wchar_t *, void *, unsigned long *, unsigned long *);
+    using Headers = int(__stdcall *)(Handle, unsigned long, const wchar_t *, void *,
+                                     unsigned long *, unsigned long *);
     using Read = int(__stdcall *)(Handle, void *, unsigned long, unsigned long *);
     using Close = int(__stdcall *)(Handle);
     bool ok = false;
-    const char *stage = "arguments";
+    using DWNetworkDiagnostics::Stage;
+    const bool tls = DW_LocalConfig_UseTls();
+    DWNetworkDiagnostics::Request diagnostic(DWNetworkDiagnostics::OperationForPath(path),
+                                             DW_LocalConfig_Host(), tls ? 8443 : 8085, Log,
+                                             GetTickCount64, GetCurrentProcessId());
+    Stage stage = Stage::Arguments;
     unsigned long error = 0, status = 0;
     unsigned used = 0, extraBytes = 0;
-    auto checked = [&](const char *operation, int success)
+    auto checked = [&](Stage operation, auto action)
     {
         stage = operation;
-        if (!success)
-            error = GetLastError();
-        return success != 0;
+        diagnostic.Begin(stage);
+        const bool success = action() != 0;
+        error = success ? 0 : GetLastError();
+        diagnostic.End(success, error, status, used, outputSize);
+        return success;
     };
+    diagnostic.Begin(Stage::LoadLibrary);
     auto library = LoadLibraryA("winhttp.dll");
+    error = library ? 0 : GetLastError();
+    diagnostic.End(library != nullptr, error);
     if (!library)
     {
-        stage = "load-library";
-        error = GetLastError();
+        stage = Stage::LoadLibrary;
     }
     if (library && path && body && bodySize && output && outputSize)
     {
@@ -386,50 +398,86 @@ extern "C" bool DW_LocalPlatform_Post(
         auto headers = reinterpret_cast<Headers>(GetProcAddress(library, "WinHttpQueryHeaders"));
         auto read = reinterpret_cast<Read>(GetProcAddress(library, "WinHttpReadData"));
         auto close = reinterpret_cast<Close>(GetProcAddress(library, "WinHttpCloseHandle"));
-        using Option = int (__stdcall *)(Handle, unsigned long, void *, unsigned long);
+        using Option = int(__stdcall *)(Handle, unsigned long, void *, unsigned long);
         auto option = reinterpret_cast<Option>(GetProcAddress(library, "WinHttpSetOption"));
-        const bool tls = DW_LocalConfig_UseTls();
         unsigned long redirectPolicy = 0; // WINHTTP_OPTION_REDIRECT_POLICY_NEVER
-        stage = "resolve-api";
-        if (open && connect && request && timeouts && send && receive && headers && read &&
-            close && option)
+        stage = Stage::ResolveApi;
+        diagnostic.Begin(stage);
+        auto callback = reinterpret_cast<DWNetworkDiagnostics::SetCallback>(
+            GetProcAddress(library, "WinHttpSetStatusCallback"));
+        if (open && connect && request && timeouts && send && receive && headers && read && close &&
+            option)
         {
+            diagnostic.End(true, 0);
             Handle session = nullptr, connection = nullptr, message = nullptr;
             do
             {
-                session = open(L"IW8-Replay-LocalPlatform/1", 1, nullptr, nullptr, 0);
-                if (!checked("open", session != nullptr) ||
-                    !checked("timeouts", timeouts(session, 10000, 10000, 10000, 10000)))
+                if (!checked(Stage::Open,
+                             [&]
+                             {
+                                 session =
+                                     open(L"IW8-Replay-LocalPlatform/1", 1, nullptr, nullptr, 0);
+                                 return session != nullptr;
+                             }) ||
+                    !checked(Stage::Timeouts,
+                             [&] { return timeouts(session, 10000, 10000, 10000, 10000); }))
                     break;
-                connection = connect(session, DW_LocalConfig_WideHost(), tls ? 8443 : 8085, 0);
-                if (!checked("connect", connection != nullptr))
+                if (!checked(Stage::Connect,
+                             [&]
+                             {
+                                 connection = connect(session, DW_LocalConfig_WideHost(),
+                                                      tls ? 8443 : 8085, 0);
+                                 return connection != nullptr;
+                             }))
                     break;
-                message = request(connection, L"POST", path, nullptr, nullptr, nullptr,
-                                  tls ? 0x00800000 : 0);
-                if (!checked("open-request", message != nullptr) ||
-                    !checked("redirect-policy", option(message, 88, &redirectPolicy, sizeof(redirectPolicy))) ||
-                    !checked("send", send(message, DW_LocalConfig_Headers(), ~0UL, body, bodySize, bodySize, 0)) ||
-                    !checked("receive", receive(message, nullptr)))
+                if (!checked(Stage::OpenRequest,
+                             [&]
+                             {
+                                 message = request(connection, L"POST", path, nullptr, nullptr,
+                                                   nullptr, tls ? 0x00800000 : 0);
+                                 return message != nullptr;
+                             }))
+                    break;
+                diagnostic.Attach(message, option, callback);
+                if (!checked(
+                        Stage::RedirectPolicy, [&]
+                        { return option(message, 88, &redirectPolicy, sizeof(redirectPolicy)); }) ||
+                    !checked(Stage::Send,
+                             [&]
+                             {
+                                 return send(message, DW_LocalConfig_Headers(), ~0UL, body,
+                                             bodySize, bodySize, diagnostic.Context());
+                             }) ||
+                    !checked(Stage::Receive, [&] { return receive(message, nullptr); }))
                     break;
                 unsigned long size = sizeof(status);
-                if (!checked("query-status", headers(message, 0x20000013, nullptr, &status, &size, nullptr)))
+                if (!checked(
+                        Stage::QueryStatus, [&]
+                        { return headers(message, 0x20000013, nullptr, &status, &size, nullptr); }))
                     break;
-                stage = "http-status";
+                stage = Stage::HttpStatus;
+                diagnostic.Begin(stage);
+                diagnostic.End(status == 200, 0, status, used, outputSize);
                 if (status != 200)
                     break;
                 bool complete = true;
                 while (used < outputSize)
                 {
                     unsigned long received = 0;
-                    if (!checked("read", read(message, reinterpret_cast<uint8_t *>(output) + used,
-                                              outputSize - used, &received)))
+                    if (!checked(Stage::Read,
+                                 [&]
+                                 {
+                                     return read(message,
+                                                 reinterpret_cast<uint8_t *>(output) + used,
+                                                 outputSize - used, &received);
+                                 }))
                     {
                         complete = false;
                         break;
                     }
                     if (!received)
                     {
-                        stage = "short-response";
+                        stage = Stage::ShortResponse;
                         complete = false;
                         break;
                     }
@@ -439,12 +487,13 @@ extern "C" bool DW_LocalPlatform_Post(
                     break;
                 uint8_t extra = 0;
                 unsigned long received = 0;
-                if (!checked("read-eof", read(message, &extra, 1, &received)))
+                if (!checked(Stage::ReadEof, [&] { return read(message, &extra, 1, &received); }))
                     break;
                 extraBytes = received;
-                stage = received ? "long-response" : "complete";
+                stage = received ? Stage::LongResponse : Stage::Complete;
                 ok = !received;
             } while (false);
+            diagnostic.Detach();
             if (message)
                 close(message);
             if (connection)
@@ -453,40 +502,15 @@ extern "C" bool DW_LocalPlatform_Post(
                 close(session);
         }
         else
+        {
             error = GetLastError();
+            diagnostic.End(false, error);
+        }
     }
     if (library)
         FreeLibrary(library);
-    if (!ok)
-    {
-        // Transport metadata only: never request paths, payloads, identities or tokens.
-        char diagnostic[256]{};
-        unsigned length = 0;
-        auto text = [&](const char *value)
-        {
-            while (*value && length + 1 < sizeof(diagnostic))
-                diagnostic[length++] = *value++;
-        };
-        auto number = [&](unsigned long value)
-        {
-            char digits[16];
-            unsigned count = 0;
-            do
-            {
-                digits[count++] = static_cast<char>('0' + value % 10);
-                value /= 10;
-            } while (value);
-            while (count && length + 1 < sizeof(diagnostic))
-                diagnostic[length++] = digits[--count];
-        };
-        text("DW_LOCAL_POST_FAILED stage="); text(stage);
-        text(" win32="); number(error);
-        text(" http="); number(status);
-        text(" received="); number(used);
-        text(" expected="); number(outputSize);
-        text(" extra="); number(extraBytes);
-        Log(diagnostic);
-    }
+    diagnostic.Begin(stage);
+    diagnostic.Complete(ok, error, status, used, outputSize, extraBytes);
     return ok;
 }
 
