@@ -8,6 +8,14 @@ from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
 
 TARGET = "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
 BODIES = {
+    "GetFloat": (
+        "fn_7fd59fd53bf837c3", 271,
+        "b3087de25645da7d31120b424991ee57b02c5e6408054abadb5271fdd22bcd79",
+    ),
+    "GetVector": (
+        "fn_914bd022ae48b9ae", 264,
+        "7fa554e91cf076814b1f6c295297905b449d9198ffd50e94bdf669f8b0720b6b",
+    ),
     "initializer": (
         "fn_c4246490a119c784",
         48,
@@ -283,6 +291,8 @@ def derive(exe, catalog, output):
         "GetWeaponTable",
         "GetNumParam",
         "GetInt",
+        "GetFloat",
+        "GetVector",
         "GetString",
         "ParseFullWeapon",
         "FindBaseWeapon",
@@ -363,6 +373,8 @@ def derive(exe, catalog, output):
         "const void *SM_GetWeaponTable(const void *);",
         "uint32_t SM_GetNumParam(void *);",
         "int32_t SM_GetInt(void *, uint32_t);",
+        "float SM_GetFloat(void *, uint32_t);",
+        "void SM_GetVector(void *, uint32_t, void *);",
         "const char *SM_GetString(void *, uint32_t);",
         "bool SM_ParseFullWeapon(const char *, void *, void *(*)(void *, const char *));",
         "void *SM_FindBaseWeapon(void *, const char *);",
@@ -421,6 +433,9 @@ def derive(exe, catalog, output):
         "<I", pe.get_data(table_rva + 4 * survival_opcode, 4)
     )[0]
     assert survival_handler == method_handler
+    gas_opcode = 0x83  # fixed arity: 0x7e + five circle-state arguments
+    gas_handler = struct.unpack("<I", pe.get_data(table_rva + 4 * gas_opcode, 4))[0]
+    assert gas_handler == method_handler
     bool_tail = next(
         i.operands[0].imm
         for i in bodies["HasWeaponBoolResult"]
@@ -540,6 +555,16 @@ def derive(exe, catalog, output):
                 result="bool",
                 callback_symbol="DW_BotMPClassReadyMethod",
                 opcode=survival_opcode,
+            ),
+            dict(
+                id=constants[3204] + 3,
+                name="dw_bot_gas_state",
+                type=0,
+                argument_count=5,
+                receiver="entity",
+                result="bool",
+                callback_symbol="DW_BotGasStateMethod",
+                opcode=gas_opcode,
             ),
         ],
         limitations=[

@@ -124,8 +124,14 @@ def prepare(snapshot, *, replace_owned=False):
     output = snapshot / "generated/weapon-inspect-crosshair"
     output.mkdir(parents=True, exist_ok=True)
     workspace = workspace_for(snapshot, catalog, output / "cache")
+    # Preserve equal-offset unwind operation ordering exactly. Re-emitting
+    # .seh directives lets the assembler reorder the pinned native record.
+    owner = proof["owners"][SYMBOL]
+    unwind = [dict(begin=OWNER_RVA, end=OWNER_RVA + OWNER_SIZE,
+                   unwind_rva=owner["unwind_rva"], bytes=owner["unwind"])]
     native_source, clone = assemble(workspace, pe, catalog, row, HELPER, output,
-                                    Path(r"C:\Program Files\LLVM\bin"), read)
+                                    Path(r"C:\Program Files\LLVM\bin"), read,
+                                    gs_unwind=unwind)
     assert clone["bytes"] == OWNER_SIZE and clone["unwind_records"] == 1
     for fixup in clone["external_fixups"]:
         proof["imports"][fixup["stable_id"]] = fixup["stable_id"]

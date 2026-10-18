@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "evidence_kind": "original-image static instruction and function-inventory audit",
+  "original_image": {
+    "path": "E:\\IW8\\Builds\\1.20-replay\\game_dx12_ship_replay.exe",
+    "sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
+  },
+  "functions": [
+    {
+      "name": "sub_1410B2E30",
+      "va": "0x1410b2e30",
+      "rva": "0x10b2e30",
+      "size": 1061,
+      "original_bytes_sha256": "e9ad2d48003fa11c7769e4a4deb690be12040349c6c0814c894f27e75ac3596b"
+    },
+    {
+      "name": "sub_1410B4BE0",
+      "va": "0x1410b4be0",
+      "rva": "0x10b4be0",
+      "size": 721,
+      "original_bytes_sha256": "cdc42747a718f195d8350bcf528c88d4c0ac91b081e9df017e3147d8c6fd371b"
+    },
+    {
+      "name": "q_ComFastFileZoneList::Add",
+      "va": "0x1410b6370",
+      "rva": "0x10b6370",
+      "size": 241,
+      "original_bytes_sha256": "e49aa0ce6660078a54b4fb098c9492c92ea6c3e4cb52e751fda8c77416b9a6d0"
+    },
+    {
+      "name": "sub_1410B23E0",
+      "va": "0x1410b23e0",
+      "rva": "0x10b23e0",
+      "size": 546,
+      "original_bytes_sha256": "c5f496436613697bbb3075c7df4011ac9c044720c2dbef5f7b1e8613120a4d07"
+    },
+    {
+      "name": "sub_1410B50E0",
+      "va": "0x1410b50e0",
+      "rva": "0x10b50e0",
+      "size": 527,
+      "original_bytes_sha256": "9f613a5865b6ca9603123799b130f51130707768f0ee4a1e8b0fb06a140f40de"
+    },
+    {
+      "name": "DB_DecideLevelLoad",
+      "va": "0x140f63570",
+      "rva": "0xf63570",
+      "size": 283,
+      "original_bytes_sha256": "0e21fc9191234c547e9a8d9aea3e83577a7472e78f61ad2fcd4c142e8adb92ee"
+    },
+    {
+      "name": "sub_140F63690",
+      "va": "0x140f63690",
+      "rva": "0xf63690",
+      "size": 177,
+      "original_bytes_sha256": "5a683efaaf21b63db623da8c385397468b738a4249771f02de832f5786cc1a17"
+    },
+    {
+      "name": "DB_LoadLevelXAssets",
+      "va": "0x140f63750",
+      "rva": "0xf63750",
+      "size": 668,
+      "original_bytes_sha256": "f42963220f504d2e0bf823327bbcea31deded3300abec3e855296f6d7df8fb34"
+    },
+    {
+      "name": "DB_LoadFastfiles",
+      "va": "0x1411acd30",
+      "rva": "0x11acd30",
+      "size": 933,
+      "original_bytes_sha256": "67aca521a4a40ccf222ecb58a0010a6bc2a8fe0481bb60a215bdbb5e6bbc3c31"
+    },
+    {
+      "name": "DB_TryLoadXFile",
+      "va": "0x1411afe20",
+      "rva": "0x11afe20",
+      "size": 1079,
+      "original_bytes_sha256": "d31fe36b3483fd6c4b3e3aba709f8dde9ef42409684d63b38aa057f30d23c547"
+    },
+    {
+      "name": "q_DB_Zones_PerformZoneLoad",
+      "va": "0x140f677a0",
+      "rva": "0xf677a0",
+      "size": 461,
+      "original_bytes_sha256": "82672c79d7c69ea0449c5e037e5b2b25a1738967594c8c5ddd8d7a8a9da83136"
+    },
+    {
+      "name": "sub_1411A79F0",
+      "va": "0x1411a79f0",
+      "rva": "0x11a79f0",
+      "size": 827,
+      "original_bytes_sha256": "ecb85ef079351389aaf616aa967c749e69c44c16e9ba9f63a684274ed58ddd47"
+    },
+    {
+      "name": "Load_ArchiveData",
+      "va": "0x1411b27e0",
+      "rva": "0x11b27e0",
+      "size": 461,
+      "original_bytes_sha256": "1f4b4af22e3e42e3fde4204c4a129a68e8f7a7875c275a553c0d24634b915194"
+    },
+    {
+      "name": "Load_NavMeshDataPtr",
+      "va": "0x140ddce20",
+      "rva": "0xddce20",
+      "size": 239,
+      "original_bytes_sha256": "cdabc92da418496e14b7eb62c1038c0a65cdc26c5b140a9ba97c3c5f675468b1"
+    },
+    {
+      "name": "q_Preload_NavMeshDataPtr",
+      "va": "0x140dedb80",
+      "rva": "0xdedb80",
+      "size": 161,
+      "original_bytes_sha256": "ce97dd131d52e267cf8a206332d3081ea72b1013a052ac36b3a7be8db597b74f"
+    },
+    {
+      "name": "q_Postload_NavMeshDataPtr",
+      "va": "0x140de6550",
+      "rva": "0xde6550",
+      "size": 234,
+      "original_bytes_sha256": "ae3bfb5580aed2365d4c4007e629feb60dc41db6225ea552d01aa8c96e88966e"
+    },
+    {
+      "name": "sub_1410EB7D0",
+      "va": "0x1410eb7d0",
+      "rva": "0x10eb7d0",
+      "size": 854,
+      "original_bytes_sha256": "d403e3f3cd8aade083da85f14b2aae0a59431bf1774ed45a497106155a5b5657"
+    },
+    {
+      "name": "Nav_FindMostLikelySpaceCustom",
+      "va": "0x141008440",
+      "rva": "0x1008440",
+      "size": 1424,
+      "original_bytes_sha256": "b840c5b563d20d08e6dd2ca9d354d82d2aa3c0aeee21c966548cb0d847163b61"
+    },
+    {
+      "name": "sub_1410EA260",
+      "va": "0x1410ea260",
+      "rva": "0x10ea260",
+      "size": 1660,
+      "original_bytes_sha256": "5bb59f6b73a262e4148b8d497869e5c8493f2b6a3355bd1331c39a8006cde15d"
+    },
+    {
+      "name": "q_Nav_AddResourceToNewSpace",
+      "va": "0x141007b80",
+      "rva": "0x1007b80",
+      "size": 277,
+      "original_bytes_sha256": "45987488ff6faae22082221a26c3b133abd48af4964a6b549343552fe3873eb8"
+    },
+    {
+      "name": "sub_141007CA0",
+      "va": "0x141007ca0",
+      "rva": "0x1007ca0",
+      "size": 661,
+      "original_bytes_sha256": "374e1991ef37e55e289cd1437f9e57c37d58b232313c510d95c899ada883bd97"
+    }
+  ],
+  "preload_routing": {
+    "native_mp_preload_reachable": true,
+    "requested_name_copied_unchanged": true,
+    "module_va": "0x14c4ebbf0",
+    "module_zone_flags": "0x100000",
+    "batch_preload_mask": "0x3f00000",
+    "ordinary_map_request_flags": "0x900",
+    "queued_ordinary_map_flags": "0x100",
+    "ordinary_navmesh_root_stream": 1,
+    "preload_postload_navmesh_root_stream": 2,
+    "guard": "Gulag injection requires the OR of all incoming zoneFlags masked with 0x3F00000 to equal zero.",
+    "later_ordinary_batch": "DB_TryLoadXFile identifies existing preload status separately for each zone name; existing stock map can process its preload while the new unique overlay uses ordinary Load."
+  },
+  "bounds": {
+    "root_static_mid_offset": 156,
+    "root_static_half_offset": 144,
+    "copied_globals_begin": "0x14c617ffc",
+    "copied_globals_end_inclusive": "0x14c618013",
+    "static_inventory_functions_scanned": 94922,
+    "direct_reference_functions": [
+      {
+        "va": "0x1410eb7d0",
+        "name": "sub_1410EB7D0",
+        "assembly_lines": [
+          "movss   cs:dword_14C617FFC, xmm0",
+          "movss   cs:dword_14C618000, xmm1",
+          "movss   cs:dword_14C618004, xmm0",
+          "movss   cs:dword_14C618008, xmm1",
+          "movss   cs:dword_14C61800C, xmm0",
+          "movss   cs:dword_14C618010, xmm1"
+        ]
+      }
+    ],
+    "direct_reads_found": 0,
+    "verified_query_chain": [
+      "Nav_FindMostLikelySpaceCustom 0x141008440 iterates spaces with resourceCount+632 nonzero",
+      "0x1410EA260 queries BFX closest area 0x141FC73C0 and projects its actual area",
+      "Resource Add 0x141007B80/0x141007CA0 forwards payload and resource pose without root bounds"
+    ],
+    "conclusion": "No global-root-bounds cull occurs in the verified registration, space selection and closest-area path."
+  },
+  "source_evidence": [
+    {
+      "path": "E:\\DW\\IW8\\integration\\replay\\DW_BotStyleZone.cpp",
+      "sha256": "a6c234adfa404f35ea487c2348df246dbb4bddbebcbaa32b0c7f85a8ffb7c5bc"
+    },
+    {
+      "path": "E:\\DW\\IW8\\tools\\bot_style_zone_harness.cpp",
+      "sha256": "0d50c6772d17fd2eddcce0133bc6a261dd6d7be913ee97771af21ded30acf576"
+    },
+    {
+      "path": "E:\\DW\\IW8\\validation\\gulag-zone-preload-guard.json",
+      "sha256": "61128bbaf9a2d81c1fe3e19d753340b362a60809c25df9fa78246b6adf465a30"
+    }
+  ],
+  "execution_scope": {
+    "this_audit_native_execution": false,
+    "source_harness_receipt": "validation/gulag-zone-preload-guard.json",
+    "separate_native_bfx_execution_receipt": "validation/gulag-native-bfx/final-summary.json",
+    "live_game": false
+  },
+  "limits": [
+    "Static inventory sweep establishes no direct reads of the six copied bounds globals; it does not rule out every possible indirect alias.",
+    "No game process, matchmaking session or live loader was exercised.",
+    "The package ordinary-load reservation does not establish general Preload/Postload support.",
+    "Source-harness and separate native BFX execution evidence are distinct from this static integration audit."
+  ]
+}

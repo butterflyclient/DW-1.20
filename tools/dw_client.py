@@ -303,6 +303,10 @@ def prepare(pending_map_record=None):
             "prepare-host-scale-integration.py", "prepare-bot-style-data.py",
             "prepare-bot-think-integration.py", "generate-bot-names.py",
             "prepare-br-bot-loot-integration.py", "prepare-host-bot-equipment.py",
+            "prepare-host-bot-gpu.py", "prepare-host-nav-graph.py",
+            "test-host-bot-gpu.py", "host_bot_gpu_harness.cpp",
+            "host_bot_gpu_planner_harness.cpp", "test-host-nav-graph.cpp",
+            "test-host-gpu-movement.py", "test-host-navigation.py",
             "test-bot-slide-cancel.py", "test-bot-slide-cancel.cpp",
             "test-map-voting-client.py", "map_vote_harness.cpp",
             "test-ui-focus-lifetime.py",
@@ -317,6 +321,10 @@ def prepare(pending_map_record=None):
             "prepare-script-method-integration.py", "prepare-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "test-bot-style-zone.py", "bot_style_zone_harness.cpp",
+            "prepare-gulag-navigation-package.py", "test-gulag-navigation-package.py",
+            "test-gulag-zone-lifecycle.py", "test-gulag-integration.py",
+            "test-native-bfx-consumer.py",
+            "generate-native-nav-resource.py",
             "bot_style_paths.py", "prepare-map-images-package.py",
             "prepare-join-in-progress.py",
             "prepare-dw-verifier.py",
@@ -372,7 +380,7 @@ def prepare(pending_map_record=None):
             if root != "integration/host-scale" and path.name not in replay_additions:
                 continue
             name = path.relative_to(ROOT).as_posix()
-            if path.suffix not in (".cpp", ".h", ".lua") or name in overlays.values():
+            if path.suffix not in (".cpp", ".h", ".lua", ".hlsl") or name in overlays.values():
                 continue
             destination = "src/" + path.name
             if destination in overlays:
@@ -444,6 +452,8 @@ def prepare(pending_map_record=None):
         "dw_client_host", ROOT / "tools/prepare-host-scale-integration.py"
     )
     host.prepare(source, replace_owned=True)
+    gpu = load_module("dw_host_bot_gpu", ROOT / "tools/prepare-host-bot-gpu.py")
+    gpu.prepare(source)
     styles = load_module("dw_bot_style_data", ROOT / "tools/prepare-bot-style-data.py")
     styles.prepare(source)
     ranks = load_module("dw_bot_rank", ROOT / "tools/prepare-bot-rank-integration.py")
@@ -491,6 +501,34 @@ def prepare(pending_map_record=None):
     inspect_crosshair.prepare(source)
     slide_view = load_module("dw_slide_view", ROOT / "tools/prepare-slide-view.py")
     slide_view.prepare(source)
+    # Missing underground navigation is an additive native map asset. Its
+    # collision inputs and audits are frozen before any executable is built;
+    # incomplete or synthetic geometry cannot become a production package.
+    gulag_inputs_path = ROOT / "data/gulag-navigation/production-inputs.json"
+    gulag_inputs = read(gulag_inputs_path)
+    if gulag_inputs.get("schema") != 1 or gulag_inputs.get("map") != "mp_donetsk":
+        raise ValueError("Invalid canonical Gulag navigation inputs")
+    gulag_rows = gulag_inputs.get("resources", [])
+    if len(gulag_rows) != 6 or {row.get("arena") for row in gulag_rows} != set(range(6)):
+        raise ValueError("Gulag navigation must cover all six authored arenas")
+    gulag_resources = [inside(ROOT / row["resource"]) for row in gulag_rows]
+    gulag_reports = [inside(ROOT / row["report"]) for row in gulag_rows]
+    gulag_canonical = inside(ROOT / gulag_inputs["canonical_nav"])
+    gulag_package = load_module("dw_gulag_package", ROOT / "tools/prepare-gulag-navigation-package.py")
+    gulag_proof = gulag_package.prepare(
+        source, gulag_resources, gulag_reports,
+        source / "generated/gulag-navigation", canonical_nav=gulag_canonical,
+    )
+    gulag_header = digest(source / "src/DW_GulagNavPackage.h")
+    gulag_geometry = [inside(Path(read(path)["input"])) for path in gulag_reports]
+    for path in (gulag_inputs_path, *gulag_resources, *gulag_reports,
+                 *gulag_geometry, gulag_canonical):
+        source_inputs.append(dict(
+            source=path.relative_to(ROOT).as_posix(), source_sha256=digest(path),
+            compiled_source="src/DW_GulagNavPackage.h", compiled_sha256=gulag_header,
+        ))
+    if not gulag_proof["production_ready"] or gulag_proof["synthetic_format_fixture"]:
+        raise ValueError("Gulag package lacks actual audited collision geometry")
     assets = load_module("dw_update_assets", ROOT / "tools/dw_update_assets.py")
     assets.prepare(source)
     maps = load_module("dw_update_maps", ROOT / "tools/dw_update_maps.py")
@@ -658,6 +696,8 @@ def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     checks = (
         ("test-host-scale.py", ["--snapshot", str(source)], "host.json"),
         ("test-host-navigation.py", ["--snapshot", str(source)], "navigation.json"),
+        ("test-host-bot-gpu.py", [], "host-bot-gpu.json"),
+        ("test-host-gpu-movement.py", ["--snapshot", str(source)], "host-gpu-movement.json"),
         ("test-host-safety.py", ["--snapshot", str(source)], "host-safety.json"),
         ("test-host-command-ownership.py", ["--snapshot", str(source)], "host-command-ownership.json"),
         ("test-bot-behavior.py", ["--snapshot", str(source)], "bot-behavior.json"),
@@ -692,6 +732,7 @@ def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         ("test-bot-rank.py", ["--snapshot", str(source)], "bot-ranks.json"),
         ("test-bot-style-scripts.py", ["--snapshot", str(source)], "bot-style-scripts.json"),
         ("test-bot-style-zone.py", ["--snapshot", str(source)], "bot-style-zone.json"),
+        ("test-gulag-integration.py", [], "gulag-navigation.json"),
         ("test-weapon-inspect.py", [], "weapon-inspect.json"),
         ("test-weapon-inspect-runtime.py", [], "weapon-inspect-runtime.json"),
         ("test-weapon-inspect-blend.py", [], "weapon-inspect-blend.json"),

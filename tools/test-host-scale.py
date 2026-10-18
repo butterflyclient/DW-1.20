@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Runner:
-    def __init__(self, snapshot, build=None):
+    def __init__(self, snapshot, build=None, only=None):
         self.snapshot = snapshot
         self.proof = json.loads((snapshot / "generated/host-scale-integration.json").read_bytes())
         self.original = pefile.PE(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe", fast_load=True)
@@ -63,6 +63,8 @@ class Runner:
             destination = snapshot / "host-scale-test-objects"
             destination.mkdir(exist_ok=True)
             for symbol in self.entries:
+                if only and symbol not in only:
+                    continue
                 source = ROOT / "integration/host-scale" / (symbol + ".cpp")
                 obj = destination / (symbol + ".obj")
                 subprocess.run([r"C:\Program Files\LLVM\bin\clang++.exe",
@@ -122,7 +124,11 @@ class Runner:
                    "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
                    "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency")
         helpers += ("DW_LocalBackend_IsEnabled", "SV_HostBot_StampQueuedCommand",
-                    "DW_BotPolicy_ProfileSeed")
+                    "DW_BotPolicy_ProfileSeed", "DW_BotPolicy_IsBattleRoyale", "SV_HostBot_GasEvacuationRequired")
+        planner_symbols = self.report["symbols"] if self.report else {
+            symbol["name"] for obj in self.objects.values() for symbol in obj["symbols"].values()
+        } if edited else ()
+        helpers += tuple(name for name in planner_symbols if "@HostBotPlanner@@" in name)
         if edited and self.report:
             entry = self.base + self.report["symbols"][routine]
             for name in helpers:
@@ -132,12 +138,16 @@ class Runner:
             # The scheduling fixture models profile ownership in both object
             # and linked modes. Executing the real roster lookup here would
             # contradict its disabled-backend boundary and unseeded BotRecords.
-            for name in ("DW_LocalBackend_IsEnabled", "SV_HostBot_StampQueuedCommand", "DW_BotPolicy_ProfileSeed"):
+            for name in ("DW_LocalBackend_IsEnabled", "SV_HostBot_StampQueuedCommand", "DW_BotPolicy_ProfileSeed", "DW_BotPolicy_IsBattleRoyale"):
                 hooks[self.base + self.report["symbols"][name]] = name
             for name in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement",
                          "SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot",
                          "SV_HostBot_InGulag", "SV_HostBot_UpdateTravelUrgency"):
                 hooks[self.base + self.report["symbols"][name]] = name
+            for name in helpers:
+                if "@HostBotPlanner@@" in name or name == "SV_HostBot_GasEvacuationRequired":
+                    if name in self.report["symbols"]:
+                        hooks[self.base + self.report["symbols"][name]] = name
             for name in ("memcpy", "memcmp", "memset", "__chkstk", "__security_check_cookie"):
                 if name in self.report["symbols"]:
                     hooks[self.base + self.report["symbols"][name]] = name
@@ -203,6 +213,7 @@ class Runner:
         scopes = []
         urgency = []
         profile_queries = []
+        custom_calls = []
         entities, sentients, info, ai, interface, vtable = (0x51000000, 0x52000000, 0x53000000,
                                                          0x54000000, 0x54100000, 0x54200000)
         clients, players, commands, queues = 0x55000000, 0x5A000000, 0x5B000000, 0x5C000000
@@ -291,8 +302,15 @@ class Runner:
                 put(sentients + i * 184 + 72, case.get("target", 0), "<H")
                 put(client + 1368 + 8988, 0, "<I")
                 put(player, bytes(25000)); put(player + 21368, 2, "<i")
+                put(player + 22336, case.get('gulag_phase', 0), '<I')
+                put(client + 1368 + 516, case.get('script_goal_type', 0), '<I')
+                put(client + 1368 + 28068, case.get('grenade_flags', 0), '<I')
+                put(client + 1368 + 27884, case.get('grenade_hold_until', 0), '<i')
                 put(player + 448, i, "<i")
                 data = bytearray(rng.randbytes(264)); struct.pack_into("<iii", data, 12, now, now, now)
+                if case.get('idle_command'):
+                    struct.pack_into('<Q', data, 0, case.get('idle_buttons', 0))
+                    struct.pack_into('<H', data, 156, case.get('idle_movement', 0))
                 put(commands + i * 264, bytes(data))
                 if case.get("mixed"):
                     if i % 7 == 0:
@@ -348,6 +366,12 @@ class Runner:
             if kind is None:
                 return
             a, b, c, d = (vm.reg_read(r) for r in (UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9))
+            if "@HostBotPlanner@@" in kind:
+                # The scheduler fixture holds GPU navigation disabled. Backend
+                # execution and request lifetime are separate focused fixtures.
+                returned(); return
+            if kind == "SV_HostBot_GasEvacuationRequired":
+                returned(bool(case.get("gas_required", False))); return
             if kind == "__chkstk":
                 returned(vm.reg_read(UC_X86_REG_RAX)); return
             if kind == "__security_check_cookie":
@@ -356,6 +380,8 @@ class Runner:
                 returned(case.get("mode", 0) != 0); return
             if kind == "?Population@HostScale@@YAIXZ":
                 returned(case.get("population", 20)); return
+            if kind == "DW_BotPolicy_IsBattleRoyale":
+                returned(case.get('br_policy', True)); return
             if kind == "DW_BotPolicy_ProfileSeed":
                 assert 0 <= a < min(count, case.get('population', 20), 200)
                 client = get(symbols['SVHS_Clients'] + a * 8, '<Q')
@@ -366,7 +392,7 @@ class Runner:
                 assert get(player + 21368, '<i') == 2 and get(player + 21372, '<i') == 0
                 mapped_profile = bool(case.get('mapped_profile', True))
                 profile_queries.append((a, now, mapped_profile))
-                if mapped_profile: put(b, 120, '<Q')
+                if mapped_profile: put(b, 121 if now >= case.get('profile_change_time', 0x7fffffff) else 120, '<Q')
                 returned(mapped_profile); return
             if kind.startswith("?Record"):
                 stats.append((kind, a & 0xffffffff, b & 0xffffffff, c & 0xffffffff))
@@ -376,6 +402,8 @@ class Runner:
             if kind in ("SV_HostNav_BeginBot", "SV_HostNav_EndBot", "SV_HostNav_RefreshBotMovement"):
                 if kind != "SV_HostNav_RefreshBotMovement":
                     scopes.append((kind, now))
+                else:
+                    custom_calls.append((kind, (a - clients - 1368) // 321192, now))
                 returned(kind == "SV_HostNav_BeginBot"); return
             if kind == "SV_HostBot_InGulag":
                 slot = (a - clients - 1368) // 321192
@@ -385,6 +413,8 @@ class Runner:
                 if case.get('mode', 0):urgency.append(((a - clients - 1368) // 321192, now, bool(c & 255)))
                 returned(); return
             if kind in ("SV_HostBot_PrepareEquipment", "SV_HostBot_UpdateLoot", "SV_HostBot_FaceLoot"):
+                if kind != "SV_HostBot_PrepareEquipment":
+                    custom_calls.append((kind, (a - clients - 1368) // 321192, now))
                 returned(); return
             if kind == "SVHS_TransientFileLoaded":
                 events.append(("file-loaded", a)); returned(case.get("loaded", True)); return
@@ -518,6 +548,17 @@ class Runner:
                     if frame == case.get("gulag_at"):
                         for i in range(count):
                             put(players + i * 0x8000 + 22336, 0x200, '<I')
+                    if frame == case.get('phase_at'):
+                        for i in range(count):
+                            put(players + i * 0x8000 + 22336, case['phase_after'], '<I')
+                    if frame == case.get('goal_at'):
+                        for i in range(count): put(clients + i * 321192 + 1368 + 516, 2, '<I')
+                    if frame == case.get('grenade_at'):
+                        for i in range(count): put(clients + i * 321192 + 1368 + 28068, 1, '<I')
+                    if frame == case.get('weapon_flags_at'):
+                        for i in range(count): put(players + i * 0x8000 + 1796, 1, '<I')
+                    if frame == case.get('map_at'):
+                        put(symbols['SVHS_GameStatics'], 0x12345678, '<Q')
                     if frame == case.get("teleport_at"):
                         for i in range(count):
                             put(entities + i * 1440 + 304, struct.pack('<3f', 300., 0., 0.))
@@ -534,7 +575,7 @@ class Runner:
                             all_setup=bool(get(symbols['SVHS_AllTilesSetup'], '<B')), events=events)
             if routine == "SV_BotUpdateBots":
                 return dict(events=events, observed=observed, stats=stats, scopes=scopes, urgency=urgency,
-                            profile_queries=profile_queries,
+                            profile_queries=profile_queries, custom_calls=custom_calls,
                             active=get(symbols['SVHS_ActiveBotCount'], '<I'),
                             pings=bytes(vm.mem_read(symbols['SVHS_BotPingAnchor'] - 8, 512)).hex())
             if routine == "AICommon_UpdateSight":
@@ -552,13 +593,93 @@ class Runner:
             vm.hook_del(missing_hook)
 
 
+def waiting_jail_cases(runner):
+    """Execute actual scheduler instructions; model only native engine leaves."""
+    rows = []
+    cases = [
+        ('idle jail', {}, True),
+        ('150-player idle jail', {'population':150,'count':150}, True),
+        ('non-BR extra info', {'br_policy':False}, False),
+        ('arena', {'gulag_phase':0x400}, False),
+        ('overlapping transition', {'gulag_phase':0x600}, False),
+        ('script goal', {'script_goal_type':2}, False),
+        ('grenade continuation', {'grenade_flags':1}, False),
+        ('scripted grenade request', {'grenade_flags':2}, False),
+        ('grenade hold', {'grenade_hold_until':20000}, False),
+        ('native fire', {'idle_buttons':1}, False),
+        ('native grenade button', {'idle_buttons':0x1000}, False),
+        ('stock native button flags', {'idle_buttons':0x18002000000000}, False),
+        ('native movement', {'idle_movement':127}, False),
+        ('unmapped profile', {'mapped_profile':False}, False),
+        ('combat target', {'target':2}, False),
+        ('50ms native frame', {'frame_ms':50}, False),
+        ('64ms native frame', {'frame_ms':64}, False),
+        ('arena transition', {'phase_at':5,'phase_after':0x400}, None),
+        ('overlap transition', {'phase_at':5,'phase_after':0x600}, None),
+        ('leave jail', {'phase_at':5,'phase_after':0}, None),
+        ('enter jail', {'gulag_phase':0,'phase_at':5,'phase_after':0x200}, None),
+        ('arena to jail', {'gulag_phase':0x400,'phase_at':5,'phase_after':0x200}, None),
+    ]
+    cases += [(name,{trigger:5},None) for name,trigger in (
+        ('damage','damage_at'),('script buttons','script_at'),('new script goal','goal_at'),
+        ('grenade start','grenade_at'),('weapon flags','weapon_flags_at'),
+        ('weapon selection','equipment_at'),('teleport','teleport_at'),
+        ('map owner','map_at'),('time rewind','rewind_at'),('new target','target_at'))]
+    cases.append(('profile identity',{'profile_change_time':10100},None))
+    for label,extra,expected_reuse in cases:
+        case=dict(population=21,count=21,frames=12,frame_ms=20,gulag_phase=0x200,idle_command=True)
+        # Avoid duplicate kwargs when a scenario selects another phase/frame.
+        case.update(extra)
+        count=case['count']
+        original=runner.run('SV_BotUpdateBots',False,case)
+        on=runner.run('SV_BotUpdateBots',True,{**case,'mode':1})
+        decisions=[e for e in on['events'] if e[0]=='decision']
+        full=len([e for e in original['events'] if e[0]=='decision'])
+        assert on['active']==original['active'] and on['pings']==original['pings'],label
+        # Worker completion can reorder bots. Compare exact command multisets;
+        # hashes cover all 264 bytes, timestamps are asserted on every call,
+        # and sorting preserves duplicate counts.
+        assert sorted(on['observed'])==sorted(original['observed']),('native idle commands changed',label)
+        if 'rewind_at' not in extra:
+            assert len(on['observed'])==count*12,('lost movement tick',label)
+        if expected_reuse is True:
+            assert 0<len(decisions)<full/2,('idle jail did not reuse bounded decisions',label,len(decisions),full)
+            for slot in range(count):
+                times=[e[2] for e in decisions if e[1]==slot]
+                assert times and max(b-a for a,b in zip(times,times[1:]))<=64,('jail native think starved',slot,times)
+            thought={(e[1],e[2]) for e in decisions}
+            assert all((slot,time) in thought for _,slot,time in on['custom_calls']), 'Reused jail entered custom movement/loot'
+            assert all((slot,time) in thought and not reused for slot,time,reused in on['urgency']), 'Reused jail entered travel urgency'
+            assert not on['scopes'], 'Waiting jail entered approximate/GPU navigation scope'
+        if expected_reuse is False:
+            assert len(decisions)==full,('active jail/arena action cadence changed',label,len(decisions),full)
+        trigger=next((key for key in ('phase_at','damage_at','script_at','goal_at','grenade_at','weapon_flags_at',
+                                     'equipment_at','teleport_at','map_at','rewind_at','target_at') if key in extra),None)
+        instant=10000+extra[trigger]*case['frame_ms']-(1000 if trigger=='rewind_at' else 0) if trigger else extra.get('profile_change_time')
+        if instant is not None:
+            assert sum(e[2]==instant for e in decisions)==count,('transition failed immediate full think',label)
+        if extra.get('phase_after') in (0x400,0x600):
+            assert sum(e[2]>=instant for e in decisions)==count*(12-extra['phase_at']),('arena stopped full cadence',label)
+        print('PASS waiting jail:', label, len(decisions), '/', full, flush=True)
+        rows.append(dict(name=label,native_decisions=full,scheduled_decisions=len(decisions),movement_commands=len(on['observed'])))
+    return dict(schema=1,scenarios=len(rows),actual_scheduler_instructions=True,engine_boundaries='modeled',
+                live_game_execution=False,jail_phase=0x200,arena_phase=0x400,max_idle_think_ms=64,cases=rows)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--build", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--jail-only', action='store_true', help='Focused actual scheduler instruction regression')
     args = parser.parse_args()
-    runner = Runner(args.snapshot, args.build)
+    runner = Runner(args.snapshot, args.build, {'SV_BotUpdateBots'} if args.jail_only else None)
+    if args.jail_only:
+        receipt = waiting_jail_cases(runner)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(receipt, indent=2)+'\n')
+        print('PASS waiting jail instruction cases', receipt['scenarios'], flush=True)
+        return
     total, reductions = 0, []
     sight_cases = [dict(count=n, population=min(n, 200), seed=n)
                    for n in (1, 2, 20, 21, 64, 65, 100, 101, 150, 200, 272)]
@@ -683,7 +804,9 @@ def main():
         assert 0 < human_cases[8000, 2] == human_cases[100, 2], 'Mapped distant combat lost frame priority'
         assert human_cases[8000, 1] == human_cases[100, 2], 'Distant human target lost priority'
         assert human_cases[800, None] > human_cases[8000, None], 'Nearby human acquisition lost priority'
-    print('PASS bot decision cadence and command continuity', total, flush=True)
+    jail_receipt = waiting_jail_cases(runner)
+    total += jail_receipt['scenarios']
+    print('PASS bot decision cadence and command continuity including waiting jail', total, flush=True)
     for tile in (0, 31, 32, 560, 1023):
         for worlds, models in ((0, 0), (31, 31), (3, 0), (1, 0), (0, 1), (16, 31), (31, 16)):
             for requested in (True, False):

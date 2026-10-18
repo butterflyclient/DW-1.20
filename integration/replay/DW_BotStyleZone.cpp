@@ -2,6 +2,7 @@
 #include "DW_BotStyleZoneBindings.h"
 #include "DW_MapImagesPackage.h"
 #include "DW_WeaponInspectPackage.h"
+#include "DW_GulagNavPackage.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -521,21 +522,30 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     const char *const publishedImagesZone = DWMapImages::ZoneName;
     const DWBotStyleScriptPackage *package = DW_BotStyleScripts_GetPackage();
     const DWBotStyleScriptPackage &inspectPackage = DWWeaponInspectPackage::Package;
+    const DWBotStyleScriptPackage &gulagPackage = DWGulagNavPackage::Package;
     const DWBotStyleFastfileInfo *common = nullptr, *ui = nullptr, *boot = nullptr;
+    const DWBotStyleFastfileInfo *verdansk = nullptr;
     bool supplied = false, imagesSupplied = false, publishedSupplied = false;
     bool inspectSupplied = false;
+    bool gulagSupplied = false;
+    uint32_t requestZoneFlags = 0;
     for (uint32_t i = 0; info && i < count; ++i)
     {
+        requestZoneFlags |= info[i].zoneFlags;
         if (equal(info[i].name, "common_base_mp"))
             common = &info[i];
         if (equal(info[i].name, "ui"))
             ui = &info[i];
         if (equal(info[i].name, "common"))
             boot = &info[i];
+        if (equal(info[i].name, "mp_donetsk"))
+            verdansk = &info[i];
         if (package && equal(info[i].name, package->zoneName))
             supplied = true;
         if (equal(info[i].name, inspectPackage.zoneName))
             inspectSupplied = true;
+        if (equal(info[i].name, gulagPackage.zoneName))
+            gulagSupplied = true;
         if (equal(info[i].name, kMapImagesZone))
             imagesSupplied = true;
         if (equal(info[i].name, publishedImagesZone))
@@ -575,18 +585,26 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     bool bot = common && package && !supplied && DWBSZ_PollFastfileState(package->zoneName) == 0;
     bool inspection = common && !inspectSupplied &&
                       DWBSZ_PollFastfileState(inspectPackage.zoneName) == 0;
+    // These resources cover the shipped underground arenas. Load them only
+    // with Verdansk, in its native unload group; frontend and transient zone
+    // requests must not attach world navigation to a different map.
+    // Native DB_LoadFastfiles selects Preload for the entire batch from these
+    // flags. This package reserves the ordinary Load root in stream1 only.
+    // Leave preload requests untouched; the later ordinary map request adds it.
+    bool gulag = verdansk && (requestZoneFlags & 0x3F00000u) == 0 && !gulagSupplied &&
+                 DWBSZ_PollFastfileState(gulagPackage.zoneName) == 0;
     const bool images = imageAnchor && !imagesSupplied && DW_MapImages_ZoneInstalled() &&
                         DWBSZ_PollFastfileState(kMapImagesZone) == 0;
     bool published = imageAnchor && !publishedSupplied && s_publishedImages >= 0 &&
                      DWBSZ_PollFastfileState(publishedImagesZone) == 0;
-    if (!bot && !images && !published && !inspection)
+    if (!bot && !images && !published && !inspection && !gulag)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     Kernel api{};
-    if (!resolve(api) || count >= UINT32_MAX - 4 ||
-        static_cast<size_t>(count) + 4 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
+    if (!resolve(api) || count >= UINT32_MAX - 5 ||
+        static_cast<size_t>(count) + 5 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
     {
         DWBSZ_Print(10, "DW: native overlay request failed; original zone request retained.\n");
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
@@ -603,6 +621,11 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
         DWBSZ_Print(10, "DW: inspection animation staging failed; inspection unavailable.\n");
         inspection = false;
     }
+    if (gulag && !stage(api, gulagPackage, "dw_gulag_nav_"))
+    {
+        DWBSZ_Print(10, "DW: Gulag navigation staging failed; stock map request retained.\n");
+        gulag = false;
+    }
     if (published && !s_publishedImages)
     {
         s_publishedImages = stageMapImages(api) ? 1 : -1;
@@ -610,14 +633,14 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             DWBSZ_Print(10, "DW: published map image zone staging failed; map images omitted.\n");
     }
     published = published && s_publishedImages > 0;
-    if (!bot && !images && !published && !inspection)
+    if (!bot && !images && !published && !inspection && !gulag)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     void *heap = api.heap();
     auto *augmented = static_cast<DWBotStyleFastfileInfo *>(
-        api.alloc(heap, 0, (static_cast<size_t>(count) + 4) * sizeof(DWBotStyleFastfileInfo)));
+        api.alloc(heap, 0, (static_cast<size_t>(count) + 5) * sizeof(DWBotStyleFastfileInfo)));
     if (!augmented)
     {
         DWBSZ_Print(10, "DW: native overlay request allocation failed.\n");
@@ -627,6 +650,15 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     uint32_t at = 0;
     for (uint32_t i = 0; i < count; ++i)
     {
+        if (&info[i] == verdansk && gulag)
+        {
+            // Native Nav_AddPendingMesh accumulates resources from distinct
+            // assets. The stock map remains last, retaining its global bounds
+            // and exposure settings. The package also copies those exact
+            // settings, and never replaces the stock navmesh or tactical data.
+            augmented[at] = info[i];
+            augmented[at++].name = gulagPackage.zoneName;
+        }
         if (&info[i] == common && inspection)
         {
             // Register real XAnims and their ANM names before the common
@@ -665,6 +697,12 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     if (inspection)
         DWBSZ_Print(10, "DW: inspection animation zone '%s' precedes common_base_mp.\n",
                     inspectPackage.zoneName);
+    if (gulag)
+    {
+        DWBSZ_Print(10, "DW: native Gulag navigation zone '%s' precedes mp_donetsk.\n",
+                    gulagPackage.zoneName);
+        logZoneRequest("DW_GULAG_NAV added before", verdansk, 1, loadFlags);
+    }
     if (published)
         DWBSZ_Print(10, "DW: published map image zone '%s' precedes %s.\n", publishedImagesZone,
                     imageAnchor->name);

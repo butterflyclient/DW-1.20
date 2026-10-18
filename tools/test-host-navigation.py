@@ -95,6 +95,15 @@ class Runner:
                   "SV_HostNav_PrintStatus":"print", "SV_HostBot_GetLootGoal":"loot-goal",
                   "SV_HostBot_InGulag":"gulag", "SVHBE_WeaponMap":"weapon-map",
                   "DW_BotPolicy_ProfileSeed":"mapped-profile"}
+        common["sqrtf"] = "sqrtf"
+        common.update({"SV_HostBot_GasEvacuationRequired":"gas-required",
+                       "SV_HostBot_GetGasGoal":"gas-goal", "SV_HostBot_GetGasState":"gas-state"})
+        planner_names = self.report["symbols"] if self.report else {
+            symbol["name"] for obj in self.objects for symbol in obj["symbols"].values()
+        } if edited else ()
+        for name in planner_names:
+            if "@HostBotPlanner@@" in name:
+                common[name] = "planner-" + name.split("@", 1)[0][1:].lower()
         if not self.report:
             # Object-only navigation fixtures model the equipment boundary.
             # A linked fixture executes the actual compiled read-only helper.
@@ -225,6 +234,28 @@ class Machine:
         if kind=="thread-id":self.ret(self.thread)
         elif kind=="mode":self.ret(self.mode!=0)
         elif kind=="population":self.ret(self.population)
+        elif kind == 'sqrtf':
+            value = struct.unpack('<f', struct.pack('<I', self.uc.reg_read(UC_X86_REG_XMM0) & 0xffffffff))[0]
+            bits = struct.unpack('<I', struct.pack('<f', math.sqrt(value)))[0]
+            self.uc.reg_write(UC_X86_REG_XMM0, bits);self.ret()
+        elif kind.startswith('planner-'):
+            action = kind.removeprefix('planner-')
+            if action == 'enabled':self.ret(getattr(self, 'gpu_enabled', False))
+            elif action == 'pending':self.ret(getattr(self, 'gpu_state', 0) != 0)
+            elif action == 'take':
+                state = getattr(self, 'gpu_state', 0) if getattr(self, 'gpu_enabled', False) else 0
+                if state == 2:
+                    output = self.get(self.uc.reg_read(UC_X86_REG_RSP) + 64, '<Q')
+                    self.put(output, struct.pack('<3f', *self.gpu_waypoint)); self.gpu_state = 0
+                self.ret(state)
+            elif action == 'queue':
+                enabled = getattr(self, 'gpu_enabled', False)
+                if enabled:self.gpu_queues = getattr(self, 'gpu_queues', 0) + 1
+                accepted = enabled and getattr(self, 'gpu_queue_accept', False)
+                if accepted:self.gpu_state = 1
+                self.ret(accepted)
+            elif action == 'cancel':self.gpu_state = 0;self.ret()
+            else:self.ret()
         elif kind == "cookie":self.ret(self.uc.reg_read(UC_X86_REG_RAX))
         elif kind == "print":self.ret()
         elif kind in ("memcpy","SVHS_NavMemmove"):
@@ -298,6 +329,18 @@ class Machine:
             goal = getattr(self, 'loot_goal', None)
             if goal is not None:self.put(b, struct.pack('<3f', *goal))
             self.ret(goal is not None)
+        elif kind == 'gas-required':self.ret(getattr(self, 'gas_required', False))
+        elif kind == 'gas-goal':
+            goal = getattr(self, 'gas_goal', None) if getattr(self, 'gas_required', False) else None
+            if goal is not None:self.put(b, struct.pack('<3f', *goal))
+            self.ret(goal is not None)
+        elif kind == 'gas-state':
+            valid = getattr(self, 'gas_required', False)
+            if valid:
+                self.put(a, struct.pack('<3f3fffiiBBxx', *getattr(self, 'gas_center', (0., 0., 0.)),
+                    *getattr(self, 'gas_center', (0., 0., 0.)), getattr(self, 'gas_radius', 1000.),
+                    getattr(self, 'gas_radius', 1000.), 1000, 1, False, True))
+            self.ret(valid)
         elif kind == 'gulag':self.ret(getattr(self, 'gulag', False))
         elif kind == 'equipment-active':
             self.ret(bool(a and self.get(a + 448, '<Q') and self.get(a + 28068, '<I') & 3))
@@ -562,6 +605,15 @@ def install_bot_tls(vm):
     return tls
 
 
+def map_mesh_bot(vm):
+    bot, entity = 0x5b000000, 0x5b010000
+    client = bot - 1368
+    vm.put(client, bytes(1368));vm.put(client + 280, entity, '<Q')
+    vm.put(client + 214756, 2, '<i')
+    vm.put(vm.symbols['SVHS_Clients'], client, '<Q')
+    vm.put(vm.symbols['SVHS_ClientCount'], 1, '<I')
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot",type=Path,required=True)
@@ -717,12 +769,51 @@ def main():
         assert any(event[0] == 'path-request' for event in tactical['events'])
         total += 1
         failed=mesh_bot(runner.machine(True,mode),'failed')
-        assert failed['movement']=='0000' and all(e[0]!='follow-path' for e in failed['events'])
+        assert failed['movement'] == mesh_bot(runner.machine(False), 'failed')['movement']
+        assert all(e[0]!='follow-path' for e in failed['events'])
         unreachable = mesh_bot(runner.machine(True, mode), 'unreachable')
-        assert unreachable['movement'] == '0000'
+        assert unreachable['movement'] == mesh_bot(runner.machine(False), 'unreachable')['movement']
         assert all(e[0] not in ('path-request', 'follow-path') for e in unreachable['events'])
         total += 1
         total+=2
+        # Execute the actual compiled movement entry with modeled authoritative
+        # circle data. Escape outranks a pre-existing tactical route and combat.
+        vm = runner.machine(True, mode)
+        vm.gas_required = vm.can_fire = True
+        vm.gas_center = vm.gas_goal = (2000., 0., 0.)
+        vm.loot_goal = (-2000., 0., 0.)
+        gas_route = mesh_bot(vm, 'normal', goal_type=5,
+                             native_goal=(-2000., 0., 0.), existing_path=True)
+        assert next(e[1] for e in gas_route['events'] if e[0] == 'path-request') == vm.gas_goal
+        assert gas_route['events'][-1] == ('steer-path', 127)
+        assert gas_route['movement'] == '286e'
+        assert getattr(vm, 'gpu_queues', 0) == 0
+        total += 1
+        vm = runner.machine(True, mode)
+        mesh_bot(vm, 'normal');map_mesh_bot(vm)
+        vm.gpu_enabled = True;vm.gpu_state = 1
+        before = len(vm.events)
+        vm.put(vm.symbols['SVHS_LevelTime'], 1016, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert vm.events[before:] == [('follow-path',)], 'Pending GPU work erased an existing native route'
+        assert getattr(vm, 'gpu_queues', 0) == 0
+        vm.gpu_state = 2;vm.gpu_waypoint = (320., 0., 0.)
+        before = len(vm.events)
+        vm.put(vm.symbols['SVHS_LevelTime'], 1032, '<i')
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert next(e[1] for e in vm.events[before:] if e[0] == 'path-request') == vm.gpu_waypoint
+        assert vm.events[-1] == ('follow-path',)
+        # A completed patrol search must not replace a newly authored critical
+        # script destination. The native critical route retains ownership.
+        vm.gpu_state = 2
+        vm.put(0x5b000000 + 516, 5, '<I')
+        vm.put(0x5b000000 + 472, struct.pack('<3f', -1500., 400., 0.))
+        vm.put(vm.symbols['SVHS_LevelTime'], 1048, '<i')
+        before = len(vm.events)
+        vm.call('Bot_UpdateMove_OffPathGrid', 0x5b000000, 0x5b060000)
+        assert not any(e[0] == 'path-request' for e in vm.events[before:])
+        assert vm.gpu_state == 0, 'Stale GPU patrol survived a changed critical script goal'
+        total += 3
         vm = runner.machine(True, mode)
         mesh_bot(vm, 'normal')
         # A cached decision must steer again without replanning or rescanning
@@ -742,9 +833,10 @@ def main():
         assert vm.get(tls + 16, '<Q') == 0x5d004000
         vm.path_exists = False
         before = len(vm.events)
+        previous_command = bytes(vm.uc.mem_read(0x5b060000, 264))
         vm.call('SV_HostNav_RefreshBotMovement', 0x5b000000, 0x5b060000)
         assert vm.events[before:] == []
-        assert vm.get(0x5b060000 + 156, '<H') == 0
+        assert bytes(vm.uc.mem_read(0x5b060000, 264)) == previous_command
         total += 2
         # Native routes also need fresh corner steering between full decisions.
         vm = runner.machine(True, mode)
@@ -892,7 +984,7 @@ def main():
     vm.call('Sentient_NearestTacPoint', sentient)
     assert len(vm.events) > before  # No negative cache outside the owning bot thread.
     total += 4
-    print('PASS mesh-only routing, failed-path stop and empty tactical-graph fast return',total,flush=True)
+    print('PASS mesh-only routing, failed-path native movement preservation and empty tactical-graph fast return',total,flush=True)
     for count in (1,2,7,65):
         for blocked in (False,True):
             for tracked in (False,True,2):

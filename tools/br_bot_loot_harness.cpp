@@ -203,6 +203,45 @@ extern "C" __declspec(dllexport) int Test_Run()
         SV_HostBot_UpdateLoot(&bot, &command);
     }
     CHECK(scans - before == 4);
+    entity.number = 0;
+    entity.origin = {1200, 0, 16};
+    BotGasState gas{{0, 0, 0}, {100, 0, 0}, 1000, 500, 0, 0, false, true};
+    SV_HostBot_ResetGasState();
+    CHECK(SV_HostBot_PublishGasState(&gas));
+    CHECK(SV_HostBot_GasEvacuationRequired(&bot));
+    firing = true;
+    sentient.targetHandle = 2;
+    CHECK(SV_HostBot_GasEvacuationRequired(&bot)); // Combat must yield movement priority.
+    CHECK(SV_HostBot_GetGasGoal(&bot, &goal) && goal.x == 0 && goal.z == 16);
+    Vec3 stable = goal;
+    entity.origin.x = 1100;
+    CHECK(SV_HostBot_PublishGasState(&gas));
+    CHECK(SV_HostBot_GetGasGoal(&bot, &goal) && goal.x == stable.x && goal.z == stable.z);
+    firing = false;
+    sentient.targetHandle = 0;
+    CHECK(!SV_HostBot_GetLootGoal(&bot, &goal) && !SV_HostBot_AllowSurvival(&bot));
+    gas.closing = true;
+    CHECK(SV_HostBot_PublishGasState(&gas));
+    CHECK(SV_HostBot_GetGasGoal(&bot, &goal) && goal.x == 100);
+    entity.origin.x = 100;
+    CHECK(!SV_HostBot_GasEvacuationRequired(&bot));
+    entity.origin.x = 1100;
+    Field<uint32_t>(client, 22336) = 0x600;
+    CHECK(!SV_HostBot_GasEvacuationRequired(&bot));
+    Field<uint32_t>(client, 22336) = 0;
+    BotGasState copy{};
+    CHECK(SV_HostBot_GetGasState(&copy));
+    const auto generation = copy.generation;
+    SVHS_LevelTime += 2001;
+    CHECK(!SV_HostBot_GetGasState(&copy));
+    SVHS_LevelTime = 4000;
+    CHECK(!SV_HostBot_GetGasState(&copy));
+    CHECK(SV_HostBot_PublishGasState(&gas));
+    CHECK(SV_HostBot_GetGasState(&copy) && copy.generation != generation);
+    SV_HostBot_ResetGasState();
+    CHECK(!SV_HostBot_GetGasState(&copy));
+    gas.currentRadius = -1;
+    CHECK(!SV_HostBot_PublishGasState(&gas) && !SV_HostBot_GetGasState(&copy));
     CHECK(tlsValue == reinterpret_cast<void *>(0x1111));
     return 0;
 }

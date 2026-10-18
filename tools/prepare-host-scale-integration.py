@@ -447,6 +447,11 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
     equipment_module = importlib.util.module_from_spec(equipment_spec)
     equipment_spec.loader.exec_module(equipment_module)
     equipment_proof = equipment_module.configure(pe, by_id, funcs, snapshot)
+    graph_spec = importlib.util.spec_from_file_location(
+        "host_nav_graph_preparation", ROOT / "tools/prepare-host-nav-graph.py")
+    graph_module = importlib.util.module_from_spec(graph_spec)
+    graph_spec.loader.exec_module(graph_module)
+    graph_proof = graph_module.configure(pe, by_id, funcs, snapshot)
     (snapshot / "src/SV_HostScaleBindings.h").write_text(header, encoding="utf-8")
     sys.path.insert(0, str(snapshot / "tools"))
     spec = importlib.util.spec_from_file_location("private_host_scale_catalog", snapshot / "tools/source_catalog.py")
@@ -518,6 +523,7 @@ void SVHS_GlassNotify(void *, uint32_t, unsigned);
                   entity_bytes=1440, sentient_bytes=184, sentient_info_bytes=64,
                   team_bit_count=160, sight_capacity=272, client_capacity=200,
                   equipment_bindings=equipment_proof,
+                  gpu_navigation_graph=graph_proof,
                   command_ownership=dict(
                       worker_identity="fn_98ca31595956f57c",
                       bot_info_offset=1368, bot_info_entity_offset=0,

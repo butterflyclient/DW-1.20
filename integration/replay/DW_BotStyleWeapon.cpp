@@ -257,6 +257,30 @@ extern "C" void DW_BotSurvivalAllowedMethod(void *context, uint64_t self)
     SM_AddBool(context, allowed ? 1 : 0);
 }
 
+extern "C" void DW_BotGasStateMethod(void *context, uint64_t self)
+{
+    bool published = false;
+    if (!((self >> 32) & 0xff) && uint32_t(self) < 200 &&
+        SM_GetNumParam(context) == 5 && DW_BotPolicy_IsBattleRoyale())
+    {
+        auto *entity = static_cast<HostScale::Entity *>(SM_GetEntity(self));
+        uint64_t profile = 0;
+        if (DWBot_IsCurrentEntity(uint32_t(self), entity) &&
+            DW_BotPolicy_ProfileSeed(uint32_t(self), &profile))
+        {
+            HostScale::BotGasState gas{};
+            SM_GetVector(context, 0, &gas.currentCenter);
+            gas.currentRadius = SM_GetFloat(context, 1);
+            SM_GetVector(context, 2, &gas.nextCenter);
+            gas.nextRadius = SM_GetFloat(context, 3);
+            gas.closing = SM_GetInt(context, 4) != 0;
+            gas.valid = true;
+            published = SV_HostBot_PublishGasState(&gas);
+        }
+    }
+    SM_AddBool(context, published ? 1 : 0);
+}
+
 // Class preload can run synchronously inside ConnectBot, before its caller
 // marks TC_BOT and binds the roster record. Only the later managed MP receiver
 // may rebuild that cached class; keep worker/input ownership equally strict.

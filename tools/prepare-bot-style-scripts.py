@@ -43,6 +43,7 @@ IMAGE_HASH = "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
 METHOD_ID = 0x8787
 SURVIVAL_METHOD_ID = 0x8788
 MP_CLASS_METHOD_ID = 0x8789
+GAS_STATE_METHOD_ID = 0x878A
 ORIGINAL_HASHES = {
     "1827.gscbin": "b6ede9e3437161cd6eafa3de808d69a1d9e724e4f04b93d8a71fecf53ea28be2",
     "scripts/mp/bots/bots_gametype_br.gsc.gscbin": "e3abf284c279a21d6567dc93cc47f1e9d927ec92924af0cc1f6043e4dc62a58a",
@@ -232,27 +233,17 @@ def survival_edits():
         exported("scripts/mp/gametypes/br.gsc.gscbin", 0x2395), 0x69)
     inserting, inserting_source, inserting_event = stock_instruction(
         exported("2300.gscbin", "br_use_armor_plate"), 0x17)
-    critical, critical_source, critical_event = stock_instruction(
-        exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_br_circle_think"), 0xC5)
-    goal, goal_source, _ = stock_instruction(
-        exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_br_circle_think"), 0xCE)
     if (heal[0] != 0x60 or len(heal) != 4 or
         heal_event["first"].get("string") != "scripts/mp/gametypes/br_pickups.gsc" or
         heal_event["second"].get("string") != "playerusehealslot" or
-        inserting[0] != 0x3C or inserting_event["token"].get("string") != "insertingarmorplate" or
-        critical[0] != 0x7A or critical_event["string"].get("string") != "critical" or
-        goal != bytes.fromhex("84065780") or goal_source):
-        raise ValueError("Stock armor/import/critical goal contract changed")
+        inserting[0] != 0x3C or inserting_event["token"].get("string") != "insertingarmorplate"):
+        raise ValueError("Stock armor/import contract changed")
     functions = {e["name"].get("string"): int(e["function_at"], 16)
                  for e in bot[2] if "function_at" in e}
-    local_index = 1 + max(bot[1][pc + 1] for pc, op, _ in _script_instructions(bot[1])
-                          if start <= pc < start + int(bot[3]["size"], 16) and op in (0x30, 0x5B))
-    if local_index > 255:
-        raise ValueError("Survival temporary exceeds native local index range")
     field = bytes.fromhex("ffffffff")
     literal = struct.pack("<I", 0) + b"dw_survival_next_ms\0"
 
-    def fragment(armor):
+    def armor_fragment():
         code, source, references = bytearray(), bytearray(), []
         labels, branches = {}, []
         def emit(value, consumed=b""):
@@ -267,35 +258,61 @@ def survival_edits():
         emit(b"\x53\x59")
         labels["due_condition"] = len(code)
         branch(0x72, "normal")
-        if armor:
-            # Advance the shared cadence even when armor is denied or gas owns
-            # the route. The stock heal-slot chain retains charge/armor checks.
-            emit(bytes.fromhex("1dd70066f4010218") + field, literal)
-            local("bot_is_in_gas"); branch(0x0E, "normal")
-            emit(b"\x3a\x7e" + struct.pack("<H", SURVIVAL_METHOD_ID)); branch(0x72, "normal")
-            emit(inserting, inserting_source); emit(b"\xa8"); branch(0x0E, "normal")
-            emit(b"\x15\x1a"); emit(heal, heal_source); emit(b"\x58")
-        else:
-            # Run before ordinary hunt/loot navigation; the native critical
-            # priority prevents a local loot goal from stealing a gas escape.
-            local("bot_is_in_gas"); branch(0x72, "normal")
-            local("getrandompointinsafecirclenearby")
-            emit(b"\x5b" + bytes([local_index]) + b"\x3e\xa7"); branch(0x72, "cleanup")
-            emit(b"\x5c\x1a\x1a"); emit(critical, critical_source)
-            emit(bytes.fromhex("16803e3a")); emit(goal); emit(b"\x58")
-            labels["cleanup"] = len(code)
-            # The native goal setter rejects lower priorities while critical is
-            # active. Restore the local scope and retain the stock hunt branch;
-            # crossing that branch with a synthetic jump breaks its structure.
-            emit(b"\x03\x01")
+        # Advance the cadence even when armor is denied or gas owns the route.
+        # The stock heal-slot chain retains charge/armor checks.
+        emit(bytes.fromhex("1dd70066f4010218") + field, literal)
+        local("bot_is_in_gas"); branch(0x0E, "normal")
+        emit(b"\x3a\x7e" + struct.pack("<H", SURVIVAL_METHOD_ID)); branch(0x72, "normal")
+        emit(inserting, inserting_source); emit(b"\xa8"); branch(0x0E, "normal")
+        emit(b"\x15\x1a"); emit(heal, heal_source); emit(b"\x58")
         labels["normal"] = len(code)
         for operand, label in branches:
             struct.pack_into("<h", code, operand, labels[label] - operand - 2)
-        return Edit(0x394 if armor else 0x355, b"", bytes(code),
-                    "500ms stock heal-slot armor policy yielding to gas" if armor else
-                    "500ms stock safe-circle critical gas route before normal destination policy",
+        return Edit(0x394, b"", bytes(code),
+                    "500ms stock heal-slot armor policy yielding to gas",
                     function_token=0x2039, source=bytes(source), references=tuple(references))
-    return fragment(False), fragment(True)
+    # Publish authoritative current/next circles before the ordinary tactical
+    # destination gate. Native evacuation now selects a stable destination;
+    # distant random safe-point projection no longer gates gas movement.
+    gas_function = exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_is_in_gas")
+    code, consumed = bytearray(), bytearray()
+    labels, branches = {}, []
+    gas_stamp_literal = struct.pack("<I", 0) + b"dw_gas_sample_ms\0"
+    def gas_branch(opcode, target):
+        code.extend(bytes([opcode]) + bytes(2))
+        branches.append((len(code) - 2, target))
+    def gas_stamp(opcode):
+        code.extend(bytes([opcode]) + field)
+        consumed.extend(gas_stamp_literal)
+    def copy_instruction(owner, offset):
+        instruction, source_bytes, _ = stock_instruction(owner, offset)
+        code.extend(instruction); consumed.extend(source_bytes)
+    copy_instruction(bot, 0x23B)  # level.br_circle
+    code.extend(b"\xa7"); gas_branch(0x72, "done")
+    # The circles are global: sample once per level time, before any getter.
+    # This is the pinned compiler's exact level-field/short-circuit pattern.
+    # Inequality permits clock rewind; a new map owns a fresh level object.
+    gas_stamp(0x7B); code.extend(b"\xa7\x77")
+    gas_branch(0x1C, "due_condition")
+    gas_stamp(0x7B); code.extend(bytes.fromhex("1dd7009759"))
+    labels["due_condition"] = len(code)
+    gas_branch(0x72, "done")
+    copy_instruction(gas_function, 0xD)  # level.circleclosing
+    code.extend(b"\xa8")  # stock istrue: undefined becomes false
+    for offset in (0x1C, 0x16, 0x7, 0x1):
+        copy_instruction(gas_function, offset)  # reverse argument order
+    code.extend(b"\x3a\x83" + struct.pack("<H", GAS_STATE_METHOD_ID))
+    gas_branch(0x72, "done")
+    # Failed/rejected publishers must leave the same tick available to a later
+    # valid bot. Never suppress retries by stamping an unaccepted sample.
+    code.extend(bytes.fromhex("1dd700")); gas_stamp(0x38)
+    labels["done"] = len(code)
+    for operand, label in branches:
+        struct.pack_into("<h", code, operand, labels[label] - operand - 2)
+    publish = Edit(0x23B, b"", bytes(code),
+                   "publish accepted global BR circles once per level time before tactical-goal gate",
+                   function_token=0x2039, source=bytes(consumed))
+    return publish, armor_fragment()
 
 
 def custom_loadout_gate():
@@ -910,7 +927,7 @@ def method_binding(snapshot):
         or bounds.get("extended_count") != 1927 + len(registry)
         or bounds.get("extended_end") != 0x8000 + 1927 + len(registry)
         or registered_ids != list(range(0x8787, 0x8787 + len(registry)))
-        or len(registry) != 3
+        or len(registry) != 4
     ):
         raise ValueError(
             "Custom method array bounds do not include the expected registered ID"
@@ -935,6 +952,12 @@ def method_binding(snapshot):
         mp_class[0].get("result") != "bool" or mp_class[0].get("opcode") != 0x7E or
         mp_class[0].get("callback_symbol") != "DW_BotMPClassReadyMethod"):
         raise ValueError("MP class readiness requires the exact zero-argument scalar bool registry")
+    gas = [r for r in registry if r.get("id") == GAS_STATE_METHOD_ID]
+    if (len(gas) != 1 or gas[0].get("name") != "dw_bot_gas_state" or
+        gas[0].get("argument_count") != 5 or gas[0].get("receiver") != "entity" or
+        gas[0].get("result") != "bool" or gas[0].get("opcode") != 0x83 or
+        gas[0].get("callback_symbol") != "DW_BotGasStateMethod"):
+        raise ValueError("Gas state requires the exact five-argument scalar bool registry")
     owner = snapshot / receipt["source"]
     if sha(owner.read_bytes()) != receipt["source_sha256"]:
         raise ValueError(
@@ -984,10 +1007,13 @@ def compile_package(snapshot, binding):
                                          actual_custom_method_binding=binding)
         if result["inserted_survival_method_id"]:
             if not all(value in fresh for value in ("dw_survival_next_ms", "playerusehealslot",
-                       '128, "critical"', "gettime() + 500", "!bot_is_in_gas()")):
+                       "dw_gas_sample_ms", "gettime() + 500", "!bot_is_in_gas()")):
                 raise ValueError("Fresh decompile does not retain the survival policy")
-            result["survival_policy"] = dict(main_function=0x2039, gas_offset=0x355, armor_offset=0x394,
-                cooldown_ms=500, gas_priority="critical", gas_radius=128,
+            result["survival_policy"] = dict(main_function=0x2039, gas_offset=0x23B, armor_offset=0x394,
+                cooldown_ms=500, gas_state_method=GAS_STATE_METHOD_ID,
+                gas_before_tactical_gate=True, gas_random_destination_removed=True,
+                gas_global_sample_field="level.dw_gas_sample_ms",
+                gas_publication_once_per_level_time=True, gas_stamp_only_after_acceptance=True,
                 armor_stock_import="scripts/mp/gametypes/br_pickups.gsc::playerusehealslot",
                 source_provenance=POLICY_SOURCE_HASHES, original_wait_preserved=True,
                 armor_yields_to_gas=True, no_extra_infinite_thread=True)

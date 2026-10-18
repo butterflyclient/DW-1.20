@@ -60,7 +60,12 @@ def main():
                            'previous look point time type and opaque field restored',
                            'enemy target suppresses loot look', 'active stronger script look preserved',
                            'native CODE_SEEK look can be replaced and is restored',
-                           'script look lock suppresses override', 'loot look TLS restored'])
+                           'script look lock suppresses override', 'loot look TLS restored',
+                           'gas evacuation retains priority during combat',
+                           'gas evacuation suppresses loot and armor',
+                           'stable current circle and closing next circle destinations',
+                           'gas state expires and rejects timer rollback',
+                           'gas map reset generation and invalid radius rejection'])
     proof['inputs'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in
                        (source, ROOT / 'integration/host-scale/SV_HostBot_Loot.cpp',
                         ROOT / 'integration/host-scale/sv_host_bot_loot.h')}

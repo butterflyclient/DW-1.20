@@ -55,10 +55,12 @@ static_assert(offsetof(ReplayScriptContext, instance) == 153632);
 extern "C" void DW_BotStyleWeaponMethod(void *context, uint64_t self);
 extern "C" void DW_BotSurvivalAllowedMethod(void *context, uint64_t self);
 extern "C" void DW_BotMPClassReadyMethod(void *context, uint64_t self);
+extern "C" void DW_BotGasStateMethod(void *context, uint64_t self);
 static const BuiltinMethodDefinition customMethods[] = {
     {SM_CustomMethodBegin, 0, DW_BotStyleWeaponMethod, 0, 0},
     {SM_CustomMethodBegin + 1, 0, DW_BotSurvivalAllowedMethod, 0, 0},
     {SM_CustomMethodBegin + 2, 0, DW_BotMPClassReadyMethod, 0, 0},
+    {SM_CustomMethodBegin + 3, 0, DW_BotGasStateMethod, 0, 0},
 };
 static constexpr uint32_t customCount = sizeof(customMethods) / sizeof(customMethods[0]);
 static ScriptMethodCallback methodCallbacks[SM_NativeMethodCount + customCount];

@@ -3,6 +3,15 @@
 
 namespace HostScale
 {
+    // Script-owned BR circles, copied on the server thread. No VM/nav pointers.
+    struct BotGasState
+    {
+        Vec3 currentCenter, nextCenter;
+        float currentRadius, nextRadius;
+        int32_t sampledTime;
+        uint32_t generation;
+        bool closing, valid;
+    };
     struct LootUsableRef
     {
         uint32_t index;
@@ -58,6 +67,13 @@ namespace HostScale
 
 extern "C"
 {
+    void SV_HostBot_ResetGasState();
+    bool SV_HostBot_PublishGasState(const HostScale::BotGasState *);
+    bool SV_HostBot_GetGasState(HostScale::BotGasState *);
+    bool SV_HostBot_GasEvacuationRequired(void *);
+    // Stable value-only destination. The caller must project it onto the real
+    // native mesh and install a successful native route before following it.
+    bool SV_HostBot_GetGasGoal(void *, HostScale::Vec3 *);
     // Main server thread, after a full BotThink and before movement workers.
     void SV_HostBot_UpdateLoot(void *, HostScale::UserCmd *);
     // Nearby native usable position for the ordinary navigator/look controller.

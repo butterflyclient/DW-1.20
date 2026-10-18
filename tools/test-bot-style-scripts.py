@@ -151,6 +151,75 @@ def exercise_survival(module):
     bot = module.exported("scripts/mp/bots/bots_gametype_br.gsc.gscbin", 0x2039)
     names = {int(e["function_at"], 16): e["name"].get("string")
              for e in bot[2] if "function_at" in e}
+    def publish(state):
+        # Execute the inserted publisher itself; script circle getters are the
+        # only modeled calls. Their copied stock import/source pairs are also
+        # checked by the strict native source cursor during transformation.
+        pc, stack, calls = 0, [], []
+        field_reads = [at - 1 for at, op, _ in module._script_instructions(b'\x3b' + gas.new) if op == 0x7B]
+        assert len(field_reads) == 4
+        field_names = dict(zip(field_reads, ('circle', 'sampled', 'sampled', 'closing')))
+        values = [state.get("closing", False), 200., (20, 30, 40), 300., (1, 2, 3)]
+        while pc < len(gas.new):
+            opcode_at = pc
+            op = gas.new[pc]; pc += 1
+            if op == 0x7B:
+                pc += 4
+                name = field_names[opcode_at]
+                stack.append(state.get('circle', True) if name == 'circle' else
+                             state.get('sampled') if name == 'sampled' else values.pop(0))
+            elif op == 0x38:
+                assert gas.new[pc:pc + 4] == bytes.fromhex('ffffffff');pc += 4
+                state['sampled'] = stack.pop()
+            elif op == 0x1D:
+                assert gas.new[pc:pc + 2] == bytes.fromhex('d700');pc += 2
+                stack.append(state.get('now', 1000))
+            elif op == 0xA7:
+                value = stack.pop();stack.append(value is not None and value is not False)
+            elif op == 0x77: stack.append(not stack.pop())
+            elif op == 0xA8: stack.append(bool(stack.pop()))
+            elif op == 0x59: stack.append(bool(stack.pop()))
+            elif op == 0x97:
+                right, left = stack.pop(), stack.pop();stack.append(left != right)
+            elif op in (0x72, 0x1C):
+                delta = struct.unpack_from("<h", gas.new, pc)[0]; pc += 2
+                value = bool(stack[-1])
+                if op != 0x1C or not value:stack.pop()
+                if (not value if op == 0x72 else value):pc += delta
+            elif op == 0x75:
+                pc += 3; stack.append(values.pop(0)); calls.append("circle_getter")
+            elif op == 0x3A: stack.append("self")
+            elif op == 0x83:
+                assert struct.unpack_from("<H", gas.new, pc)[0] == 0x878A; pc += 2
+                assert stack.pop() == "self"
+                arguments = [stack.pop() for _ in range(5)]
+                assert arguments == [(1, 2, 3), 300., (20, 30, 40), 200., state.get("closing", False)]
+                calls.append("dw_bot_gas_state"); stack.append(state.get('accepted', True))
+            elif op == 0x58: stack.pop()
+            else: raise AssertionError(f"Unmodeled gas publisher opcode {op:#x}")
+        assert not stack
+        return calls
+    assert gas.offset == 0x23B < 0x25D  # precedes tactical/remote eligibility gate
+    assert publish(dict(circle=False)) == []
+    for closing in (False, True):
+        assert publish(dict(closing=closing)) == ["circle_getter"] * 4 + ["dw_bot_gas_state"]
+    level = dict(now=1000)
+    batch = [publish(level) for _ in range(151)]
+    assert sum(row.count('circle_getter') for row in batch) == 4
+    assert sum(row.count('dw_bot_gas_state') for row in batch) == 1
+    assert level['sampled'] == 1000
+    assert publish(level) == []
+    level['now'] = 1016
+    assert publish(level)[-1] == 'dw_bot_gas_state' and level['sampled'] == 1016
+    rejected = dict(now=2000, sampled=1016, accepted=False)
+    assert publish(rejected)[-1] == 'dw_bot_gas_state' and rejected['sampled'] == 1016
+    rejected['accepted'] = True
+    assert publish(rejected)[-1] == 'dw_bot_gas_state' and rejected['sampled'] == 2000
+    assert publish(rejected) == []
+    rejected['now'] = 500
+    assert publish(rejected)[-1] == 'dw_bot_gas_state' and rejected['sampled'] == 500
+    reset = dict(now=500)  # A fresh map's level object has no inherited stamp.
+    assert publish(reset)[-1] == 'dw_bot_gas_state' and reset['sampled'] == 500
     def execute(edit, state):
         pc, stack, locals_, calls = 0, [], [], []
         refs = {r.operand: names[r.target] for r in edit.references}
@@ -210,24 +279,24 @@ def exercise_survival(module):
         assert not stack and not locals_, "Survival insertion leaked evaluation/local scope"
         return calls
     idle = dict(now=1000, gas=False, point=(1, 2, 3), allowed=True, inserting=False)
-    assert execute(gas, idle) == ["bot_is_in_gas"]
     assert execute(armor, idle) == ["bot_is_in_gas", "dw_bot_survival", "playerusehealslot"]
     assert idle["next"] == 1500
     idle["now"] = 1499
-    assert execute(gas, idle) == execute(armor, idle) == [] and idle["next"] == 1500
+    assert execute(armor, idle) == [] and idle["next"] == 1500
     idle["now"] = 1500
     assert execute(armor, idle)[-1] == "playerusehealslot" and idle["next"] == 2000
     for point in ((10, 20, 30), None):
         state = dict(now=3000, gas=True, point=point, allowed=True, inserting=False)
-        calls = execute(gas, state)
-        assert ("critical_goal" in calls) == (point is not None)
         assert execute(armor, state) == ["bot_is_in_gas"] and state["next"] == 3500
     for allowed, inserting in ((False, False), (True, True)):
         state = dict(now=4000, gas=False, point=None, allowed=allowed, inserting=inserting)
         assert "playerusehealslot" not in execute(armor, state) and state["next"] == 4500
     return dict(actual_inserted_opcodes_executed=True, native_and_script_callees_modeled=True,
                 cooldown_boundary_checked=True, no_stack_or_local_leak=True,
-                gas_goal_payload_checked=True, absent_safe_point_checked=True,
+                authoritative_circle_payload_checked=True, missing_circle_skips_publish=True,
+                gas_before_tactical_goal_gate=True, no_random_gas_projection=True,
+                gas_publication_once_for_151_bots=True, gas_later_tick_republishes=True,
+                rejected_gas_publisher_retries=True, gas_clock_rewind_and_map_reset=True,
                 armor_yields_to_gas_and_insertion=True, denied_armor_cadence_checked=True)
 
 
@@ -295,8 +364,22 @@ def main():
         if result["inserted_survival_method_id"]:
             assert result["inserted_survival_method_id"] == 0x8788
             assert len(result["function_edits"]) == 2 and len(result["source_insertions"]) == 3
-            assert len(result["inserted_references"]) == 3
-            assert result["survival_policy"]["cooldown_ms"] == 500
+            # Gas now publishes the authoritative circles directly. Only the
+            # armor policy retains a local bot_is_in_gas call; the former
+            # random-destination calls are deliberately absent.
+            references = result["inserted_references"]
+            gas_function = module.exported(
+                "scripts/mp/bots/bots_gametype_br.gsc.gscbin", "bot_is_in_gas"
+            )[3]
+            assert len(references) == 1
+            assert references[0]["kind"] == "local" and references[0]["width"] == 3
+            assert references[0]["original_target"] == int(gas_function["function_at"], 16)
+            policy = result["survival_policy"]
+            assert policy["cooldown_ms"] == 500 and policy["gas_state_method"] == 0x878A
+            assert policy["gas_random_destination_removed"]
+            assert policy["gas_global_sample_field"] == "level.dw_gas_sample_ms"
+            assert policy["gas_publication_once_per_level_time"]
+            assert policy["gas_stamp_only_after_acceptance"]
         if result["mp_class_refresh"]:
             assert result["mp_class_refresh"]["method_id"] == 0x8789
             assert len(result["function_edits"]) == 2

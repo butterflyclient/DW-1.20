@@ -4,6 +4,7 @@
 #include "SV_HostBotEquipmentBindings.h"
 #include "DW_BotStyleProfile.h"
 #include "sv_host_bot_slide.h"
+#include "SV_HostBotGpuPlanner.h"
 #include <intrin.h>
 
 namespace
@@ -50,10 +51,14 @@ namespace
     {
         void *owner, *navigator, *player;
         Vec3 goal, lastOrigin;
-        int32_t nextPlan, lastTime, progressTime;
+        int32_t nextPlan, lastTime, progressTime, gpuRetryAfter;
         unsigned sequence, failures;
         uint16_t target;
         bool valid;
+        Vec3 pendingGoal;
+        bool pendingGas;
+        uint32_t pendingScriptType, pendingGasGeneration;
+        Vec3 pendingScriptPosition, pendingGasCenter;
     };
 
     MeshGoal s_goals[200]{};
@@ -103,7 +108,7 @@ namespace
     constexpr uint64_t TravelInterruptButtons = 0x4233ddull;
     constexpr float UrgentTravelDistance = 256.0f;
     int32_t s_planTime = -1;
-    unsigned s_plans, s_nextPlanSlot;
+    unsigned s_plans, s_nextPlanSlot, s_cpuPlans, s_gpuCommits;
 
     float DistanceSquared(const Vec3 &a, const Vec3 &b)
     {
@@ -148,6 +153,21 @@ namespace
 
     bool ChooseGoal(const BotNavigationView *bot, MeshGoal &state, Vec3 &goal)
     {
+        if (SV_HostBot_GetGasGoal(const_cast<BotNavigationView *>(bot), &goal))
+        {
+            state.target = 0;
+            // Long evacuations use reachable intermediate goals. The actual
+            // native route still negotiates walls, floors and traversal.
+            const float x = goal.x - bot->entity->origin.x;
+            const float y = goal.y - bot->entity->origin.y;
+            const float length = __builtin_sqrtf(x*x + y*y);
+            if (length > 2048.0f)
+            {
+                goal.x = bot->entity->origin.x + x * (2048.0f / length);
+                goal.y = bot->entity->origin.y + y * (2048.0f / length);
+            }
+            return true;
+        }
         if (bot->scriptGoalType >= 2 && bot->scriptGoalType <= 6)
         {
             // Replan the exact native guard/objective/critical destination when
@@ -238,13 +258,17 @@ namespace
         auto *nav = bot->navigator;
         auto *entity = bot->entity;
         const unsigned slot = entity ? uint16_t(entity->number) : 200;
-        if (slot >= 200 || !bot->sentient || !(bot->scriptFlags & 0x1000000) ||
+        const bool evacuating = SV_HostBot_GasEvacuationRequired(bot);
+        if (slot >= 200 || !bot->sentient || (!(bot->scriptFlags & 0x1000000) && !evacuating) ||
             !MeshAreaReady(nav) || !bot->playerState || entity->health <= 0 || bot->traversal ||
             SV_HostBot_InGulag(bot) || Field<uint16_t>(bot->playerState, 626) == 2047 ||
             Locked(bot))
         {
             if (slot < 200)
+            {
                 s_goals[slot].valid = false;
+                HostBotPlanner::Cancel(slot);
+            }
             return false;
         }
 
@@ -252,7 +276,12 @@ namespace
         const int32_t now = SVHS_LevelTime;
         if (state.owner != bot || state.navigator != nav || state.player != bot->playerState ||
             now < state.lastTime)
-            state = {bot, nav, bot->playerState, {}, entity->origin, 0, now, now, 0, 0, 0, false};
+        {
+            HostBotPlanner::Cancel(slot);
+            state = {};
+            state.owner = bot; state.navigator = nav; state.player = bot->playerState;
+            state.lastOrigin = entity->origin; state.lastTime = state.progressTime = now;
+        }
         state.lastTime = now;
         if (DistanceSquared(entity->origin, state.lastOrigin) > 24.0f * 24.0f)
         {
@@ -265,22 +294,46 @@ namespace
                 s_nextPlanSlot = 0;
             s_planTime = now;
             s_plans = 0;
+            s_cpuPlans = s_gpuCommits = 0;
         }
         bool path = SVHS_NavHasPath(nav);
+        if (HostBotPlanner::Pending(slot) && state.pendingGas != evacuating)
+            HostBotPlanner::Cancel(slot);
+        if (HostBotPlanner::Pending(slot))
+        {
+            BotGasState gas{};
+            const bool newScriptGoal = !evacuating && bot->scriptGoalType >= 2 &&
+                (bot->scriptGoalType != state.pendingScriptType ||
+                 DistanceSquared(bot->scriptGoalPosition, state.pendingScriptPosition) > 1.0f);
+            const bool newGasGoal = evacuating && SV_HostBot_GetGasState(&gas) &&
+                (gas.generation != state.pendingGasGeneration ||
+                 DistanceSquared(gas.closing ? gas.nextCenter : gas.currentCenter, state.pendingGasCenter) > 64.0f * 64.0f);
+            Vec3 loot{};
+            const bool newLoot = !evacuating && bot->scriptGoalType <= 1 &&
+                SV_HostBot_GetLootGoal(bot, &loot) && DistanceSquared(loot, state.pendingGoal) > 96.0f * 96.0f;
+            if (newScriptGoal || newGasGoal || newLoot) HostBotPlanner::Cancel(slot);
+        }
+        uint64_t profile = 0;
+        Vec3 gpuWaypoint{};
+        const bool mapped = CurrentMappedBot(bot, &profile);
+        const auto gpu = mapped ? HostBotPlanner::Take(slot, bot, bot->playerState, nav,
+            profile, nav->currentArea, entity->origin, gpuWaypoint) : HostBotPlanner::RouteState::Fallback;
+        const bool gpuReady = gpu == HostBotPlanner::RouteState::Ready;
+        const bool gpuPending = gpu == HostBotPlanner::RouteState::Pending;
         // A tactical reference is a nearby point, not proof of a usable route.
         // Preserve an existing native route; repair the no-route case even when
         // a streamed tactical graph supplies a point for this bot.
         if (state.valid && path && DistanceSquared(bot->nativeGoal, state.goal) > 1.0f)
             state.valid = false; // A native combat/script route replaced our request.
         const bool owned = state.valid && state.owner == bot && state.navigator == nav;
-        if (path && bot->scriptGoalType >= 2)
+        if (path && bot->scriptGoalType >= 2 && !evacuating)
         {
             state.valid = false;
             return false;
         }
         Vec3 lootGoal{};
         const bool localLoot = bot->scriptGoalType <= 1 && SV_HostBot_GetLootGoal(bot, &lootGoal);
-        if (path && !owned &&
+        if (path && !owned && !evacuating && !gpuReady && !gpuPending &&
             (!localLoot || DistanceSquared(bot->nativeGoal, lootGoal) < 32.0f * 32.0f))
             return false;
         const bool newLootGoal =
@@ -288,6 +341,8 @@ namespace
         const bool reached =
             state.valid && DistanceSquared(entity->origin, state.goal) < 96.0f * 96.0f;
         const bool stuck = now - state.progressTime >= 750;
+        if (evacuating && !state.pendingGas)
+            state.nextPlan = now;
         if (reached || stuck || newLootGoal)
             state.nextPlan = now;
         bool targetGone = false;
@@ -299,30 +354,31 @@ namespace
             if (targetGone)
                 state.nextPlan = now;
         }
-        if (allowPlan && now >= state.nextPlan &&
+        if (gpuReady || (allowPlan && !gpuPending && now >= state.nextPlan &&
             (!path || reached || stuck || !state.valid || targetGone || newLootGoal) &&
-            s_plans < 2 && slot >= s_nextPlanSlot)
+            s_plans < (HostBotPlanner::Enabled() ? 16u : 2u) && slot >= s_nextPlanSlot))
         {
-            Vec3 goal{};
+            Vec3 goal = gpuReady ? gpuWaypoint : Vec3{};
             ++s_plans;
             s_nextPlanSlot = slot + 1;
             state.nextPlan = now + 500 + int32_t((slot * 97) % 250);
-            state.progressTime = now;
             if (stuck || state.failures || (reached && !state.target))
             {
                 ++state.sequence;
                 if (stuck)
                     ++state.failures;
             }
-            if (ChooseGoal(bot, state, goal))
+            if (gpuReady || ChooseGoal(bot, state, goal))
             {
                 // Targets can be on another floor, and a radial offset can land
                 // outside the mesh. Resolve a reachable surface first instead
                 // of repeatedly asking the pathfinder to route to raw XYZ.
                 NavAreaHandle area{};
                 bool projected = false;
+                bool projectionAttempted = false;
                 if (SV_HostNav_BeginRouteProjection())
                 {
+                    projectionAttempted = true;
                     SVHS_NavClosestArea(&area, &goal, &nav->currentArea, nav->pathConfiguration);
                     if (area.reference && *area.reference && area.space)
                     {
@@ -330,52 +386,115 @@ namespace
                         SVHS_NavProjectArea(&area, &snapped, &goal, nullptr);
                         if (__builtin_isfinite(snapped.x) && __builtin_isfinite(snapped.y) &&
                             __builtin_isfinite(snapped.z) &&
-                            DistanceSquared(entity->origin, snapped) > 96.0f * 96.0f)
+                            DistanceSquared(entity->origin, snapped) > 32.0f * 32.0f)
                         {
                             goal = snapped;
                             projected = true;
+                            BotGasState gas{};
+                            if (evacuating && !gpuReady && SV_HostBot_GetGasState(&gas))
+                            {
+                                const Vec3 center = gas.closing ? gas.nextCenter : gas.currentCenter;
+                                const float radius = gas.closing ? gas.nextRadius : gas.currentRadius;
+                                const float x = goal.x - center.x, y = goal.y - center.y;
+                                const float ox = entity->origin.x - center.x, oy = entity->origin.y - center.y;
+                                // A distant bot needs intermediate waypoints
+                                // outside the circle. Reject a snapped goal
+                                // farther into gas; native paths may still
+                                // detour around walls on their way inward.
+                                const float distance = __builtin_sqrtf(x*x + y*y);
+                                const float current = __builtin_sqrtf(ox*ox + oy*oy);
+                                projected = distance < radius - 32.0f || distance < current - 16.0f;
+                            }
+                            // A copied GPU graph route may first go sideways
+                            // or outward around a wall before reaching its gas
+                            // destination. Do not discard that necessary first
+                            // hop on radial distance alone. PathToGoal below
+                            // must still validate/install the native segment;
+                            // stale objective/circle results were rejected above.
                         }
                     }
-                    SVHS_NavDestroyArea(&area);
                     SV_HostNav_End(0);
                 }
+                bool queued = false;
+                if (projected && !gpuReady && mapped && HostBotPlanner::Enabled() && now >= state.gpuRetryAfter)
+                {
+                    NavSearchSpec specification{};
+                    __builtin_memcpy(&specification, nav->pathConfiguration, sizeof(specification));
+                    queued = HostBotPlanner::Queue(slot, bot, bot->playerState, nav, profile,
+                        nav->currentArea, area, specification, entity->origin, goal);
+                    if (queued)
+                    {
+                        state.pendingGoal = goal;
+                        state.pendingGas = evacuating;
+                        state.pendingScriptType = bot->scriptGoalType;
+                        state.pendingScriptPosition = bot->scriptGoalPosition;
+                        BotGasState gas{};
+                        if (evacuating && SV_HostBot_GetGasState(&gas))
+                        {
+                            state.pendingGasGeneration = gas.generation;
+                            state.pendingGasCenter = gas.closing ? gas.nextCenter : gas.currentCenter;
+                        }
+                        state.nextPlan = now + 16;
+                    }
+                }
+                SVHS_NavDestroyArea(&area);
                 // PathToGoal owns goal bookkeeping and native area/path handles.
                 // Suspend approximate closest search while making an actual route.
                 bool planned = false;
-                if (projected)
+                bool attempted = false;
+                if (projected && !queued && (gpuReady ? s_gpuCommits < 8 : s_cpuPlans < 2))
                 {
+                    attempted = true;
+                    if (gpuReady) ++s_gpuCommits; else ++s_cpuPlans;
                     const bool suspended = SV_HostNav_SuspendClosest(true);
                     path = SVHS_BotPathToGoal(bot, &goal, 32.0f, "mesh fallback") != 0;
                     SV_HostNav_SuspendClosest(suspended);
                     planned = path;
-                    state.goal = goal;
-                    state.valid = path;
+                    HostBotPlanner::RecordCommit(gpuReady, planned, evacuating);
+                    if (planned)
+                    {
+                        state.goal = goal;
+                        state.valid = true;
+                        state.pendingGas = evacuating;
+                        state.progressTime = now;
+                    }
+                    else
+                        state.valid = false;
                 }
-                else
+                if (gpuReady && ((projectionAttempted && !projected) || (attempted && !planned)))
                 {
-                    path = false;
-                    state.valid = false;
+                    // A copied graph is a planning hint. Dynamic obstacles or
+                    // stricter native search rules can reject its first hop.
+                    // Give the stable destination a bounded native fallback
+                    // before submitting the same graph request again.
+                    state.gpuRetryAfter = now + 1000;
                 }
                 if (planned)
                     state.failures = 0;
-                else
+                else if (!queued && (attempted || !projected))
                 {
                     ++state.failures;
-                    state.nextPlan += int32_t(state.failures < 4 ? state.failures : 4) * 500;
+                    // Keep retries responsive and fair, especially while gas
+                    // is closing. Do not impose seconds of motionless backoff.
+                    state.nextPlan = now + (evacuating ? 100 : 250) + int32_t(slot % 8) * 16;
                 }
             }
         }
-        Field<uint16_t>(command, 156) = 0;
-        if (path && !reached)
+        // Pending GPU work or failed projection must not erase native motion
+        // or an existing route. Only take movement ownership with a real path.
+        path = SVHS_NavHasPath(nav);
+        if (path && (!state.valid || DistanceSquared(entity->origin, state.goal) > 32.0f * 32.0f))
         {
-            if (allowPlan)
+            Field<uint16_t>(command, 156) = 0;
+            if (allowPlan && !evacuating)
                 SVHS_BotMovePathing(bot, command);
             else
                 // The native steering/avoidance leaf updates direction without
                 // repeating the all-player friendly-speed scan or route search.
                 SVHS_BotSteerPath(bot, command, 127);
+            return true;
         }
-        return true;
+        return false;
     }
 } // namespace
 
@@ -499,7 +618,7 @@ extern "C" unsigned Bot_UpdateMove_OffPathGrid(void *data, HostScale::UserCmd *c
     }
     // Do not consume this movement stage before the native combat/melee
     // controller. This applies equally to bot and human opponents.
-    if (!canFire && Enabled() && FollowMesh(bot, command, true))
+    if ((!canFire || SV_HostBot_GasEvacuationRequired(bot)) && Enabled() && FollowMesh(bot, command, true))
         return 1;
     const bool failedLongEnough =
         bot->noPathFoundTime && SVHS_LevelTime - bot->noPathFoundTime > 750;
@@ -528,7 +647,7 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
     const bool gulag = SV_HostBot_InGulag(bot);
     if (gulag)
         s_goals[slot].valid = false;
-    if (SVHS_BotCanFire(bot))
+    if (SVHS_BotCanFire(bot) && !SV_HostBot_GasEvacuationRequired(bot))
         return;
     const auto &state = s_goals[slot];
     auto *nav = bot->navigator;
@@ -540,7 +659,7 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
                             (!gulag || MeshAreaReady(nav)) && SVHS_NavHasPath(nav);
     // Refresh fallback-owned and native routes without choosing another goal.
     // Combat firing, airborne and locked/scripted movement retain their commands.
-    if (owned || nativePath)
+    if (owned || nativePath || HostBotPlanner::Pending(slot) || SV_HostBot_GasEvacuationRequired(bot))
     {
         // BotThink normally installs this native TLS context around steering.
         // Cached decisions bypass BotThink, so preserve that exact contract here.
@@ -548,8 +667,8 @@ extern "C" void SV_HostNav_RefreshBotMovement(void *data, HostScale::UserCmd *co
         auto &statics = *reinterpret_cast<void **>(slots[SVHS_BotTlsIndex] + 16);
         void *previous = statics;
         statics = SVHS_GameStatics;
-        if (owned)
-            FollowMesh(bot, command, false);
+        if (owned || HostBotPlanner::Pending(slot) || SV_HostBot_GasEvacuationRequired(bot))
+            FollowMesh(bot, command, SV_HostBot_GasEvacuationRequired(bot));
         else
             SVHS_BotSteerPath(bot, command, 127);
         statics = previous;

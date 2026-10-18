@@ -20,6 +20,7 @@ bool seenServer, packagePresent = true;
 bool mapImages;
 unsigned mapImagesState, publishedState = 99;
 unsigned inspectionState = 99;
+unsigned gulagState = 99;
 const DWBotStyleFastfileInfo *seenPointer;
 bool sameWide(const wchar_t *a, const wchar_t *b)
 {
@@ -74,6 +75,7 @@ void clear()
     mapImagesState = 0;
     publishedState = 99;
     inspectionState = 99;
+    gulagState = 99;
 }
 void *__stdcall create(const wchar_t *name, unsigned long access, unsigned long, void *,
                        unsigned long disposition, unsigned long, void *)
@@ -291,6 +293,8 @@ extern "C"
             return publishedState;
         if (equal(name, DWWeaponInspectPackage::Package.zoneName))
             return inspectionState;
+        if (equal(name, DWGulagNavPackage::Package.zoneName))
+            return gulagState;
         return equal(name, package.zoneName) ? state : 99;
     }
     bool DW_MapImages_ZoneInstalled()
@@ -341,7 +345,8 @@ extern "C"
         if (count <= 8)
             for (unsigned i = 0; i < count; ++i)
                 captured[i] = info[i];
-        const DWBotStyleScriptPackage *resources[] = {&package, &DWWeaponInspectPackage::Package};
+        const DWBotStyleScriptPackage *resources[] = {
+            &package, &DWWeaponInspectPackage::Package, &DWGulagNavPackage::Package};
         for (const auto *resource : resources)
         {
             bool overlay = false;
@@ -630,6 +635,97 @@ extern "C"
               writes == stagedWrites);
         CHECK(DW_MapImages_PublishedListed(DWMapImages::MapIds[0]) &&
               !DW_MapImages_PublishedListed("mp_not_published"));
+        return 0;
+#undef CHECK
+    }
+    __declspec(dllexport) int Test_Gulag()
+    {
+#define CHECK(c) if (!(c)) return __LINE__
+        clear();
+        packagePresent = false;
+        gulagState = 0;
+        const auto &gulag = DWGulagNavPackage::Package;
+        CHECK(sizeof(gulag) == 96 && gulag.installationNameCount == 10);
+        // Preload is selected for the whole native batch, including when only
+        // an unrelated row carries a preload flag. Neither case may stage the
+        // ordinary-only NavMesh package or alter the original request.
+        DWBotStyleFastfileInfo preload[] = {{"mp_donetsk", 0x100000, 7, 88, 0x12345678}};
+        DW_BotStyleZone_LoadFastfiles(preload, 1, 2, false);
+        CHECK(seenPointer == preload && seenCount == 1 && !reads && !writes && !moves);
+        DWBotStyleFastfileInfo mixed[] = {{"mp_donetsk", 0x900, 7, 88, 0x12345678},
+                                         {"other_preload", 0x200000, 1, 2, 3}};
+        DW_BotStyleZone_LoadFastfiles(mixed, 2, 2, false);
+        CHECK(seenPointer == mixed && seenCount == 2 && !reads && !writes && !moves);
+        // Skipping preload must not poison staging or suppress the subsequent
+        // ordinary request. A second ordinary request reuses the staged files.
+        DWBotStyleFastfileInfo ordinary[] = {{"mp_donetsk", 0x900, 7, 88, 0x12345678}};
+        DW_BotStyleZone_LoadFastfiles(ordinary, 1, 0, true);
+        CHECK(seenCount == 2 && equal(captured[0].name, gulag.zoneName) &&
+              equal(captured[1].name, "mp_donetsk") && writes == 20 && moves == 20 &&
+              captured[0].zoneFlags == ordinary[0].zoneFlags &&
+              captured[0].failureMode == ordinary[0].failureMode &&
+              captured[0].priority == ordinary[0].priority &&
+              captured[0].reserved == ordinary[0].reserved && !nativeMissing);
+        DW_BotStyleZone_LoadFastfiles(ordinary, 1, 0, true);
+        CHECK(seenCount == 2 && writes == 20 && moves == 20 && !nativeMissing);
+        clear(); packagePresent = false; gulagState = 0;
+        DWBotStyleFastfileInfo map[] = {{"before", 1, 2, 3, 4},
+                                       {"mp_donetsk", 0x8008123, 7, 88, 0x12345678},
+                                       {"after", 9, 10, 11, 12}};
+        DW_BotStyleZone_LoadFastfiles(map, 3, 15, true);
+        CHECK(nativeCalls == 1 && seenCount == 4 && seenFlags == 15 && seenServer && frees == 1);
+        CHECK(equal(captured[0].name, "before") && equal(captured[1].name, gulag.zoneName) &&
+              equal(captured[2].name, "mp_donetsk") && equal(captured[3].name, "after"));
+        CHECK(captured[1].zoneFlags == map[1].zoneFlags && captured[1].failureMode == map[1].failureMode &&
+              captured[1].priority == map[1].priority && captured[1].reserved == map[1].reserved);
+        CHECK(equal(map[1].name, "mp_donetsk") && map[1].reserved == 0x12345678 &&
+              writes == 20 && moves == 20 && !nativeMissing);
+        const unsigned stagedWrites = writes, stagedMoves = moves;
+        for (unsigned pending = 1; pending <= 4; ++pending)
+        {
+            gulagState = pending;
+            const unsigned priorReads = reads;
+            DW_BotStyleZone_LoadFastfiles(map, 3, 2, false);
+            CHECK(seenPointer == map && seenCount == 3 && reads == priorReads &&
+                  writes == stagedWrites && moves == stagedMoves);
+        }
+        gulagState = 0;
+        DW_BotStyleZone_LoadFastfiles(map, 3, 2, false);
+        CHECK(seenCount == 4 && equal(captured[1].name, gulag.zoneName) &&
+              writes == stagedWrites && moves == stagedMoves && !nativeMissing);
+        DWBotStyleFastfileInfo duplicate[] = {{gulag.zoneName, 1, 2, 3, 4},
+                                             {"mp_donetsk", 5, 6, 7, 8}};
+        const unsigned priorReads = reads;
+        DW_BotStyleZone_LoadFastfiles(duplicate, 2, 0, false);
+        CHECK(seenPointer == duplicate && seenCount == 2 && reads == priorReads);
+        const char *unrelated[] = {"ui", "frontend", "common_base_mp", "mp_donetsk_tr",
+                                   "mp_donetsk_extra", "mp_test", "srv_mp_donetsk"};
+        for (const char *name : unrelated)
+        {
+            clear(); packagePresent = false; gulagState = 0;
+            DWBotStyleFastfileInfo other[] = {{name, 1, 2, 3, 4}};
+            DW_BotStyleZone_LoadFastfiles(other, 1, 0, false);
+            CHECK(seenPointer == other && seenCount == 1 && !writes && !reads);
+        }
+        clear(); packagePresent = false; gulagState = 0; failure = 1;
+        DW_BotStyleZone_LoadFastfiles(map, 3, 0, false);
+        CHECK(seenPointer == map && seenCount == 3 && !writes);
+        // All five possible overlays coexist without overwriting the input or
+        // the allocation; the Gulag owner still copies the exact map record.
+        clear(); gulagState = 0; inspectionState = 0; publishedState = 0; mapImages = true;
+        DWBotStyleFastfileInfo combined[] = {{"common_base_mp", 0x8123, 2, 3, 4},
+                                            {"mp_donetsk", 0x4567, 5, 6, 7},
+                                            {"ui", 0x40, 8, 9, 10}};
+        DW_BotStyleZone_LoadFastfiles(combined, 3, 3, true);
+        CHECK(seenCount == 8 && seenFlags == 3 && seenServer && frees == 1 && !nativeMissing);
+        unsigned gulagAt = 8;
+        for (unsigned i = 0; i < seenCount; ++i)
+            if (equal(captured[i].name, gulag.zoneName)) gulagAt = i;
+        CHECK(gulagAt < 7 && equal(captured[gulagAt + 1].name, "mp_donetsk"));
+        CHECK(captured[gulagAt].zoneFlags == combined[1].zoneFlags &&
+              captured[gulagAt].failureMode == combined[1].failureMode &&
+              captured[gulagAt].priority == combined[1].priority &&
+              captured[gulagAt].reserved == combined[1].reserved);
         return 0;
 #undef CHECK
     }

@@ -2,8 +2,10 @@
 #include "sv_host_bot_equipment.h"
 #include "DW_BotStyleProfile.h"
 
+extern "C" bool DW_BotPolicy_IsBattleRoyale();
 extern "C" void SV_HostBot_UpdateTravelUrgency(void *, HostScale::UserCmd *, bool);
 #include "sv_host_bot_loot.h"
+#include "SV_HostBotGpuPlanner.h"
 #include <string.h>
 
 namespace
@@ -36,12 +38,17 @@ namespace
     {
         UserCmd command;
         void *client, *player;
+        const Entity *entity;
         int32_t thoughtTime;
         int32_t health;
         uint16_t target;
         bool valid;
         Vec3 origin;
         EquipmentStamp equipment;
+        const void *mapStatics;
+        uint64_t jailProfile;
+        uint32_t jailWeaponFlags;
+        bool jailMapped;
     };
 
     BotDecision s_decisions[200]{};
@@ -128,24 +135,47 @@ namespace
     }
 
     bool ReuseDecision(
-        BotDecision &previous, void *client, unsigned slot, unsigned population, int32_t now)
+        BotDecision &previous, void *client, unsigned slot, unsigned population, int32_t now, bool battleRoyale)
     {
         const auto *entity = Field<Entity *>(client, 280);
         const uint16_t target = entity->sentient ? entity->sentient->targetHandle : 0;
         const float x = entity->origin.x - previous.origin.x;
         const float y = entity->origin.y - previous.origin.y;
         const float z = entity->origin.z - previous.origin.z;
-        if (!previous.valid || previous.client != client || previous.player != entity->client ||
-            previous.health != entity->health || entity->health <= 0 || previous.target != target ||
+        if (!previous.valid || previous.client != client || previous.player != entity->client || previous.entity != entity ||
+            previous.mapStatics != SVHS_GameStatics || previous.health != entity->health ||
+            entity->health <= 0 || previous.target != target ||
             now <= previous.command.serverTime || now < previous.thoughtTime ||
             Field<uint32_t>(client,
                             1368 + 8988)) // Pending script-driven buttons must run immediately.
             return false;
         // A script teleport can follow an earlier phase change. Compare against
         // the last full think, not the last replayed movement command.
-        if (x * x + y * y + z * z > 256.0f * 256.0f ||
-            SV_HostBot_InGulag(static_cast<uint8_t *>(client) + 1368))
+        if (x * x + y * y + z * z > 256.0f * 256.0f)
             return false;
+        const auto *bot = reinterpret_cast<const BotEquipmentData *>(
+            static_cast<const uint8_t *>(client) + 1368);
+        const auto *player = reinterpret_cast<const BotEquipmentPlayer *>(entity->client);
+        const uint32_t phase = player->gameExtraInfo & 0x600;
+        const bool waitingJail = phase == 0x200;
+        if (phase && !waitingJail)
+            return false; // Arena and overlapping transition bits always think now.
+        if (waitingJail)
+        {
+            // Stock bot_gulag_think clears enemies and script goals while the
+            // jail waits. Only replay an idle native decision, never an action
+            // or a walking command. A decision containing any native button
+            // keeps its full native cadence, preserving stock action/flag bits.
+            uint64_t profile = 0;
+            if (!battleRoyale || x != 0.0f || y != 0.0f || z != 0.0f ||
+                target || Field<uint32_t>(client, 1368 + 516) ||
+                (bot->grenadeFlags & 3) || bot->grenadeHoldUntil > now ||
+                previous.command.buttons ||
+                Field<uint16_t>(&previous.command, 156) || !previous.jailMapped ||
+                player->weaponFlags != previous.jailWeaponFlags ||
+                !DW_BotPolicy_ProfileSeed(slot, &profile) || profile != previous.jailProfile)
+                return false;
+        }
         if (target && target <= SVHS_ClientCount && target <= 200)
         {
             void *other = SVHS_Clients[target - 1];
@@ -159,9 +189,11 @@ namespace
 
         // Spend decision time where humans can interact with the bots. Commands
         // still advance every server tick, including for distant cached bots.
-        const unsigned interval = DecisionInterval(entity, target, population);
         const unsigned frame = SVHS_FrameDuration > 0 ? unsigned(SVHS_FrameDuration) : 16;
-        const unsigned stride = (interval + frame - 1) / frame;
+        const unsigned interval = waitingJail ? 64 : DecisionInterval(entity, target, population);
+        // Round the jail interval down: a 20 ms server runs native thoughts at
+        // least every 60 ms, rather than rounding a 64 ms bound up to 80 ms.
+        const unsigned stride = waitingJail ? interval / frame : (interval + frame - 1) / frame;
         if (stride <= 1 || uint32_t(now - previous.thoughtTime) >= stride * frame)
             return false;
         return (uint32_t(now) / frame + slot) % stride != 0;
@@ -171,6 +203,7 @@ namespace
 extern "C" void SV_BotUpdateBots()
 {
     using namespace HostScale;
+    HostBotPlanner::BeginServerFrame(SVHS_BotSystemAllocated && SVHS_LevelClientsAllocated);
     if (!SVHS_BotSystemAllocated || !SVHS_LevelClientsAllocated)
     {
         for (auto &decision : s_decisions)
@@ -185,6 +218,7 @@ extern "C" void SV_BotUpdateBots()
     else
         s_observerCount = 0;
     const int32_t now = Field<int32_t>(SVHS_ServerGlobals, 28);
+    const bool battleRoyale = population > 20 && DW_BotPolicy_IsBattleRoyale();
     unsigned thought = 0, reused = 0;
     for (unsigned slot = 0; slot < SVHS_ClientCount && slot < 200; ++slot)
     {
@@ -194,20 +228,26 @@ extern "C" void SV_BotUpdateBots()
         if (!SVHS_SupportsFeature(2) || Field<int32_t>(client, 214756) != 2)
         {
             previous.valid = false;
+            HostBotPlanner::Cancel(slot);
             continue;
         }
         if (SVHS_IsBotPlaying(client))
         {
             void *data = static_cast<uint8_t *>(client) + 1368;
             bool reusedCommand = false;
+            bool reusedJail = false;
             if (SV_HostBot_PrepareEquipment(data))
                 previous.valid = false;
-            if (population > 20 && ReuseDecision(previous, client, slot, population, now))
+            if (population > 20 && ReuseDecision(previous, client, slot, population, now, battleRoyale))
             {
                 command = previous.command;
                 command.serverTime = command.commandTime = command.inputTime = now;
-                SV_HostNav_RefreshBotMovement(static_cast<uint8_t *>(client) + 1368, &command);
-                SV_HostBot_FaceLoot(data, &command);
+                reusedJail = (previous.equipment.phase == 0x200);
+                if (!reusedJail)
+                {
+                    SV_HostNav_RefreshBotMovement(data, &command);
+                    SV_HostBot_FaceLoot(data, &command);
+                }
                 ++reused;
                 reusedCommand = true;
             }
@@ -229,24 +269,34 @@ extern "C" void SV_BotUpdateBots()
                 previous.command = command;
                 previous.client = client;
                 previous.player = entity->client;
+                previous.entity = entity;
                 previous.thoughtTime = now;
                 previous.health = entity->health;
                 previous.origin = entity->origin;
                 previous.target = entity->sentient ? entity->sentient->targetHandle : 0;
                 previous.equipment = Equipment(entity, client);
+                previous.mapStatics = SVHS_GameStatics;
+                previous.jailMapped = previous.equipment.phase == 0x200 && battleRoyale &&
+                    DW_BotPolicy_ProfileSeed(slot, &previous.jailProfile);
+                previous.jailWeaponFlags = reinterpret_cast<const BotEquipmentPlayer *>(
+                    entity->client)->weaponFlags;
                 previous.valid = population > 20;
                 ++thought;
             }
             // Travel intent belongs to every playing bot, including normal
             // population full thoughts. The cached base command remains native
             // so added sprint requests cannot become stale decision buttons.
-            SV_HostBot_UpdateTravelUrgency(data, &command, reusedCommand);
+            if (!reusedCommand && SV_HostBot_GasEvacuationRequired(data))
+                SV_HostNav_RefreshBotMovement(data, &command);
+            if (!reusedJail)
+                SV_HostBot_UpdateTravelUrgency(data, &command, reusedCommand);
             SVHS_AdvanceBotPriority(int(slot));
             ++SVHS_ActiveBotCount;
         }
         else
         {
             previous.valid = false;
+            HostBotPlanner::Cancel(slot);
             if (SVHS_IsBotSpectator(client))
             {
                 command.serverTime = command.commandTime = command.inputTime = now;
@@ -270,6 +320,7 @@ extern "C" void SV_BotUpdateBots()
         }
     }
     const uint64_t afterBrain = Clock();
+    HostBotPlanner::EndServerFrame();
     SV_BotApplyCommands(commands);
     RecordBotFrame(thought, reused, afterBrain - begin, Clock() - afterBrain);
 }

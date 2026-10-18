@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "original_source": "D:\\mw124\\mw120rproxy\\iw8-zonetool\\src\\zonetool\\iw8\\replay_navigation.cpp",
+  "original_sha256": "d01088512e13782aae5e0c4aad6d5d69245d1d9237d86e56597ac4cdbdf630ed",
+  "output_sha256": "ee48d2881da744780526f125fc2a13fdc3359a932487d7f4815459a978d1c753",
+  "retained": [
+    "original source start through BuildNavGraph end",
+    "Build geometry stage through BuildMesh"
+  ],
+  "adaptations": [
+    "standalone types header",
+    "stderr logging header",
+    "return serialized nav resource directly",
+    "separate collision fidelity audit adapter included after retained source",
+    "native convex radius represented by conservative shifted support-plane envelope and expanded AABB",
+    "optional conservative Scene footprint/support refinement before polygon merging; prevents averaging distinct floor planes"
+  ],
+  "excluded": [
+    "ZoneWriter",
+    "asset registration",
+    "PathData generation",
+    "TacticalGraph generation"
+  ],
+  "provenance_note": "Source reuse is not evidence that supplied geometry is correct or live Gulag navigation works."
+}

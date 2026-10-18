@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "hardware_execution": true,
+  "game_execution": false,
+  "production_build": false,
+  "stress_batches": 120,
+  "bots_per_batch": 200,
+  "verified_stress_routes": 24000,
+  "graph_nodes": 256,
+  "graph_edges": 960,
+  "source_sha256": {
+    "integration/host-scale/SV_HostBotGpu.h": "80d37638cb3a3bfd39b34f4fe9813b244382816b250aeb1aa4f17226eb66d21c",
+    "integration/host-scale/SV_HostBotGpu.cpp": "0d9e61a5e9ab73ece681d5ca07c87ab1bfd5cf752adb8a766433a0c71b4887d2",
+    "integration/host-scale/SV_HostBotGpu.hlsl": "56a16c62229469e246666227910d6cee305216f2267a1cc60cf3265a71d6a099",
+    "tools/prepare-host-bot-gpu.py": "d7c0a9884db122794a960025e3801bc7caf4390f64066c34d2d36c1489a5ca57",
+    "tools/host_bot_gpu_harness.cpp": "3fe538b65a79b12fcc5979ba14bbb95da923d1389d8d01c2ff87046fbb3801e5"
+  },
+  "stdout": "hardware-stress.txt",
+  "freestanding_compile": "PASS -ffreestanding -fno-stack-protector -funwind-tables -ffunction-sections -fdata-sections -O2 -std=c++20 -Wall -Wextra -Werror -fno-exceptions -fno-rtti",
+  "undefined_symbols": [
+    "CreateDXGIFactory1",
+    "__imp_GetLastError",
+    "__imp_GetProcAddress",
+    "__imp_GetTickCount64",
+    "__imp_LoadLibraryExW",
+    "_fltused",
+    "memcpy",
+    "memset"
+  ],
+  "untested": [
+    "actual device removal",
+    "actual hung GPU timeout",
+    "in-game/native graph integration"
+  ],
+  "lookahead_tests": {
+    "zero": "all existing first-hop checks unchanged",
+    "weighted_branch_1_5": "cost3 shortest route0->2->1->3 returnsnode1",
+    "beyond_goal_512": "same route returnsgoal3"
+  },
+  "shader_bytecode_sha256": "2687f73f8ba7d8c13f9b441842c76f93fc57d750fb374bc4865d6b74b2186112",
+  "hardware_executable_sha256": "d5c47e657f17164ea6baf0886bf5b3b5dfd62a1994dc2298068641c2b94e2cb7",
+  "hardware_stdout_sha256": "3f0a7de9c6916ceae3ae013cb88f3c0afc30becedc37e56568eb9b79ab583c24",
+  "coff_directives": [],
+  "freestanding_object_sha256": "31dbc49d069b1e0562029692cc850ddd7d3b423ba7b2e68101850d07d0c4c90c",
+  "no_drectve_section": true,
+  "shader_header_sha256": "a0e949bdb8d2deaae03c1ad32979aa46127af9349163062a94f3eb583d97cb6d",
+  "shader_header_source": "Fixed R5 shader header; byte-for-byte verified against original R5 snapshot",
+  "measured_timing_microseconds": {
+    "submit_cpu_average": 106.039,
+    "submit_cpu_maximum": 1799.5,
+    "submit_to_readback_average": 1291.687,
+    "submit_to_readback_maximum": 10466.4,
+    "gpu_dispatch_average": 797.583,
+    "gpu_dispatch_maximum": 808.0
+  },
+  "measured_adapter": {
+    "vendor": "0x10de",
+    "device": "0x2d05",
+    "luid": "00000000:00012cb2",
+    "timestamp_hz": 1000000000
+  },
+  "measured_metrics": {
+    "submitted": 128,
+    "completed": 128,
+    "busy": 1,
+    "pending": 0,
+    "device_failures": 0,
+    "timeouts": 0
+  }
+}

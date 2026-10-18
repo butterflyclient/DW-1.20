@@ -2,6 +2,7 @@
 #include "com_optimized.h"
 #include "com_debugstates.h"
 #include "sv_host_navigation.h"
+#include "SV_HostBotGpuPlanner.h"
 
 extern "C"
 {
@@ -52,6 +53,7 @@ namespace
                 double(__atomic_load_n(&s_peakTicks, __ATOMIC_RELAXED)) * milliseconds);
         }
         SV_HostNav_PrintStatus();
+        HostBotPlanner::PrintStatus();
     }
 }
 
@@ -122,6 +124,7 @@ extern "C" void SV_HostScale_Frame()
 {
     if (!Sys_IsMainThread())
         return;
+    HostBotPlanner::Frame();
     if (!s_registered)
     {
         int64_t frequency = 0;

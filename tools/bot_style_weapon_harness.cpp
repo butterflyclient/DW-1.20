@@ -2,6 +2,7 @@
 #include "DW_BotBindings.h"
 #include "DW_ScriptMethodBindings.h"
 #include "sv_host_bot_equipment.h"
+#include "sv_host_bot_loot.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 extern "C" void DW_BotStyleWeaponMethod(void *, uint64_t);
 extern "C" void DW_BotSurvivalAllowedMethod(void *, uint64_t);
 extern "C" void DW_BotMPClassReadyMethod(void *, uint64_t);
+extern "C" void DW_BotGasStateMethod(void *, uint64_t);
 extern "C"
 {
     void *SVHS_Clients[200]{};
@@ -30,7 +32,7 @@ namespace
         alignas(2) uint8_t weaponTable[70596]{};
         uint64_t self = 33, profile = 1;
         unsigned params = 2, adds = 0, parses = 0, validations = 0;
-        unsigned survivalCalls = 0, boolAdds = 0;
+        unsigned survivalCalls = 0, boolAdds = 0, gasPublishes = 0;
         int returnedBool = -1;
         bool survivalAllowed = true;
         int slot = -1;
@@ -140,8 +142,29 @@ extern "C" bool DW_BotPolicy_IsBattleRoyale()
 extern "C" int32_t SM_GetInt(void *ctx, uint32_t index)
 {
     CheckContext(ctx);
+    if (index == 4) return 1;
     assert(index == 1);
     return current->slot;
+}
+
+extern "C" float SM_GetFloat(void *ctx, uint32_t index)
+{
+    CheckContext(ctx);
+    assert(index == 1 || index == 3);
+    return index == 1 ? 1000.0f : 500.0f;
+}
+extern "C" void SM_GetVector(void *ctx, uint32_t index, void *out)
+{
+    CheckContext(ctx);
+    assert(index == 0 || index == 2);
+    *static_cast<HostScale::Vec3 *>(out) = {float(index), 2, 3};
+}
+extern "C" bool SV_HostBot_PublishGasState(const HostScale::BotGasState *gas)
+{
+    assert(gas->currentCenter.x == 0 && gas->nextCenter.x == 2);
+    assert(gas->currentRadius == 1000 && gas->nextRadius == 500 && gas->closing && gas->valid);
+    ++current->gasPublishes;
+    return true;
 }
 
 extern "C" const char *SM_GetWeaponBaseName(const void *weapon, bool alternate)
@@ -466,6 +489,21 @@ int main()
         assert(fixture.returnedBool == (scenario == 0 ? 1 : 0));
         assert(fixture.survivalCalls == (scenario == 0 || scenario >= 7 ? 1u : 0u));
         ++survivalCases;
+    }
+    for (unsigned scenario = 0; scenario < 6; ++scenario)
+    {
+        Fixture fixture;
+        current = &fixture;
+        fixture.params = 5;
+        fixture.br = true;
+        if (scenario == 1) fixture.params = 0;
+        if (scenario == 2) fixture.br = false;
+        if (scenario == 3) fixture.bot = false;
+        if (scenario == 4) fixture.self |= uint64_t(10) << 32;
+        if (scenario == 5) DW_Bot_Clients[33]->entity = nullptr;
+        DW_BotGasStateMethod(context, fixture.self);
+        assert(fixture.boolAdds == 1 && fixture.returnedBool == (scenario == 0));
+        assert(fixture.gasPublishes == (scenario == 0));
     }
     printf(
         "PASS: %u callback weapon recipes match lobby profile data; %u full Weapon60/alternate "

@@ -47,6 +47,53 @@ namespace
     int32_t s_scanTime = -1;
     unsigned s_scans;
 
+    BotGasState s_gas{};
+    void *s_gasStatics;
+    uint32_t s_gasGeneration;
+    struct GasGoal
+    {
+        void *owner, *player;
+        Vec3 goal, center;
+        float radius;
+        int32_t lastTime;
+        uint32_t generation;
+        bool valid;
+    };
+    GasGoal s_gasGoals[200]{};
+
+    bool Finite(const Vec3 &v)
+    {
+        return __builtin_isfinite(v.x) && __builtin_isfinite(v.y) && __builtin_isfinite(v.z);
+    }
+
+    bool GasEligible(const BotLootView *bot)
+    {
+        // Evacuation remains eligible during native combat; loot's CanFire
+        // exclusion must never make a threatened bot ignore the circle.
+        return bot && bot->entity && bot->entity->client && bot->sentient &&
+               bot->entity->health > 0 && bot->playerState && !bot->traversal &&
+               unsigned(uint16_t(bot->entity->number)) < 200 &&
+               !(Field<uint32_t>(bot->entity->client, 22336) & 0x600) &&
+               Field<uint32_t>(bot->playerState, 12) <= 1 &&
+               !(Field<uint32_t>(bot->playerState, 28) & 0x800) &&
+               !SVHBL_IsSkydiving(bot->playerState) &&
+               Field<int32_t>(bot->playerState, 0) >= Field<int32_t>(bot->playerState, 4) &&
+               !(bot->scriptFlags & 4) && !(Field<uint8_t>(bot->playerState, 24) & 1) &&
+               !(Field<uint32_t>(bot->playerState, 364) & 0xe0) &&
+               Field<uint16_t>(bot->playerState, 626) != 2047 && Finite(bot->entity->origin);
+    }
+
+    float GasDistanceSquared(const Vec3 &a, const Vec3 &b)
+    {
+        const float x = a.x - b.x, y = a.y - b.y;
+        return x * x + y * y;
+    }
+
+    float GasMarginRadius(float radius)
+    {
+        return radius > 256.0f ? radius - 128.0f : radius * 0.5f;
+    }
+
     struct GameStaticsScope
     {
         void **slot;
@@ -160,11 +207,89 @@ namespace
     }
 } // namespace
 
+extern "C" void SV_HostBot_ResetGasState()
+{
+    s_gas = {};
+    s_gasStatics = nullptr;
+    ++s_gasGeneration;
+    for (auto &goal : s_gasGoals)
+        goal = {};
+}
+
+extern "C" bool SV_HostBot_PublishGasState(const HostScale::BotGasState *sample)
+{
+    if (!sample || !HostScale::Enabled() || !sample->valid ||
+        !Finite(sample->currentCenter) || !Finite(sample->nextCenter) ||
+        !__builtin_isfinite(sample->currentRadius) || !__builtin_isfinite(sample->nextRadius) ||
+        sample->currentRadius <= 0 || sample->nextRadius <= 0)
+    {
+        SV_HostBot_ResetGasState();
+        return false;
+    }
+    if (s_gasStatics != SVHS_GameStatics ||
+        SVHS_LevelTime < s_gas.sampledTime)
+        SV_HostBot_ResetGasState();
+    s_gas = *sample;
+    s_gas.sampledTime = SVHS_LevelTime;
+    s_gas.generation = s_gasGeneration;
+    s_gasStatics = SVHS_GameStatics;
+    return true;
+}
+
+extern "C" bool SV_HostBot_GetGasState(HostScale::BotGasState *out)
+{
+    if (!out || !HostScale::Enabled() || !s_gas.valid ||
+        s_gasStatics != SVHS_GameStatics ||
+        SVHS_LevelTime < s_gas.sampledTime ||
+        SVHS_LevelTime - s_gas.sampledTime > 2000)
+        return false;
+    *out = s_gas;
+    return true;
+}
+
+extern "C" bool SV_HostBot_GasEvacuationRequired(void *data)
+{
+    const auto *bot = static_cast<const BotLootView *>(data);
+    HostScale::BotGasState gas{};
+    if (!GasEligible(bot) || !SV_HostBot_GetGasState(&gas))
+        return false;
+    const auto &center = gas.closing ? gas.nextCenter : gas.currentCenter;
+    const float radius = GasMarginRadius(gas.closing ? gas.nextRadius : gas.currentRadius);
+    return GasDistanceSquared(bot->entity->origin, center) > radius * radius;
+}
+
+extern "C" bool SV_HostBot_GetGasGoal(void *data, HostScale::Vec3 *out)
+{
+    const auto *bot = static_cast<const BotLootView *>(data);
+    HostScale::BotGasState gas{};
+    if (!out || !SV_HostBot_GasEvacuationRequired(data) || !SV_HostBot_GetGasState(&gas))
+        return false;
+    const auto &center = gas.closing ? gas.nextCenter : gas.currentCenter;
+    const float radius = GasMarginRadius(gas.closing ? gas.nextRadius : gas.currentRadius);
+    auto &state = s_gasGoals[unsigned(uint16_t(bot->entity->number))];
+    if (!state.valid || state.owner != bot || state.player != bot->playerState ||
+        state.generation != gas.generation || SVHS_LevelTime < state.lastTime ||
+        GasDistanceSquared(state.goal, center) > radius * radius ||
+        GasDistanceSquared(state.center, center) > 128.0f * 128.0f || state.radius != radius)
+    {
+        // Use the same evacuation destination until the circle changes. Keep
+        // current elevation for native projection; circle Z is not a floor.
+        // The central destination provides slack if boundary projection fails.
+        state = {const_cast<BotLootView *>(bot), bot->playerState,
+                 {center.x, center.y, bot->entity->origin.z}, center, radius,
+                 SVHS_LevelTime, gas.generation, true};
+    }
+    state.lastTime = SVHS_LevelTime;
+    *out = state.goal;
+    return true;
+}
+
 extern "C" bool SV_HostBot_AllowSurvival(void *data)
 {
     auto *bot = static_cast<BotLootView *>(data);
     GameStaticsScope gameStatics;
-    return Enabled() && Eligible(bot) && !bot->sentient->targetHandle;
+    return Enabled() && Eligible(bot) && !bot->sentient->targetHandle &&
+           !SV_HostBot_GasEvacuationRequired(data);
 }
 
 extern "C" void SV_HostBot_UpdateLoot(void *data, HostScale::UserCmd *command)
@@ -173,7 +298,7 @@ extern "C" void SV_HostBot_UpdateLoot(void *data, HostScale::UserCmd *command)
     (void)command; // Movement/look consume GetLootGoal through the normal bot path.
     auto *bot = static_cast<BotLootView *>(data);
     GameStaticsScope gameStatics;
-    if (!Enabled() || !Eligible(bot))
+    if (!Enabled() || !Eligible(bot) || SV_HostBot_GasEvacuationRequired(data))
         return;
     const unsigned slot = Slot(bot);
     if (slot >= 200)
@@ -263,7 +388,8 @@ extern "C" bool SV_HostBot_GetLootGoal(void *data, HostScale::Vec3 *goal)
 {
     auto *bot = static_cast<BotLootView *>(data);
     GameStaticsScope gameStatics;
-    if (!goal || !Enabled() || !Eligible(bot) || Slot(bot) >= 200)
+    if (!goal || !Enabled() || !Eligible(bot) || Slot(bot) >= 200 ||
+        SV_HostBot_GasEvacuationRequired(data))
         return false;
     const auto &state = s_states[Slot(bot)];
     const int32_t now = SVHS_LevelTime;
