@@ -1392,6 +1392,16 @@ namespace platform
         return std::string(reinterpret_cast<const char *>(&reply), sizeof(reply));
     }
 
+    std::string releaseManifest(const std::string &nonceHex)
+    {
+        std::lock_guard lock(mutex);
+        const auto body = executable_updates::releaseManifest(identityDirectory, nonceHex, now());
+        uint8_t signature[256]{};
+        // Same pinned platform key, PSS padding and 32-byte salt as the update plan.
+        sign(body.data(), body.size(), signature, 32);
+        return body + "\n" + executable_updates::hexBytes(signature, sizeof(signature));
+    }
+
     std::string resource(const std::string &bytes)
     {
         if (bytes.size() != sizeof(DWLocalResourceRequest))

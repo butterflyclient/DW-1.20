@@ -577,6 +577,36 @@ namespace
                 remaining -= count;
             }
         }
+        else if (path.substr(0, path.find('?')) == "/updates/v2/manifest")
+        {
+            // Read-only signed description of the whole current release. HTTPS only: this route
+            // is deliberately absent from the plaintext bootstrap list above, so a remote
+            // plaintext request never reaches here.
+            constexpr std::string_view prefix = "/updates/v2/manifest?nonce=";
+            if (method != "GET" || length || rangeHeader || !path.starts_with(prefix) ||
+                path.size() != prefix.size() + 64)
+            {
+                reply(socket, 400, "{\"error\":\"invalid_release_manifest_request\"}");
+            }
+            else
+            {
+                try
+                {
+                    reply(socket,
+                          200,
+                          platform::releaseManifest(path.substr(prefix.size())),
+                          "application/octet-stream");
+                }
+                catch (const std::invalid_argument &)
+                {
+                    reply(socket, 400, "{\"error\":\"invalid_release_manifest_request\"}");
+                }
+                catch (const std::exception &)
+                {
+                    reply(socket, 503, "{\"error\":\"release_manifest_unavailable\"}");
+                }
+            }
+        }
         else if (path == "/operator/start-match" || path == "/operator/fill-bots")
         {
             if (method != "POST")

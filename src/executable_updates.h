@@ -1,5 +1,6 @@
 #pragma once
 #include "../integration/replay/dw_update_protocol.h"
+#include "crypto.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
 #include <cstring>
@@ -134,5 +135,143 @@ namespace executable_updates
             throw std::runtime_error("Executable patch is not completely published");
         result.status = 1;
         return result;
+    }
+
+    // ---- Signed release manifest (GET /updates/v2/manifest) ------------------------------
+    // One document that describes the whole current release: the executable, the custom-map
+    // manifest and the owned game-content (overlay) manifest. Everything is read from files the
+    // existing publishers already commit (full-image-catalog.json and the hash-addressed
+    // manifest blobs), re-verified here, and embedded so the signature covers the lot.
+
+    constexpr size_t RELEASE_CATALOG_LIMIT = 4096;
+    constexpr size_t RELEASE_MANIFEST_BLOB_LIMIT = 512 * 1024;
+    constexpr size_t RELEASE_DOCUMENT_LIMIT = 2 * 1024 * 1024;
+    constexpr uint64_t RELEASE_DOCUMENT_LIFETIME = 3600;
+
+    inline std::string base64(const std::string &bytes)
+    {
+        constexpr char alphabet[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string out;
+        out.reserve((bytes.size() + 2) / 3 * 4);
+        for (size_t i = 0; i < bytes.size(); i += 3)
+        {
+            unsigned v = static_cast<unsigned>(static_cast<uint8_t>(bytes[i])) << 16;
+            if (i + 1 < bytes.size())
+                v |= static_cast<unsigned>(static_cast<uint8_t>(bytes[i + 1])) << 8;
+            if (i + 2 < bytes.size())
+                v |= static_cast<uint8_t>(bytes[i + 2]);
+            out += alphabet[(v >> 18) & 63];
+            out += alphabet[(v >> 12) & 63];
+            out += i + 1 < bytes.size() ? alphabet[(v >> 6) & 63] : '=';
+            out += i + 2 < bytes.size() ? alphabet[v & 63] : '=';
+        }
+        return out;
+    }
+
+    inline std::string hexBytes(const uint8_t *bytes, size_t size)
+    {
+        std::string result;
+        result.reserve(size * 2);
+        for (size_t i = 0; i < size; ++i)
+        {
+            result += "0123456789abcdef"[bytes[i] >> 4];
+            result += "0123456789abcdef"[bytes[i] & 15];
+        }
+        return result;
+    }
+
+    inline std::string readBounded(const std::filesystem::path &path, size_t limit)
+    {
+        std::error_code ignored;
+        if (!std::filesystem::is_regular_file(path, ignored) ||
+            std::filesystem::is_symlink(path, ignored))
+            throw std::runtime_error("Release manifest input is missing");
+        const auto size = std::filesystem::file_size(path);
+        if (!size || size > limit)
+            throw std::runtime_error("Release manifest input exceeds its bounds");
+        std::ifstream file(path, std::ios::binary);
+        std::string data(static_cast<size_t>(size), '\0');
+        file.read(data.data(), static_cast<std::streamsize>(size));
+        if (static_cast<size_t>(file.gcount()) != size)
+            throw std::runtime_error("Release manifest input is unreadable");
+        return data;
+    }
+
+    // A manifest blob is embedded only if it still hashes to what the catalog promises.
+    inline std::string verifiedBlob(const std::filesystem::path &path,
+                                    const std::string &digest,
+                                    uint64_t size)
+    {
+        if (!digestName(digest) || !size || size > RELEASE_MANIFEST_BLOB_LIMIT)
+            throw std::runtime_error("Invalid release manifest blob identity");
+        auto blob = readBounded(path, RELEASE_MANIFEST_BLOB_LIMIT);
+        const auto actual = crypto::sha256(std::span<const uint8_t>(
+            reinterpret_cast<const uint8_t *>(blob.data()), blob.size()));
+        if (blob.size() != size || hexBytes(actual.data(), actual.size()) != digest)
+            throw std::runtime_error("Published release manifest blob does not verify");
+        return blob;
+    }
+
+    inline std::string releaseManifest(const std::filesystem::path &root,
+                                       const std::string &nonceHex,
+                                       uint64_t now)
+    {
+        using Json = nlohmann::json;
+        if (!digestName(nonceHex)) // exactly 64 lowercase hex characters
+            throw std::invalid_argument("Invalid release manifest nonce");
+        const auto updates = root / "updates";
+        const auto catalog = Json::parse(
+            readBounded(updates / "full-image-catalog.json", RELEASE_CATALOG_LIMIT));
+        if (catalog.at("schema") != 1 || catalog.at("format") != "full-executable-v1")
+            throw std::runtime_error("Unsupported executable catalog");
+        const auto latest = catalog.at("latest").get<std::string>();
+        const auto size = catalog.at("target_size").get<uint64_t>();
+        const auto release = catalog.at("release").get<uint64_t>();
+        if (!digestName(latest) || !size || size > DW_UPDATE_MAX_IMAGE || !release ||
+            std::filesystem::file_size(updates / "images" / (latest + ".exe")) != size)
+            throw std::runtime_error("Full executable is not completely published");
+
+        Json document = {{"schema", 1},
+                         {"nonce", nonceHex},
+                         {"issued", now},
+                         {"expires", now + RELEASE_DOCUMENT_LIFETIME},
+                         {"executable", {{"release", release}, {"sha256", latest}, {"size", size}}},
+                         {"maps", nullptr},
+                         {"overlays", nullptr}};
+        if (catalog.contains("maps"))
+        {
+            const auto &maps = catalog.at("maps");
+            const auto digest = maps.at("manifest_sha256").get<std::string>();
+            const auto manifestSize = maps.at("manifest_size").get<uint64_t>();
+            const auto blob =
+                verifiedBlob(updates / "map-manifests" / (digest + ".bin"), digest, manifestSize);
+            document["maps"] = {{"package_hash", maps.at("package_hash")},
+                                {"manifest_sha256", digest},
+                                {"manifest_size", manifestSize},
+                                {"files", maps.at("files")},
+                                {"chunks", maps.at("chunks")},
+                                {"manifest_b64", base64(blob)}};
+        }
+        if (catalog.contains("assets"))
+        {
+            const auto &assets = catalog.at("assets");
+            const auto digest = assets.at("manifest_sha256").get<std::string>();
+            const auto manifestSize = assets.at("manifest_size").get<uint64_t>();
+            // The publisher stores this manifest under the executable that embeds it.
+            const auto blob = verifiedBlob(updates / "asset-manifests" / (latest + ".bin"),
+                                           digest,
+                                           manifestSize);
+            document["overlays"] = {{"manifest_sha256", digest},
+                                    {"manifest_size", manifestSize},
+                                    {"files", assets.at("files")},
+                                    {"payloads", assets.at("payloads")},
+                                    {"manifest_b64", base64(blob)}};
+        }
+        // nlohmann orders object keys, so these bytes are stable for a given input.
+        auto text = document.dump();
+        if (text.size() > RELEASE_DOCUMENT_LIMIT)
+            throw std::runtime_error("Release manifest exceeds its bounds");
+        return text;
     }
 } // namespace executable_updates

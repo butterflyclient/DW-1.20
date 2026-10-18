@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "activated": true,
+  "verified_utc": "2026-10-18T21:39:20+00:00",
+  "release": "/opt/replay-dw/releases/20261018T213739Z-release-manifest-ca7c6d8a9f91",
+  "previous_release": "/opt/replay-dw/releases/20261018T202708Z-tls-deadline-2cf35140c662",
+  "server_sha256": "ca7c6d8a9f9133bab85acb9cfc951b6d72f9da0db5f8a6c56d980dd39edd0ec4",
+  "pid": 530532,
+  "source_baseline_commit": "13896a53151688f453f808664b8715c0c0c2f881",
+  "production_changed_files": [
+    "src/tls_transport.cpp",
+    "src/executable_updates.h",
+    "src/platform.cpp",
+    "src/platform.h",
+    "src/server.cpp"
+  ],
+  "release_manifest_changes": {
+    "src/executable_updates.h": {
+      "before": "3257a83aaaa14fe61c5c9c5a6c7be8081ffcfcc61afbab02a6dce9ad8d9802e7",
+      "after": "bf03e9983501faa19216eedd235636c86ea69c19d2edb66b01bd33efb0048675"
+    },
+    "src/platform.cpp": {
+      "before": "d716992adac9e7c9f756ce5a587a2cdebfec48f4e21879dc25b6ffd2aecc92a4",
+      "after": "6419fc904913948e4f89aa67687b50969f4d6259c4aa594b1ba076323f241e0e"
+    },
+    "src/platform.h": {
+      "before": "a50a9f411afda13a07642b437c1cef5e56f04069c0806ef5cc82ba58274dc072",
+      "after": "d2c1be1ec4c33c72c4e05f7737fd3d87cd35a3aef92e15012a856e84d26adaef"
+    },
+    "src/server.cpp": {
+      "before": "eca506af3cbf27d897f3cbeffdf35d9b252e6f51559bf4578fb0fc8cec168a2e",
+      "after": "400fc50b860859bb73b3331d434aa33e951672f8391a222def190b2c3d92656e"
+    }
+  },
+  "compile_passed": true,
+  "fresh_compiled_translation_units": 48,
+  "retained_objects": 0,
+  "tls_checks_passed": 11,
+  "connection_budget_checks_passed": 10,
+  "release_manifest_checks_passed": 8,
+  "release_manifest_fixture": "copy of live /var/lib/replay-dw/updates catalog and manifest blobs (release 34)",
+  "public_https_health": 200,
+  "preactivation_activity": {
+    "online_players": 0,
+    "matches": 0,
+    "parties": 0,
+    "player_rows": 0,
+    "utc": "2026-10-18T21:37:22Z"
+  },
+  "fresh_mutable_backup": {
+    "path": "/var/backups/replay-dw/state-pre-release-manifest-20261018T213739Z.tar.gz",
+    "sha256": "670bf97ca6e3355269e45c88e35464f4c489c370d64213680bb4ef0b1fa5b191"
+  },
+  "activation_script_sha256": "67e9529e58c9573ffbf65f4afb066ce6d9b28b990920971f9145ea6ef31cefa6",
+  "rollback_required": false,
+  "post_activation": {
+    "pinned_key_manifest_check": true,
+    "remote_plaintext_manifest_status": 403,
+    "launcher_prepare": {
+      "source": "signed-manifest",
+      "seconds": 2.3,
+      "exe_cached": false,
+      "maps": [
+        "mp_nuketown",
+        "mp_nuketown_c"
+      ],
+      "overlay_files": 40,
+      "download_bytes": 838162852,
+      "executable_downloaded": false,
+      "release": 34
+    },
+    "health": {
+      "server": "iw8-dw",
+      "build": "replay120",
+      "stage": "transport-ready",
+      "platform_auth": true,
+      "native_auth": true,
+      "matchmaking": false
+    }
+  },
+  "evidence_directory": "data/release-manifest-candidate-20261018T211826Z",
+  "receipts": {
+    "source-receipt.json": "fca3adf919fed9321c85e3aeef9a08621cd1ec5a5ff3c03688ba1b324a6a21c1",
+    "live-activity-before-activation.json": "8a20289efd9856a60a3a6e58aa090d5ea4e118156f28afd84b71cb718bcdb56a",
+    "activation-result.json": "aca2b456eead536d911ca84eb42edad1e02098ed0d1a37d1a931fcb239cdb1de",
+    "activation-verification.json": "3eb23b27e37ff05c60dedb6e3c77ea1d06bb5296243a724f50a331039bc8f3d5"
+  },
+  "native_game_verified": false,
+  "actual_game_login_verified": false,
+  "note": "Adds read-only signed GET /updates/v2/manifest; no data, catalog or publisher changes."
+}

@@ -35,6 +35,8 @@ namespace platform
     std::vector<Account> findAccounts(const std::string &username, bool prefix);
     std::string resource(const std::string &request);
     std::string executableUpdate(const std::string &request);
+    // Signed whole-release description: "<json>\n<hex RSA-PSS/SHA-256 signature over the json>".
+    std::string releaseManifest(const std::string &nonceHex);
     std::filesystem::path executableAssetPath(const std::string &digest);
     std::filesystem::path executablePatchPath(const std::string &digest);
     std::filesystem::path executableImagePath(const std::string &digest);
