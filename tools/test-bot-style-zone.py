@@ -537,6 +537,16 @@ def main():
             encoding="utf-8",
         )
         gulag_fixture_sha256 = sha(gulag_fixture_header)
+        operators_fixture_header = fixture / "DW_CustomOperatorsPackage.h"
+        operators_fixture_header.write_text(
+            inspection_fixture_header(policy)
+            .replace("DWWeaponInspectPackage", "DWCustomOperatorsPackage")
+            .replace("dw_weapon_inspect_mp_", "dw_custom_operators_"),
+            encoding="utf-8",
+        )
+        if not a.source_only_fixtures:
+            assert (snapshot / "src/DW_CustomOperatorsPackage.h").is_file(), \
+                "Prepare the real custom operator package before the production gate"
         production_gulag_header = snapshot / "src/DW_GulagNavPackage.h"
         assert (
             a.source_only_fixtures or production_gulag_header.is_file()
@@ -609,6 +619,8 @@ def main():
             assert (
                 result == 0
             ), f"Compiled Gulag zone owner failed at source line {result}"
+            result = library.Test_CustomOperators()
+            assert result == 0, f"Compiled custom operator zone failed at source line {result}"
             library.Test_Locale.argtypes = [ctypes.c_char_p] * 4
             locale_cases = 0
             for region, region_directory in policy["region_directories"].items():

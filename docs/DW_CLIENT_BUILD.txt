@@ -57,8 +57,10 @@ editable integration sources. Normal builds do not read historical revision
 projects or the shared Replay Workstation's changing source selections.
 This private foundation contains game-derived material and is not committed.
 
-Each compilation freezes its inputs under data/dw-client/jobs and rebuilds the
-CPP, recovered assembly, symbol references, relocations and unwind metadata.
+Each compilation freezes its inputs under data/dw-client/jobs. Unchanged C++
+and assembly objects are reused only when their compiler, options, source,
+headers and object bytes match. Linking, relocations, unwind metadata, PDB and
+MAP generation still run for the current source selection.
 Job directories and old receipts are immutable evidence, not supported source
 revisions or launch targets. Never edit a completed job to make another variant.
 The sole ready artifact is data/dw-client/game_dx12_ship_replay_dw.exe.
@@ -67,6 +69,41 @@ Build and deployment are serialized. Deployment refuses changed source/proof
 bytes, a replaced owner EXE or a running game, and preserves the INI/profiles.
 The optional -PrepareOnly switch freezes the same target without compiling it.
 It does not select a different source or executable.
+
+Incremental compilation and checks
+For a local build without publication:
+    .\build-game.ps1 -ValidateOnly
+To force native preparation again:
+    .\build-game.ps1 -ValidateOnly -Clean
+To rerun every behavior check and the complete native instruction comparison:
+    .\build-game.ps1 -ValidateOnly -FullChecks
+
+The default path reuses native preparation for C++ edits when the database,
+generators, headers, assets and source selection are unchanged. Other changes
+fall back to full preparation. The complete SQLite snapshot is retained. A
+matching main-database/WAL signature permits reuse of a verified snapshot;
+Windows read handles prevent that frozen snapshot from being changed during
+the build.
+
+Behavior checks track their checker/harness inputs and the compiled units they
+use, including calls into other compiled units. Unchanged results are reused
+from a successful verified build. Unknown check ownership uses all C++ units.
+Current source/image integrity, linked code, relocation/unwind checks and the
+PDB/MAP association remain checked for the new executable. The native instruction
+comparison is reused only for identical retained bytes, layout and inputs.
+
+Each job records timing.json, local-readiness.json and verification-progress.json.
+The build directory records object-cache.json. Readiness distinguishes executed
+checks from reused unchanged behavior. The first build after compiler-policy
+changes populates these caches and takes longer than a normal C++ iteration.
+
+Measured locally on 2026-10-23: a real C++ constant change compiled and linked
+in 104.24 seconds, compared with 740.47 seconds before these changes. An
+unchanged build reused its verified artifact in 27.40 seconds. The final
+qualification with all 48 behavior checks took 725.32 seconds. Compile/link
+time and complete validation time are separate; a one-minute changed-source
+build has not been achieved. Measurements are recorded in
+validation/20261023-dw-build-performance.json.
 
 Obsolete audit/hostscale/pair EXEs and INIs are moved out of the root game folder
 to data/dw-client/retired-artifacts with hashes and a recovery manifest. Main

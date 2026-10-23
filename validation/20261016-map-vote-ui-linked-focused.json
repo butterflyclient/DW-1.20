@@ -1,9 +1,9 @@
 {
   "passed": true,
   "linked_build": {
-    "image_sha256": "1e5c8bc086110a4cf764d3798aec3da755b32489680f2d78e2bbc782b68ad344",
-    "object_sha256": "ccaefdbd1c239b6924586f3d1565f984eb83755316f70b094f53032128c6c7f4",
-    "source_sha256": "4f047be019526b91fc885cd77a8e10b6e1195d3fcae0dc268b6f55a9449191de",
+    "image_sha256": "1e84466da420003608afc1f0b20b92f69163f75ac0e0ada33601a7ac9c2abedc",
+    "object_sha256": "dd42b6ca4ec4e284633693afd5f5ebae515b06116040eba96a00653578bf369b",
+    "source_sha256": "a80792acdc3a2b733bb87bfaafb986ed74e06188afc97e589c7cf34f02fcf972",
     "dependency_sha256": "e13e3186811a98b6de9e549f6d4b82467847349e6acc061cd5022676277114aa"
   },
   "original_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
@@ -1467,10 +1467,10 @@
     }
   ],
   "bridge_sha256": "e13e3186811a98b6de9e549f6d4b82467847349e6acc061cd5022676277114aa",
-  "controls_sha256": "4f047be019526b91fc885cd77a8e10b6e1195d3fcae0dc268b6f55a9449191de",
+  "controls_sha256": "a80792acdc3a2b733bb87bfaafb986ed74e06188afc97e589c7cf34f02fcf972",
   "harness_sha256": "a987bb8b10578b4d31345a62ddc9753037498d037c51d4dc50301cc9b67a6307",
   "compiler_sha256": "986af49c2d1eefeac324f724ff54597753d1053927fa5d58a37a457f578e1cf8",
-  "component_sha256": "7ac6843d7724bfe9abd88053dc55229fc75edc51669eb42b93560cf666f57977",
+  "component_sha256": "1530dc245bb22bc91040814ac233c787eec708f95093249abfec108ae5c386fc",
   "native_host_document": {
     "game_state": {
       "state": "intermission"
@@ -1509,7 +1509,7 @@
       "Absent native title fonts defer installation without registering the marker; installation retries successfully after fonts become available",
       "Repeated installation is idempotent and creates no sealed global/module fields"
     ],
-    "source_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
+    "source_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484",
     "original_lua_inputs": {
       "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\mp\\mapvotebutton.lua.529.lua": "0b4e118dd9c4c80c1cd35ec4fa7baffc8f1ca41039be7f2868dd08567f4c674e",
       "E:\\replay-compiler\\evidence\\workstation-luafile-decompiled-all\\ui\\frontend\\mp\\mapvotebuttonbackground.lua.530.lua": "0176c9e6d2b367ad5689319ea8f8b12b4e74cf884cac2c98754e49a5f1b0fdf4",
@@ -1557,16 +1557,16 @@
       "setText"
     ],
     "serialized_source": {
-      "frozen_lua_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
-      "generated_header_sha256": "2621e4074dfa8eb2f240af1b3224e2b680a333c0f5221a74d2da12e46a1260f8",
+      "frozen_lua_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484",
+      "generated_header_sha256": "93d9f66feb08b6ec71b4fd7fc0ac91c34828e3ea326dc68440d9aec54cc9bae6",
       "exact_embedded_lua": true
     },
     "linked_build": {
-      "image_sha256": "1e5c8bc086110a4cf764d3798aec3da755b32489680f2d78e2bbc782b68ad344",
+      "image_sha256": "1e84466da420003608afc1f0b20b92f69163f75ac0e0ada33601a7ac9c2abedc",
       "cpp_source_sha256": "b8eaa797f3404c798f1e385c633e0fe81cb88c06ea0920264608819a97674982",
-      "object_sha256": "bf0746636d6d42ae5a7e93f9827d8324512e5d16c06e98f2dc7af1701503d354",
-      "header_sha256": "2621e4074dfa8eb2f240af1b3224e2b680a333c0f5221a74d2da12e46a1260f8",
-      "lua_source_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1"
+      "object_sha256": "987474d9f968aa4e0547e4edf700d12f4dad58bc77d7d508261d428335e5da32",
+      "header_sha256": "93d9f66feb08b6ec71b4fd7fc0ac91c34828e3ea326dc68440d9aec54cc9bae6",
+      "lua_source_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484"
     },
     "modeled_boundaries": "Native rendering/input/model APIs; original builder, checkbox and list Lua execute",
     "game_runs_performed": false,

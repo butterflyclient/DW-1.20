@@ -3,6 +3,8 @@
 #include "DW_MapImagesPackage.h"
 #include "DW_WeaponInspectPackage.h"
 #include "DW_GulagNavPackage.h"
+#include "DW_CustomOperatorsPackage.h"
+#include "DW_CustomOperators.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -523,17 +525,27 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     const DWBotStyleScriptPackage *package = DW_BotStyleScripts_GetPackage();
     const DWBotStyleScriptPackage &inspectPackage = DWWeaponInspectPackage::Package;
     const DWBotStyleScriptPackage &gulagPackage = DWGulagNavPackage::Package;
+    const DWBotStyleScriptPackage &operatorsPackage = DWCustomOperatorsPackage::Package;
     const DWBotStyleFastfileInfo *common = nullptr, *ui = nullptr, *boot = nullptr;
     const DWBotStyleFastfileInfo *verdansk = nullptr;
+    const DWBotStyleFastfileInfo *mpCommon = nullptr, *globalStream = nullptr;
+    const DWBotStyleFastfileInfo *operatorsAnchor = nullptr;
     bool supplied = false, imagesSupplied = false, publishedSupplied = false;
     bool inspectSupplied = false;
-    bool gulagSupplied = false;
+    bool gulagSupplied = false, operatorsSupplied = false;
     uint32_t requestZoneFlags = 0;
     for (uint32_t i = 0; info && i < count; ++i)
     {
         requestZoneFlags |= info[i].zoneFlags;
         if (equal(info[i].name, "common_base_mp"))
             common = &info[i];
+        if (equal(info[i].name, "common_mp"))
+            mpCommon = &info[i];
+        if (equal(info[i].name, "global_stream_mp"))
+            globalStream = &info[i];
+        if (equal(info[i].name, "common_stream_mp") || equal(info[i].name, "common_mp") ||
+            equal(info[i].name, "common_base_mp") || equal(info[i].name, "common_core_mp"))
+            operatorsAnchor = &info[i];
         if (equal(info[i].name, "ui"))
             ui = &info[i];
         if (equal(info[i].name, "common"))
@@ -544,6 +556,8 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             supplied = true;
         if (equal(info[i].name, inspectPackage.zoneName))
             inspectSupplied = true;
+        if (equal(info[i].name, operatorsPackage.zoneName))
+            operatorsSupplied = true;
         if (equal(info[i].name, gulagPackage.zoneName))
             gulagSupplied = true;
         if (equal(info[i].name, kMapImagesZone))
@@ -582,6 +596,18 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
     // Native polling includes pending, paused, cancelled and fully loaded zones.
     // A later unload returns state zero, allowing the next request to load the
     // same overlay again. No process-lifetime 'loaded' latch is used.
+    // These models reference a techsets_common_mp technique and the ragdoll
+    // in global_stream_mp. Native comma references resolve immediately, so a
+    // boot/common insertion would bind defaults before those owners load.
+    // Append after every MP common record and any dependency in this batch.
+    // An omitted owner must be fully loaded (native completion state two).
+    const bool operatorsPhase = operatorsAnchor != nullptr;
+    if (operatorsAnchor && globalStream && globalStream > operatorsAnchor)
+        operatorsAnchor = globalStream;
+    bool operators = operatorsPhase && (requestZoneFlags & 0x3F00000u) == 0 &&
+                     (mpCommon || DWBSZ_PollFastfileState("common_mp") == 2) &&
+                     (globalStream || DWBSZ_PollFastfileState("global_stream_mp") == 2) &&
+                     !operatorsSupplied && DWBSZ_PollFastfileState(operatorsPackage.zoneName) == 0;
     bool bot = common && package && !supplied && DWBSZ_PollFastfileState(package->zoneName) == 0;
     bool inspection = common && !inspectSupplied &&
                       DWBSZ_PollFastfileState(inspectPackage.zoneName) == 0;
@@ -597,14 +623,14 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
                         DWBSZ_PollFastfileState(kMapImagesZone) == 0;
     bool published = imageAnchor && !publishedSupplied && s_publishedImages >= 0 &&
                      DWBSZ_PollFastfileState(publishedImagesZone) == 0;
-    if (!bot && !images && !published && !inspection && !gulag)
+    if (!bot && !images && !published && !inspection && !gulag && !operators)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     Kernel api{};
-    if (!resolve(api) || count >= UINT32_MAX - 5 ||
-        static_cast<size_t>(count) + 5 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
+    if (!resolve(api) || count >= UINT32_MAX - 6 ||
+        static_cast<size_t>(count) + 6 > SIZE_MAX / sizeof(DWBotStyleFastfileInfo))
     {
         DWBSZ_Print(10, "DW: native overlay request failed; original zone request retained.\n");
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
@@ -621,6 +647,13 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
         DWBSZ_Print(10, "DW: inspection animation staging failed; inspection unavailable.\n");
         inspection = false;
     }
+    if (operators)
+    {
+        operators = stage(api, operatorsPackage, "dw_custom_operators_");
+        DW_CustomOperators_ZoneInstalled(operators);
+        if (!operators)
+            DWBSZ_Print(10, "DW: custom operator staging failed; equipped stock operators retained.\n");
+    }
     if (gulag && !stage(api, gulagPackage, "dw_gulag_nav_"))
     {
         DWBSZ_Print(10, "DW: Gulag navigation staging failed; stock map request retained.\n");
@@ -633,14 +666,14 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             DWBSZ_Print(10, "DW: published map image zone staging failed; map images omitted.\n");
     }
     published = published && s_publishedImages > 0;
-    if (!bot && !images && !published && !inspection && !gulag)
+    if (!bot && !images && !published && !inspection && !gulag && !operators)
     {
         DW_BotStyleZone_LoadFastfilesNative(info, count, loadFlags, loadServerZone);
         return;
     }
     void *heap = api.heap();
     auto *augmented = static_cast<DWBotStyleFastfileInfo *>(
-        api.alloc(heap, 0, (static_cast<size_t>(count) + 5) * sizeof(DWBotStyleFastfileInfo)));
+        api.alloc(heap, 0, (static_cast<size_t>(count) + 6) * sizeof(DWBotStyleFastfileInfo)));
     if (!augmented)
     {
         DWBSZ_Print(10, "DW: native overlay request allocation failed.\n");
@@ -690,10 +723,21 @@ extern "C" void DW_BotStyleZone_LoadFastfiles(const DWBotStyleFastfileInfo *info
             }
         }
         augmented[at++] = info[i];
+        if (&info[i] == operatorsAnchor && operators)
+        {
+            augmented[at] = mpCommon ? *mpCommon : info[i];
+            augmented[at].name = operatorsPackage.zoneName;
+            // Match common_mp's lifetime, including a later request containing
+            // only common_base_mp/core. The shared technique unloads with 0x8.
+            augmented[at++].zoneFlags = 0x8;
+        }
     }
     if (bot)
         DWBSZ_Print(10, "DW: native bot style overlay '%s' precedes common_base_mp.\n",
                     package->zoneName);
+    if (operators)
+        DWBSZ_Print(10, "DW: custom operator zone '%s' follows %s in common_mp group 0x8.\n",
+                    operatorsPackage.zoneName, operatorsAnchor->name);
     if (inspection)
         DWBSZ_Print(10, "DW: inspection animation zone '%s' precedes common_base_mp.\n",
                     inspectPackage.zoneName);

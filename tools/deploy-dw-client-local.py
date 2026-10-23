@@ -206,6 +206,30 @@ def deploy(job, replace_reviewed_build=None):
             payloads[entry["sha256"]] = dict(source=entry["source"])
             entries.append(entry)
 
+    custom_proof_path = snapshot / "generated/custom-operators-package/package-proof.json"
+    if custom_proof_path.exists():
+        custom = read(custom_proof_path)
+        assert custom["production_ready"]
+        assert sha(snapshot / "src/DW_CustomOperatorsPackage.h") == custom["header_sha256"]
+        assert sha(custom_proof_path.parent / "manifest.json") == custom["manifest_sha256"]
+        gates = [proof for proof in ready["proofs"] if proof["checker"] == "test-custom-operators.py"]
+        assert len(gates) == 1
+        gate_path = Path(gates[0]["path"]).resolve(strict=True)
+        assert gate_path.is_relative_to(job) and sha(gate_path) == gates[0]["sha256"]
+        gate = read(gate_path)
+        assert gate["passed"] and gate["executable_sha256"] == ready["sha256"]
+        assert gate["package_proof_sha256"] == sha(custom_proof_path)
+        assert gate["compiled_package_header_sha256"] == custom["header_sha256"]
+        for entry in custom["installation_manifest"]:
+            assert re.fullmatch(
+                r"(?:[a-z0-9_]{0,16}_)?dw_custom_operators_[0-9a-f]{16}\.(?:ff|fp)",
+                entry["name"],
+            )
+            assert entry["name"] not in native_paths
+            native_paths[entry["name"]] = entry["relative_path"]
+            payloads[entry["sha256"]] = dict(source=entry["source"])
+            entries.append(entry)
+
     records = []
     zone = (game / "zone").resolve(strict=True)
     for entry in entries:

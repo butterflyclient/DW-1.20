@@ -2,6 +2,7 @@
 #include "DW_ProgressionBindings.h"
 #include "DW_PlaylistUI_Source.h"
 #include "DW_WeaponInspectUI_Source.h"
+#include "DW_CustomOperatorsUI_Source.h"
 
 extern "C"
 {
@@ -60,6 +61,9 @@ extern "C" void DW_PlaylistUI_Frame()
             double inspectInstalled = 0;
             ok = Execute(vm, dwWeaponInspectUISource,
                          sizeof(dwWeaponInspectUISource) - 1, inspectInstalled);
+            double operatorsInstalled = 0;
+            ok = Execute(vm, dwCustomOperatorsUISource,
+                         sizeof(dwCustomOperatorsUISource) - 1, operatorsInstalled) && ok;
             char voteState[1024]{}, update[1400]{};
             if (DW_MapVoting_UIState(voteState, sizeof(voteState)) > 0)
             {

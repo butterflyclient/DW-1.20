@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "image_sha256": "1e5c8bc086110a4cf764d3798aec3da755b32489680f2d78e2bbc782b68ad344",
+  "image_sha256": "1e84466da420003608afc1f0b20b92f69163f75ac0e0ada33601a7ac9c2abedc",
   "checks": [
     "DW disabled early return",
     "off-thread early return",
@@ -27,9 +27,9 @@
     "ballot refresh retries successfully after Lua errors"
   ],
   "checker_sha256": "8db71723347a701e51e7931c96c4b780ece7fa648f75668091f55e2fdebd306a",
-  "lua_source": "data\\dw-client\\jobs\\1792197118736660800\\source\\src\\DW_PlaylistUI.lua",
-  "lua_source_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
-  "embedded_lua_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
+  "lua_source": "data\\dw-client\\jobs\\1792200192027973700\\source\\src\\DW_PlaylistUI.lua",
+  "lua_source_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484",
+  "embedded_lua_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484",
   "evidence": "Actual linked frame instructions; modeled native Lua and locking boundaries",
   "game_launched": false
 }

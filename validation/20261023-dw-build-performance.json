@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "date": "2026-10-23",
+  "target": "game_dx12_ship_replay_dw.exe",
+  "compile_link": {
+    "baseline_seconds": 740.471,
+    "real_cpp_edit_seconds": 104.242,
+    "speedup": 7.103,
+    "object_cache_hits": 217,
+    "object_cache_misses": 2,
+    "one_minute_target_met": false
+  },
+  "unchanged_build": {
+    "seconds": 27.39,
+    "verified_artifact_reused": true
+  },
+  "final_qualification": {
+    "passed": true,
+    "total_seconds": 725.317,
+    "checks_executed": 48,
+    "checks_reused": 0,
+    "unresolved_symbols": 0,
+    "executable_sha256": "9be9b9d98ee57d28e0b129c24142a33d985ae9401c77c5b8cb40b62ffe7f2710"
+  },
+  "cached_validation": {
+    "passed": true,
+    "seconds": 17.682,
+    "checks_executed": 1,
+    "checks_reused": 47
+  },
+  "focused_tests": {
+    "passed": true,
+    "command": "python -B tools/test-dw-build-cache.py"
+  },
+  "scope": {
+    "game_runs_performed": false,
+    "game_deployed": false,
+    "server_published": false,
+    "compile_link_timings_exclude_validation": true,
+    "changed_source_complete_build_under_one_minute": false
+  }
+}

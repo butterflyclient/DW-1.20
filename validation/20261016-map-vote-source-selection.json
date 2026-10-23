@@ -1,42 +1,43 @@
 {
   "passed": true,
-  "job": "data\\dw-client\\jobs\\1792197118736660800",
-  "previous_job": "data\\dw-client\\jobs\\1792131363983337100",
+  "job": "data\\dw-client\\jobs\\1792200192027973700",
+  "previous_job": "data/dw-client/jobs/1792197118736660800",
   "current_authored_sources_guarded": true,
-  "retained_latest_production_sources": [
-    "integration/replay/DW_MapAvailability.cpp",
-    "integration/replay/DW_BotStyleZone.cpp",
-    "integration/replay/DW_ExecutableUpdate.cpp",
-    "integration/replay/DW_LocalBackend_Frame.cpp"
+  "completed_shared_changes": [
+    {
+      "source": "integration/replay/DW_LobbyControls.cpp",
+      "sha256": "a80792acdc3a2b733bb87bfaafb986ed74e06188afc97e589c7cf34f02fcf972"
+    },
+    {
+      "source": "integration/replay/DW_LocalBackend_Frame.cpp",
+      "sha256": "ec0368cb6c7898d4d4b5628c9203bccc7eae3f678b475852ecbcc7228f54500f"
+    },
+    {
+      "source": "integration/replay/DW_PlaylistUI.lua",
+      "sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484"
+    },
+    {
+      "source": "integration/replay/DW_BotStyleZone.cpp",
+      "sha256": "8fc192580b56c4d379a0a7de69d8d8fe1a4f0b9c8fddb2f73f31eb447beb4cfb"
+    }
   ],
-  "changed_authored_inputs": [
-    "integration/replay/DW_PlaylistUI.lua",
-    "integration/replay/DW_BotStyleWeapon.cpp",
-    "integration/replay/DW_MapVoting.h"
-  ],
-  "new_preparer_dependencies_guarded": [
-    "tools/dw_client.py",
-    "tools/dw_catalog.py",
-    "tools/prepare-br-bot-loot-integration.py",
-    "tools/prepare-host-bot-equipment.py"
-  ],
-  "lua_sha256": "39bd18d879e8a502111b206f8a5cf5371c88fa6bc424a7517657fca71e1109a1",
-  "native_map_tile": [
-    96,
-    849,
-    526,
-    979
-  ],
+  "bot_custom_loadout_gate_retained": true,
   "ballot_rectangle": [
     96,
     849,
     768,
     979
   ],
+  "native_map_tile": [
+    96,
+    849,
+    526,
+    979
+  ],
   "native_roster_layout_changed": false,
   "voting_tooltips": false,
   "home_play_menu_ballot": false,
-  "server_modified": false,
+  "lua_sha256": "4ce1b23be902ac0d6da3bb76b6aa007f6633676004c329e0447521834ae56484",
   "maps_modified": false,
   "game_run_performed": false
 }

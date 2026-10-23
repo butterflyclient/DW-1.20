@@ -125,6 +125,58 @@ def exercise(
             )
         )
 
+    # Explicit, authenticated handoff keeps the old owner's live DW lease and
+    # player slot. It must not weaken the ordinary disconnected-host tests below.
+    lobby, mm, docs = create()
+    path = root / "lobbies" / f"{lobby}.json"
+    host = copy.deepcopy(docs[0])
+    host["player_state"] = {str(owner_user): 2, str(user): 2}
+    host["dw_migration_target"] = user
+    payload = u64(lobby) + u64(docs[1]["update_id"]) + text(json.dumps(host))
+    before = snapshot()
+    candidate.task(145, 15, payload, error=101)
+    assert snapshot() == before
+    assert owner.task(145, 15, payload) == boolean(True)
+    kind, packet = owner.receive()
+    assert kind == 2 and packet.startswith(u32(2006) + u64(lobby))
+    assert candidate.receive() == (kind, packet)
+    current = strings(packet[23:])
+    assert "dw_migration_target" not in current[0]
+    grant_state = path.read_bytes()
+    for edit in (
+        lambda grant: grant.update(expires=0),
+        lambda grant: grant.update(session=base64.b64encode(b"x" * 32).decode()),
+        lambda grant: grant.update(target=owner_user),
+        lambda grant: grant.update(owner_session=base64.b64encode(b"y" * 32).decode()),
+    ):
+        stored = json.loads(grant_state)
+        edit(stored["host_handoff"])
+        path.write_text(json.dumps(stored))
+        try:
+            claim(lobby, current, error=101)
+        finally:
+            path.write_bytes(grant_state)
+    claim(lobby, current, error=106)  # A live handoff cannot remove the old host.
+    successor = copy.deepcopy(current[0])
+    successor["listen_server"] = {"host_player_id": user, "host_address": address}
+    assert candidate.task(
+        145, 15, u64(lobby) + u64(current[1]["update_id"]) + text(json.dumps(successor))
+    ) == boolean(True)
+    kind, packet = candidate.receive()
+    assert owner.receive() == (kind, packet)
+    migrated = strings(packet[23:])
+    stored = json.loads(path.read_bytes())
+    assert stored["owner"] == user and set(stored["members"]) == {user, owner_user}
+    assert "host_handoff" not in stored
+    assert migrated[1]["dtls"] == docs[1]["dtls"]
+    assert migrated[0]["player_state"] == {str(owner_user): 2, str(user): 2}
+    assert strings(owner.task(145, 13, u64(lobby))) == migrated
+    owner.task(145, 15, payload, error=101)  # Old host remains a member, not an owner.
+    candidate.task(145, 10, u64(lobby))
+    assert candidate.receive() == (2, u32(2002) + u64(lobby) + u64(0))
+    assert owner.receive() == (2, u32(2002) + u64(lobby) + u64(0))
+    checks.append("authenticated named handoff retains both live players, consumes the session-bound grant, and rejects expired/foreign grants and removal of the old host")
+
     lobby, mm, docs = create()
     path = root / "lobbies" / f"{lobby}.json"
     before = snapshot()

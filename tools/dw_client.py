@@ -278,7 +278,7 @@ def initialize():
     return manifest
 
 
-def prepare(pending_map_record=None):
+def prepare(pending_map_record=None, clean=False):
     _, state, base = settings()
     initialize()
     directory = inside(state / "jobs" / str(time.time_ns()))
@@ -286,9 +286,14 @@ def prepare(pending_map_record=None):
     local = read(base / "replay-project.local.json")
     live_database = Path(os.environ.get("REPLAY_SQLITE") or local["sqlite"])
     print("Pinning complete analysis SQLite snapshot:", live_database, flush=True)
-    binding = dw_sqlite_snapshot.create_snapshot(live_database, directory / "inputs/analysis.sqlite")
+    binding = dw_sqlite_snapshot.create_snapshot(live_database, directory / "inputs/analysis.sqlite",
+                                                cache_directory=state / 'sqlite-cache')
     print("Pinned analysis SQLite:", binding["sha256"], flush=True)
     with dw_sqlite_snapshot.scoped_sqlite(binding["path"]):
+        if not clean and pending_map_record is None:
+            cached = load_module("dw_incremental_preparation", ROOT / "tools/dw_build_cache.py").prepare_incremental(directory, binding)
+            if cached:
+                return cached
         return _prepare(directory, binding, pending_map_record)
 
 
@@ -321,7 +326,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
         for name in (
             "prepare-workstation-performance.py", "workstation_preparation_context.py",
             "preparation_instruction_source.py", "verifier_performance.py", "native_relocation_performance.py",
-            "dw_client.py", "dw_catalog.py", "dw_sqlite_snapshot.py", "dw_debug_symbols.py", "test-dw-debug-symbols.py",
+            "dw_client.py", "dw_build_cache.py", "test-dw-build-cache.py", "dw_catalog.py", "dw_sqlite_snapshot.py", "dw_debug_symbols.py", "test-dw-debug-symbols.py",
             "dw_validation_scheduler.py", "test-dw-validation-scheduler.py",
             "test-network-diagnostics.py",
             "prepare-playlist-ui.py", "prepare-lobby-native-clones.py",
@@ -354,6 +359,10 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "test-script-method-integration.py", "test-bot-style-scripts.py",
             "prepare-bot-style-zone.py", "prepare-matchmaking-assignments.py",
             "test-bot-style-zone.py", "bot_style_zone_harness.cpp",
+            "prepare-custom-operators.py", "test-custom-operators.py",
+            "test-custom-operators-ui.py",
+            "freeze-custom-operator-package.py", "prepare-custom-operator-package.py",
+            "import-custom-operator-model.py", "custom-operator-model.cpp",
             "prepare-gulag-navigation-package.py", "test-gulag-navigation-package.py",
             "test-gulag-script-string-contract.py",
             "test-gulag-zone-lifecycle.py", "test-gulag-integration.py",
@@ -371,6 +380,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "weapon_inspect_blend_harness.cpp",
             "prepare-weapon-inspect-crosshair.py", "test-weapon-inspect-crosshair.py",
             "prepare-slide-view.py", "test-slide-view.py", "slide_view_harness.cpp",
+            "prepare-controller-armor.py", "test-controller-armor.py",
             "dw_update_assets.py", "dw_update_maps.py", "embed-update-helper.py", "replay-update-client.rc",
             "replay-update-client.cpp", "replay-update-assets.h", "replay-update-maps.h",
             "test-update-maps.py", "update_maps_harness.cpp",
@@ -391,6 +401,7 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
     sys.path.insert(0, str(source / "tools"))
     performance = load_module("dw_preparation_performance", source / "tools/prepare-workstation-performance.py")
     performance.prepare(source)
+    load_module("dw_build_cache_preparation", ROOT / "tools/dw_build_cache.py").prepare(source)
     overlays = dict(manifest["overlays"])
     for root in config["authored_source_roots"]:
         # Host replacements acquire their native bindings below. Other authored
@@ -414,6 +425,9 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             "DW_WeaponInspectBlend.cpp", "DW_WeaponInspectBlend.h",
             "DW_WeaponInspectCrosshair.cpp", "DW_WeaponInspectCrosshair.h",
             "DW_SlideView.cpp", "DW_SlideView.h",
+            "DW_ControllerArmor.cpp",
+            "DW_CustomOperators.cpp", "DW_CustomOperators.h",
+            "DW_CustomOperatorsUI.lua",
         }
         for path in sorted(inside(ROOT / root).iterdir()):
             if root != "integration/host-scale" and path.name not in replay_additions:
@@ -482,7 +496,6 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
         '    report["debug_sqlite_snapshot"] = debug_sqlite_snapshot\n'
         '    (output / "build-report.json").write_text(json.dumps(report, indent=2) + "\\n")\n'
         '    emit_debug_symbols(output / "build-report.json")\n'
-        '    subprocess.run([sys.executable, str(ROOT / "tools/test-dw-debug-symbols.py"), "--build", str(output)], check=True)\n'
         '    report = json.loads((output / "build-report.json").read_text())\n' + anchor),
         encoding="utf-8")
     # Keep the supplied name corpus tied to the generated compiled pool.
@@ -527,6 +540,11 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
     methods.prepare(source)
     scripts = load_module("dw_bot_style_scripts", ROOT / "tools/prepare-bot-style-scripts.py")
     scripts.prepare(source)
+    custom_assets = load_module("dw_custom_operator_package", ROOT / "tools/freeze-custom-operator-package.py")
+    custom_manifest, custom_inputs = custom_assets.prepare(source)
+    source_inputs.extend(custom_inputs)
+    custom = load_module("dw_custom_operators", ROOT / "tools/prepare-custom-operators.py")
+    custom.prepare(source, manifest=custom_manifest)
     zones = load_module("dw_bot_style_zones", ROOT / "tools/prepare-bot-style-zone.py")
     zones.prepare(source)
     # Published custom maps' lobby/loading images, embedded as dw_map_images.
@@ -566,6 +584,8 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
     inspect_crosshair.prepare(source)
     slide_view = load_module("dw_slide_view", ROOT / "tools/prepare-slide-view.py")
     slide_view.prepare(source)
+    controller_armor = load_module("dw_controller_armor", ROOT / "tools/prepare-controller-armor.py")
+    controller_armor.prepare(source)
     # Missing underground navigation is an additive native map asset. Its
     # collision inputs and audits are frozen before any executable is built;
     # incomplete or synthetic geometry cannot become a production package.
@@ -656,9 +676,11 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
     for name in ("DW_AltKillcam_Native.cpp", "DW_AltKillcamRender_Native.cpp",
                  "DW_WeaponInspect_Native.cpp", "DW_WeaponInspectInput_Native.cpp",
                  "DW_WeaponInspectBlend_Native.cpp", "DW_WeaponInspectCrosshair_Native.cpp",
-                 "DW_SlideView_Native.cpp"):
+                 "DW_SlideView_Native.cpp", "DW_ControllerArmor_Native.cpp"):
         clone = source / "src" / name
         cpp[clone.relative_to(source).as_posix()] = digest(clone)
+    custom_clone = source / "src/DW_CustomOperators_Native.cpp"
+    cpp[custom_clone.relative_to(source).as_posix()] = digest(custom_clone)
     receipt = dict(
         schema=1,
         target=config["target"],
@@ -681,6 +703,10 @@ def _prepare(directory, sqlite_snapshot, pending_map_record=None):
             for path in sorted(source.rglob("*"))
             if path.is_file()
         ],
+        authored_inventory={path.relative_to(ROOT).as_posix(): digest(path)
+                            for name in config['authored_source_roots']
+                            for path in (ROOT / name).iterdir()
+                            if path.suffix in ('.cpp', '.c', '.h', '.lua')},
     )
     require_current_sources(receipt)
     save(directory / "source-receipt.json", receipt)
@@ -696,6 +722,18 @@ def build(directory, publish_ready=True, gameplay_checks=True):
     directory = inside(directory)
     receipt = read(directory / "source-receipt.json")
     database = dw_sqlite_snapshot.verify_binding(receipt["sqlite_snapshot"])
+    if (directory/'local-readiness.json').is_file() and os.environ.get('REPLAY_FULL_CHECKS') != '1':
+        ready = read(directory/'local-readiness.json')
+        require_current_sources(receipt)
+        if (not ready['passed'] or digest(ready['executable']) != ready['sha256']
+                or digest(ready['build_report']) != ready['build_report_sha256']
+                or digest(directory/'source-receipt.json') != ready['source_receipt_sha256']):
+            raise ValueError('Unchanged build artifact/provenance changed')
+        for proof in ready['proofs']:
+            if (digest(proof['path']) != proof['sha256'] or not read(proof['path'])['passed']
+                    or digest(ROOT/'tools'/proof['checker']) != proof['checker_sha256']):
+                raise ValueError('Unchanged build proof changed')
+        return publish_validated(directory) if publish_ready else ready
     local = read(Path(receipt["snapshot"]) / "replay-project.local.json")
     if Path(local["sqlite"]).resolve() != database:
         raise ValueError("Frozen compiler metadata points to another SQLite database")
@@ -707,8 +745,10 @@ def _build(directory, publish_ready=True, gameplay_checks=True):
     directory = inside(directory)
     receipt = read(directory / "source-receipt.json")
     source = inside(receipt["snapshot"])
+    shared = set(receipt.get('shared_immutable_inputs', []))
     for item in receipt["files"]:
-        if digest(source / item["path"]) != item["sha256"]:
+        actual = dw_sqlite_snapshot.snapshot_digest(source/item['path']) if item['path'] in shared else digest(source/item['path'])
+        if actual != item["sha256"]:
             raise ValueError("Frozen compiler input changed: " + item["path"])
     local = read(source / "replay-project.local.json")
     for key in ("REPLAY_WORKSTATION_BUILD_ROOT", "REPLAY_WORKSTATION_OUTPUT_ROOT"):
@@ -720,6 +760,7 @@ def _build(directory, publish_ready=True, gameplay_checks=True):
         # Filtered Clang AST results keyed by exact compiler, options, source and
         # header hashes; shared by every job so unchanged units are not re-parsed.
         REPLAY_AST_CACHE=str(ROOT / "data/dw-client/ast-cache"),
+        REPLAY_OBJECT_CACHE=str(ROOT / "data/dw-client/object-cache"),
     )
     sys.path[:0] = [str(source), str(source / "tools")]
     from workstation.project import Project
@@ -761,6 +802,11 @@ def verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         return _verify(directory, report_path, publish_ready, gameplay_checks)
 
 
+def prepare_validation_dependencies(source):
+    checker = load_module('dw_host_validation_dependency', ROOT/'tools/test-host-scale.py')
+    return checker.install_validation_dependency(Path(source))
+
+
 def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     """Bind every gate to the freshly compiled image, never a revision alias."""
     config, state, _ = settings()
@@ -789,6 +835,8 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     ):
         raise ValueError("Fresh compilation/source/image gate failed")
     tools = ROOT / "tools"
+    if gameplay_checks:
+        prepare_validation_dependencies(source)
     checks = (
         ("test-dw-debug-symbols.py", [], "debug-symbols.json"),
         ("test-network-diagnostics.py", [], "network-diagnostics.json"),
@@ -835,12 +883,15 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         ("test-bot-style-scripts.py", ["--snapshot", str(source)], "bot-style-scripts.json"),
         ("test-bot-br-roam-script.py", ["--snapshot", str(source)], "bot-br-roam-script.json"),
         ("test-bot-style-zone.py", ["--snapshot", str(source)], "bot-style-zone.json"),
+        ("test-custom-operators.py", ["--snapshot", str(source)], "custom-operators.json"),
+        ("test-custom-operators-ui.py", ["--snapshot", str(source)], "custom-operators-ui.json"),
         ("test-gulag-integration.py", [], "gulag-navigation.json"),
         ("test-weapon-inspect.py", [], "weapon-inspect.json"),
         ("test-weapon-inspect-runtime.py", [], "weapon-inspect-runtime.json"),
         ("test-weapon-inspect-blend.py", [], "weapon-inspect-blend.json"),
         ("test-weapon-inspect-crosshair.py", [], "weapon-inspect-crosshair.json"),
         ("test-slide-view.py", [], "slide-view.json"),
+        ("test-controller-armor.py", [], "controller-armor.json"),
         ("test-matchmaking-assignments.py", ["--snapshot", str(source)], "matchmaking-assignments.json"),
         ("test-join-in-progress.py", ["--snapshot", str(source)], "join-in-progress.json"),
         ("test-dw-verifier.py", ["--snapshot", str(source)], "dw-verifier.json"),
@@ -882,6 +933,22 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
     def run_one(index, check):
         checker, extra, name = check
         output = directory / name
+        cache = load_module('dw_behavior_cache_' + str(index), tools / 'dw_build_cache.py')
+        dependency_key, units = cache.check_dependencies(checker, report, receipt, ROOT)
+        cache_path = state / 'check-cache' / (checker + '-' + dependency_key + '.json')
+        if checker != 'test-dw-debug-symbols.py' and os.environ.get('REPLAY_FULL_CHECKS') != '1' and cache_path.is_file():
+            previous = read(cache_path)
+            cohort = Path(previous['cohort'])
+            prior_path = Path(previous['path'])
+            if (cohort.is_file() and prior_path.is_file() and digest(cohort) == previous['cohort_sha256']
+                    and digest(prior_path) == previous['sha256'] and read(cohort)['passed']
+                    and read(prior_path)['passed']):
+                save(output, dict(passed=True, validation_kind='unchanged-compiled-inputs',
+                    linked_image_sha256=report['sha256'], dependency_sha256=dependency_key,
+                    compiled_units=units, previous_proof=previous))
+                print('Reused unchanged behavior:', checker, flush=True)
+                return dict(path=str(output), sha256=digest(output), checker=checker,
+                    checker_sha256=digest(tools/checker), dependency_sha256=dependency_key, reused=True)
         subprocess.run(
             [
                 sys.executable,
@@ -904,6 +971,7 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
             sha256=digest(output),
             checker=checker,
             checker_sha256=digest(tools / checker),
+            dependency_sha256=dependency_key, reused=False,
         )
 
     scheduler = load_module("dw_validation_scheduler", tools / "dw_validation_scheduler.py")
@@ -925,8 +993,15 @@ def _verify(directory, report_path, publish_ready=True, gameplay_checks=True):
         game_runs_performed=False,
         gameplay_checks_run=gameplay_checks,
         gameplay_checks_waived_by_owner=not gameplay_checks,
+        checks_executed=sum(not proof.get('reused') for proof in proofs),
+        checks_reused=sum(bool(proof.get('reused')) for proof in proofs),
     )
     save(directory / "local-readiness.json", local)
+    for proof in proofs:
+        if not proof.get('reused') and proof.get('dependency_sha256'):
+            save(state/'check-cache'/(proof['checker']+'-'+proof['dependency_sha256']+'.json'),
+                 dict(path=proof['path'], sha256=proof['sha256'], cohort=str(directory/'local-readiness.json'),
+                      cohort_sha256=digest(directory/'local-readiness.json')))
     if not publish_ready:
         save(state / "latest-job.json", dict(directory=str(directory), prepared=True,
                                              validated=True, passed=False, awaiting_publication=True))

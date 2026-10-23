@@ -53,6 +53,12 @@ def main():
         inspection_header_bytes.replace(b'\r\n', b'\n'), re.S)
     assert len(inspection_chunks) == 1, 'Frozen inspection header must contain exactly one installer chunk'
     inspection_source = inspection_chunks[0][1]
+    operator_header = report_path.parent.parent.parent / 'source/src/DW_CustomOperatorsUI_Source.h'
+    operator_chunks = re.findall(
+        rb'inline constexpr char dwCustomOperatorsUISource\[\] = R"([A-Za-z0-9_]+)\((.*?)\)\1";',
+        operator_header.read_bytes().replace(b'\r\n', b'\n'), re.S)
+    assert len(operator_chunks) == 1
+    operator_source = operator_chunks[0][1]
     assert inspection_source.startswith(b'local state=MenuBuilder.m_types.replaydwplaylistfillstate(); ')
     state = dict(enabled=True, main=True, now=1000, locked=False, top=7,
                  installed=False, eligible=True, load_error=0, call_error=0, error_kind='probe',
@@ -170,8 +176,11 @@ def main():
                     assert text == state['expected_ballot'], 'Refresh did not use the actual linked UIState result'
                     state['ballots'].append(text)
                 elif text.startswith(b'local state=MenuBuilder.m_types.replaydwplaylistfillstate(); '):
-                    kind = 'inspection'
-                    assert text == inspection_source, 'Linked inspection Lua differs from its frozen header'
+                    if text == operator_source:
+                        kind = 'operators'
+                    else:
+                        kind = 'inspection'
+                        assert text == inspection_source, 'Linked inspection Lua differs from its frozen header'
                 else:
                     kind = 'installer'
                     assert text == source, 'Linked embedded Lua differs from supplied source'
@@ -245,10 +254,10 @@ def main():
     frame('one-second throttle', advance=1)
     assert len(state['loads']) == before
     frame('marker idempotence')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot'] and len(state['prints']) == 2
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot'] and len(state['prints']) == 2
     state['installed'], state['inspection_installed'] = False, False
     frame('VM reload at reused address reinstalls')
-    assert state['loads'][-4:] == ['probe', 'installer', 'inspection', 'ballot']
+    assert state['loads'][-5:] == ['probe', 'installer', 'inspection', 'operators', 'ballot']
     state['vm'], state['installed'], state['inspection_installed'] = arena + 0x2000, False, False
     frame('replacement VM installs and reports success')
     assert state['installed'] and len(state['prints']) == 3
@@ -258,29 +267,29 @@ def main():
     state['inspection_installed'], state['inspection_eligible'] = False, False
     before = len(state['loads'])
     frame('inspection installer waits for stock options without reinstalling playlist or interrupting ballot')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot']
     assert state['installed'] and not state['inspection_installed'] and len(state['prints']) == 3
     state['inspection_eligible'] = True
     before = len(state['loads'])
     frame('inspection installer retries when stock options become available')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot']
     assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 3
 
     state['error_kind'], state['load_error'] = 'inspection', 1
     before, calls_before = len(state['loads']), len(state['calls'])
     frame('inspection load error preserves installed UI and ballot while restoring stack and lock')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
-    assert state['calls'][calls_before:] == ['probe', 'ballot']
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot']
+    assert state['calls'][calls_before:] == ['probe', 'operators', 'ballot']
     assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
     state['load_error'], state['call_error'] = 0, 1
     before = len(state['loads'])
     frame('inspection pcall error preserves installed UI and suppresses repeated refresh error log')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot']
     assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
     state['call_error'] = 0
     before = len(state['loads'])
     frame('inspection retries successfully after load and pcall errors without playlist reinstall')
-    assert state['loads'][before:] == ['probe', 'inspection', 'ballot']
+    assert state['loads'][before:] == ['probe', 'inspection', 'operators', 'ballot']
     assert state['installed'] and state['inspection_installed'] and len(state['prints']) == 4
 
     def write(address, value, format='<i'):

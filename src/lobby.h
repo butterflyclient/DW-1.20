@@ -23,6 +23,7 @@ namespace lobby
 
     void serve(const IO &io);
     void publishOperatorUpdates(uint32_t title, std::span<const services::Delivery> deliveries);
+
     struct OnlinePlayer
     {
         uint32_t title;

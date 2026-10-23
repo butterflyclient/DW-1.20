@@ -11,6 +11,7 @@ extern "C"
     void DW_ExecutableUpdate_Frame();
     void DW_LobbyControls_Frame();
     void DW_WeaponInspectInput_Frame();
+    void DW_CustomOperators_Frame();
     void DW_SlideView_Init();
     __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *, char *, unsigned long);
     __declspec(dllimport) void *__stdcall LoadLibraryA(const char *);
@@ -362,6 +363,7 @@ extern "C" void DW_LocalBackend_Frame()
     }
     DW_LocalProgression_Frame();
     DW_WeaponInspectInput_Frame();
+    DW_CustomOperators_Frame();
     DW_SlideView_Init();
     DW_ExecutableUpdate_Frame();
     DW_LobbyControls_Frame();

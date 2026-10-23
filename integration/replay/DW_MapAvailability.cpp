@@ -44,6 +44,7 @@ static_assert(offsetof(DWReplayGameInfo, maps) == 5512);
 
 extern "C"
 {
+    const void *DW_CustomOperators_TableView(const void *);
     bool DW_LocalBackend_IsEnabled();
     unsigned char Com_GameMode_GetActiveGameMode();
     int func_1413E2FE0(const DWReplayStringTable *, int column, const char *value);
@@ -618,6 +619,7 @@ extern "C" void CL_TransientsCollisionMP_SetTransientMode(int mode)
 extern "C" const char *func_1413E2BA0(const DWReplayStringTable *table,
                                      int column, const char *value, int resultColumn)
 {
+    table = static_cast<const DWReplayStringTable *>(DW_CustomOperators_TableView(table));
     if (!table)
     {
         func_1412B0570(13, "Unable to find the lookup table in the fastfile, aborting lookup\n");

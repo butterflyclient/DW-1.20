@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import struct
@@ -23,6 +24,18 @@ def verify(build):
     report_path = Path(build) / "build-report.json"
     report = json.loads(report_path.read_bytes())
     debug = report["debug_symbols"]
+    checker_hash = digest(__file__)
+    report_hash = digest(report_path)
+    existing_path = Path(build) / "debug-symbol-verification.json"
+    if existing_path.is_file():
+        try:
+            previous = json.loads(existing_path.read_bytes())
+        except (OSError, ValueError):
+            previous = {}
+        if (previous.get("checker_sha256") == checker_hash and previous.get("build_report_sha256") == report_hash
+                and digest(report["executable"]) == report["sha256"]
+                and all(digest(debug[kind]) == debug[kind+"_sha256"] for kind in ("pdb","map"))):
+            return previous
     sqlite_snapshot = report["debug_sqlite_snapshot"]
     assert debug["sqlite_global_snapshot"] == sqlite_snapshot
     assert (
@@ -94,41 +107,59 @@ def verify(build):
             ), "Mapped symbol was incorrectly omitted"
         else:
             expected.add((name, rva))
-    map_symbols = set()
-    with Path(debug["map"]).open(encoding="utf-8") as source:
-        for line in source:
-            match = re.match(
-                r" ([0-9A-F]{4}):([0-9A-F]{8}) (.*) ([0-9A-F]{16}) [fd]$",
-                line.rstrip("\n"),
-            )
-            if match:
-                segment, offset = int(match[1], 16), int(match[2], 16)
-                rva = section_rvas[segment - 1] + offset
-                assert rva + pe.OPTIONAL_HEADER.ImageBase == int(match[4], 16)
-                map_symbols.add((match[3], rva))
-    assert map_symbols == expected, "MAP does not cover all verified public symbols"
-    dump = Path(build) / "debug-publics.pending.txt"
-    try:
-        with dump.open("w", encoding="utf-8") as output:
-            subprocess.run(
-                [debug["llvm_pdbutil"], "dump", "--publics", debug["pdb"]],
-                stdout=output,
-                check=True,
-            )
-        publics = set()
-        name = None
-        with dump.open(encoding="utf-8") as source:
+    symbol_check_key = hashlib.sha256(json.dumps([checker_hash, debug["generator_sha256"],
+        debug["llvm_pdbutil_sha256"], debug["pdb_sha256"], debug["map_sha256"], sorted(expected)],
+        separators=(",", ":")).encode()).hexdigest()
+    symbol_check_path = (Path(os.environ["REPLAY_OBJECT_CACHE"])/"debug-symbol-checks"/(symbol_check_key+".json")
+        if os.environ.get("REPLAY_OBJECT_CACHE") else None)
+    reused_symbols = False
+    if symbol_check_path and symbol_check_path.is_file() and os.environ.get("REPLAY_FULL_CHECKS") != "1":
+        try:
+            saved = json.loads(symbol_check_path.read_bytes())
+            reused_symbols = saved.get("passed") and saved.get("key") == symbol_check_key
+        except (OSError, ValueError):
+            pass
+    if not reused_symbols:
+        map_symbols = set()
+        with Path(debug["map"]).open(encoding="utf-8") as source:
             for line in source:
-                if " | S_PUB32 " in line:
-                    name = line.split("`", 1)[1].rsplit("`", 1)[0]
-                elif name is not None and "addr = " in line:
-                    segment, offset = line.split("addr = ", 1)[1].strip().split(":")
-                    publics.add((name, section_rvas[int(segment) - 1] + int(offset)))
-                    name = None
-        assert publics == expected, "PDB does not cover all verified public symbols"
-    finally:
-        dump.unlink(missing_ok=True)
-        pe.close()
+                match = re.match(
+                    r" ([0-9A-F]{4}):([0-9A-F]{8}) (.*) ([0-9A-F]{16}) [fd]$",
+                    line.rstrip("\n"),
+                )
+                if match:
+                    segment, offset = int(match[1], 16), int(match[2], 16)
+                    rva = section_rvas[segment - 1] + offset
+                    assert rva + pe.OPTIONAL_HEADER.ImageBase == int(match[4], 16)
+                    map_symbols.add((match[3], rva))
+        assert map_symbols == expected, "MAP does not cover all verified public symbols"
+        dump = Path(build) / "debug-publics.pending.txt"
+        try:
+            with dump.open("w", encoding="utf-8") as output:
+                subprocess.run(
+                    [debug["llvm_pdbutil"], "dump", "--publics", debug["pdb"]],
+                    stdout=output,
+                    check=True,
+                )
+            publics = set()
+            name = None
+            with dump.open(encoding="utf-8") as source:
+                for line in source:
+                    if " | S_PUB32 " in line:
+                        name = line.split("`", 1)[1].rsplit("`", 1)[0]
+                    elif name is not None and "addr = " in line:
+                        segment, offset = line.split("addr = ", 1)[1].strip().split(":")
+                        publics.add((name, section_rvas[int(segment) - 1] + int(offset)))
+                        name = None
+            assert publics == expected, "PDB does not cover all verified public symbols"
+        finally:
+            dump.unlink(missing_ok=True)
+        if symbol_check_path:
+            symbol_check_path.parent.mkdir(parents=True,exist_ok=True)
+            temporary = symbol_check_path.with_suffix(".pending")
+            temporary.write_text(json.dumps(dict(passed=True,key=symbol_check_key,public_count=len(expected)))+"\n")
+            os.replace(temporary,symbol_check_path)
+    pe.close()
     catalog = json.loads(Path(report["function_catalog_snapshot"]["path"]).read_bytes())
     moved = []
     for row in catalog["functions"]:
@@ -160,6 +191,8 @@ def verify(build):
         age=debug["age"],
         scope="Public code/data names only; no source lines, local variables, or types",
     )
+    result.update(checker_sha256=checker_hash,build_report_sha256=report_hash,
+                  reused_symbol_comparison=bool(reused_symbols),symbol_check_key=symbol_check_key)
     (Path(build) / "debug-symbol-verification.json").write_text(
         json.dumps(result, indent=2) + "\n"
     )

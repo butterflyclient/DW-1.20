@@ -9,6 +9,7 @@ import bisect
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import sqlite3
@@ -17,6 +18,25 @@ import subprocess
 import uuid
 
 import pefile
+
+
+def public_symbol_yaml(llvm, yaml_path, pdb, guid, pe, symbols, starts):
+    """Use compact YAML for the existing LLVM public-symbol writer."""
+    with yaml_path.open('w',encoding='utf-8',newline='\n') as out:
+        out.write('---\nPdbStream:\n  Age: 1\n  Guid: "{'+str(guid).upper()+'}"\n  Features: [ VC140 ]\n  Version: VC70\n')
+        out.write('DbiStream:\n  VerHeader: V70\n  Age: 1\n  MachineType: Amd64\n  SectionHeaders:\n')
+        for section in pe.sections:
+            out.write('    - Name: '+json.dumps(section.Name.rstrip(b'\0').decode('ascii'))+'\n')
+            for key in ('VirtualAddress','SizeOfRawData','PointerToRawData','PointerToRelocations',
+                        'PointerToLinenumbers','NumberOfRelocations','NumberOfLinenumbers','Characteristics'):
+                out.write(f'      {key}: {getattr(section,key)}\n')
+            out.write(f'      VirtualSize: {section.Misc_VirtualSize}\n')
+        out.write('PublicsStream:\n  Records:\n')
+        for rva,name,segment,function in symbols:
+            out.write('    - { Kind: S_PUB32, PublicSym32: { Flags: '+('[ Code ]' if function else '[]')+
+                f', Offset: {rva-starts[segment-1]}, Segment: {segment}, Name: '+json.dumps(name,ensure_ascii=True)+' } }\n')
+        out.write('...\n')
+    subprocess.run([llvm,'yaml2pdb',str(yaml_path),'--pdb='+str(pdb)],check=True)
 
 
 def digest(path):
@@ -389,7 +409,26 @@ def emit(report_path):
     pdb = image.with_name("game_dx12_ship_replay_dw.pdb")
     map_path = image.with_name("game_dx12_ship_replay_dw.map")
     yaml_path = image.with_suffix(".pdb.yaml.pending")
-    guid = uuid.uuid4()
+    symbol_pairs = known_symbols(report)
+    symbol_cache = None
+    cache_folder = None
+    cache_key = None
+    if os.environ.get("REPLAY_OBJECT_CACHE"):
+        cache_key = hashlib.sha256(json.dumps(["public-symbol-layout-v1", digest(__file__), digest(llvm),
+            image.name, pe.OPTIONAL_HEADER.ImageBase, pe.OPTIONAL_HEADER.SectionAlignment,
+            pe.OPTIONAL_HEADER.FileAlignment, pe.OPTIONAL_HEADER.SizeOfImage,
+            [section.__pack__().hex() for section in sections], sorted(symbol_pairs)],
+            separators=(",", ":")).encode()).hexdigest()
+        cache_folder = Path(os.environ["REPLAY_OBJECT_CACHE"]) / "debug-symbols" / cache_key
+        metadata = cache_folder / "proof.json"
+        try:
+            previous = json.loads(metadata.read_bytes())
+            if (previous["key"] == cache_key and digest(cache_folder / "symbols.pdb") == previous["pdb_sha256"]):
+                uuid.UUID(previous["guid"])
+                symbol_cache = previous
+        except (OSError, ValueError, KeyError):
+            pass
+    guid = uuid.UUID(symbol_cache["guid"]) if symbol_cache else uuid.uuid4()
     age = 1
     align = lambda value, size: (value + size - 1) // size * size
     raw = bytearray(image.read_bytes())
@@ -494,7 +533,7 @@ def emit(report_path):
     starts = [s.VirtualAddress for s in final_pe.sections]
     symbols = []
     omitted = []
-    for name, rva in known_symbols(report):
+    for name, rva in symbol_pairs:
         index = bisect.bisect_right(starts, rva) - 1
         if index < 0 or rva >= starts[index] + max(
             final_pe.sections[index].Misc_VirtualSize,
@@ -513,44 +552,10 @@ def emit(report_path):
             )
         )
     symbols.sort()
-    with yaml_path.open("w", encoding="utf-8", newline="\n") as out:
-        out.write(
-            '---\nPdbStream:\n  Age: 1\n  Guid: "{'
-            + str(guid).upper()
-            + '}"\n  Features: [ VC140 ]\n  Version: VC70\n'
-        )
-        out.write(
-            "DbiStream:\n  VerHeader: V70\n  Age: 1\n  MachineType: Amd64\n  SectionHeaders:\n"
-        )
-        for section in final_pe.sections:
-            out.write(
-                "    - Name: "
-                + json.dumps(section.Name.rstrip(b"\0").decode("ascii"))
-                + "\n"
-            )
-            for key in (
-                "VirtualAddress",
-                "SizeOfRawData",
-                "PointerToRawData",
-                "PointerToRelocations",
-                "PointerToLinenumbers",
-                "NumberOfRelocations",
-                "NumberOfLinenumbers",
-                "Characteristics",
-            ):
-                out.write(f"      {key}: {getattr(section, key)}\n")
-            out.write(f"      VirtualSize: {section.Misc_VirtualSize}\n")
-        out.write("PublicsStream:\n  Records:\n")
-        for rva, name, segment, function in symbols:
-            out.write("    - Kind: S_PUB32\n      PublicSym32:\n")
-            out.write(f'        Flags: {"[ Code ]" if function else "[]"}\n')
-            out.write(
-                f"        Offset: {rva - starts[segment - 1]}\n        Segment: {segment}\n        Name: "
-                + json.dumps(name, ensure_ascii=True)
-                + "\n"
-            )
-        out.write("...\n")
-    subprocess.run([llvm, "yaml2pdb", str(yaml_path), "--pdb=" + str(pdb)], check=True)
+    if symbol_cache:
+        shutil.copyfile(cache_folder / "symbols.pdb", pdb)
+    else:
+        public_symbol_yaml(llvm, yaml_path, pdb, guid, final_pe, symbols, starts)
     check = subprocess.run(
         [llvm, "pdb2yaml", "--pdb-stream", "--dbi-stream", str(pdb)],
         check=True,
@@ -571,7 +576,16 @@ def emit(report_path):
     temporary = image.with_suffix(".exe.debug.pending")
     temporary.write_bytes(raw)
     temporary.replace(image)
-    yaml_path.unlink()
+    yaml_path.unlink(missing_ok=True)
+    if cache_folder and not symbol_cache:
+        cache_folder.mkdir(parents=True, exist_ok=True)
+        pending = cache_folder / "symbols.pdb.pending"
+        shutil.copyfile(pdb, pending)
+        os.replace(pending, cache_folder / "symbols.pdb")
+        pending = cache_folder / "proof.json.pending"
+        pending.write_text(json.dumps(dict(key=cache_key, guid=str(guid).upper(),
+            pdb_sha256=digest(pdb), public_count=len(symbols)), indent=2)+"\n", encoding="utf-8")
+        os.replace(pending, cache_folder / "proof.json")
     report["debug_symbols"] = dict(
         schema=1,
         kind="public-symbols-no-source-lines-or-types",
@@ -582,6 +596,8 @@ def emit(report_path):
         guid=str(guid).upper(),
         age=age,
         symbol_count=len(symbols),
+        symbol_cache_hit=bool(symbol_cache),
+        symbol_cache_key=cache_key,
         omitted_symbols=omitted,
         pre_debug_image_sha256=report["sha256"],
         pre_debug_image_size=pe.OPTIONAL_HEADER.SizeOfImage,

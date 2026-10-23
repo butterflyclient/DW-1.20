@@ -10,7 +10,7 @@ struct Entry
     bool exists;
 } files[128];
 DWBotStyleScriptPackage package = DWBotStyleScripts::Package;
-DWBotStyleFastfileInfo captured[8], allocation[8];
+DWBotStyleFastfileInfo captured[10], allocation[10];
 unsigned nativeCalls, seenCount, seenFlags, state, writes, moves, frees, messages, failure;
 unsigned reads, nativeMissing;
 unsigned backupMoves, restoreMoves;
@@ -20,7 +20,9 @@ bool seenServer, packagePresent = true;
 bool mapImages;
 unsigned mapImagesState, publishedState = 99;
 unsigned inspectionState = 99;
-unsigned gulagState = 99;
+unsigned gulagState = 99, operatorsState = 99;
+unsigned commonMpState = 99, globalStreamMpState = 99;
+bool operatorsInstalled;
 const DWBotStyleFastfileInfo *seenPointer;
 bool sameWide(const wchar_t *a, const wchar_t *b)
 {
@@ -75,7 +77,9 @@ void clear()
     mapImagesState = 0;
     publishedState = 99;
     inspectionState = 99;
-    gulagState = 99;
+    gulagState = operatorsState = 99;
+    operatorsInstalled = false;
+    commonMpState = globalStreamMpState = 99;
 }
 void *__stdcall create(const wchar_t *name, unsigned long access, unsigned long, void *,
                        unsigned long disposition, unsigned long, void *)
@@ -293,10 +297,17 @@ extern "C"
             return publishedState;
         if (equal(name, DWWeaponInspectPackage::Package.zoneName))
             return inspectionState;
+        if (equal(name, "common_mp"))
+            return commonMpState;
+        if (equal(name, "global_stream_mp"))
+            return globalStreamMpState;
+        if (equal(name, DWCustomOperatorsPackage::Package.zoneName))
+            return operatorsState;
         if (equal(name, DWGulagNavPackage::Package.zoneName))
             return gulagState;
         return equal(name, package.zoneName) ? state : 99;
     }
+    void DW_CustomOperators_ZoneInstalled(bool installed) { operatorsInstalled = installed; }
     bool DW_MapImages_ZoneInstalled()
     {
         return mapImages;
@@ -342,11 +353,12 @@ extern "C"
         seenCount = count;
         seenFlags = flags;
         seenServer = server;
-        if (count <= 8)
+        if (count <= 10)
             for (unsigned i = 0; i < count; ++i)
                 captured[i] = info[i];
         const DWBotStyleScriptPackage *resources[] = {
-            &package, &DWWeaponInspectPackage::Package, &DWGulagNavPackage::Package};
+            &package, &DWWeaponInspectPackage::Package, &DWGulagNavPackage::Package,
+            &DWCustomOperatorsPackage::Package};
         for (const auto *resource : resources)
         {
             bool overlay = false;
@@ -726,6 +738,80 @@ extern "C"
               captured[gulagAt].failureMode == combined[1].failureMode &&
               captured[gulagAt].priority == combined[1].priority &&
               captured[gulagAt].reserved == combined[1].reserved);
+        return 0;
+#undef CHECK
+    }
+    __declspec(dllexport) int Test_CustomOperators()
+    {
+#define CHECK(x) do { if (!(x)) return __LINE__; } while (false)
+        const auto &custom = DWCustomOperatorsPackage::Package;
+        clear(); packagePresent = false; operatorsState = 0;
+        DWBotStyleFastfileInfo boot[] = {{"common", 1, 4, 5, 6}, {"ui", 0x40, 7, 8, 9}};
+        DW_BotStyleZone_LoadFastfiles(boot, 2, 0, false);
+        CHECK(seenPointer == boot && seenCount == 2 && !writes && !operatorsInstalled);
+        DWBotStyleFastfileInfo mp[] = {{"common_mp", 8, 4, 5, 6}};
+        globalStreamMpState = 2;
+        DW_BotStyleZone_LoadFastfiles(mp, 1, 0, false);
+        CHECK(seenCount == 2 && equal(captured[0].name, "common_mp") &&
+              equal(captured[1].name, custom.zoneName) && operatorsInstalled && !nativeMissing);
+        CHECK(captured[1].zoneFlags == 8 && captured[1].failureMode == 4 &&
+              captured[1].priority == 5 && captured[1].reserved == 6);
+        CHECK(writes == 2 * custom.installationNameCount);
+        unsigned previousWrites = writes;
+        for (unsigned pending = 1; pending <= 4; ++pending)
+        {
+            operatorsState = pending;
+            DW_BotStyleZone_LoadFastfiles(mp, 1, 0, false);
+            CHECK(seenPointer == mp && seenCount == 1 && writes == previousWrites);
+        }
+        // A native unload permits a fresh request; verified files are reused.
+        operatorsState = 0;
+        DW_BotStyleZone_LoadFastfiles(mp, 1, 0, false);
+        CHECK(seenCount == 2 && equal(captured[1].name, custom.zoneName) && writes == previousWrites);
+        clear(); packagePresent = false; operatorsState = 0;
+        DWBotStyleFastfileInfo ordered[] = {{"global_stream_mp", 2, 1, 2, 3},
+            {"common_mp", 8, 4, 5, 6}, {"common_base_mp", 16, 7, 8, 9},
+            {"common_core_mp", 32, 10, 11, 12}};
+        DW_BotStyleZone_LoadFastfiles(ordered, 4, 0, false);
+        CHECK(seenCount == 5 && equal(captured[4].name, custom.zoneName) &&
+              equal(captured[3].name, "common_core_mp") && captured[4].zoneFlags == 8 &&
+              captured[4].failureMode == 4 && captured[4].priority == 5 && captured[4].reserved == 6);
+        clear(); packagePresent = false; operatorsState = 0;
+        commonMpState = globalStreamMpState = 2;
+        DWBotStyleFastfileInfo base[] = {{"common_base_mp", 16, 4, 5, 6}};
+        DW_BotStyleZone_LoadFastfiles(base, 1, 0, false);
+        CHECK(seenCount == 2 && equal(captured[1].name, custom.zoneName) && captured[1].zoneFlags == 8);
+        // Queued, missing, paused and cancelled dependencies are not resident.
+        for (unsigned state = 0; state <= 4; ++state)
+        {
+            if (state == 2) continue;
+            clear(); packagePresent = false; operatorsState = 0;
+            commonMpState = state; globalStreamMpState = 2;
+            DW_BotStyleZone_LoadFastfiles(base, 1, 0, false);
+            CHECK(seenPointer == base && seenCount == 1 && !writes);
+            commonMpState = 2; globalStreamMpState = state;
+            DW_BotStyleZone_LoadFastfiles(base, 1, 0, false);
+            CHECK(seenPointer == base && seenCount == 1 && !writes);
+        }
+        clear(); packagePresent = false; operatorsState = 0;
+        commonMpState = globalStreamMpState = 2;
+        DWBotStyleFastfileInfo preload[] = {{"common_mp", 0x100008, 4, 5, 6}};
+        DW_BotStyleZone_LoadFastfiles(preload, 1, 0, false);
+        CHECK(seenPointer == preload && seenCount == 1 && !writes && !operatorsInstalled);
+        DWBotStyleFastfileInfo duplicate[] = {{"common_mp", 8, 1, 2, 3}, {custom.zoneName, 8, 4, 5, 6}};
+        DW_BotStyleZone_LoadFastfiles(duplicate, 2, 0, false);
+        CHECK(seenPointer == duplicate && seenCount == 2 && !writes);
+        clear(); packagePresent = false; operatorsState = 0; globalStreamMpState = 2; failure = 1;
+        DW_BotStyleZone_LoadFastfiles(mp, 1, 0, false);
+        CHECK(seenPointer == mp && seenCount == 1 && !operatorsInstalled);
+        clear(); operatorsState = gulagState = inspectionState = publishedState = 0;
+        globalStreamMpState = 2; mapImages = true;
+        DWBotStyleFastfileInfo combined[] = {{"common_mp", 8, 1, 1, 1},
+                                            {"common_base_mp", 0x8123, 2, 3, 4},
+                                            {"mp_donetsk", 0x4567, 5, 6, 7},
+                                            {"ui", 0x40, 8, 9, 10}};
+        DW_BotStyleZone_LoadFastfiles(combined, 4, 3, true);
+        CHECK(seenCount == 10 && operatorsInstalled && !nativeMissing && frees == 1);
         return 0;
 #undef CHECK
     }
