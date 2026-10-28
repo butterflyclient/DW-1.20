@@ -1,0 +1,171 @@
+[
+  {
+    "1": "activate_battlepass",
+    "3": 20,
+    "14": 3000001,
+    "initialState": {
+      "id": 3000001,
+      "name": "activate_battlepass",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000002,
+    "initialState": {
+      "id": 3000002,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000003,
+    "initialState": {
+      "id": 3000003,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000004,
+    "initialState": {
+      "id": 3000004,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000005,
+    "initialState": {
+      "id": 3000005,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000006,
+    "initialState": {
+      "id": 3000006,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000007,
+    "initialState": {
+      "id": 3000007,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "skip_tier",
+    "3": 20,
+    "14": 3000008,
+    "initialState": {
+      "id": 3000008,
+      "name": "skip_tier",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "activate_battlepass_s2",
+    "3": 20,
+    "14": 3001001,
+    "initialState": {
+      "id": 3001001,
+      "name": "activate_battlepass_s2",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "activate_battlepass_s3",
+    "3": 20,
+    "14": 3002001,
+    "initialState": {
+      "id": 3002001,
+      "name": "activate_battlepass_s3",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "activate_battlepass_s4",
+    "3": 20,
+    "14": 3003001,
+    "initialState": {
+      "id": 3003001,
+      "name": "activate_battlepass_s4",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "activate_battlepass_s5",
+    "3": 20,
+    "14": 3004001,
+    "initialState": {
+      "id": 3004001,
+      "name": "activate_battlepass_s5",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  },
+  {
+    "1": "activate_battlepass_s6",
+    "3": 20,
+    "14": 3005001,
+    "initialState": {
+      "id": 3005001,
+      "name": "activate_battlepass_s6",
+      "kind": 20,
+      "status": 2,
+      "progress": 0,
+      "target": 0
+    }
+  }
+]

@@ -1,0 +1,197 @@
+REPLAY DW FULL COVERAGE, LOCAL PARITY AND UNIVERSAL BACKEND - 2026-10-27
+
+1. NATIVE BASELINE (what the game can ask for)
+
+tools/inventory-dw-task-baseline.py builds the reference from the untouched
+original image, not from logs or source guesses. Every native DemonWare
+request reaches the wire through a small set of SDK entry points that take
+literal service/task bytes:
+  bdTaskParams::bdTaskParams            0x142156330  dl=service r8b=task
+  bdRemoteTaskManager::initTaskBuffer   0x1421170B0  dl=service r8b=task
+  bdRemoteTaskManager::startStructTask  0x142117C10  r8d=service r9d=task
+  bdRemoteTaskManager::startLSGTask     0x1421179A0  r8=service r9=task
+  bdAchievementsEngineService::startTask 0x142118270 service 125, r8=task
+  q_bdMW4Service::startTask             0x14213C990  service 197, r8=task
+  bdCrossPlatformIdentity::startTask    0x142139930  service 197, r8=task
+All rel32 call/jmp sites in executable sections are scanned (the exported
+callgraph table is incomplete); argument registers are traced back through
+moves, cmov alternatives and spilled stack slots; forwarded arguments are
+resolved at the forwarder's own call sites. Result: 124 native routes, zero
+unresolved call sites. REST writers come from the exact-image REST inventory
+(28 service/resource/operation rows).
+
+With --server the tool also probes a disposable backend (isolated data and
+ports) with every route and classifies the logged operation. Current build:
+  native 124/124 handled, REST 28/28 handled (abtesting/enroll: the native
+  writer leaves serviceName empty and its own SDK validator rejects it before
+  sending; the explicit "abtesting" route is served for correct writers).
+Receipt: validation/20261027-dw-task-baseline.json
+
+Per-build profile: tools/dw-build-profiles/replay120.json names the image,
+its hash, the symbol database and the entry points above. Another game build
+gets its own profile; the tool itself has no Replay addresses.
+
+2. ROUTES ADDED IN THIS PASS
+
+193/9, 193/10, REST ObjectsResourcePublishers/get_metadata
+  List publisher/user objects by category. URL formats recovered from the
+  image (0x1426A2FD0..0x1426A32A0, REST 0x142144CF0). Public, unexpired
+  publisher objects and the caller's own or public user objects; name order,
+  limit (bounded to 50) and decimal pageToken paging; extra=tags returns tags.
+193/12, 193/24
+  Large-object upload completion: /v1/[core/]upload-sessions/<name>/complete/
+  and /v2/[core/]upload-sessions/$batch/complete/ (0x1426A2568..0x1426A2620).
+  Bodies carry metadata and content and commit through the same journaled,
+  restart-recoverable window as 193/7.
+50/22, 58/22
+  Paged/multipart download windows: request UInt64 file, (50/22: UInt32 slot),
+  UInt16 first part, UInt16 count (writers 0x142133E60, 0x14213D250). Reply:
+  complete bdFileMetaData followed by the first part index and the packed
+  download URL array; the download route now serves stored multipart parts.
+
+Reachability, for the record: the shipped client never issues these six.
+OnlineStorage::ExecuteTask's category branches have no enqueuer that sets
+their task kinds; bdObjectStoreStreaming::start's only caller passes mode 1,
+so upload modes 2/4 never run; every initDownload call site passes null
+extended metadata, so _preDownloadPage never runs. They are served anyway for
+other SDK builds and modified clients.
+
+Checks: tools/full_coverage_fixtures.py (called from tools/test-lobby.py).
+
+3. HIDDEN PUBLISHER OBJECT
+
+Every login requests 193/8 publisher object infinityward/7617664569516336902.
+The name is XOR-decrypted at run time inside control-flow-flattened code in
+sub_1415285B0 (live frame); the downloaded buffer is stored and released, not
+parsed there. The backend returns the native NotFound the client already
+handles. Publishing a file with that name under objectstore/publisher serves it.
+
+4. MISSION STAGES ADDED
+
+Event admission now includes death, start_match, stun and hack (all native
+upload dvars default on). New earning rules:
+  Rapid kills (4 s rearm): 1580, 1582, 1584, 10041 (hybrid optic category),
+    10132 (FR 5.56, weapon 18).
+  Kills in one life (reset on death/start_match): 1581, 1583, 1585,
+    10045 (1911, weapon 4), 10133 (FN Scar 17, weapon 22),
+    10049 (two pistol headshots).
+  Minute windows (60 s, kills consumed on success): 10136..10141.
+  Kill predicates: 10002 (SMG with Golem 20013 as Coalition operator, from the
+    packed operator word in Param2), 10008 (SMG + Insmoke), 10042 (point blank
+    with a reflex-category optic), 10043 (ADS with a scope-category optic),
+    1599 (AR longshot with attachments and no suppressor), 10032/10033/10034/
+    10035 (IAV turret, Little Bird, APC turret, any vehicle weapon: special
+    weapon IDs 10000-10003), 10036/10037 (vehicle destroyed by APC/IAV).
+  Events: 1554 (stun), 1564 (hack).
+  BR: 50013/50045/50080 (kills while in a vehicle), 50020/50056/50087
+    (vehicle destroyed with an enemy aboard).
+Streak/window trackers persist with the stage state even when an event adds
+no progress (QuestProgress::stateChanged).
+
+Completed in the follow-up pass (all 232 canonical stages now have a rule):
+  Co-op category: native game mode 3 reports gamemode 4 (AddGamemode
+    0x140F33A00); public allocations whose playlist script is cp_* get
+    category 4, matching the co-op quest rows. 10057 sniper/marksman kills,
+    10058 Juggernaut kills as Otter (20009), 10059 finishing moves, 10060
+    vehicles (tanks), 10061 Precision Airstrike kills and 10065 Sentry Gun
+    kills (killstreak_end 70003/70027 kill counts), 10062 cp_complete, 10063
+    assists, 10064 Thermite as Minotaur (20029, Allegiance word), 10066 pistol
+    kills, 10067 throwing knife as Kreuger (20024), 10068 vehicle kills, 10069
+    killstreak/munition uses. Co-op enemies are AI agents (findenemytype masks).
+    Classic Spec Ops (cp_specops) has no challenge game type in the game's own
+    initchallengeandeventglobals list, so its matches are not captured.
+  1561 Scavenger: no native resupply event exists (pickup is BR-only); each
+    player kill with the Scavenger perk (perktable 11/37) counts, since each
+    such kill drops the enemy's resupply bag.
+  1567 Kill Chain (perktable 10, icon_perk_kill_chain): killstreak_end kills
+    count when the player's latest kill packet carried that perk.
+  Dailies, from the exported English strings (eng_*.ff localize, ACTS):
+    5000 "Buy &&1 Munitions Boxes", 5001 "Buy &&1 Killstreaks", 5002 "Buy &&1
+    Loadout Drop(s)" (BR buy_item); 9055/9056/9057 co-op AR kills, AR
+    headshots, SMG kills. Each daily kind matches its own public category
+    (12 MP, 27 BR, 30 co-op).
+Exact attachments: kill Param3 holds up to five 12-bit slots, each
+loot/iw8_pi_golf21_attachment_ids.csv id % 1000 + 1 for the script's base
+attachment ref (ProcessParams 0x140F35980). Names come from the exported
+English strings: acog (1) "Scout Combat Optic" for 10043, reflexmini3 (15)
+"Cronen LP945 Mini Reflex" for 10042, hybrid/hybrid2/hybrid3/hybrid4
+(24/26/28/30) for 10041, unsuppressed barrels barlong..barcust2 (72-77),
+barcustnoguard (174), barextra (199) for 1599. 1516 "suppressed weapons" now
+also counts the integrally suppressed barrels barsil/barsil2 (185, 186).
+
+Checks:
+  tools/test-mission-rules.cpp (iw8-mission-rules-test): 38 cases through
+    advanceReplayQuests/advanceReplayDailies with native packet layouts,
+    passing on Windows and on a Linux (GCC 13) compile check.
+  tools/test-replay-quest-earning.py: the end-to-end encrypted earning suite
+    runs again and passes (241 groups, 181 stages). Its parser proof is
+    rebuilt by tools/research-quest-earning-parser-proof.py: 297 labelled cases,
+    every one produced by executing the original ProcessParams (the pruned
+    kill-modifier/kiosk/completion steps are re-run as explicit inputs). The
+    Battle Pass publication was rebuilt from the exported tables and matches
+    the droplet's rules.json byte for byte. Two test sections created a new
+    public match while an earlier same-playlist lobby was still live; current
+    matchmaking (fullest-lobby selection) joins it, so the test now releases
+    each lobby first (the untouched HEAD server failed the same way).
+
+5. LOCAL SERVER PARITY
+
+A fresh data folder used to start without QoS/relay, with an empty Store,
+default-only publisher variables, and no Battle Pass, leaderboards,
+playlists, marketing, achievement definitions or dashboard operator key.
+
+Content packs (content/<pack>/manifest.json + files/) hold the primary
+server's published, non-player content. tools/sync-content-pack.py snapshots
+it read-only from the droplet (--from-droplet) or any data folder; player
+data, keys, sessions, logs, backups, updates and maps are never selected.
+At startup the backend installs every pack found beside its executable
+(src/content_pack.cpp): missing files are added, files still holding an older
+pack's bytes are updated, operator-published or edited files are kept, and
+nothing is deleted (state: <data>/content-packs/<pack>.json). Disposable
+fixture servers (--port-offset) and --provision runs never seed; use
+--content-pack <dir> or --no-content-pack to choose explicitly.
+
+Signed content: the two publisher patch manifests (1_manifest_patch/comms_pc_
+8.19.txt) carry an RSA-PSS signature (salt 8) over the native manifest digest,
+verified by the client at 0x141038500 against the key the client trusts. The
+local client trusts only its own server's key, so the droplet-signed copies
+failed the "checking for update" patch fence with error_codes/4_48 (TORCH).
+At startup the backend now verifies zero-entry manifests against its own
+platform key and re-signs them when needed (metadata checksum/version
+follow); the pack state records which pack file each local signature came
+from, so restarts are idempotent and a newer pack still applies. Marketing
+messages in the pack are unsigned; no other packed content is key-bound.
+
+A loopback-only server also creates operator-access.key for the dashboard's
+start-match/fill-bot controls. When <data>/local-play.json names the game
+folder, the server writes playlists/<title>/packages.json from the actual
+installed maps (custom maps in mods/mw120r/maps, junctioned folders handled),
+so matchmaking only selects maps this PC has.
+
+One command: Host-Local-Server.ps1 (or Run_Replay_DW_Local_Server.cmd) builds
+if needed, starts the server, creates or refreshes the local client when the
+production EXE updated or the server key changed (INI kept, old files backed
+up in dw-local-client-backup/), and launches the game. -Stop stops only the
+server it started; -StopWhenGameExits stops it after the game closes.
+
+6. UNIVERSAL BACKEND DIRECTION
+
+Version-specific facts live in data, not code paths, for new work:
+  tools/dw-build-profiles/<build>.json  image, symbols, SDK entry points
+  content/<pack>/manifest.json          titles, build, published content
+Packs are title-scoped by path, so several game versions can be served from
+one data folder. Existing services already key storage by title ID; new
+title support starts with a build profile (to get its baseline), a content
+pack, and handlers for any routes the baseline marks unhandled.
+
+7. VERIFICATION IN THIS PASS
+
+Windows Release build of iw8-dw-server; tools/test-lobby.py (encrypted wire,
+including the new coverage cases); baseline probe; REST exclusion check;
+fresh-server pack install, restart idempotency and local-edit retention;
+host script end to end with -NoLaunch; local client --check/--refresh against
+a scratch copy of the production EXE; map inventory against the real game
+folder (13 installed playlist maps, matching the droplet policy). A Linux
+compile of the same sources (server plus mission harness, Release, GCC 13) was
+run in a scratch folder on the droplet at low priority and removed afterwards.
+No game was launched and nothing was deployed to the droplet.

@@ -131,8 +131,16 @@ are disabled by default through two native boolean dvars:
 Set either to 1 to restore its original automatic onboarding checks. These
 controls gate presentation, preserve saved completion flags and do not replace
 explicit tutorial/trailer actions. They are independent of com_optimized.
-The stock season, Magma and Warzone onboarding Lua stages use these gates;
-the existing frontend probe repairs reloaded stages without stacking wrappers.
+The gate lives in the native tutorial-flag binding (Engine IsTutorialCompleted,
+LUI_CoD_LuaCall_IsTutorialCompleted_impl): season 1-6 watch flags and the Magma
+flag follow lui_dwIntroVideos; Warzone introduction, tutorial-initiated and
+Plunder flags follow lui_dwTutorialPrompts. A Lua wrapper is not enough: after
+a match the frontend VM is replaced and the stock main menu runs its season
+video/reward sequence while it is built, before the once-per-second playlist
+probe reaches the new VM. The late wrapper then hid the real flag from the
+video's completion callback, so the flag was never saved and the video and
+season reward popup repeated after every match on a profile that had not seen
+them.
 
 Playlist titles and first-match Battle Pass reward
 Promoted/featured playlist buttons consume their name model without calling

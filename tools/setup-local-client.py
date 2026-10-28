@@ -5,6 +5,7 @@ Only exact existing public-key constants in the rebuilt PE section are changed.
 """
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -114,7 +115,7 @@ def personalize(image, public):
     return bytes(result), [dict(offset=at, bytes=len(old), purpose=name) for at, old, _, name in edits]
 
 
-def setup(client, server_data):
+def setup(client, server_data, ini_content=None):
     client = client.resolve(strict=True)
     if client.name != "game_dx12_ship_replay_dw.exe":
         raise ValueError("Select the original game_dx12_ship_replay_dw.exe in your game folder")
@@ -141,7 +142,7 @@ def setup(client, server_data):
     )
     contents = (
         result,
-        b"host=127.0.0.1\r\nbypass_update_restart=1\r\n",
+        ini_content or b"host=127.0.0.1\r\nbypass_update_restart=1\r\n",
         ('@echo off\r\ncd /d "%~dp0"\r\nstart "" "' + LOCAL_NAME + '"\r\n').encode("ascii"),
         (json.dumps(report, indent=2) + "\n").encode("utf-8"),
     )
@@ -160,18 +161,78 @@ def setup(client, server_data):
     return report
 
 
+def local_files(client):
+    output = client.with_name(LOCAL_NAME)
+    return (output, output.with_suffix(".ini"), client.with_name("Run_Replay_DW_Local.cmd"),
+            output.with_suffix(".setup.json"))
+
+
+def check(client, server_data):
+    """Is the local client present and built from this EXE and this server's key?"""
+    client = client.resolve(strict=True)
+    files = local_files(client)
+    present = [path.exists() for path in files]
+    if not any(present):
+        return dict(state="missing", reasons=["no local client files"])
+    reasons = []
+    if not all(present):
+        reasons.append("incomplete local client files")
+    try:
+        receipt = json.loads(files[3].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        receipt = {}
+        reasons.append("unreadable setup receipt")
+    if receipt.get("source_sha256") != sha(client.read_bytes()):
+        reasons.append("original DW EXE changed (updated) since setup")
+    public = (server_data.resolve(strict=True) / "platform-public.blob").read_bytes()
+    if receipt.get("public_key_sha256") != sha(public):
+        reasons.append("server public key differs from the one the local client trusts")
+    if files[0].exists() and receipt.get("output_sha256") != sha(files[0].read_bytes()):
+        reasons.append("local EXE does not match its receipt")
+    return dict(state="stale" if reasons else "current", reasons=reasons)
+
+
+def refresh(client, server_data):
+    """Create, or regenerate a stale, local client; the user's INI is kept."""
+    client = client.resolve(strict=True)
+    current = check(client, server_data)
+    if current["state"] == "current":
+        return dict(current, refreshed=False)
+    ini_content = None
+    if current["state"] == "stale":
+        files = local_files(client)
+        if files[1].exists():
+            ini_content = files[1].read_bytes()
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup = client.parent / "dw-local-client-backup" / stamp
+        backup.mkdir(parents=True, exist_ok=False)
+        for path in files:
+            if path.exists():
+                path.replace(backup / path.name)
+    report = setup(client, server_data, ini_content)
+    return dict(report, state="current", refreshed=True, previous=current)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--client", type=Path, required=True, help="Original DW EXE in the game folder")
     parser.add_argument("--server-data", type=Path, required=True, help="The running local server's data folder")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true", help="Report missing/stale/current and exit")
+    mode.add_argument("--refresh", action="store_true",
+                      help="Create the local client, or back up and regenerate a stale one (keeps the INI)")
     args = parser.parse_args()
     try:
-        report = setup(args.client, args.server_data)
+        if args.check:
+            print(json.dumps(check(args.client, args.server_data), indent=2))
+            return
+        report = refresh(args.client, args.server_data) if args.refresh else setup(args.client, args.server_data)
     except (OSError, ValueError, struct.error) as error:
         parser.exit(1, "Local client setup failed: " + str(error) + "\n")
     print(json.dumps(report, indent=2))
-    print("Start your local backend, then launch Run_Replay_DW_Local.cmd from the game folder.")
-    print("Automatic updates are disabled for this separate local client; keep required game assets installed.")
+    if not args.refresh:
+        print("Start your local backend, then launch Run_Replay_DW_Local.cmd from the game folder.")
+        print("Automatic updates are disabled for this separate local client; keep required game assets installed.")
 
 
 if __name__ == "__main__":

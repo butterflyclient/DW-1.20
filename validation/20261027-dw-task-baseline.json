@@ -1,0 +1,3016 @@
+{
+  "schema": 1,
+  "generated_utc": "2026-10-28T01:41:20.089085+00:00",
+  "build": "replay120",
+  "titles": [
+    5800
+  ],
+  "target_image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "server_sha256": "49826f25ab2562f5186804750b2d65b5bb6db3255a8d80fc93f96c75e8c8b969",
+  "starters": {
+    "0x142156330": "bdTaskParams::bdTaskParams",
+    "0x1421170b0": "bdRemoteTaskManager::initTaskBuffer",
+    "0x142117c10": "bdRemoteTaskManager::startStructTask",
+    "0x1421179a0": "bdRemoteTaskManager::startLSGTask",
+    "0x142118270": "bdAchievementsEngineService::startTask",
+    "0x14213c990": "q_bdMW4Service::startTask",
+    "0x142139930": "bdCrossPlatformIdentity::startTask"
+  },
+  "summary": {
+    "native_routes": 124,
+    "unresolved_call_sites": 0,
+    "rest_operations": 28,
+    "handled": 124,
+    "unhandled": 0,
+    "ambiguous": 0,
+    "rest_unhandled": [],
+    "rest_inconclusive": [
+      [
+        "bdABTestingEnrollRequest::restSerializeRequest",
+        "",
+        "abtesting"
+      ]
+    ]
+  },
+  "routes": [
+    {
+      "service": 3,
+      "task": 46,
+      "writers": [
+        "bdMarketplace::wiiUProcessDurable"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128970",
+          "call_site": "0x1421289bd",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 1,
+      "writers": [
+        "bdStats::writeStats"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128800",
+          "call_site": "0x142128843",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 4,
+      "writers": [
+        "bdStats::startTaskStatReadLeaderboardByRank"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128310",
+          "call_site": "0x14212835a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 11,
+      "writers": [
+        "bdStats::readStatsByLeaderboardIDsAndEntityIDs"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142127c30",
+          "call_site": "0x142127c77",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 13,
+      "writers": [
+        "bdStats::startTaskStatReadByEntityIDV2"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142127ef0",
+          "call_site": "0x142127f38",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 14,
+      "writers": [
+        "bdStats::writeServerValidatedStats"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421286f0",
+          "call_site": "0x142128777",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 16,
+      "writers": [
+        "bdStats::startTaskStatReadByEntityIDV2IncludedColumns"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128100",
+          "call_site": "0x142128148",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 4,
+      "task": 17,
+      "writers": [
+        "bdStats::startTaskStatReadLeaderboardByRankIncludedColumns"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128500",
+          "call_site": "0x142128548",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 6,
+      "task": 14,
+      "writers": [
+        "bdProfiles::setPublicInfoByUserID"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212cc20",
+          "call_site": "0x14212cc93",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 8,
+      "task": 1,
+      "writers": [
+        "bdProfiles::getPublicInfos"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212f900",
+          "call_site": "0x14212f96e",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "profile-read",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 8,
+      "task": 3,
+      "writers": [
+        "bdProfiles::setPublicInfo"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212fa20",
+          "call_site": "0x14212fa88",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 12,
+      "task": 1,
+      "writers": [
+        "bdTitleUtilities::verifyString"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421279f0",
+          "call_site": "0x142127a8d",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 12,
+      "task": 6,
+      "writers": [
+        "bdMessaging::unsubscribeAllMsgGroups"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142127890",
+          "call_site": "0x1421278ee",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "server-time",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 12,
+      "task": 13,
+      "writers": [
+        "sub_142127960"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142127960",
+          "call_site": "0x14212798e",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 18,
+      "task": 1,
+      "writers": [
+        "GMovingPlatformClient::UpdateLinkToBlendPos",
+        "sub_142130860"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212fbf0",
+          "call_site": "0x14212fc73",
+          "starter": "bdRemoteTaskManager::startLSGTask"
+        },
+        {
+          "writer_address": "0x142130860",
+          "call_site": "0x1421308d6",
+          "starter": "bdRemoteTaskManager::startLSGTask"
+        }
+      ],
+      "operation": "lsg-dispatch",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 23,
+      "task": 1,
+      "writers": [
+        "??$_Ucopy@PEAVinventory_item@marketplace@services@xbox@@@?$vector@Vinventory_item@marketplace@services@xbox@@V?$allocator@Vinventory_item@marketplace@services@xbox@@@std@@@std@@AEAAPEAVinventory_item@marketplace@services@xbox@@PEAV2345@00@Z"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212e170",
+          "call_site": "0x14212e1b3",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "global-counter-increments-persisted",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 23,
+      "task": 2,
+      "writers": [
+        "bdCounter::getCounterTotals"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212e050",
+          "call_site": "0x14212e08c",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "global-counter-totals-read",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 27,
+      "task": 2,
+      "writers": [
+        "CgDrawSystemSP::FadeHudMenu"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134b80",
+          "call_site": "0x142134bba",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "dml-local-geography",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 29,
+      "task": 4,
+      "writers": [
+        "bdMail::getMail"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d530",
+          "call_site": "0x14212d60d",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 29,
+      "task": 5,
+      "writers": [
+        "bdMail::deleteMail"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d330",
+          "call_site": "0x14212d40e",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 29,
+      "task": 7,
+      "writers": [
+        "bdMail::sendMailWithDuration"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d9d0",
+          "call_site": "0x14212dafc",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 29,
+      "task": 9,
+      "writers": [
+        "bdMail::sendMailWithDuration"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d9d0",
+          "call_site": "0x14212dafc",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 29,
+      "task": 10,
+      "writers": [
+        "sub_14212D770"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d770",
+          "call_site": "0x14212d846",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 38,
+      "task": 2,
+      "writers": [
+        "sub_142115720"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142115720",
+          "call_site": "0x14211575a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 38,
+      "task": 6,
+      "writers": [
+        "bdAntiCheat::reportExtendedAuthInfoTask"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142115950",
+          "call_site": "0x1421159b8",
+          "starter": "bdTaskParams::bdTaskParams",
+          "forwarded_by": "bdAntiCheat::reportExtendedAuthInfo",
+          "forwarded_site": "0x14211593d"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 38,
+      "task": 7,
+      "writers": [
+        "bdAntiCheat::reportBNetSessionToken"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142115830",
+          "call_site": "0x14211586f",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 2,
+      "writers": [
+        "bdContentStreaming::listFilesByOwner"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134800",
+          "call_site": "0x1421348a4",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 3,
+      "writers": [
+        "bdContentStreaming::listAllPublisherFiles"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134690",
+          "call_site": "0x14213472c",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 6,
+      "writers": [
+        "bdContentStreaming::_postUploadFile"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421339f0",
+          "call_site": "0x142133b00",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 9,
+      "writers": [
+        "bdContentStreaming::_preDownloadByFileID__Atlas_361A5E0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142133d70",
+          "call_site": "0x142133dcf",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 10,
+      "writers": [
+        "bdContentStreaming::_preDownloadPublisherFile"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142133fb0",
+          "call_site": "0x14213400f",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 16,
+      "writers": [
+        "bdContentStreaming::_postCopy"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142133750",
+          "call_site": "0x142133853",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 18,
+      "writers": [
+        "bdContentStreaming::_preDownloadSummary"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142133c90",
+          "call_site": "0x142133ce6",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 19,
+      "writers": [
+        "bdContentStreaming::downloadUserSummary"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134380",
+          "call_site": "0x1421344b2",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 50,
+      "task": 22,
+      "writers": [
+        "bdContentStreaming::_preDownloadByFileID__Atlas_361A730"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142133e60",
+          "call_site": "0x142133ebf",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 5,
+      "writers": [
+        "bdPooledStorage::_preUpload"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213d390",
+          "call_site": "0x14213d461",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 6,
+      "writers": [
+        "bdPooledStorage::_postUploadFile"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213cea0",
+          "call_site": "0x14213cf4f",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 18,
+      "writers": [
+        "bdPooledStorage::_preDownloadSummary"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213d170",
+          "call_site": "0x14213d1c6",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 20,
+      "writers": [
+        "bdPooledStorage::_preUploadMultiPart"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213d580",
+          "call_site": "0x14213d62a",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 21,
+      "writers": [
+        "bdPooledStorage::_postUploadStream"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213d030",
+          "call_site": "0x14213d0b6",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 58,
+      "task": 22,
+      "writers": [
+        "bdPooledStorage::_preDownloadMultiPart"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213d250",
+          "call_site": "0x14213d2af",
+          "starter": "bdRemoteTaskManager::initTaskBuffer"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 67,
+      "task": 5,
+      "writers": [
+        "bdEventLog::recordEventsMixed"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212de00",
+          "call_site": "0x14212de4a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 67,
+      "task": 6,
+      "writers": [
+        "bdEventLog::initializeFiltering",
+        "sub_14212DCA0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212dca0",
+          "call_site": "0x14212dce4",
+          "starter": "bdTaskParams::bdTaskParams"
+        },
+        {
+          "writer_address": "0x14212dd80",
+          "call_site": "0x14212ddbd",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "event-filter-initialized",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 58,
+      "writers": [
+        "bdMarketplace::validateInventoryItemsToken"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142129190",
+          "call_site": "0x142129205",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 69,
+      "writers": [
+        "bdMarketplace::getInventoryItemInfo"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128f40",
+          "call_site": "0x142128f91",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 106,
+      "writers": [
+        "bdMarketplace::purchaseSkus"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421295b0",
+          "call_site": "0x142129657",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 125,
+      "writers": [
+        "bdMarketplace::purchaseSkus_0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142129000",
+          "call_site": "0x142129055",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 132,
+      "writers": [
+        "bdMarketplace::getBalanceV2"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421292e0",
+          "call_site": "0x142129334",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 134,
+      "writers": [
+        "bdMarketplace::getSkus"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421293f0",
+          "call_site": "0x14212944b",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 243,
+      "writers": [
+        "bdMarketplace::bnetReconciliation"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128db0",
+          "call_site": "0x142128e12",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 80,
+      "task": 245,
+      "writers": [
+        "bdMarketplace::getBalancesV3"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142128e80",
+          "call_site": "0x142128ed1",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 95,
+      "task": 1,
+      "writers": [
+        "RB_DrawScreenColoredQuadInternal"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142115fd0",
+          "call_site": "0x14211600a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 104,
+      "task": 6,
+      "writers": [
+        "sub_142129BC0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142129bc0",
+          "call_site": "0x142129bed",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 104,
+      "task": 7,
+      "writers": [
+        "bdMarketingComms::reportMessagesViewed"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142129c50",
+          "call_site": "0x142129c7d",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 123,
+      "task": 1,
+      "writers": [
+        "Concurrency::task_from_exception<void,web::websockets::client::websocket_exception>"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136990",
+          "call_site": "0x142136a16",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 123,
+      "task": 2,
+      "writers": [
+        "AICommonInterface::OnScrCmd_GetNearbyNegotiationInfo"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136aa0",
+          "call_site": "0x142136b2f",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 1,
+      "writers": [
+        "bdAchievementsEngineService::reportEvents"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142118060",
+          "call_site": "0x142118132",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 2,
+      "writers": [
+        "bdAchievementsEngineService::reportUserEvents"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142118150",
+          "call_site": "0x1421181eb",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 3,
+      "writers": [
+        "bdAchievementsEngineService::getAchievementStates"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142117ff0",
+          "call_site": "0x142118004",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 4,
+      "writers": [
+        "bdAchievementsEngineService::getAchievementDefinitions"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142117fc0",
+          "call_site": "0x142117fd4",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 5,
+      "writers": [
+        "bdAchievementsEngineService::activateAchievement"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142117f60",
+          "call_site": "0x142117f78",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 6,
+      "writers": [
+        "bdAchievementsEngineService::deactivateAchievement"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142117f90",
+          "call_site": "0x142117fa8",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 125,
+      "task": 9,
+      "writers": [
+        "bdAchievementsEngineService::getUserState"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142118030",
+          "call_site": "0x142118044",
+          "starter": "bdAchievementsEngineService::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 2,
+      "writers": [
+        "bdAsyncMatchMaking::setPlayerInfo"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136420",
+          "call_site": "0x142136462",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 3,
+      "writers": [
+        "bdAsyncMatchMaking::getMatchMakingPlayerToken"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135730",
+          "call_site": "0x14213576a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "matchmaker-player-info-required",
+      "error": 108,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 4,
+      "writers": [
+        "bdAsyncMatchMaking::qosHostsReply"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135ce0",
+          "call_site": "0x142135d3e",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "dcqos-report-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 8,
+      "writers": [
+        "bdAsyncMatchMaking::cancelMatchMaking"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135390",
+          "call_site": "0x1421353d2",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 9,
+      "writers": [
+        "bdAsyncMatchMaking::shutdownMatchMaking"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421364e0",
+          "call_site": "0x142136522",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 10,
+      "writers": [
+        "q_bdAsyncMatchMaking::rejoinTournament"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135bf0",
+          "call_site": "0x142135c2a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 13,
+      "writers": [
+        "bdAsyncMatchMaking::getLobbyDocuments"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135610",
+          "call_site": "0x142135652",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 15,
+      "writers": [
+        "bdAsyncMatchMaking::syncLobbyDocuments"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421367b0",
+          "call_site": "0x1421367f9",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 16,
+      "writers": [
+        "bdAsyncMatchMaking::getDataCenterPreferences"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421354b0",
+          "call_site": "0x1421354f6",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 18,
+      "writers": [
+        "bdAsyncMatchMaking::startSearch"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136600",
+          "call_site": "0x142136642",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 19,
+      "writers": [
+        "bdAsyncMatchMaking::readyUpTournament"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136110",
+          "call_site": "0x142136151",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 20,
+      "writers": [
+        "q_bdAsyncMatchMaking::getTournamentState"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421359b0",
+          "call_site": "0x1421359ea",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "tournament-player-not-enrolled",
+      "error": 14526,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 21,
+      "writers": [
+        "bdAsyncMatchMaking::submitTournamentMatchResults"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421366f0",
+          "call_site": "0x142136732",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 22,
+      "writers": [
+        "bfx::ClosestVolumesProcessor<bfx::Path3DSpec>::ProcessPrim"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135b60",
+          "call_site": "0x142135b92",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "tournament-owner-left-all",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 23,
+      "writers": [
+        "q_bdAsyncMatchMaking::ackJoinTournament"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135260",
+          "call_site": "0x1421352a3",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 24,
+      "writers": [
+        "bdAsyncMatchMaking::getPreferredServerDetails"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421357f0",
+          "call_site": "0x142135832",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 25,
+      "writers": [
+        "bdAsyncMatchMaking::initiateDCQoS"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142135a70",
+          "call_site": "0x142135ab2",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 26,
+      "writers": [
+        "bdAsyncMatchMaking::getRelayClientAuthToken"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421358f0",
+          "call_site": "0x14213592a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "relay-client-auth-token-issued",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 28,
+      "writers": [
+        "bdAsyncMatchMaking::rejoinTournament"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136330",
+          "call_site": "0x14213636a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 145,
+      "task": 29,
+      "writers": [
+        "bdAsyncMatchMaking::registerForTournament"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136240",
+          "call_site": "0x142136282",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 150,
+      "task": 1,
+      "writers": [
+        "bdMatchScheduler::listScheduledMatches"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134f30",
+          "call_site": "0x142134f73",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 150,
+      "task": 2,
+      "writers": [
+        "bdMatchScheduler::getScheduledMatch"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134c40",
+          "call_site": "0x142134c83",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 150,
+      "task": 3,
+      "writers": [
+        "bdMatchScheduler::recordScheduledMatchEvent"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421350a0",
+          "call_site": "0x1421350e3",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 150,
+      "task": 4,
+      "writers": [
+        "bdMatchScheduler::listMatchEvents"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142134db0",
+          "call_site": "0x142134df2",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 151,
+      "task": 1,
+      "writers": [
+        "sub_142136BE0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142136be0",
+          "call_site": "0x142136c1a",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "esports-registration-read",
+      "error": 0,
+      "status": "handled"
+    },
+    {
+      "service": 152,
+      "task": 1,
+      "writers": [
+        "bdPerformance::submitPerformance"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142129dc0",
+          "call_site": "0x142129e02",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 6,
+      "writers": [
+        "bdObjectStore::getUserObjectsVectorized"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212a820",
+          "call_site": "0x14212a890",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 7,
+      "writers": [
+        "bdObjectStore::uploadUserObjectsVectorized"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212add0",
+          "call_site": "0x14212ae40",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 8,
+      "writers": [
+        "bdObjectStore::getPublisherObject"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212a4f0",
+          "call_site": "0x14212a55e",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 9,
+      "writers": [
+        "bdObjectStore::listPublisherObjectsByCategory"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212a960",
+          "call_site": "0x14212a9d3",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 10,
+      "writers": [
+        "bdObjectStore::listUserObjectsByCategory"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212aa70",
+          "call_site": "0x14212aae0",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 12,
+      "writers": [
+        "bdObjectStoreStreaming::exitHTTP"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14215ffe0",
+          "call_site": "0x142160335",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 16,
+      "writers": [
+        "bdObjectStore::getPublisherObjectMetadatas",
+        "bdObjectStore::uploadUserSummaryObject"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212a640",
+          "call_site": "0x14212a6aa",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        },
+        {
+          "writer_address": "0x14212a710",
+          "call_site": "0x14212a792",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 193,
+      "task": 24,
+      "writers": [
+        "bdObjectStoreStreaming::exitHTTP"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14215ffe0",
+          "call_site": "0x1421600e3",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 194,
+      "task": 1,
+      "writers": [
+        "bdABTesting::enroll"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142139ad0",
+          "call_site": "0x142139b08",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 195,
+      "task": 1,
+      "writers": [
+        "sub_142139BB0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142139bb0",
+          "call_site": "0x142139be3",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 10,
+      "writers": [
+        "bdCrossPlatformIdentity::getCrossPlatformUserIDs"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x1421397a0",
+          "call_site": "0x1421397b4",
+          "starter": "bdCrossPlatformIdentity::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 11,
+      "writers": [
+        "bdCrossPlatformIdentity::getPlatformUserIDs"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142139820",
+          "call_site": "0x142139834",
+          "starter": "bdCrossPlatformIdentity::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 20,
+      "writers": [
+        "bdMW4Service::createGroup"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c780",
+          "call_site": "0x14213c794",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 21,
+      "writers": [
+        "bdMW4Service::getGroupInfos"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c7e0",
+          "call_site": "0x14213c7f4",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 22,
+      "writers": [
+        "bdMW4Service::updateGroup"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213ca20",
+          "call_site": "0x14213ca34",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 23,
+      "writers": [
+        "bdMW4Service::addOrUpdateGroupMember"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c750",
+          "call_site": "0x14213c764",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 24,
+      "writers": [
+        "bdMW4Service::removeGroupMember"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c900",
+          "call_site": "0x14213c914",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 25,
+      "writers": [
+        "bdMW4Service::proposeMemberships"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c8d0",
+          "call_site": "0x14213c8e4",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 26,
+      "writers": [
+        "bdMW4Service::removeProposals"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c930",
+          "call_site": "0x14213c944",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 27,
+      "writers": [
+        "bdMW4Service::getMembershipProposalsByGroup"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c840",
+          "call_site": "0x14213c854",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 28,
+      "writers": [
+        "bdMW4Service::getMembershipProposalsByUser"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c870",
+          "call_site": "0x14213c884",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 29,
+      "writers": [
+        "bdMW4Service::getGroupMembers"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c810",
+          "call_site": "0x14213c824",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 30,
+      "writers": [
+        "bdMW4Service::getMembershipsByUsers"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c8a0",
+          "call_site": "0x14213c8b4",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 31,
+      "writers": [
+        "bdMW4Service::getGroupFile"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c7b0",
+          "call_site": "0x14213c7c4",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 32,
+      "writers": [
+        "bdMW4Service::uploadGroupFile"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213ca50",
+          "call_site": "0x14213ca64",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 197,
+      "task": 37,
+      "writers": [
+        "bdMW4Service::setActiveGroup"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14213c960",
+          "call_site": "0x14213c978",
+          "starter": "q_bdMW4Service::startTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 1,
+      "writers": [
+        "bdMessaging::subscribeToChannel"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212ce40",
+          "call_site": "0x14212cebb",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 2,
+      "writers": [
+        "bdMessaging::unsubscribeFromChannel"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d030",
+          "call_site": "0x14212d0a6",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 3,
+      "writers": [
+        "bdMessaging::sendToChannel"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212cd20",
+          "call_site": "0x14212cdb4",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 4,
+      "writers": [
+        "bdMessaging::whisperToChannelMember"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212d130",
+          "call_site": "0x14212d1d3",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 5,
+      "writers": [
+        "task_from_exception_XVwebsocket_exception_client_websockets_web_Concurrency_YA_AV_task_X_0_Vwebsocket_exception_client_websockets_web_AEBVtask_options_0_Z_0"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212c970",
+          "call_site": "0x14212c9ed",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 6,
+      "writers": [
+        "task_from_exception_XVwebsocket_exception_client_websockets_web_Concurrency_YA_AV_task_X_0_Vwebsocket_exception_client_websockets_web_AEBVtask_options_0_Z_1"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212c860",
+          "call_site": "0x14212c8dd",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 7,
+      "writers": [
+        "bdMessaging::getChannelsInfo"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212ca80",
+          "call_site": "0x14212cb80",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 198,
+      "task": 12,
+      "writers": [
+        "bdMessaging::unsubscribeFromCategory"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x14212cf40",
+          "call_site": "0x14212cfab",
+          "starter": "bdRemoteTaskManager::startStructTask"
+        }
+      ],
+      "operation": "task-parameters-invalid",
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "service": 255,
+      "task": 10,
+      "writers": [
+        "sub_142157970"
+      ],
+      "sites": [
+        {
+          "writer_address": "0x142157970",
+          "call_site": "0x142157a2e",
+          "starter": "bdTaskParams::bdTaskParams"
+        }
+      ],
+      "operation": "rest-envelope-invalid",
+      "error": 106,
+      "status": "handled"
+    }
+  ],
+  "unresolved": [],
+  "rest": [
+    {
+      "writer": "bdGetCrossPlatformUserSearchRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetCrossPlatformUserSearchRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdABTestingEnrollRequest::restSerializeRequest",
+      "services": [],
+      "resource": "abtesting",
+      "operation": "rest-envelope-invalid",
+      "service": "",
+      "method": 4670804,
+      "error": 106,
+      "status": "inconclusive"
+    },
+    {
+      "writer": "bdABTestingEnrollRequest::restSerializeRequest",
+      "services": [],
+      "resource": "abtesting",
+      "operation": "rest-envelope-invalid",
+      "service": "",
+      "method": 5264724,
+      "error": 106,
+      "status": "inconclusive"
+    },
+    {
+      "writer": "bdRenameCrossPlatformUserRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdRenameCrossPlatformUserRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpgradeAnonUnoAccRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UnoRes",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpgradeAnonUnoAccRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UnoRes",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdReportEventsRequest::restSerializeRequest",
+      "services": [
+        "ae.demonware.net"
+      ],
+      "resource": "user_events",
+      "operation": "achievement-rest-domain-invalid",
+      "service": "ae.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdReportEventsRequest::restSerializeRequest",
+      "services": [
+        "ae.demonware.net"
+      ],
+      "resource": "user_events",
+      "operation": "achievement-rest-domain-invalid",
+      "service": "ae.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "sub_14212E5F0",
+      "services": [
+        "presence"
+      ],
+      "resource": "UserPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "sub_14212E5F0",
+      "services": [
+        "presence"
+      ],
+      "resource": "UserPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUsersPresenceRequestV3::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUsersPresenceRequestV3::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSubscribeToUsersPresenceRequestV3::restSerializeRequest",
+      "services": [
+        "presence"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSubscribeToUsersPresenceRequestV3::restSerializeRequest",
+      "services": [
+        "presence"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUnsubscribeFromUsersPresenceRequest::restSerializeRequest",
+      "services": [
+        "presence"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUnsubscribeFromUsersPresenceRequest::restSerializeRequest",
+      "services": [
+        "presence"
+      ],
+      "resource": "UsersPresence",
+      "operation": "task-parameters-invalid",
+      "service": "presence",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSendFriendInvitationsRequest::restSerializeRequest",
+      "services": [
+        "friends"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "friends",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSendFriendInvitationsRequest::restSerializeRequest",
+      "services": [
+        "friends"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "friends",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetPendingFriendsRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetPendingFriendsRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdRejectFriendRequest::restSerializeRequest",
+      "services": [
+        "friends"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "friends",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdRejectFriendRequest::restSerializeRequest",
+      "services": [
+        "friends"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "friends",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetFriendsRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetFriendsRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Friends",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdCreateUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdCreateUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpdateUsersInUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpdateUsersInUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdRemoveUsersFromUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdRemoveUsersFromUserListRequest::restSerializeRequest",
+      "services": [
+        "userlists"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "userlists",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUserListRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUserListRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "UserLists",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdFetchRegulationsRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdFetchRegulationsRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSetUserRegulationPreferenceRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdSetUserRegulationPreferenceRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUserRegulationPreferenceRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetUserRegulationPreferenceRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Regulations",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreListPublisherObjectsByCategoryRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsResourcePublishers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreGetUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.dev.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.cert.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdObjectStoreUploadUserObjectsVectorizedRequest::restSerializeRequest",
+      "services": [
+        "objectstore.dev.demonware.net",
+        "objectstore.cert.demonware.net",
+        "objectstore.prod.demonware.net"
+      ],
+      "resource": "ObjectsVectorizedResourceUsers",
+      "operation": "task-parameters-invalid",
+      "service": "objectstore.prod.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetCrossPlatformUsernamesRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Users",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdGetCrossPlatformUsernamesRequest::restSerializeRequest",
+      "services": [
+        "social-service"
+      ],
+      "resource": "Users",
+      "operation": "task-parameters-invalid",
+      "service": "social-service",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdAuthenticateCrossPlatformUserRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdAuthenticateCrossPlatformUserRequest::restSerializeRequest",
+      "services": [
+        "uno"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "uno",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdCrossPlatformLinkUserRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdCrossPlatformLinkUserRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "UserResource",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpgradeUmbrellaRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Umbrella",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdUpgradeUmbrellaRequest::restSerializeRequest",
+      "services": [
+        "umbrella"
+      ],
+      "resource": "Umbrella",
+      "operation": "task-parameters-invalid",
+      "service": "umbrella",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdReportUserEventsRequest::restSerializeRequest",
+      "services": [
+        "ae.demonware.net"
+      ],
+      "resource": "user_events",
+      "operation": "achievement-rest-domain-invalid",
+      "service": "ae.demonware.net",
+      "method": 4670804,
+      "error": 106,
+      "status": "handled"
+    },
+    {
+      "writer": "bdReportUserEventsRequest::restSerializeRequest",
+      "services": [
+        "ae.demonware.net"
+      ],
+      "resource": "user_events",
+      "operation": "achievement-rest-domain-invalid",
+      "service": "ae.demonware.net",
+      "method": 5264724,
+      "error": 106,
+      "status": "handled"
+    }
+  ]
+}

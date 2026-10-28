@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "build": "replay120",
+  "game": "Call of Duty: Modern Warfare (2019) Replay 1.20",
+  "titles": [5800],
+  "image": "E:/IW8/Builds/1.20-replay/game_dx12_ship_replay.exe",
+  "image_sha256": "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0",
+  "symbols": "E:/IW8/Builds/1.20-replay/game_dx12_ship_replay.exe.sqlite",
+  "content_pack": "content/replay120",
+  "starters": [
+    {"address": "0x142156330", "name": "bdTaskParams::bdTaskParams", "service": "rdx", "task": "r8"},
+    {"address": "0x1421170B0", "name": "bdRemoteTaskManager::initTaskBuffer", "service": "rdx", "task": "r8"},
+    {"address": "0x142117C10", "name": "bdRemoteTaskManager::startStructTask", "service": "r8", "task": "r9"},
+    {"address": "0x1421179A0", "name": "bdRemoteTaskManager::startLSGTask", "service": "r8", "task": "r9"},
+    {"address": "0x142118270", "name": "bdAchievementsEngineService::startTask", "service": 125, "task": "r8", "wrapper": true},
+    {"address": "0x14213C990", "name": "q_bdMW4Service::startTask", "service": 197, "task": "r8", "wrapper": true},
+    {"address": "0x142139930", "name": "bdCrossPlatformIdentity::startTask", "service": 197, "task": "r8", "wrapper": true}
+  ],
+  "forwarders": ["bdStructBufferTask::setRequest"],
+  "rest_inventory": "data/native-rest-callgraph.json"
+}

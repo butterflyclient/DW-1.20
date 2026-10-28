@@ -17,6 +17,8 @@ namespace services
         std::map<uint32_t, uint32_t> successors;
         std::set<uint32_t> items;
         uint64_t xp = 0;
+        // Per-life/rapid/minute trackers advanced without completing progress.
+        bool stateChanged = false;
     };
 
     struct ReplayQuestEventContext

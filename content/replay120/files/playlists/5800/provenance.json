@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "title": 5800,
+  "version": 14,
+  "compressed_source": "E:\\DW\\IW8\\data\\unified_large_playlist_tu19.aggr",
+  "compressed_sha256": "74f6f3efa819666dde982dc1633428491d934b925b968fb14e2178ee24d3e3a2",
+  "catalog_sha256": "297192a8818ae60597f625487496f6242c123af20e09ca8c6502570baf8cc03f",
+  "native_name_map_sha256": "fdf2adeaa88025fbc5d9fc9893d2a576a75868c4035272c8a79b26dd8806c09d",
+  "playlists": 64,
+  "game_types": 43,
+  "maps": 61,
+  "match_entries": 589,
+  "native_contracts": {
+    "parse": "0x1410CE1A0",
+    "lobby_selection": "0x141044F30",
+    "choose_entry": "0x1410CBD20"
+  },
+  "policy_is_separate_from_publication": true,
+  "package_inventory_revision": "be5cba3dbb1d47a17e2a74355b3eed1a62aaf98f772c7ed33eab112b0fe85309",
+  "installed_main_packages": 13
+}

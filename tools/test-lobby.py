@@ -721,6 +721,19 @@ try:
     multipart_fixture = multipart_content_fixtures.exercise(
         client, directory, title, user, base, (u32, u64, text), checks
     )
+    import full_coverage_fixtures
+
+    full_coverage_fixtures.exercise(
+        client,
+        directory,
+        title,
+        user,
+        base,
+        (u32, u64, text, structure, pb_text, pb_bytes, pb_fields),
+        content_fixture,
+        multipart_fixture,
+        checks,
+    )
     request_structure = pb_text(1, "iw8") + pb_text(2, "fixture")
     bulk = client.task(
         95,

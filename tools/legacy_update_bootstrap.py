@@ -71,8 +71,21 @@ def publish(image, catalog, output):
                     with path.open('rb') as stream:
                         if hashlib.file_digest(stream, 'sha256').hexdigest() == identity[1]:
                             retained[identity[1]] = path
-        if set(retained) != set(sizes):
-            raise ValueError('Retained legacy compiler images are missing: ' + ', '.join(sorted(set(sizes) - set(retained))))
+        missing = sorted(set(sizes) - set(retained))
+        if missing:
+            # Without the old bases no new deltas can be made. The published
+            # bridge stays valid while its target is still a retained full
+            # image: that release's full-image updater installs the current one.
+            try:
+                kept = sftp.stat(REMOTE + '/images/' + previous['latest'] + '.exe').st_size
+            except FileNotFoundError:
+                kept = None
+            if kept != previous['target_size']:
+                raise ValueError('Retained legacy compiler images are missing: ' + ', '.join(missing))
+            print('Legacy bridge kept at release', previous['release'], '->', previous['latest'][:12],
+                  '(full-image updater continues); bases not retained:', len(missing), flush=True)
+            return dict(required=True, bridged=False, release=previous['release'],
+                        latest=previous['latest'], missing_bases=missing)
 
         def prepare_patch(identity):
             size = sizes[identity]

@@ -1543,7 +1543,8 @@ namespace services
                 data["requests"].erase(data["requests"].begin());
             }
             writes.push_back({id.userId, id.platformAccountId, context, {}, std::move(data)});
-            if (!questProgress.updates.empty() || !dailyProgress.updates.empty() || dailyStatesChanged)
+            if (!questProgress.updates.empty() || !dailyProgress.updates.empty() || dailyStatesChanged ||
+                questProgress.stateChanged)
                 writes.push_back({id.userId, id.platformAccountId, context, {}, questProgress.states,
                                   achievement_store::Destination::states});
             if (awards && awards->changed)
@@ -1662,7 +1663,9 @@ namespace services
                 const auto timestamp = replayMatchNumber(event, "timestamp");
                 const auto family = values.value("gamemode", uint64_t{0});
                 const bool familyMatches =
-                    row.at("category") == 0 ? family == 2 : family == 8 || family == 24;
+                    row.at("category") == 0   ? family == 2
+                    : row.at("category") == 4 ? family == 4
+                                              : family == 8 || family == 24;
                 if ((!retained && !currentOwns) ||
                     replayMatchNumber(row, "expires") < time || timestamp > time + 300 ||
                     timestamp < replayMatchNumber(row, "start") ||

@@ -1122,7 +1122,7 @@ def main():
                 assert snapshot(host) == saved
                 checks.append(f"Stage {identity}: exact original BR rarity/circle/victim flags credit one player kill, exclude unknown and wrong fields, and preserve completion/retry rewards")
             if mp_contract:
-                create_match(host, peer)
+                action_lobby = create_match(host, peer)
                 action_rules = {
                     1502: ("killstreak_end", 70000, 1),
                     1545: ("killstreak_end", 70009, 1),
@@ -1216,7 +1216,18 @@ def main():
                 completion_rules = {1500: (6, 2), 1511: (6, 3), 1504: (6, 1),
                     1568: (6, 1), 1579: (6, 1), 1574: (7, 1), 1578: (25, 1),
                     1587: (25, 2), 1593: (26, 1)}
+                # Public matchmaking joins a live compatible lobby (fullest-lobby
+                # selection); release each match before searching for the next.
+                def release(live):
+                    host.task(145, 10, u64(int(live.stem)), structured=False)
+                    receive_lobby(host, 2002)
+                    receive_lobby(peer, 2002)
+
+                release(action_lobby)
+                release(br_lobby)
                 for index, (identity, (mode, outcome)) in enumerate(completion_rules.items()):
+                    if index:
+                        release(lobby)
                     lobby = create_match(host, peer, playlist=completion_playlists[mode])
                     label = f"complete_end_{mode}_{outcome}"
                     native = 99100000 + index
@@ -1304,6 +1315,11 @@ def main():
                 with NativeClient(fixture, profile="quest-peer", port_offset=offset,
                                   auth_identity=resumed_identity) as old_session:
                     assert old_session.task(12, 6, b"", structured=False).startswith(b"\x08")
+                    # Release the old-session allocation so the renewed search
+                    # creates its own lobby rather than joining the live one.
+                    host.task(145, 10, u64(int(lobby.stem)), structured=False)
+                    receive_lobby(host, 2002)
+                    receive_lobby(rotated, 2002)
                     lobby = create_match(host, rotated)
                     renewed = json.loads(lobby.read_bytes())
                     search_id = renewed["backend_doc"]["player_id_to_mm_id"][str(rotated.user)]

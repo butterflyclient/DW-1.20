@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "passed": true,
+  "server_sha256": "a04e5fae26b94adafaa8197fb2a1dfeff28615d76ceb9ee13b7f92065bcb40cc",
+  "cases": [
+    {
+      "rest_method": 4670804,
+      "status": 503,
+      "error": "LocalServiceUnavailable",
+      "passed": true
+    },
+    {
+      "rest_method": 5264724,
+      "status": 503,
+      "error": "LocalServiceUnavailable",
+      "passed": true
+    }
+  ],
+  "connection_survived": true,
+  "excluded_route_domain_writes": false,
+  "native_game_verified": false,
+  "disposable_fixture_removed": true
+}

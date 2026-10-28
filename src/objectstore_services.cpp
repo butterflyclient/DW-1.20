@@ -5,6 +5,7 @@
 #include "crypto.h"
 #include "network.h"
 #include "../third_party/nlohmann/json.hpp"
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <set>
@@ -1093,6 +1094,281 @@ namespace services
                            " missing=" + std::to_string(body["errors"].size());
             return reply;
         }
+
+        Reply completeUpload(const std::filesystem::path &directory,
+                             const platform::LobbyIdentity &id,
+                             const Request &r,
+                             bool batch)
+        {
+            // Large-object completion: 0x14215FFE0 sends 193/12 (streaming mode 2,
+            // one session) or 193/24 (mode 4, $batch) to the same-Replay URLs
+            //   %s/v1/[core/]upload-sessions/%s/complete/?client&context
+            //   %s/v2/[core/]upload-sessions/$batch/complete/?client&context
+            // (0x1426A2568..0x1426A2620). The completion body carries each object's
+            // metadata and content; the session ID is the object name. Commit uses
+            // the same validated, journaled window as the 193/7 vector upload.
+            wire::require((r.method == "POST" || r.method == "PUT") && !r.body.empty() &&
+                          r.objectIds.empty());
+            const auto path = r.url.substr(0, r.url.find('?'));
+            const auto marker = path.find("/upload-sessions/");
+            wire::require(marker != std::string::npos && path.ends_with("/complete/"));
+            const auto session = path.substr(marker + 17, path.size() - marker - 17 - 10);
+            wire::require((session == "$batch") == batch);
+            auto input = parameters(r.body);
+            Request common = r;
+            common.method = "PUT";
+            common.contentType = "application/json";
+            if (!batch)
+            {
+                wire::require(input.is_object() && input.contains("metadata") &&
+                              input.at("metadata").is_object() &&
+                              filename(input.at("metadata"), "name", 65) ==
+                                  filename(Json{{"name", session}}, "name", 65));
+                common.body = Json{{"objects", Json::array({std::move(input)})}}.dump();
+            }
+            auto reply = upload(directory, id, common);
+            if (!reply.error)
+                reply.operation =
+                    batch ? "user-large-objects-upload-completed" : "user-large-object-upload-completed";
+            return reply;
+        }
+
+        std::string decodeQueryValue(const std::string &value, size_t capacity)
+        {
+            std::string out;
+            for (size_t i = 0; i < value.size(); ++i)
+            {
+                if (value[i] != '%')
+                {
+                    out.push_back(value[i] == '+' ? ' ' : value[i]);
+                    continue;
+                }
+                wire::require(i + 2 < value.size());
+                auto digit = [](char c) -> unsigned
+                {
+                    if (c >= '0' && c <= '9')
+                        return c - '0';
+                    if (c >= 'a' && c <= 'f')
+                        return c - 'a' + 10;
+                    if (c >= 'A' && c <= 'F')
+                        return c - 'A' + 10;
+                    wire::require(false);
+                    return 0;
+                };
+                out.push_back(static_cast<char>((digit(value[i + 1]) << 4) | digit(value[i + 2])));
+                i += 2;
+            }
+            wire::require(out.size() < capacity && out.find('\0') == std::string::npos);
+            return out;
+        }
+
+        struct CategoryQuery
+        {
+            std::string owner, context, category;
+            size_t offset = 0;
+            unsigned limit = 0;
+            bool tags = false;
+        };
+
+        CategoryQuery categoryQuery(const platform::LobbyIdentity &id,
+                                    const std::string &url,
+                                    bool publisherOwner)
+        {
+            // Same-Replay list-by-category URLs. Struct-buffer writers 0x142143720 /
+            // 0x142143690 (publisher) and 0x142143C60 / 0x1421437B0 (user) format
+            //   %s/v1/core/publishers/%s/objects/?client&context&category&limit[&pageToken]
+            //   %s/v2/[core/]users/{me|<platform>-<id>}/objects/?...[&pageToken][&extra]
+            // (format strings 0x1426A2FD0..0x1426A32A0); the REST writer 0x142144CF0
+            // uses /v2/core/publishers/{publisher}/objects/ with the same query.
+            const auto query = url.find('?');
+            wire::require(query != std::string::npos && url.find('#') == std::string::npos);
+            const auto path = url.substr(0, query);
+            wire::require(path.ends_with("/objects/"));
+            CategoryQuery out;
+            const auto segment = [&](std::initializer_list<std::string_view> prefixes)
+            {
+                for (const auto prefix : prefixes)
+                    if (const auto start = path.find(prefix); start != std::string::npos)
+                    {
+                        const auto first = start + prefix.size();
+                        wire::require(path.size() > first + 9);
+                        return path.substr(first, path.size() - 9 - first);
+                    }
+                wire::require(false);
+                return std::string{};
+            };
+            if (publisherOwner)
+                out.owner = filename(
+                    Json{{"owner", segment({"/v1/core/publishers/", "/v2/core/publishers/"})}},
+                    "owner",
+                    30);
+            else
+                out.owner = owner(id, Json{{"owner", segment({"/v2/core/users/", "/v2/users/"})}});
+            std::map<std::string, std::string> fields;
+            size_t position = query + 1;
+            while (position < url.size())
+            {
+                const auto end = url.find('&', position);
+                const auto pair =
+                    url.substr(position, end == std::string::npos ? end : end - position);
+                const auto equal = pair.find('=');
+                wire::require(equal != std::string::npos);
+                const auto key = pair.substr(0, equal);
+                wire::require((key == "client" || key == "context" || key == "category" ||
+                               key == "limit" || key == "pageToken" ||
+                               (!publisherOwner && key == "extra")) &&
+                              fields.emplace(key, pair.substr(equal + 1)).second);
+                if (end == std::string::npos)
+                    break;
+                wire::require(end + 1 < url.size());
+                position = end + 1;
+            }
+            wire::require(fields.contains("client") && fields.contains("context") &&
+                          fields.contains("category") && fields.contains("limit") &&
+                          !fields.at("client").empty() && fields.at("client").size() < 64);
+            out.context = contextFromURL(url);
+            out.category = decodeQueryValue(fields.at("category"), 65);
+            wire::require(!out.category.empty());
+            const auto &limit = fields.at("limit");
+            const auto parsed = std::from_chars(limit.data(), limit.data() + limit.size(), out.limit);
+            // Replay passes 50 (publisher, 0x1410692C0) and 30 (user); the server
+            // also bounds a page to its 50-object vector window.
+            wire::require(parsed.ec == std::errc{} && parsed.ptr == limit.data() + limit.size() &&
+                          out.limit >= 1 && out.limit <= 100);
+            out.limit = std::min(out.limit, 50u);
+            if (fields.contains("pageToken"))
+            {
+                // Page tokens are this server's decimal continuation offsets.
+                const auto &token = fields.at("pageToken");
+                const auto offset =
+                    std::from_chars(token.data(), token.data() + token.size(), out.offset);
+                wire::require(offset.ec == std::errc{} &&
+                              offset.ptr == token.data() + token.size() && out.offset <= 100000);
+            }
+            if (fields.contains("extra"))
+            {
+                const auto extra = decodeQueryValue(fields.at("extra"), 16);
+                wire::require(extra == "tags" || extra == "stats" || extra == "tags,stats");
+                out.tags = extra.starts_with("tags");
+            }
+            return out;
+        }
+
+        bool categoryMatches(const Json &metadata, const std::string &category)
+        {
+            return metadata.contains("category") && metadata.at("category").is_string() &&
+                   metadata.at("category").get<std::string>() == category;
+        }
+
+        Json categoryPage(std::vector<Json> objects, const CategoryQuery &q)
+        {
+            std::sort(objects.begin(),
+                      objects.end(),
+                      [](const Json &a, const Json &b)
+                      {
+                          return a.at("metadata").at("name").get<std::string>() <
+                                 b.at("metadata").at("name").get<std::string>();
+                      });
+            Json body = {{"objects", Json::array()}};
+            for (size_t i = q.offset; i < objects.size() && i < q.offset + q.limit; ++i)
+                body["objects"].push_back(std::move(objects[i]));
+            if (q.offset + q.limit < objects.size())
+                body["nextPageToken"] = std::to_string(q.offset + q.limit);
+            return body;
+        }
+
+        Reply publisherCategory(const std::filesystem::path &directory,
+                                const platform::LobbyIdentity &id,
+                                const Request &r)
+        {
+            // 193/9 (bdObjectStore::listPublisherObjectsByCategory 0x14212A960) and
+            // REST ObjectsResourcePublishers/get_metadata. Only public, unexpired
+            // publications are listed, with the same metadata/contentURL as 193/16.
+            wire::require(r.method == "GET" && r.objectIds.empty() && r.body.empty());
+            const auto q = categoryQuery(id, r.url, true);
+            const auto parent = directory / "objectstore" / "publisher" /
+                                std::to_string(id.titleId) / q.context / q.owner;
+            std::vector<Json> objects;
+            if (std::filesystem::is_directory(parent))
+                for (const auto &entry : std::filesystem::directory_iterator(parent))
+                {
+                    const auto file = entry.path().filename().string();
+                    constexpr std::string_view suffix = ".metadata.json";
+                    if (!entry.is_regular_file() || !file.ends_with(suffix))
+                        continue;
+                    const auto name = file.substr(0, file.size() - suffix.size());
+                    try
+                    {
+                        (void)filename(Json{{"name", name}}, "name", 65);
+                    }
+                    catch (const std::runtime_error &)
+                    {
+                        continue;
+                    }
+                    const auto metadata =
+                        publisherDocument(directory, id.titleId, q.context, q.owner, name, false);
+                    if (metadata && categoryMatches(*metadata, q.category))
+                        objects.push_back(Json{{"metadata", *metadata}});
+                    if (objects.size() > 4096)
+                        throw std::runtime_error("Publisher category exceeds listing capacity");
+                }
+            const auto total = objects.size();
+            const auto body = categoryPage(std::move(objects), q);
+            auto reply = response(body, "publisher-objects-by-category", 200, true, r.restVersion);
+            reply.detail = " context=" + q.context + " owner=" + q.owner +
+                           " category=" + q.category + " matched=" + std::to_string(total) +
+                           " returned=" + std::to_string(body["objects"].size());
+            return reply;
+        }
+
+        Reply userCategory(const std::filesystem::path &directory,
+                           const platform::LobbyIdentity &id,
+                           const Request &r)
+        {
+            // 193/10 (bdObjectStore::listUserObjectsByCategory 0x14212AA70). Another
+            // account's private objects are omitted, exactly as vector reads deny them.
+            wire::require(r.method == "GET" && r.objectIds.empty() && r.body.empty());
+            const auto q = categoryQuery(id, r.url, false);
+            if (const auto user = account(q.owner))
+                recoverUploads(directory, id, *user);
+            const auto parent = directory / "objectstore" / "users" / std::to_string(id.titleId) /
+                                q.context / q.owner;
+            std::vector<Json> objects;
+            if (std::filesystem::is_directory(parent))
+                for (const auto &entry : std::filesystem::directory_iterator(parent))
+                {
+                    const auto file = entry.path().filename().string();
+                    constexpr std::string_view suffix = ".object.json";
+                    if (!entry.is_regular_file() || !file.ends_with(suffix))
+                        continue;
+                    wire::require(std::filesystem::file_size(entry.path()) < 96000);
+                    std::ifstream stream(entry.path());
+                    auto stored = Json::parse(stream);
+                    const auto &metadata = stored.at("metadata");
+                    validateMetadata(metadata,
+                                     q.owner,
+                                     metadata.at("name").get<std::string>(),
+                                     q.context);
+                    const auto expires = metadata.at("expiresOn").get<int64_t>();
+                    if ((!own(id, q.owner) && metadata.at("acl") != "public") ||
+                        (expires > 0 && static_cast<uint64_t>(expires) <= now()) ||
+                        !categoryMatches(metadata, q.category))
+                        continue;
+                    Json object = {{"metadata", metadata}};
+                    if (q.tags && stored.contains("tags"))
+                        object["tags"] = stored.at("tags");
+                    objects.push_back(std::move(object));
+                    if (objects.size() > 4096)
+                        throw std::runtime_error("User category exceeds listing capacity");
+                }
+            const auto total = objects.size();
+            const auto body = categoryPage(std::move(objects), q);
+            auto reply = response(body, "user-objects-by-category", 200, false, r.restVersion);
+            reply.detail = " context=" + q.context + " category=" + q.category +
+                           " matched=" + std::to_string(total) +
+                           " returned=" + std::to_string(body["objects"].size());
+            return reply;
+        }
     } // namespace
 
     void initializePublisherContent(const std::filesystem::path &directory, unsigned short port)
@@ -1141,10 +1417,21 @@ namespace services
     {
         // Same-Replay 1421443E0 strips https:// from these environment hosts;
         // 142145DE0/142146E60 bind the vector GET/PUT resource and operation.
-        if ((r.service != "objectstore.dev.demonware.net" &&
-             r.service != "objectstore.cert.demonware.net" &&
-             r.service != "objectstore.prod.demonware.net") ||
-            r.resource != "ObjectsVectorizedResourceUsers" ||
+        if (r.service != "objectstore.dev.demonware.net" &&
+            r.service != "objectstore.cert.demonware.net" &&
+            r.service != "objectstore.prod.demonware.net")
+            return std::nullopt;
+        if (r.resource == "ObjectsResourcePublishers" && r.operation == "get_metadata")
+        {
+            // REST twin of 193/9 from 0x142144CF0: GET, Accept JSON, no body.
+            wire::require(r.accept == 1 && r.method == 0x474554u && !r.hasBody);
+            Request common;
+            common.method = "GET";
+            common.url = r.uri;
+            common.restVersion = r.version;
+            return publisherCategory(directory, id, common);
+        }
+        if (r.resource != "ObjectsVectorizedResourceUsers" ||
             (r.operation != "get_objects" && r.operation != "put_objects"))
             return std::nullopt;
         const bool writing = r.operation == "put_objects";
@@ -1175,12 +1462,24 @@ namespace services
                       uint8_t task,
                       wire::Reader &p)
     {
-        if (task != 6 && task != 7 && task != 8 && task != 16)
+        // 12/24 (large-object completion) are selected only by streaming modes 2/4
+        // in 0x14215FFE0; Replay's sole start() caller passes mode 1, so the
+        // shipped client never sends them (validation/20261027-dw-task-baseline.json).
+        // They are served for clients and SDK builds that do.
+        if (task != 6 && task != 7 && task != 8 && task != 9 && task != 10 && task != 12 &&
+            task != 16 && task != 24)
             return {108, {}, "objectstore-task-unimplemented"};
         const auto r = request(p);
         const auto path = r.url.substr(0, r.url.find('?'));
         // Same-Replay startStructTask: 6=user vector download, 7=user vector upload,
-        // 16=publisher metadata. Do not inherit another build's labels or IDs.
+        // 9/10=publisher/user list by category, 16=publisher metadata. Do not
+        // inherit another build's labels or IDs.
+        if (task == 12 || task == 24)
+            return completeUpload(directory, id, r, task == 24);
+        if (task == 9)
+            return publisherCategory(directory, id, r);
+        if (task == 10)
+            return userCategory(directory, id, r);
         if (task == 7)
         {
             wire::require(path.find("/users/objects/") != std::string::npos);

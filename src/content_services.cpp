@@ -1665,6 +1665,63 @@ namespace services
                 reply.results.push_back(metadata(id.titleId, selected[i]));
             return reply;
         }
+        if ((service == 50 || service == 58) && task == 22)
+        {
+            // Paged/multipart download windows. Writers 0x142133E60 (50/22: UInt64
+            // file, UInt32 slot, UInt16 first part, UInt16 part count) and
+            // 0x14213D250 (58/22: UInt64 file, UInt16 first, UInt16 count) fill one
+            // extended result: the complete bdFileMetaData followed by the window's
+            // first part index and its packed download URL array (the same
+            // ten-slot string array the multipart upload reply uses). A stored
+            // single-blob file is one part; pooled multipart files keep their parts.
+            const auto file = p.u64();
+            if (service == 50)
+                (void)p.u32();
+            const auto first = p.u16(), count = p.u16();
+            p.end();
+            wire::require(file && file != UINT64_MAX && count >= 1 && count <= 10);
+            const auto data = load(id.titleId);
+            const auto &rows = data.at("files");
+            const auto found = std::find_if(rows.begin(),
+                                            rows.end(),
+                                            [&](const auto &row)
+                                            {
+                                                return row.at("id") == file;
+                                            });
+            if (found == rows.end() || (service == 50 && found->at("kind") == "publisher") ||
+                (service == 58 && found->at("kind") != "pooled"))
+                return Reply{108, {}, "streaming-file-not-found"};
+            std::vector<std::string> parts;
+            if (found->contains("parts"))
+                for (const auto &part : found->at("parts"))
+                    parts.push_back(part.at("content").get<std::string>());
+            else
+                parts.push_back(found->at("content").get<std::string>());
+            if (first >= parts.size())
+                return Reply{108, {}, "streaming-part-not-found"};
+            const auto end = std::min(parts.size(), static_cast<size_t>(first) + count);
+            auto result = metadata(id.titleId, *found);
+            wire::Writer window;
+            window.u16(first);
+            wire::Bytes strings;
+            for (size_t i = first; i < end; ++i)
+            {
+                const auto value = url(id.titleId, parts[i]);
+                wire::require(value.size() < 1025);
+                strings.insert(strings.end(), value.begin(), value.end());
+                strings.push_back(0);
+            }
+            window.data.push_back(116);
+            window.data.push_back(8);
+            wire::raw(window.data, static_cast<uint32_t>(strings.size()));
+            wire::raw(window.data, static_cast<uint32_t>(end - first));
+            window.data.insert(window.data.end(), strings.begin(), strings.end());
+            result.insert(result.end(), window.data.begin(), window.data.end());
+            auto reply = Reply{0, {std::move(result)}, "streaming-part-window-prepared"};
+            reply.detail = " parts=" + std::to_string(parts.size()) + " first=" +
+                           std::to_string(first) + " returned=" + std::to_string(end - first);
+            return reply;
+        }
         if ((service == 50 && (task == 9 || task == 10 || task == 19)) || task == 18)
         {
             const auto file = p.u64();
@@ -1771,11 +1828,22 @@ namespace services
             return std::nullopt;
         const auto data = load(static_cast<uint32_t>(title));
         const auto &rows = data.at("files");
+        // Whole files, summaries and the stored parts of pooled multipart files
+        // (part windows from 50/22 and 58/22 address each part separately).
+        const auto part = [&](const Json &row)
+        {
+            if (row.contains("parts"))
+                for (const auto &entry : row.at("parts"))
+                    if (entry.at("content") == hash)
+                        return &entry;
+            return static_cast<const Json *>(nullptr);
+        };
         if (std::none_of(rows.begin(),
                          rows.end(),
                          [&](const auto &row)
                          {
-                             return row.at("content") == hash || row.at("summary") == hash;
+                             return row.at("content") == hash || row.at("summary") == hash ||
+                                    part(row);
                          }))
             return std::nullopt;
         const auto path = blobPath(static_cast<uint32_t>(title), hash);
@@ -1785,9 +1853,13 @@ namespace services
         if (size > maximumStreamingBody)
             throw std::runtime_error("Streaming blob size invalid");
         for (const auto &row : rows)
+        {
+            const auto *stored = part(row);
             if ((row.at("content") == hash && row.at("size") != size) ||
-                (row.at("summary") == hash && row.at("summary_size") != size))
+                (row.at("summary") == hash && row.at("summary_size") != size) ||
+                (stored && stored->at("size") != size))
                 throw std::runtime_error("Streaming metadata size disagrees with blob");
+        }
         wire::Bytes bytes(static_cast<size_t>(size));
         std::ifstream in(path, std::ios::binary);
         if (!in.read(reinterpret_cast<char *>(bytes.data()),

@@ -49,6 +49,7 @@ add_executable(iw8-dw-server
     src/anticheat_services.cpp
     src/relay_services.cpp
     src/relay_provider.cpp
+    src/content_pack.cpp
 )
 target_compile_features(iw8-dw-server PRIVATE cxx_std_20)
 target_compile_definitions(iw8-dw-server PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0601)
@@ -67,6 +68,15 @@ else()
   target_link_libraries(iw8-session-lease-contract-test PRIVATE OpenSSL::Crypto Threads::Threads)
   target_compile_options(iw8-session-lease-contract-test PRIVATE -Wall -Wextra -Wpedantic)
   target_compile_options(iw8-dw-server PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_executable(iw8-mission-rules-test tools/test-mission-rules.cpp
+    src/quest_services.cpp src/crypto.cpp src/crypto_provider.cpp src/host_os.cpp)
+target_compile_features(iw8-mission-rules-test PRIVATE cxx_std_20)
+target_compile_definitions(iw8-mission-rules-test PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+if(WIN32)
+  target_link_libraries(iw8-mission-rules-test PRIVATE bcrypt)
+else()
+  target_link_libraries(iw8-mission-rules-test PRIVATE OpenSSL::Crypto Threads::Threads)
 endif()
 add_executable(iw8-playlist-contract-test tools/test-playlist-contract.cpp
     src/playlist_catalog.cpp src/crypto.cpp src/crypto_provider.cpp src/host_os.cpp)

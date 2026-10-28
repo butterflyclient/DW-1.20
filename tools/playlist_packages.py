@@ -51,17 +51,15 @@ def inventory(catalog, catalog_bytes, game_directory):
         for directory in (root, root / "zone", root / "main", custom):
             path = directory / (name + ".ff")
             if path.is_file():
-                resolved = path.resolve(strict=True)
-                if not resolved.is_relative_to(root):
+                # Lexical containment: mods/mw120r/maps may be a junction to
+                # another drive (the DW client follows a junctioned parent).
+                if not path.absolute().is_relative_to(root):
                     raise ValueError("Map package escapes the game directory")
-                record = basic_file(resolved, root)
+                record = basic_file(path.absolute(), root)
                 for suffix in (".fp", ".fc"):
                     companion = path.with_suffix(suffix)
                     if companion.is_file():
-                        resolved_companion = companion.resolve(strict=True)
-                        if not resolved_companion.is_relative_to(root):
-                            raise ValueError("Map companion escapes the game directory")
-                        record[suffix[1:]] = basic_file(resolved_companion, root)
+                        record[suffix[1:]] = basic_file(companion.absolute(), root)
                 candidates.append(record)
         primary = candidates[0] if candidates else None
         # Stock packages are IWffa100; zonetool-built custom maps are IWffc100.

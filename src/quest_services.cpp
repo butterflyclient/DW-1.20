@@ -9,6 +9,7 @@
 #include "replay_match_completion.h"
 #include "replay_groundwar_mission_earning.h"
 #include <algorithm>
+#include <optional>
 #include <string_view>
 
 namespace services
@@ -60,6 +61,11 @@ namespace services
                                 replay_kill_data::Sniper.end();
             // Destruction is reported through the same native kill packet.
             // Its flags overlap: a killstreak vehicle satisfies both criteria.
+            // Special weapon IDs from loot/special_weapon_ids.csv: 10000 IAV
+            // turret, 10001 Little Bird, 10002 APC turret, 10003 vehicle crush.
+            if (id == 10036 || id == 10037)
+                return event.targets(ReplayKillTarget::Vehicle) &&
+                       weapon == (id == 10036 ? 10002 : 10000);
             if (id == 10012)
                 return event.targets(ReplayKillTarget::Vehicle);
             if (id == 10013)
@@ -183,6 +189,43 @@ namespace services
             case 10135:
                 return weapon == replay_kill_context::M13 &&
                        event.hasModifier(ReplayKillModifier::Kingslayer);
+            case 1561:
+                // Scavenger (perktable 11 loadout row, 37 base ability): no native
+                // resupply event exists; each enemy killed drops its resupply bag.
+                return event.hasPerk(11) || event.hasPerk(37);
+            case 10002:
+                // Param2 low word packs both selected operators (field_end uses
+                // the same word): high 16 = Coalition, low 16 = Allegiance.
+                // loot/operator_ids.csv: 20013 golem_western.
+                return classification == 5 &&
+                       static_cast<uint16_t>(event.parameters[2] >> 16) == 20013;
+            case 10008:
+                return classification == 5 && event.hasModifier(ReplayKillModifier::Insmoke);
+            // Attachment slots: loot/iw8_pi_golf21_attachment_ids.csv id % 1000 + 1
+            // (ProcessParams 0x140F35980); names from the exported English strings.
+            case 10042:
+                // reflexmini3 (1001014): "Cronen LP945 Mini Reflex".
+                return event.hasModifier(ReplayKillModifier::Pointblank) &&
+                       replay_mp_mission_earning::hasAttachment(event, 15, 15);
+            case 10043:
+                // acog (1001000): "Scout Combat Optic".
+                return event.hasModifier(ReplayKillModifier::Ads) &&
+                       replay_mp_mission_earning::hasAttachment(event, 1, 1);
+            case 1599:
+                // Unsuppressed barrels: barlong, barmid, barshort, barshortnoguard,
+                // barcust, barcust2 (72..77), barcustnoguard (174), barextra (199).
+                return classification == 3 && event.hasModifier(ReplayKillModifier::Longshot) &&
+                       (replay_mp_mission_earning::hasAttachment(event, 72, 77) ||
+                        replay_mp_mission_earning::hasAttachment(event, 174, 174) ||
+                        replay_mp_mission_earning::hasAttachment(event, 199, 199));
+            case 10032:
+                return weapon == 10000;
+            case 10033:
+                return weapon == 10001;
+            case 10034:
+                return weapon == 10002;
+            case 10035:
+                return weapon >= 10000 && weapon <= 10003;
             default:
                 return replay_mp_mission_earning::killProgress(id, event) != 0 ||
                        replay_groundwar_mission_earning::killProgress(id, event) != 0;
@@ -204,8 +247,225 @@ namespace services
             return value;
         }
 
-        uint64_t mpProgress(uint32_t id, const Json &event)
+        // Co-op enemies are AI agents (findenemytype masks); players count too.
+        bool coopEnemy(const ReplayKillEvent &kill)
         {
+            return kill.targets(ReplayKillTarget::Player) || kill.targets(ReplayKillTarget::AgentSoldier) ||
+                   kill.targets(ReplayKillTarget::AgentJuggernaut) ||
+                   kill.targets(ReplayKillTarget::AgentSuicideBomber) ||
+                   kill.targets(ReplayKillTarget::AgentShield);
+        }
+
+        // Co-op operations (gamemode 4, public cp_* allocation). Operators are the
+        // packed Param2 word: high 16 Coalition, low 16 Allegiance
+        // (loot/operator_ids.csv: 20009 otter, 20024 kreuger, 20029 minotavr).
+        uint64_t cpProgress(uint32_t id, const Json &event)
+        {
+            const auto &values = event.at("values");
+            const auto &name = event.at("name");
+            if (name == "cp_complete")
+                return id == 10062;
+            if (name == "assist")
+                return id == 10063 && completeParameters(values, 2);
+            if (name == "killstreak_end" && completeParameters(values, 7))
+            {
+                const auto streakId = number(values, "Param0"), kills = number(values, "Param1");
+                if (streakId < 70000 || streakId > 70032 || kills > UINT32_MAX)
+                    return 0;
+                // loot/killstreak_ids.csv: 70003 precision_airstrike, 70027 sentry_gun.
+                if (id == 10061)
+                    return streakId == 70003 ? kills : 0;
+                if (id == 10065)
+                    return streakId == 70027 ? kills : 0;
+                return id == 10069;
+            }
+            if (name != "kill" || !completeParameters(values, 7))
+                return 0;
+            ReplayKillEvent kill{};
+            for (unsigned index = 0; index < kill.parameters.size(); ++index)
+                kill.parameters[index] = number(values, ("Param" + std::to_string(index)).c_str());
+            const auto weapon = kill.weapon();
+            const auto classification = kill.classification();
+            const auto coalition = static_cast<uint16_t>(kill.parameters[2] >> 16);
+            const auto allegiance = static_cast<uint16_t>(kill.parameters[2]);
+            if (id == 10060)
+                return kill.targets(ReplayKillTarget::Vehicle);
+            if (!coopEnemy(kill))
+                return 0;
+            const auto inList = [weapon](const auto &list)
+            { return std::find(list.begin(), list.end(), weapon) != list.end(); };
+            switch (id)
+            {
+            case 10057:
+                return classification == 65 || inList(replay_kill_data::Sniper) ||
+                       inList(replay_kill_data::Marksman);
+            case 10058:
+                return kill.targets(ReplayKillTarget::AgentJuggernaut) && coalition == 20009;
+            case 10059:
+                return kill.cause() == 21 || kill.hasModifier(ReplayKillModifier::Execution);
+            case 10064:
+                return weapon == 50006 && allegiance == 20029;
+            case 10066:
+                return classification == 129;
+            case 10067:
+                return (weapon == 50004 || weapon == 50017) && allegiance == 20024;
+            case 10068:
+                return kill.hasModifier(ReplayKillModifier::InVehicle) ||
+                       (weapon >= 10000 && weapon <= 10003);
+            default:
+                return 0;
+            }
+        }
+
+        // Stages that count streaks rather than single reports. The journal is
+        // ordered and timestamped server-side; "death" ends a life and
+        // "start_match" ends every streak. Native script rearms its rapid-kill
+        // wait 4 seconds after each kill; minute windows consume their kills.
+        struct Streak
+        {
+            unsigned kind; // 1 rapid chain, 2 kills per life, 3 minute window
+            unsigned count;
+        };
+
+        std::optional<Streak> streak(uint32_t id)
+        {
+            switch (id)
+            {
+            case 1580: case 10041: case 10132: return Streak{1, 2};
+            case 1582: return Streak{1, 3};
+            case 1584: return Streak{1, 4};
+            case 1581: return Streak{2, 5};
+            case 1583: return Streak{2, 10};
+            case 1585: return Streak{2, 15};
+            case 10045: case 10049: return Streak{2, 2};
+            case 10133: return Streak{2, 3};
+            case 10136: return Streak{3, 7};
+            case 10137: case 10140: case 10141: return Streak{3, 3};
+            case 10138: return Streak{3, 4};
+            case 10139: return Streak{3, 2};
+            default: return std::nullopt;
+            }
+        }
+
+        bool streakKill(uint32_t id, const ReplayKillEvent &kill)
+        {
+            if (!kill.targets(ReplayKillTarget::Player) || (kill.classification() & 1) == 0)
+                return false;
+            switch (id)
+            {
+            case 10041:
+                // hybrid, hybrid2, hybrid3, hybrid4 attachment refs (24, 26, 28, 30).
+                return replay_mp_mission_earning::hasAttachment(kill, 24, 24) ||
+                       replay_mp_mission_earning::hasAttachment(kill, 26, 26) ||
+                       replay_mp_mission_earning::hasAttachment(kill, 28, 28) ||
+                       replay_mp_mission_earning::hasAttachment(kill, 30, 30);
+            case 10132: return kill.weapon() == 18; // iw8_ar_falpha, the FR 5.56
+            case 10045: return kill.weapon() == 4; // iw8_pi_mike1911
+            case 10133: return kill.weapon() == 22; // iw8_ar_scharlie, FN Scar 17
+            case 10049:
+                return kill.classification() == 129 && kill.hasModifier(ReplayKillModifier::Headshot);
+            case 10137: return kill.hasModifier(ReplayKillModifier::Headshot);
+            case 10138: return kill.hasModifier(ReplayKillModifier::Longshot);
+            case 10139:
+                return kill.cause() == 21 || kill.hasModifier(ReplayKillModifier::Execution);
+            case 10140: return kill.hasModifier(ReplayKillModifier::Quickscope);
+            case 10141: return kill.hasModifier(ReplayKillModifier::Pointblank);
+            default: return true;
+            }
+        }
+
+        uint64_t trackedProgress(uint32_t id, const Json &event, Json &state)
+        {
+            const auto rule = streak(id);
+            if (!rule)
+                return 0;
+            const auto &name = event.at("name");
+            auto tracker = state.value("tracker", Json::object());
+            wire::require(tracker.is_object());
+            const auto timestamp = number(event, "timestamp");
+            uint64_t increment = 0;
+            if (name == "start_match" || name == "death")
+            {
+                tracker["life"] = uint64_t{0};
+                tracker["chain"] = uint64_t{0};
+                if (name == "start_match")
+                    tracker["window"] = Json::array();
+            }
+            else if (name == "kill" && completeParameters(event.at("values"), 7))
+            {
+                ReplayKillEvent kill{};
+                for (unsigned index = 0; index < kill.parameters.size(); ++index)
+                    kill.parameters[index] =
+                        number(event.at("values"), ("Param" + std::to_string(index)).c_str());
+                if (!streakKill(id, kill))
+                    return 0;
+                if (rule->kind == 1)
+                {
+                    const auto chain = number(tracker, "chain");
+                    const auto last = number(tracker, "chainAt");
+                    const auto next =
+                        chain && timestamp >= last && timestamp - last <= 4 ? chain + 1 : uint64_t{1};
+                    tracker["chain"] = next;
+                    tracker["chainAt"] = timestamp;
+                    increment = next == rule->count;
+                }
+                else if (rule->kind == 2)
+                {
+                    const auto life = number(tracker, "life") + 1;
+                    tracker["life"] = life;
+                    increment = life == rule->count;
+                }
+                else
+                {
+                    Json window = Json::array();
+                    for (const auto &value : tracker.value("window", Json::array()))
+                        if (value.is_number_unsigned() && value.get<uint64_t>() + 60 > timestamp &&
+                            value.get<uint64_t>() <= timestamp)
+                            window.push_back(value);
+                    window.push_back(timestamp);
+                    if (window.size() >= rule->count)
+                    {
+                        increment = 1;
+                        window = Json::array();
+                    }
+                    wire::require(window.size() <= 16);
+                    tracker["window"] = std::move(window);
+                }
+            }
+            else
+                return 0;
+            state["tracker"] = std::move(tracker);
+            return increment;
+        }
+
+        uint64_t mpProgress(uint32_t id, const Json &event, Json &state)
+        {
+            if (streak(id))
+                return trackedProgress(id, event, state);
+            if (id == 1567)
+            {
+                // Kill Chain (mp/perktable.csv row 10, icon_perk_kill_chain): the
+                // terminal killstreak report carries kills but no loadout, so the
+                // perk set comes from this player's latest kill packet (Param4).
+                const auto &values = event.at("values");
+                if (event.at("name") == "kill" && completeParameters(values, 7))
+                {
+                    ReplayKillEvent kill{};
+                    for (unsigned index = 0; index < kill.parameters.size(); ++index)
+                        kill.parameters[index] = number(values, ("Param" + std::to_string(index)).c_str());
+                    auto tracker = state.value("tracker", Json::object());
+                    tracker["killChain"] = kill.hasPerk(10);
+                    state["tracker"] = std::move(tracker);
+                    return 0;
+                }
+                if (event.at("name") == "killstreak_end" && completeParameters(values, 7) &&
+                    state.value("tracker", Json::object()).value("killChain", false))
+                {
+                    const auto streakId = number(values, "Param0"), kills = number(values, "Param1");
+                    return streakId >= 70000 && streakId <= 70032 && kills <= UINT32_MAX ? kills : 0;
+                }
+                return 0;
+            }
             const auto &values = event.at("values");
             const auto &name = event.at("name");
             if ((name == "capture" || name == "plant" || name == "defuse") &&
@@ -234,6 +494,12 @@ namespace services
                 // Count that amount, rather than treating each use as one heal.
                 return counter(values, "Param0");
             }
+            // Dedicated native "stun" and "hack" achievement events (upload dvars
+            // NLRLNKNTTN / LRRLSLKRLM default on): one report per affected target.
+            if (id == 1554 && name == "stun")
+                return 1;
+            if (id == 1564 && name == "hack")
+                return 1;
             if (event.at("name") == "kill" && completeParameters(values, 7))
                 return killMatches(id, values) ? uint64_t{1} : uint64_t{0};
             if (name == "field_end" && completeParameters(values, 3))
@@ -259,8 +525,13 @@ namespace services
                 ReplayKillEvent kill{};
                 for (unsigned index = 0; index < kill.parameters.size(); ++index)
                     kill.parameters[index] = number(values, ("Param" + std::to_string(index)).c_str());
-                if (!kill.targets(ReplayKillTarget::Player) ||
-                    kill.gameType() != ReplayChallengeGameType::br)
+                if (kill.gameType() != ReplayChallengeGameType::br)
+                    return 0;
+                // A destroyed vehicle with an enemy aboard (one report per vehicle).
+                if (id == 50020 || id == 50056 || id == 50087)
+                    return kill.targets(ReplayKillTarget::Vehicle) &&
+                           kill.hasModifier(ReplayKillModifier::VictimInVehicle);
+                if (!kill.targets(ReplayKillTarget::Player))
                     return 0;
                 switch (id)
                 {
@@ -273,6 +544,9 @@ namespace services
                 // establish an active first circle and earns no early kill.
                 case 50041: return kill.circleIndex() == 0;
                 case 50073: return kill.hasModifier(ReplayKillModifier::VictimLastStand);
+                case 50013:
+                case 50045:
+                case 50080: return kill.hasModifier(ReplayKillModifier::InVehicle);
                 default: return replay_br_cp_mission_earning::killMatches(id, kill);
                 }
             }
@@ -501,18 +775,32 @@ namespace services
             const auto &event = events[index];
             const auto &values = event.at("values");
             const auto timestamp = number(event, "timestamp");
-            if (event.at("name") != "kill" || !contexts[index].category ||
-                *contexts[index].category != 0 || number(values, "gamemode") != 2 ||
-                number(values, "version") != 1 || !completeParameters(values, 7) ||
-                timestamp > now)
+            // Daily kinds: 12 MP (gamemode 2), 27 BR (8/24), 30 co-op (4). The
+            // owner's public allocation category must match the event family.
+            const auto mode = number(values, "gamemode");
+            const unsigned category = mode == 2 ? 0u : mode == 4 ? 4u : (mode == 8 || mode == 24) ? 1u : 9u;
+            if (!contexts[index].category || *contexts[index].category != category ||
+                number(values, "version") != 1 || timestamp > now)
                 continue;
-            ReplayKillEvent kill{};
-            for (unsigned slot = 0; slot < kill.parameters.size(); ++slot)
-                kill.parameters[slot] = number(values, ("Param" + std::to_string(slot)).c_str());
-            if (!kill.targets(ReplayKillTarget::Player))
+            const auto &name = event.at("name");
+            std::optional<ReplayKillEvent> kill;
+            if (name == "kill" && completeParameters(values, 7))
+            {
+                kill.emplace();
+                for (unsigned slot = 0; slot < kill->parameters.size(); ++slot)
+                    kill->parameters[slot] = number(values, ("Param" + std::to_string(slot)).c_str());
+            }
+            const ReplayKioskPurchase *purchase = nullptr;
+            if (name == "buy_item" && completeParameters(values, 3))
+                purchase = ReplayBuyItemEvent{{number(values, "Param0"), number(values, "Param1"),
+                                               number(values, "Param2")}}.purchase();
+            if (!kill && !purchase)
                 continue;
             for (const auto &definition : replayDailyChallenges)
             {
+                const unsigned kindCategory = definition.kind == 12 ? 0u : definition.kind == 27 ? 1u : 4u;
+                if (kindCategory != category)
+                    continue;
                 auto *state = find(result.states, definition.id);
                 if (!state || definition.criterion == ReplayDailyCriterion::Pending ||
                     number(*state, "status") != 1 || number(*state, "dailyCycle") != now / 86400 ||
@@ -520,9 +808,34 @@ namespace services
                     timestamp >= number(*state, "expirationTimestamp") ||
                     contexts[index].activationCutoff < number(*state, "activationTimestamp"))
                     continue;
-                const bool matches = definition.criterion == ReplayDailyCriterion::PlayerKill ||
-                    (definition.criterion == ReplayDailyCriterion::Headshot && kill.cause() == 9) ||
-                    (definition.criterion == ReplayDailyCriterion::Melee && kill.cause() == 8);
+                const bool playerKill = kill && kill->targets(ReplayKillTarget::Player);
+                const bool coopKill = kill && coopEnemy(*kill);
+                bool matches = false;
+                switch (definition.criterion)
+                {
+                case ReplayDailyCriterion::PlayerKill: matches = playerKill; break;
+                case ReplayDailyCriterion::Headshot: matches = playerKill && kill->cause() == 9; break;
+                case ReplayDailyCriterion::Melee: matches = playerKill && kill->cause() == 8; break;
+                case ReplayDailyCriterion::BuyMunitionsBox:
+                    matches = purchase && purchase->id == ReplayKioskItem::SuperAmmoDrop;
+                    break;
+                case ReplayDailyCriterion::BuyKillstreak:
+                    matches = purchase && purchase->category == ReplayKioskCategory::Killstreak;
+                    break;
+                case ReplayDailyCriterion::BuyLoadoutDrop:
+                    matches = purchase && purchase->id == ReplayKioskItem::SupplyDrop;
+                    break;
+                case ReplayDailyCriterion::CoopAssaultRifleKill:
+                    matches = coopKill && kill->classification() == 3;
+                    break;
+                case ReplayDailyCriterion::CoopAssaultRifleHeadshot:
+                    matches = coopKill && kill->classification() == 3 && kill->cause() == 9;
+                    break;
+                case ReplayDailyCriterion::CoopSmgKill:
+                    matches = coopKill && kill->classification() == 5;
+                    break;
+                case ReplayDailyCriterion::Pending: break;
+                }
                 if (!matches)
                     continue;
                 const auto before = number(*state, "progress");
@@ -589,11 +902,12 @@ namespace services
     {
         // Keep admission beside the earning rules. The achievement transport
         // must not maintain a separate list that silently drops a new family.
-        static constexpr std::array<std::string_view, 21> supported = {
+        static constexpr std::array<std::string_view, 27> supported = {
             "kill", "stim", "pickup", "driving", "alive_in_gas", "alive_not_downed",
             "revive", "gulag_end_match", "ping", "contract_start", "contract_end",
             "use_item", "loadout", "capture", "plant", "defuse", "buy_item",
-            "field_end", "killstreak_end", "end_match", "match_placement"};
+            "field_end", "killstreak_end", "end_match", "match_placement",
+            "death", "start_match", "stun", "hack", "assist", "cp_complete"};
         return std::find(supported.begin(), supported.end(), std::string_view(name)) != supported.end();
     }
 
@@ -622,9 +936,9 @@ namespace services
             // The original AddGamemode emits 2 for MP, 8/24 for BR. Neither
             // client gamemode nor a public-looking name proves lobby membership.
             const auto mode = number(values, "gamemode");
-            if (number(values, "version") != 1 || (mode != 2 && mode != 8 && mode != 24))
+            if (number(values, "version") != 1 || (mode != 2 && mode != 4 && mode != 8 && mode != 24))
                 continue;
-            const auto category = mode == 2 ? 0u : 1u;
+            const auto category = mode == 2 ? 0u : mode == 4 ? 4u : 1u;
             if (category != *publicCategory)
                 continue;
             std::vector<uint32_t> active;
@@ -664,8 +978,14 @@ namespace services
                             {number(values, "Param0"), number(values, "Param1"), number(values, "Param2")});
                 }
                 else
+                {
+                    const auto trackerBefore = state.value("tracker", Json());
                     increment = category == 1 ? brProgress(identity, event, state)
-                        : mpProgress(identity, event);
+                        : category == 4           ? cpProgress(identity, event)
+                                                  : mpProgress(identity, event, state);
+                    if (state.value("tracker", Json()) != trackerBefore)
+                        result.stateChanged = true;
+                }
                 if (!increment && oldRemainder == number(state, "timerRemainderMs"))
                     continue;
                 const auto total = before + std::min(increment, uint64_t{row.target} - before);

@@ -37,9 +37,10 @@ namespace replay_mp_mission_earning
         switch (id)
         {
         case 1516:
-            // Native attachment refs silencer, silencer2, silencer3,
-            // silencer4. Barrel variants require their own retained mapping.
-            return hasAttachment(event, 35, 37) || hasAttachment(event, 184, 184);
+            // Slots are loot/iw8_pi_golf21_attachment_ids.csv id % 1000 + 1:
+            // silencer..silencer3 (35..37), silencer4 (184) and the integrally
+            // suppressed barrels barsil/barsil2 (185, 186).
+            return hasAttachment(event, 35, 37) || hasAttachment(event, 184, 186);
         case 1601:
             return event.cause() == 8 && hasAttachment(event, 120, 120);
         case 1602:

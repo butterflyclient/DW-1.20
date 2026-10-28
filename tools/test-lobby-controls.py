@@ -248,6 +248,14 @@ def main():
     names += ("replay_rva_00f6eb20", "replay_rva_021367b0")
     names += ("replay_rva_0118e960", "replay_rva_0118fdc0", "replay_rva_01191980",
               "replay_rva_010d23e0", "replay_rva_0118cf60")
+    # Tutorial-flag binding natives not already named above (lua_gettop/isnumber/
+    # luaL_error/pushstring/settop and Com_Printf share the existing entries).
+    tutorial_names = ("replay_rva_019ce9b0", "replay_rva_02083e80", "replay_rva_00d66c20",
+                      "replay_rva_012a1830", "replay_rva_012a1eb0", "replay_rva_015c7940",
+                      "replay_rva_01acb360")
+    names += tutorial_names
+    tutorial = dict(active=False, stack=[], errors=0, printed=[], reads=[], available=True,
+                    flags={"mpTutorialLevel": 0, "mpTutorialLevel2": 0}, buffer=None)
     map_integer_domains = {
         "replay_dw_mapVoteCycle": 0x7FFFFFFF,
         "replay_dw_mapVoteRemainingMs": 30000,
@@ -300,7 +308,61 @@ def main():
             "replay_rva_01528420": "systemlink",
             "replay_rva_010cc6f0": "playlist_bots",
         }
-        if name == "sdk_ready":
+        if tutorial["active"] and (name in tutorial_names or name in (
+                "replay_rva_020838b0", "func_1420839E0", "func_142089FB0",
+                "func_142084120", "replay_rva_02084790", "Com_Printf")):
+            lua_stack = tutorial["stack"]
+
+            def slot(index):
+                index = index - (1 << 32) if index & 0x80000000 else index
+                return lua_stack[index - 1] if index > 0 else lua_stack[index]
+
+            if name == "replay_rva_020838b0":
+                returned(len(lua_stack))
+            elif name == "func_1420839E0":
+                returned(int(isinstance(slot(values[1] & 0xFFFFFFFF), int)))
+            elif name == "func_142089FB0":
+                tutorial["errors"] += 1
+                returned(0)
+            elif name == "replay_rva_019ce9b0":
+                returned(slot(values[1] & 0xFFFFFFFF) & 0xFFFFFFFF)
+            elif name == "func_142084120":
+                lua_stack.append(string(values[1]))
+                returned()
+            elif name == "replay_rva_02084790":
+                assert values[1] & 0xFFFFFFFF == (-2 & 0xFFFFFFFF)
+                lua_stack.pop()
+                returned()
+            elif name == "replay_rva_02083e80":
+                lua_stack.append(bool(values[1] & 0xFFFFFFFF))
+                returned()
+            elif name == "replay_rva_00d66c20":
+                assert values[0] & 0xFFFFFFFF == 0
+                returned(3)
+            elif name == "replay_rva_012a1830":
+                assert values[0] & 0xFFFFFFFF == 3
+                assert string(values[1]) == "LUI_CoD_LuaCall_IsTutorialCompleted_impl"
+                returned()
+            elif name == "replay_rva_012a1eb0":
+                assert values[0] & 0xFFFFFFFF == 0
+                returned(1)
+            elif name == "replay_rva_015c7940":
+                assert [values[1] & 0xFFFFFFFF, values[2] & 0xFFFFFFFF, values[3] & 0xFFFFFFFF] == [0, 1, 0]
+                tutorial["buffer"] = values[0]
+                write(values[0] + 0x10, arena + 0xD000, "<Q")
+                returned(int(tutorial["available"]))
+            elif name == "replay_rva_01acb360":
+                rsp = machine.reg_read(UC_X86_REG_RSP)
+                assert [values[1] & 0xFFFFFFFF, values[2], values[3]] == [1, arena + 0xD000, tutorial["buffer"]]
+                assert read(rsp + 40, "<I") == 0
+                member = lua_stack[-1]
+                tutorial["reads"].append(member)
+                lua_stack.append(tutorial["flags"][member])
+                returned()
+            else:
+                tutorial["printed"].append(string(values[1]))
+                returned()
+        elif name == "sdk_ready":
             assert values[0] == arena + 0xC200
             returned(1)
         elif name == "replay_rva_00f6eb20":
@@ -944,6 +1006,44 @@ def main():
     )
     checks.append(
         "Native bundle price binding zeros regular, sale and smart costs only for DW; other columns/tables, missing rows, non-DW calls and Lua arity retain their original behavior"
+    )
+
+    def tutorial_read(flag):
+        tutorial.update(active=True, stack=[0, flag], errors=0, printed=[], reads=[], buffer=None)
+        results = run("func_1419F73C0")
+        tutorial["active"] = False
+        assert tutorial["errors"] == 0, flag
+        return results, tutorial["stack"][2:], tutorial["reads"]
+
+    settings["enabled"] = True
+    presentation = (23, 24, 25, 26, 27, 28, 42, 33, 40, 44)
+    for flag in presentation:
+        assert tutorial_read(flag) == (1, [True], []), flag
+    for key in ("lui_dwIntroVideos", "lui_dwTutorialPrompts"):
+        write(registered[key] + 40, 1, "<B")
+    for flag in presentation:
+        member = "mpTutorialLevel" if flag < 32 else "mpTutorialLevel2"
+        assert tutorial_read(flag) == (1, [False], [member]), flag
+    tutorial["flags"].update(mpTutorialLevel=1 << 25, mpTutorialLevel2=1 << (42 - 32))
+    assert tutorial_read(25) == (1, [True], ["mpTutorialLevel"])
+    assert tutorial_read(42) == (1, [True], ["mpTutorialLevel2"])
+    assert tutorial_read(26) == (1, [False], ["mpTutorialLevel"])
+    for key in ("lui_dwIntroVideos", "lui_dwTutorialPrompts"):
+        write(registered[key] + 40, 0, "<B")
+    tutorial["flags"].update(mpTutorialLevel=1 << 21, mpTutorialLevel2=0)
+    assert tutorial_read(21) == (1, [True], ["mpTutorialLevel"])
+    assert tutorial_read(35) == (1, [False], ["mpTutorialLevel2"])
+    settings["enabled"] = False
+    assert tutorial_read(25) == (1, [False], ["mpTutorialLevel"])
+    settings["enabled"] = True
+    tutorial["available"] = False
+    assert tutorial_read(21) == (0, [], [])
+    assert tutorial["printed"] == ["Tried to set PlayerData before we have downloaded player stats - %s\n"]
+    tutorial["available"] = True
+    checks.append(
+        "Native tutorial-flag binding reports disabled season/Magma videos and Warzone prompts as completed without "
+        "reading or writing player data; enabled dvars, other flags and non-DW calls keep the original "
+        "mpTutorialLevel/mpTutorialLevel2 bit reads, stats-not-ready warning and Lua stack"
     )
     assert set(map_integer_domains) | set(map_boolean_names) <= set(registered)
     for key in map_integer_domains:

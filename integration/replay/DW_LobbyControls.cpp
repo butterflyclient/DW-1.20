@@ -60,6 +60,16 @@ extern "C"
     void replay_rva_02084510(void *, int, const char *); // lua_setfield
     void replay_rva_02084790(void *, int);               // lua_settop
     unsigned replay_rva_0148fce0();                      // Sys_Milliseconds
+    int replay_rva_020839e0(void *, int);                // lua_isnumber
+    int replay_rva_02089fb0(void *, const char *, ...);  // luaL_error
+    int replay_rva_019ce9b0(void *, int);                // lui_tointeger32
+    void replay_rva_02084120(void *, const char *);      // lua_pushstring
+    void replay_rva_02083e80(void *, int);               // lua_pushboolean
+    int replay_rva_00d66c20(int);                        // CL_Mgr_GetClientFromController
+    void replay_rva_012a1830(int, const char *);         // LiveStorage_EnsureMaySetPersistentData
+    int replay_rva_012a1eb0(int);                        // LiveStorage_GetActiveStatsSource
+    bool replay_rva_015c7940(void *, int, int, int);     // CL_PlayerData_GetDDLBuffer
+    void replay_rva_01acb360(void *, int, void *, void *, int); // LUI PlayerData member read
 }
 
 #include "DW_MapVoting.h"
@@ -85,6 +95,7 @@ namespace
     };
     dvar_t *s_start{}, *s_bots{}, *s_botCount{};
     dvar_t *s_autoFill{}, *s_autoActive{}, *s_autoComplete{}, *s_autoTarget{}, *s_autoRevision{}, *s_autoAck{};
+    dvar_t *s_introVideos{}, *s_tutorialPrompts{};
     bool s_started = false, s_filled = false;
     unsigned s_luaPoll = 0;
     cmd_function_s s_fillCommand{};
@@ -487,10 +498,10 @@ extern "C" void DW_LobbyControls_Frame()
             "replay_dw_botCount", 0, 0, 199, 0, "DW operator number of native bots to add");
         s_autoFill = Dvar_RegisterBool("replay_dw_autoFillBots", false, 0,
                                       "Fill eligible lobby slots with native bots before starting");
-        Dvar_RegisterBool("lui_dwIntroVideos", false, 0,
-                          "Automatically show seasonal and mode introduction videos");
-        Dvar_RegisterBool("lui_dwTutorialPrompts", false, 0,
-                          "Automatically prompt for Warzone introduction and training");
+        s_introVideos = Dvar_RegisterBool("lui_dwIntroVideos", false, 0,
+                                          "Automatically show seasonal and mode introduction videos");
+        s_tutorialPrompts = Dvar_RegisterBool("lui_dwTutorialPrompts", false, 0,
+                                              "Automatically prompt for Warzone introduction and training");
         s_autoActive = Dvar_RegisterBool("replay_dw_autoFillBotsActive", false, 0,
                                         "Authoritative DW automatic bot fill state");
         s_autoComplete = Dvar_RegisterBool("replay_dw_autoFillBotsComplete", false, 0,
@@ -801,6 +812,87 @@ extern "C" uint64_t func_14119E3D0(void *party, const void *activeClient)
 extern "C" bool DW_LobbyControls_AutoFillEnabled()
 {
     return s_autoFill && s_autoFill->current.enabled;
+}
+
+namespace
+{
+    // Stock ui/utils/onboarding.lua flag numbers read by automatic presentation.
+    bool PresentationSuppressed(int tutorial)
+    {
+        const dvar_t *preference = nullptr;
+        if ((tutorial >= 23 && tutorial <= 28) || tutorial == 42)
+            preference = s_introVideos; // SEASON1..6_WATCH_FLAG, MAGMA_WATCHED_FLAG
+        else if (tutorial == 33 || tutorial == 40 || tutorial == 44)
+            preference = s_tutorialPrompts; // WARZONE_INTRODUCTION, _TUTORIAL_GAMEPLAY_INITIATED, PLUNDERTUTORIAL
+        else
+            return false;
+        return DW_LocalBackend_IsEnabled() && !(preference && preference->current.enabled);
+    }
+
+    // CL_PlayerData_GetDDLBuffer output: the original frame's 0x30-byte window.
+    struct PlayerDataBuffer
+    {
+        uint8_t header[0x10];
+        void *ddl;
+        uint8_t tail[0x18];
+    };
+} // namespace
+
+// Complete shipped Engine tutorial-flag binding (LUI_CoD_LuaCall_IsTutorialCompleted_impl).
+// After a match the frontend VM is replaced and the stock main menu runs its
+// season video/reward sequence while it is built, before any Lua-side wrapper
+// can be installed; a wrapper installed later also hid the real flag from the
+// video's completion callback, so the saved flag was never set and the video
+// repeated after every match. Disabled presentation flags therefore read as
+// completed here, from the first frame. Saved flags and MarkCompleted are
+// untouched; enabling the dvars restores the original reads.
+extern "C" int func_1419F73C0(void *lua)
+{
+    constexpr const char *caller = "LUI_CoD_LuaCall_IsTutorialCompleted_impl";
+    if (replay_rva_020838b0(lua) != 2)
+        replay_rva_02089fb0(lua, "");
+    if (!replay_rva_020839e0(lua, 1))
+        replay_rva_02089fb0(lua, "");
+    if (!replay_rva_020839e0(lua, 2))
+        replay_rva_02089fb0(lua, "");
+    const int controller = replay_rva_019ce9b0(lua, 1);
+    int tutorial = replay_rva_019ce9b0(lua, 2);
+    if (tutorial >= 64)
+        replay_rva_02089fb0(lua, "");
+    int results = 0;
+    if (PresentationSuppressed(tutorial))
+    {
+        replay_rva_02083e80(lua, 1);
+        results = 1;
+    }
+    else
+    {
+        replay_rva_012a1830(replay_rva_00d66c20(controller), caller);
+        PlayerDataBuffer buffer{};
+        if (!replay_rva_015c7940(&buffer, controller, replay_rva_012a1eb0(controller), 0))
+            Com_Printf(14, "Tried to set PlayerData before we have downloaded player stats - %s\n", caller);
+        else
+        {
+            const char *member = "mpTutorialLevel";
+            if (tutorial > 31)
+            {
+                tutorial -= 32;
+                member = "mpTutorialLevel2";
+            }
+            replay_rva_02084120(lua, member);
+            replay_rva_01acb360(lua, 1, buffer.ddl, &buffer, 0);
+            if (!replay_rva_020839e0(lua, -1))
+                replay_rva_02089fb0(lua, "");
+            const unsigned bits = unsigned(replay_rva_019ce9b0(lua, -1));
+            replay_rva_02084790(lua, -2);
+            replay_rva_02084790(lua, -2);
+            replay_rva_02083e80(lua, int((bits >> (unsigned(tutorial) & 31)) & 1));
+            results = 1;
+        }
+    }
+    if (results > replay_rva_020838b0(lua))
+        replay_rva_02089fb0(lua, "");
+    return results;
 }
 
 extern "C" int DW_MapVoting_UIState(char *buffer, unsigned capacity)

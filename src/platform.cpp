@@ -731,6 +731,43 @@ namespace platform
         }
     } // namespace
 
+    std::array<uint8_t, 256> signDigest(std::span<const uint8_t> digest, unsigned saltBytes)
+    {
+        if (!key || digest.size() != 32 || saltBytes > 32)
+            throw std::runtime_error("Platform digest signature unavailable");
+        std::array<uint8_t, 256> signature{};
+        BCRYPT_PSS_PADDING_INFO padding{BCRYPT_SHA256_ALGORITHM, saltBytes};
+        unsigned long written = 0;
+        check(BCryptSignHash(key,
+                             &padding,
+                             const_cast<unsigned char *>(digest.data()),
+                             static_cast<unsigned long>(digest.size()),
+                             signature.data(),
+                             static_cast<unsigned long>(signature.size()),
+                             &written,
+                             BCRYPT_PAD_PSS),
+              "digest signature");
+        if (written != signature.size())
+            throw std::runtime_error("Signature length mismatch");
+        return signature;
+    }
+
+    bool verifyDigest(std::span<const uint8_t> digest,
+                      std::span<const uint8_t> signature,
+                      unsigned saltBytes)
+    {
+        if (!key || digest.size() != 32 || signature.size() != 256 || saltBytes > 32)
+            return false;
+        BCRYPT_PSS_PADDING_INFO padding{BCRYPT_SHA256_ALGORITHM, saltBytes};
+        return BCryptVerifySignature(key,
+                                     &padding,
+                                     const_cast<unsigned char *>(digest.data()),
+                                     static_cast<ULONG>(digest.size()),
+                                     const_cast<unsigned char *>(signature.data()),
+                                     static_cast<ULONG>(signature.size()),
+                                     BCRYPT_PAD_PSS) >= 0;
+    }
+
     void initialize(const std::filesystem::path &directory)
     {
         identityDirectory = std::filesystem::absolute(directory);

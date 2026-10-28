@@ -1,0 +1,20 @@
+{
+  "available_maps": [
+    "mp_aniyah_tac",
+    "mp_backlot2",
+    "mp_donetsk",
+    "mp_emporium",
+    "mp_hideout",
+    "mp_m_fork",
+    "mp_m_king",
+    "mp_m_speed",
+    "mp_m_speedball",
+    "mp_nuketown",
+    "mp_rust",
+    "mp_shipment",
+    "mp_village2"
+  ],
+  "minimum_players": 2,
+  "split_parties_for_team_balance": true,
+  "minimum_lobby_seconds": 60
+}

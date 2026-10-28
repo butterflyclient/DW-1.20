@@ -1,0 +1,17 @@
+{
+  "id": "weapon",
+  "name": "MENU/BUNDLE_TYPE_WEAPON",
+  "order": 2,
+  "layoutType": 3,
+  "asset": "mw_store_billboard_royal_armory_i",
+  "numItemsShown": 18,
+  "idPubVar": "online_store_category_6",
+  "timerPubVar": "online_store_featured_timer",
+  "items": [
+    {
+      "order": 0,
+      "layoutOnlyItem": true,
+      "usesFirstPartyStore": false
+    }
+  ]
+}

@@ -6,6 +6,25 @@ The repository contains the C++ server, Replay client integration, configuration
 
 ## Local play on Windows (server and game on the same PC)
 
+### Quick start (one command)
+
+With the build tools from step 1 and Python 3.10+ installed, double-click
+**`Run_Replay_DW_Local_Server.cmd`** in the source folder, or run:
+
+```powershell
+.\Host-Local-Server.ps1 -GameDirectory 'C:\Games\Replay'
+```
+
+It builds the server if needed, starts it with the full feature set the primary
+server has (Store, Battle Pass, playlists, leaderboards, publisher content,
+marketing, achievements, QoS/relay; see `content/`), detects your installed maps,
+creates or refreshes your local client (after a production EXE update or a server
+key change), and launches the game. The game folder is remembered. `-Stop` stops
+the server; `-NoLaunch` only prepares it. The dashboard is
+`http://127.0.0.1:8085/stats`; the script prints its operator key.
+
+The manual steps below do the same thing one at a time.
+
 These steps build the **backend server** and connect an existing compatible DW client to it. You need a matching Replay 1.20 game installation and DW client package from your package provider. This source download does not include the game, and building the server does not create the game executable.
 
 The client embeds trusted server public keys. Step 6 creates a separate local client using **your server's public key**, without rebuilding the game or changing the original client. You still need an existing compatible DW client and its game assets. Never copy production private keys into a local server.
@@ -54,7 +73,7 @@ From the same source folder, run:
 .\build\Release\iw8-dw-server.exe .\data\local-play
 ```
 
-Leave this PowerShell window open. The server creates its own local accounts, keys, logs, and saved state in `data\local-play`. With no `network.json` in that folder, it uses loopback networking for this PC. Keep this folder between sessions so your server identity and progress persist; do not copy another server's runtime data into it.
+Leave this PowerShell window open. The server installs the published content in `content\` on first start (and newer pack revisions later, without overwriting files you changed), then creates its own local accounts, keys, logs, and saved state in `data\local-play`. With no `network.json` in that folder, it uses loopback networking for this PC. Keep this folder between sessions so your server identity and progress persist; do not copy another server's runtime data into it.
 
 This command runs the local executable directly. It does not publish to or control the project's remote server. The separate `start-server.ps1` helper can select remote administration when `data/primary-backend.json` exists, so it is not used in this walkthrough.
 

@@ -862,30 +862,17 @@ def main():
         panel.featuredButtonWidgets[3].RefreshModel()
         assert(panel.featuredButtonWidgets[3].GamemodeName:getText()=="BR STIMULUS SOLOS")
         results[#results+1]="Original Warzone SetupFeaturedButtons selects BRFeatureButton and the third tile repairs cached and subsequent names while neighboring titles stay unchanged"
-        assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==true)
-        assert(Onboarding.MagmaVideo.WasCompleted(nil,0)==true)
-        assert(Onboarding.WARZONE_INTRODUCTION.WasCompleted(nil,0)==true)
-        assert(Onboarding.WARZONE_TUTORIAL_GAMEPLAY_INITIATED.WasCompleted(nil,0)==true)
-        assert(Onboarding.Plunder.WasCompleted(nil,0)==true)
-        assert(OnboardingNativeReads==0 and OnboardingNativeWrites==0)
-        IntroPreferences.lui_dwIntroVideos=true
-        IntroPreferences.lui_dwTutorialPrompts=true
-        assert(Onboarding.SeasonVideo.WasCompleted(nil,0,3)==false)
-        assert(Onboarding.MagmaVideo.WasCompleted(nil,0)==false)
-        assert(Onboarding.WARZONE_INTRODUCTION.WasCompleted(nil,0)==false)
-        assert(Onboarding.WARZONE_TUTORIAL_GAMEPLAY_INITIATED.WasCompleted(nil,0)==false)
-        assert(Onboarding.Plunder.WasCompleted(nil,0)==false)
-        assert(OnboardingNativeReads==5 and OnboardingNativeWrites==0)
-        IntroPreferences.lui_dwIntroVideos=false
-        IntroPreferences.lui_dwTutorialPrompts=false
-        local stage=Onboarding.MagmaVideo
-        local current=stage.WasCompleted
+        local stages={"SeasonVideo","MagmaVideo","WARZONE_INTRODUCTION","WARZONE_TUTORIAL_GAMEPLAY_INITIATED","Plunder"}
+        local stock={}
+        for _,name in ipairs(stages) do stock[name]=Onboarding[name].WasCompleted end
         MenuBuilder.m_types.replaydwplaylistfillstate().Refresh()
-        assert(stage.WasCompleted==current)
-        stage.WasCompleted=function() return false end
-        MenuBuilder.m_types.replaydwplaylistfillstate().Refresh()
-        assert(stage.WasCompleted(nil,0)==true)
-        results[#results+1]="Automatic season/mode videos and BR tutorial prompts default off; enabling their dvars delegates to original onboarding checks without changing saved flags, and reloaded stages are repaired idempotently"
+        local reads=OnboardingNativeReads
+        for _,name in ipairs(stages) do
+            assert(Onboarding[name].WasCompleted==stock[name])
+            assert(Onboarding[name].WasCompleted(nil,0,3)==false)
+        end
+        assert(OnboardingNativeReads==reads+#stages and OnboardingNativeWrites==0)
+        results[#results+1]="Stock onboarding stages stay unwrapped across refreshes; their reads go straight to the native tutorial-flag binding, which owns the DW presentation gate from a reloaded VM's first frame"
         local retained={}
         local retiredCalls=0
         local function guardTree(node)

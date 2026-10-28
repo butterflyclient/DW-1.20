@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -26,6 +27,7 @@
 #include "objectstore_services.h"
 #include "qos_provider.h"
 #include "content_services.h"
+#include "content_pack.h"
 #include "relay_services.h"
 #include "relay_provider.h"
 #include "network.h"
@@ -1118,6 +1120,23 @@ namespace
 
 int main(int argc, char **argv)
 {
+    // Content-pack switches are independent of the positional forms below.
+    std::optional<std::filesystem::path> contentRoot;
+    bool contentDisabled = false;
+    std::vector<char *> arguments;
+    for (int i = 0; i < argc; ++i)
+    {
+        const std::string value = argv[i];
+        if (i > 1 && value == "--content-pack" && i + 1 < argc)
+            contentRoot = argv[++i];
+        else if (i > 1 && value == "--no-content-pack")
+            contentDisabled = true;
+        else
+            arguments.push_back(argv[i]);
+    }
+    argc = static_cast<int>(arguments.size());
+    arguments.push_back(nullptr);
+    argv = arguments.data();
     std::filesystem::path directory = argc > 1 ? argv[1] : "data";
     if (argc == 4 && std::string(argv[2]) == "--inspect-relay-client-token")
     {
@@ -1171,6 +1190,23 @@ int main(int argc, char **argv)
             platform::provisionProfile(directory, argv[3], argv[4]);
             log("PLATFORM additional persistent local identity provisioned");
             return 0;
+        }
+        // Published content (Store, Battle Pass, playlists, leaderboards, publisher
+        // objects/variables, marketing, QoS/relay switches) from content/<pack>/.
+        // Disposable fixture servers (--port-offset) start empty unless a pack
+        // is named explicitly, so their isolated assertions stay unchanged.
+        // Identity provisioning (--provision) only creates keys; it never seeds.
+        const bool provisioning = argc > 2 && std::string(argv[2]) == "--provision";
+        if (!contentDisabled && !contentRoot && !portOffset && !provisioning)
+            contentRoot = content_pack::locate();
+        const content_pack::Log record = [](const std::string &message) { log(message); };
+        if (!contentDisabled && contentRoot && !provisioning)
+            content_pack::install(directory, *contentRoot, record);
+        if (!portOffset && !provisioning)
+        {
+            content_pack::prepareLocalPlay(
+                directory, network::bindAddress() == htonl(INADDR_LOOPBACK), record);
+            content_pack::signPatchManifests(directory, record);
         }
         platform_resources::initialize(directory, static_cast<unsigned short>(8085 + portOffset));
         services::initialize(directory);

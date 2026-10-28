@@ -1,0 +1,6268 @@
+{
+  "schema": 1,
+  "current_season": 3,
+  "activations": [
+    {
+      "id": 3000001,
+      "item": 430000,
+      "name": "activate_battlepass",
+      "season": 1,
+      "skips": 0
+    },
+    {
+      "id": 3000002,
+      "item": 430002,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 1
+    },
+    {
+      "id": 3000003,
+      "item": 430003,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 2
+    },
+    {
+      "id": 3000004,
+      "item": 430004,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 5
+    },
+    {
+      "id": 3000005,
+      "item": 430005,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 10
+    },
+    {
+      "id": 3000006,
+      "item": 430006,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 20
+    },
+    {
+      "id": 3000007,
+      "item": 430007,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 50
+    },
+    {
+      "id": 3000008,
+      "item": 430008,
+      "name": "skip_tier",
+      "season": 0,
+      "skips": 100
+    },
+    {
+      "id": 3001001,
+      "item": 431000,
+      "name": "activate_battlepass_s2",
+      "season": 2,
+      "skips": 0
+    },
+    {
+      "id": 3002001,
+      "item": 432000,
+      "name": "activate_battlepass_s3",
+      "season": 3,
+      "skips": 0
+    },
+    {
+      "id": 3003001,
+      "item": 433000,
+      "name": "activate_battlepass_s4",
+      "season": 4,
+      "skips": 0
+    },
+    {
+      "id": 3004001,
+      "item": 434000,
+      "name": "activate_battlepass_s5",
+      "season": 5,
+      "skips": 0
+    },
+    {
+      "id": 3005001,
+      "item": 435000,
+      "name": "activate_battlepass_s6",
+      "season": 6,
+      "skips": 0
+    }
+  ],
+  "seasons": {
+    "1": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30108,
+          30239,
+          40016,
+          200038,
+          20012,
+          20026,
+          220012
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          44
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170807
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180593
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          188
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          179
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80241
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30000,
+          20000
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330163
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190452
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          210
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170806
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          77
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30171,
+          20019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          103
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          180597
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80016
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          330165
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          126
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190454
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30052,
+          20005
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          205
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170711
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          156
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180596
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          148
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          80022
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30264,
+          20029
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          86
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330164
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          72
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190453
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170812
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30057,
+          20006
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          178
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180532
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          135
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330166
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          113
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30032,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          190456
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          40022
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170809
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          167
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180592
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30069,
+          20007
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          147
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330167
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          190459
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          91
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170810
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180536
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30075,
+          20008
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          122
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80044
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          214
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330168
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190455
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          268
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30195,
+          20021
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170808
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180535
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          127
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          209
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30111,
+          20012
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ],
+    "2": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30135,
+          30021,
+          40050,
+          350015,
+          20015,
+          20002,
+          220015
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          371
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170792
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180616
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          275
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          295
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80276
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30081,
+          20009
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330197
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190475
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          346
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170795
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          414
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30281,
+          20032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          395
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          180619
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80275
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          330094
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          221
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190476
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30006,
+          20000
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          234
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40021
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170851
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          145
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180622
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          184
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          80277
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30344,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          363
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330198
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          351
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190478
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170796
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30343,
+          20013
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          427
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180618
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80221
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          404
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330199
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          251
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30356,
+          20023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          190477
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          40065
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170862
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          415
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180620
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80274
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30332,
+          20026
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          391
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330201
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          190480
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          319
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170797
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180621
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30347,
+          20028
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          400
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80138
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          348
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330202
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190479
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          271
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30339,
+          20029
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170854
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180615
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          328
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80272
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          330203
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30138,
+          235,
+          220108,
+          180757
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ],
+    "3": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30416,
+          30397,
+          480019,
+          350015,
+          20036,
+          20023,
+          220120
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          480
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170871
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180784
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          278
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          207
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80307
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30411
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330237
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190395
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          430
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170994
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          172
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30389,
+          20002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          220107
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          487
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80240
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          480051
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          562
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190147
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30408
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          536
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40054
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170874
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          333
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180783
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          288
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          480027
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30419,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          317
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330221
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          372
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190392
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170997
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30402
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          354
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180779
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80309
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          551
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330213
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          451
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30338,
+          20019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          40062
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          190145
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170990
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          361
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180786
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80305
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30405
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          257
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330193
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          480070
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          212
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170993
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180785
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30322,
+          20033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          418
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80308
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          431
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330219
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190482
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          168
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30114,
+          20012
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170992
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180787
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          398
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80203
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          330215
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30385,
+          537,
+          480080,
+          180788,
+          20036
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ],
+    "4": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30108,
+          30239,
+          40016,
+          200038,
+          20012,
+          20026,
+          220012
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          44
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170807
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180593
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          188
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          179
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80241
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30000,
+          20000
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330163
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190452
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          210
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170806
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          77
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30171,
+          20019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          103
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          180597
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80016
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          330165
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          126
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190454
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30052,
+          20005
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          205
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170711
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          156
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180596
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          148
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          80022
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30264,
+          20029
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          86
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330164
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          72
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190453
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170812
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30057,
+          20006
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          178
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180532
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          135
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330166
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          113
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30032,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          190456
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          40022
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170809
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          167
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180592
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30069,
+          20007
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          147
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330167
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          190459
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          91
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170810
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180536
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30075,
+          20008
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          122
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80044
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          214
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330168
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190455
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          268
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30195,
+          20021
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170808
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180535
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          127
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          209
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30111,
+          20012
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ],
+    "5": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30108,
+          30239,
+          40016,
+          200038,
+          20012,
+          20026,
+          220012
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          44
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170807
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180593
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          188
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          179
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80241
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30000,
+          20000
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330163
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190452
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          210
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170806
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          77
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30171,
+          20019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          103
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          180597
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80016
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          330165
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          126
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190454
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30052,
+          20005
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          205
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170711
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          156
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180596
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          148
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          80022
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30264,
+          20029
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          86
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330164
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          72
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190453
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170812
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30057,
+          20006
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          178
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180532
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          135
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330166
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          113
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30032,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          190456
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          40022
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170809
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          167
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180592
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30069,
+          20007
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          147
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330167
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          190459
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          91
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170810
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180536
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30075,
+          20008
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          122
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80044
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          214
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330168
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190455
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          268
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30195,
+          20021
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170808
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180535
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          127
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          209
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30111,
+          20012
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ],
+    "6": [
+      {
+        "rank": 0,
+        "xp": 0,
+        "next_xp": 105524,
+        "items": [
+          30108,
+          30239,
+          40016,
+          200038,
+          20012,
+          20026,
+          220012
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 1,
+        "xp": 105524,
+        "next_xp": 106383,
+        "items": [
+          44
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 2,
+        "xp": 211907,
+        "next_xp": 107249,
+        "items": [
+          170807
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 3,
+        "xp": 319156,
+        "next_xp": 108123,
+        "items": [
+          200039
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 4,
+        "xp": 427279,
+        "next_xp": 109002,
+        "items": [
+          180593
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 5,
+        "xp": 536281,
+        "next_xp": 109891,
+        "items": [
+          188
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 6,
+        "xp": 646172,
+        "next_xp": 110785,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 7,
+        "xp": 756957,
+        "next_xp": 111687,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 8,
+        "xp": 868644,
+        "next_xp": 112597,
+        "items": [
+          179
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 9,
+        "xp": 981241,
+        "next_xp": 113513,
+        "items": [
+          80241
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 10,
+        "xp": 1094754,
+        "next_xp": 114438,
+        "items": [
+          30000,
+          20000
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 11,
+        "xp": 1209192,
+        "next_xp": 115369,
+        "items": [
+          330163
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 12,
+        "xp": 1324561,
+        "next_xp": 116309,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 13,
+        "xp": 1440870,
+        "next_xp": 117256,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 14,
+        "xp": 1558126,
+        "next_xp": 118210,
+        "items": [
+          190452
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 15,
+        "xp": 1676336,
+        "next_xp": 119173,
+        "items": [
+          210
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 16,
+        "xp": 1795509,
+        "next_xp": 120144,
+        "items": [
+          170806
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 17,
+        "xp": 1915653,
+        "next_xp": 121121,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 18,
+        "xp": 2036774,
+        "next_xp": 122108,
+        "items": [
+          77
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 19,
+        "xp": 2158882,
+        "next_xp": 123102,
+        "items": [
+          30171,
+          20019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 20,
+        "xp": 2281984,
+        "next_xp": 124105,
+        "items": [
+          103
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 21,
+        "xp": 2406089,
+        "next_xp": 125114,
+        "items": [
+          180597
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 22,
+        "xp": 2531203,
+        "next_xp": 126134,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 23,
+        "xp": 2657337,
+        "next_xp": 127161,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 24,
+        "xp": 2784498,
+        "next_xp": 128196,
+        "items": [
+          80016
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 25,
+        "xp": 2912694,
+        "next_xp": 129239,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 26,
+        "xp": 3041933,
+        "next_xp": 130292,
+        "items": [
+          330165
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 27,
+        "xp": 3172225,
+        "next_xp": 131353,
+        "items": [
+          126
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 28,
+        "xp": 3303578,
+        "next_xp": 132423,
+        "items": [
+          190454
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 29,
+        "xp": 3436001,
+        "next_xp": 133501,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 30,
+        "xp": 3569502,
+        "next_xp": 134587,
+        "items": [
+          30052,
+          20005
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 31,
+        "xp": 3704089,
+        "next_xp": 135684,
+        "items": [
+          205
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 32,
+        "xp": 3839773,
+        "next_xp": 136788,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 33,
+        "xp": 3976561,
+        "next_xp": 137902,
+        "items": [
+          40019
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 34,
+        "xp": 4114463,
+        "next_xp": 139025,
+        "items": [
+          170711
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 35,
+        "xp": 4253488,
+        "next_xp": 140157,
+        "items": [
+          156
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 36,
+        "xp": 4393645,
+        "next_xp": 141298,
+        "items": [
+          200030
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 37,
+        "xp": 4534943,
+        "next_xp": 142449,
+        "items": [
+          180596
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 38,
+        "xp": 4677392,
+        "next_xp": 143608,
+        "items": [
+          148
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 39,
+        "xp": 4821000,
+        "next_xp": 144778,
+        "items": [
+          80022
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 40,
+        "xp": 4965778,
+        "next_xp": 145956,
+        "items": [
+          30264,
+          20029
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 41,
+        "xp": 5111734,
+        "next_xp": 147145,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 42,
+        "xp": 5258879,
+        "next_xp": 148343,
+        "items": [
+          86
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 43,
+        "xp": 5407222,
+        "next_xp": 149551,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 44,
+        "xp": 5556773,
+        "next_xp": 150769,
+        "items": [
+          330164
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 45,
+        "xp": 5707542,
+        "next_xp": 151996,
+        "items": [
+          72
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 46,
+        "xp": 5859538,
+        "next_xp": 153234,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 47,
+        "xp": 6012772,
+        "next_xp": 154481,
+        "items": [
+          190453
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 48,
+        "xp": 6167253,
+        "next_xp": 155740,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 49,
+        "xp": 6322993,
+        "next_xp": 157007,
+        "items": [
+          170812
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 50,
+        "xp": 6480000,
+        "next_xp": 158286,
+        "items": [
+          30057,
+          20006
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 51,
+        "xp": 6638286,
+        "next_xp": 159574,
+        "items": [
+          178
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 52,
+        "xp": 6797860,
+        "next_xp": 160874,
+        "items": [
+          180532
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 53,
+        "xp": 6958734,
+        "next_xp": 162184,
+        "items": [
+          200032
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 54,
+        "xp": 7120918,
+        "next_xp": 163504,
+        "items": [
+          80024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 55,
+        "xp": 7284422,
+        "next_xp": 164836,
+        "items": [
+          135
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 56,
+        "xp": 7449258,
+        "next_xp": 166178,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 57,
+        "xp": 7615436,
+        "next_xp": 167530,
+        "items": [
+          200033
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 58,
+        "xp": 7782966,
+        "next_xp": 168895,
+        "items": [
+          330166
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 59,
+        "xp": 7951861,
+        "next_xp": 170270,
+        "items": [
+          113
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 60,
+        "xp": 8122131,
+        "next_xp": 171657,
+        "items": [
+          30032,
+          20003
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 61,
+        "xp": 8293788,
+        "next_xp": 173054,
+        "items": [
+          190456
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 62,
+        "xp": 8466842,
+        "next_xp": 174463,
+        "items": [
+          40022
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 63,
+        "xp": 8641305,
+        "next_xp": 175884,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 64,
+        "xp": 8817189,
+        "next_xp": 177315,
+        "items": [
+          170809
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 65,
+        "xp": 8994504,
+        "next_xp": 178760,
+        "items": [
+          167
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 66,
+        "xp": 9173264,
+        "next_xp": 180215,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 67,
+        "xp": 9353479,
+        "next_xp": 181682,
+        "items": [
+          180592
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 68,
+        "xp": 9535161,
+        "next_xp": 183162,
+        "items": [
+          200036
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 69,
+        "xp": 9718323,
+        "next_xp": 184653,
+        "items": [
+          80023
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 70,
+        "xp": 9902976,
+        "next_xp": 186157,
+        "items": [
+          30069,
+          20007
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 71,
+        "xp": 10089133,
+        "next_xp": 187672,
+        "items": [
+          147
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 72,
+        "xp": 10276805,
+        "next_xp": 189200,
+        "items": [
+          330167
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 73,
+        "xp": 10466005,
+        "next_xp": 190741,
+        "items": [
+          200035
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 74,
+        "xp": 10656746,
+        "next_xp": 192294,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 75,
+        "xp": 10849040,
+        "next_xp": 193860,
+        "items": [
+          190459
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 76,
+        "xp": 11042900,
+        "next_xp": 195438,
+        "items": [
+          91
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 77,
+        "xp": 11238338,
+        "next_xp": 197030,
+        "items": [
+          170810
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 78,
+        "xp": 11435368,
+        "next_xp": 198633,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 79,
+        "xp": 11634001,
+        "next_xp": 200251,
+        "items": [
+          180536
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 80,
+        "xp": 11834252,
+        "next_xp": 201882,
+        "items": [
+          30075,
+          20008
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 81,
+        "xp": 12036134,
+        "next_xp": 203525,
+        "items": [
+          122
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 82,
+        "xp": 12239659,
+        "next_xp": 205183,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 83,
+        "xp": 12444842,
+        "next_xp": 206853,
+        "items": [
+          200002
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 84,
+        "xp": 12651695,
+        "next_xp": 208537,
+        "items": [
+          80044
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 85,
+        "xp": 12860232,
+        "next_xp": 210235,
+        "items": [
+          214
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 86,
+        "xp": 13070467,
+        "next_xp": 211948,
+        "items": [
+          330168
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 87,
+        "xp": 13282415,
+        "next_xp": 213672,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 88,
+        "xp": 13496087,
+        "next_xp": 215413,
+        "items": [
+          190455
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 89,
+        "xp": 13711500,
+        "next_xp": 217167,
+        "items": [
+          268
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 90,
+        "xp": 13928667,
+        "next_xp": 218935,
+        "items": [
+          30195,
+          20021
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 91,
+        "xp": 14147602,
+        "next_xp": 220717,
+        "items": [
+          350013
+        ],
+        "free": false,
+        "cod_points": 100
+      },
+      {
+        "rank": 92,
+        "xp": 14368319,
+        "next_xp": 222515,
+        "items": [
+          170808
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 93,
+        "xp": 14590834,
+        "next_xp": 224326,
+        "items": [
+          40024
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 94,
+        "xp": 14815160,
+        "next_xp": 226153,
+        "items": [
+          180535
+        ],
+        "free": true,
+        "cod_points": 0
+      },
+      {
+        "rank": 95,
+        "xp": 15041313,
+        "next_xp": 227994,
+        "items": [
+          127
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 96,
+        "xp": 15269307,
+        "next_xp": 229851,
+        "items": [
+          200038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 97,
+        "xp": 15499158,
+        "next_xp": 231722,
+        "items": [
+          80038
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 98,
+        "xp": 15730880,
+        "next_xp": 233609,
+        "items": [
+          350013
+        ],
+        "free": true,
+        "cod_points": 100
+      },
+      {
+        "rank": 99,
+        "xp": 15964489,
+        "next_xp": 235511,
+        "items": [
+          209
+        ],
+        "free": false,
+        "cod_points": 0
+      },
+      {
+        "rank": 100,
+        "xp": 16200000,
+        "next_xp": 0,
+        "items": [
+          30111,
+          20012
+        ],
+        "free": false,
+        "cod_points": 0
+      }
+    ]
+  }
+}

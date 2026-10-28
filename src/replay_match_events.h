@@ -155,7 +155,9 @@ namespace services
                 const auto startId = replayMatchNumber(values, "Param0");
                 const auto mode = replayMatchNumber(values, "Param1");
                 const bool familyMatches =
-                    allocation->category == 0 ? family == 2 : family == 8 || family == 24;
+                    allocation->category == 0   ? family == 2
+                    : allocation->category == 4 ? family == 4
+                                                : family == 8 || family == 24;
                 if (startId && startId != UINT64_MAX && (!tagged || native == startId) &&
                     allocation->session == session && familyMatches && mode <= UINT32_MAX &&
                     allocation->gameTypes.contains(
@@ -256,8 +258,9 @@ namespace services
                         cutoff = std::min(cutoff, ended);
                     const auto capturedCategory =
                         static_cast<unsigned>(replayMatchNumber(row, "category"));
-                    const bool familyMatches =
-                        capturedCategory == 0 ? family == 2 : family == 8 || family == 24;
+                    const bool familyMatches = capturedCategory == 0   ? family == 2
+                                               : capturedCategory == 4 ? family == 4
+                                                                       : family == 8 || family == 24;
                     if (name == "match_placement" && versioned && familyMatches &&
                         capturedCategory == 1 && (!ended || timestamp <= ended) &&
                         !row.contains("placement") && values.contains("Param0") &&

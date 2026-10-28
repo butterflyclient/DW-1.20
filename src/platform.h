@@ -15,6 +15,13 @@ namespace platform
     };
 
     void initialize(const std::filesystem::path &directory);
+    // RSA-PSS/SHA-256 over a caller-computed digest with this server's platform
+    // key, for content the client verifies against that key (e.g. the cached
+    // content patch manifests checked at 0x141038500).
+    std::array<uint8_t, 256> signDigest(std::span<const uint8_t> digest, unsigned saltBytes);
+    bool verifyDigest(std::span<const uint8_t> digest,
+                      std::span<const uint8_t> signature,
+                      unsigned saltBytes);
     std::string login(const std::string &nonce,
                       const std::string &profile = "",
                       const std::string &playerName = "");

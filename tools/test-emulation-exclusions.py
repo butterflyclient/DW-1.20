@@ -16,7 +16,9 @@ import urllib.request
 from native_wire_client import NativeClient, binary, integer, text, u32
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUTES = ((50, 22), (58, 22), (193, 9), (193, 10), (193, 12), (193, 24))
+# Every native route in validation/20261027-dw-task-baseline.json now has a
+# handler (tools/full_coverage_fixtures.py); only unknown REST operations remain.
+ROUTES = ()
 
 
 def rest_packet(method=0x474554):
@@ -136,7 +138,7 @@ def main():
                  native_game_verified=False, disposable_fixture_removed=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(proof, indent=2) + "\n")
-    print("PASS: 12 explicit native 108 errors, two REST 503 errors, connection survives, no domain writes")
+    print("PASS: two REST 503 errors for unconfigured operations, connection survives, no domain writes")
 
 
 if __name__ == "__main__":

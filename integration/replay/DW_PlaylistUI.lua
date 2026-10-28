@@ -17,7 +17,6 @@ local originalLocalize = Engine.CBBHFCGDIC
 local state = { widgets = setmetatable({}, { __mode = "k" }) }
 state.mapVotes = setmetatable({}, { __mode = "k" })
 state.ballot = { active = false, choices = {} }
-state.presentation = setmetatable({}, { __mode = "k" })
 local preference = "replay_dw_autoFillBots"
 local scale = _1080p or 1
 local closedAnchors = setmetatable({}, { __mode = "k" })
@@ -469,41 +468,6 @@ local function repairPlaylistTitle(widget, label)
         name:setText(current, 0)
     end
 end
-
-local function installPresentationGates()
-    local onboarding = rawget(_G, "Onboarding")
-    if not onboarding then
-        return
-    end
-    local function gate(name, preference)
-        local stage = onboarding[name]
-        local original = stage and stage.WasCompleted
-        if type(original) ~= "function" or state.presentation[stage] == original then
-            return
-        end
-        local wrapped = function(...)
-            if Dvar.IBEGCHEFE(preference) ~= true then
-                return true
-            end
-            return original(...)
-        end
-        stage.WasCompleted = wrapped
-        state.presentation[stage] = wrapped
-    end
-    -- Gate automatic presentation only. Keep the original saved flags and
-    -- MarkCompleted methods intact, including explicit training/trailer actions.
-    gate("SeasonVideo", "lui_dwIntroVideos")
-    gate("MagmaVideo", "lui_dwIntroVideos")
-    gate("WARZONE_INTRODUCTION", "lui_dwTutorialPrompts")
-    gate("WARZONE_TUTORIAL_GAMEPLAY_INITIATED", "lui_dwTutorialPrompts")
-    gate("Plunder", "lui_dwTutorialPrompts")
-end
-
-state.Refresh = function()
-    refreshCheckboxes()
-    installPresentationGates()
-end
-installPresentationGates()
 
 local customStrings = {
     ["PLAYLIST/NUKETOWN_TDM"] = "Nuketown TDM",

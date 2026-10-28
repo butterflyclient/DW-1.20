@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = Path(r"E:\IW8\Builds\1.20-replay\game_dx12_ship_replay.exe")
 IMAGE_SHA = "68fb1cbcb2924182724004039de55a4c50152bb6561803c4898b7930b38132f0"
-ACTS = Path(r"D:\mw124\atian-cod-tools\build-workstation\bin\Release\acts.exe")
+ACTS = Path(r"E:\mw124\atian-cod-tools\build-workstation\bin\Release\acts.exe")
 ASSET_NAME = "maps/mp/dw_gulag.d3dbsp"
 FOLLOW = 0xFFFFFFFFFFFFFFFE
 # Replay XAssetList: ScriptStringList occupies bytes 0..15 (count u32,
@@ -27,7 +27,7 @@ FOLLOW = 0xFFFFFFFFFFFFFFFE
 SCRIPT_STRING_NULL_INDEX = 0
 SCRIPT_STRING_COUNT = 1
 REFERENCE = Path(
-    r"D:\mw124\mw120rproxy\iw8-zonetool\src\zonetool\iw8\replay_navigation.cpp"
+    r"E:\mw124\mw120rproxy\iw8-zonetool\src\zonetool\iw8\replay_navigation.cpp"
 )
 
 

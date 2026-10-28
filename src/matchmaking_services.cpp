@@ -2530,7 +2530,8 @@ namespace services
         {
             const auto mode = entry.at("gametype").get<std::string>();
             const auto script = selection.at("game_types").at(mode).at("script").get<std::string>();
-            const unsigned candidate = script == "br" ? 1u : 0u;
+            // Quest/daily categories: 0 MP, 1 BR, 4 co-op (cp_* scripts).
+            const unsigned candidate = script == "br" ? 1u : script.starts_with("cp_") ? 4u : 0u;
             // Playlist context (e.g. "big") selects a build namespace. The
             // native rules' script determines the game family. Mixed-family
             // allocations need an explicit chosen-mode binding before credit.

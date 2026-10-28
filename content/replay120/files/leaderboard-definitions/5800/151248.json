@@ -1,0 +1,20 @@
+{
+  "schema": 2,
+  "storage_board": 1248,
+  "columns": [
+    "col_0",
+    "col_1",
+    "col_2",
+    "col_3",
+    "col_4",
+    "col_5",
+    "col_6",
+    "col_7",
+    "col_8",
+    "col_9"
+  ],
+  "assets": [
+    "lb_gm_arm_hc"
+  ],
+  "origin": "shipped-regular"
+}

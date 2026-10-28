@@ -1,0 +1,17 @@
+{
+  "id": "featured",
+  "name": "MENU/STORE_CAT_FEATURED",
+  "order": 0,
+  "layoutType": 3,
+  "asset": "mw_store_billboard_standard_issue_ii",
+  "numItemsShown": 18,
+  "idPubVar": "online_store_featured",
+  "timerPubVar": "online_store_featured_timer",
+  "items": [
+    {
+      "order": 0,
+      "layoutOnlyItem": true,
+      "usesFirstPartyStore": false
+    }
+  ]
+}
