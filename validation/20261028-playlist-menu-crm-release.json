@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-10-28T12:53:28Z",
+  "host": "162.243.115.160",
+  "source_git_commit": "70006d91a9ec59f037b1ea5d7438a862e30a93ba",
+  "server_sha256": "12dd59ecfdd2ae33aff254438ed1107c9be452225d9df811faa6b058cae08212",
+  "release": "/opt/replay-dw/releases/20261028T125128Z-playlist-menu-crm-12dd59ecfdd2",
+  "previous_release": "/opt/replay-dw/releases/20261018T213739Z-release-manifest-ca7c6d8a9f91",
+  "previous_sha256": "ca7c6d8a9f9133bab85acb9cfc951b6d72f9da0db5f8a6c56d980dd39edd0ec4",
+  "backup": {
+    "path": "/var/backups/replay-dw/state-pre-playlist-menu-crm-20261028T125128Z.tar.gz",
+    "sha256": "b41aa1a7d0c20e90d47695489b1672713bda9ce10bb47c6c92a1f9c688e5ddc2",
+    "bytes": 87719249
+  },
+  "procedure": "tools/activate-server-candidate.sh: hash-pinned candidate, fresh state backup, one controlled stop, hash-pinned CRM catalog install, atomic symlink swap, HTTPS health/process hash/release-manifest/playlist-menu checks, automatic rollback",
+  "activation": {
+    "active": true,
+    "pid": 744506,
+    "sha256": "12dd59ecfdd2ae33aff254438ed1107c9be452225d9df811faa6b058cae08212",
+    "https_health": 200,
+    "release_manifest": 200,
+    "playlist_menus": 1
+  },
+  "live_activity_before_activation": [
+    {
+      "online_players": 0,
+      "matches": 0,
+      "parties": 0,
+      "player_rows": 0,
+      "utc": "2026-10-28T12:51:07Z"
+    },
+    {
+      "online_players": 0,
+      "matches": 0,
+      "parties": 0,
+      "player_rows": 0,
+      "utc": "2026-10-28T12:51:17Z"
+    },
+    {
+      "online_players": 0,
+      "matches": 0,
+      "parties": 0,
+      "player_rows": 0,
+      "utc": "2026-10-28T12:51:27Z"
+    }
+  ],
+  "candidate_checks": {
+    "tls_full_suite": [
+      "Verified TLS works; remote plaintext health, login and updater rejected",
+      "TLS preserves real-peer authorization; spoofed forwarding header cannot acquire loopback login",
+      "untrusted certificate rejected",
+      "Wrong certificate hostname rejected",
+      "HTTPS listener never falls back to plaintext",
+      "Verified TLS client delayed beyond the former three-second budget succeeds",
+      "Idle TLS handshake closed within its absolute deadline",
+      "Encrypted-record trickling cannot bypass the absolute HTTP header deadline",
+      "TLS 1.2 and 1.3 negotiate authenticated encryption",
+      "Certificate reload accepts new connections and preserves an existing TLS connection",
+      "Legacy public bootstrap stays reachable; credentials, operator routes and encoded bypasses stay blocked"
+    ],
+    "connection_budget": "10 connection checks passed",
+    "release_manifest": [
+      "Remote HTTPS request returns a document signed by the server key (RSA-PSS/SHA-256, salt 32) that echoes the nonce and embeds manifests matching the catalog hashes",
+      "Remote plaintext request is refused (https_required)",
+      "Loopback plaintext request is served",
+      "Malformed nonces, extra parameters and POST are rejected with 400",
+      "An altered published manifest blob yields 503, never a partial document",
+      "A missing catalog yields 503",
+      "Existing signed update plan is unchanged and agrees with the manifest",
+      "Health unchanged"
+    ],
+    "mission_rules": "PASS: 38 mission rule checks, 0 failed",
+    "playlist_menu": [
+      "PASS: menu hides 19 unstartable playlists: [27, 28, 29, 30, 31, 39, 40, 45, 46, 47, 50, 51, 52, 53, 54, 55, 56, 57, 58]",
+      "PASS: restart keeps the derived menu and its pack state",
+      "PASS: an unrestricted policy serves 64 playlists; ['2026-10-28T12:49:44Z CONTENT playlist menu title=5800 hides 0 playlists this server cannot start: none']",
+      "PASS: a two-map installation offers 32 playlists"
+    ],
+    "live_content_dry_run": {
+      "menu_log": [
+        "CONTENT playlist menu title=5800 hides 19 playlists this server cannot start: 27 28 29 30 31 39 40 45 46 47 50 51 52 53 54 55 56 57 58"
+      ],
+      "menu_metadata_consistent": true,
+      "ground_war_listed": [],
+      "top_bnet_include": [
+        "A",
+        "B",
+        "E",
+        "H",
+        "J",
+        "L",
+        "Q"
+      ],
+      "playlists_unchanged": true,
+      "crm_messages": [
+        {
+          "location": 1,
+          "title": "MULTIPLAYER",
+          "short": "Squad up and jump in",
+          "action": "social"
+        },
+        {
+          "location": 2,
+          "title": "BATTLE PASS",
+          "short": "Earn tiers as you play",
+          "action": "battlepass"
+        },
+        {
+          "location": 6,
+          "title": "WARZONE",
+          "short": "Drop in with your squad",
+          "action": "social"
+        },
+        {
+          "location": 7,
+          "title": "PLUNDER",
+          "short": "Cash is king",
+          "action": "social"
+        },
+        {
+          "location": 11,
+          "title": "SPECIAL OPS",
+          "short": "Team up against the enemy",
+          "action": "social"
+        },
+        {
+          "location": 12,
+          "title": "BATTLE PASS",
+          "short": "Earn tiers as you play",
+          "action": "battlepass"
+        }
+      ],
+      "live_untouched": true
+    }
+  },
+  "crm_catalog_sha256": "ce0d70640264047a657120b0f724390b0705a2915aec67ccaedde587ed9804d0",
+  "post_activation": {
+    "process_sha256": "12dd59ecfdd2ae33aff254438ed1107c9be452225d9df811faa6b058cae08212",
+    "https_health": "iw8-dw",
+    "menu_log": "CONTENT playlist menu title=5800 hides 19 playlists this server cannot start: 27 28 29 30 31 39 40 45 46 47 50 51 52 53 54 55 56 57 58",
+    "updater_v2": {
+      "unknown client": "update to release 36 (6a22f4e99e54)",
+      "release 36 client": "current"
+    },
+    "updater_v1_legacy_bridge": {
+      "release 34 client": "current (its full-image updater continues to 36)"
+    }
+  },
+  "native_game_verified": false,
+  "note": "No player was online during the stop. Actual game login and play on this release remain unverified."
+}
