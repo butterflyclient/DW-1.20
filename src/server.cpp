@@ -1208,6 +1208,9 @@ int main(int argc, char **argv)
                 directory, network::bindAddress() == htonl(INADDR_LOOPBACK), record);
             content_pack::signPatchManifests(directory, record);
         }
+        // After the map inventory: the menu follows what this server can start.
+        if (!provisioning)
+            content_pack::publishPlaylistMenus(directory, record);
         platform_resources::initialize(directory, static_cast<unsigned short>(8085 + portOffset));
         services::initialize(directory);
         services::initializePublisherContent(directory,

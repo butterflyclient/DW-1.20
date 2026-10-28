@@ -485,4 +485,33 @@ namespace services
         }
         return std::nullopt;
     }
+
+    std::set<unsigned> servablePlaylists(const std::filesystem::path &directory, uint32_t title)
+    {
+        std::set<unsigned> servable;
+        const auto catalog =
+            document(directory / "playlists" / std::to_string(title) / "catalog.json", 409600, Json());
+        if (catalog.is_null())
+            return servable;
+        wire::require(catalog.is_object() && catalog.at("playlists").is_array());
+        const auto version = catalog.at("system").at("version");
+        // The same single-playlist query a native search sends without Quick
+        // Play groups, so the menu and matchmaking cannot disagree.
+        for (const auto &playlist : catalog["playlists"])
+        {
+            const auto id = number(playlist.at("playlist"), 127);
+            const Json query = {{"ruleset_payload",
+                                 {{"filter", {{"playlist_id", id}, {"playlist_version", version}}}}}};
+            try
+            {
+                if (selectPlaylist(directory, title, query))
+                    servable.insert(id);
+            }
+            catch (const std::exception &)
+            {
+                // Its search fails the same way; the playlist is not offered.
+            }
+        }
+        return servable;
+    }
 } // namespace services

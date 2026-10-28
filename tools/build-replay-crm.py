@@ -6,20 +6,47 @@ import json
 from pathlib import Path
 import zlib
 
+# Location IDs from crmutils.lua: each mode's MOTD (the popup and first tile) and
+# its message list (the next tile). Every message opens its own detail page.
+# Action locations are CRM.LocationFunctions entries.
+MESSAGES = (
+    (1, "MULTIPLAYER", "Squad up and jump in",
+     "Team up with friends or go solo across Multiplayer playlists. Earn XP, rank up "
+     "and unlock new weapons, attachments and Operators as you play.",
+     "social", "INVITE FRIENDS"),
+    (2, "BATTLE PASS", "Earn tiers as you play",
+     "Play matches to progress through the Battle Pass tiers and unlock weapon "
+     "blueprints, Operator skins, calling cards and more.",
+     "battlepass", "BATTLE PASS"),
+    (6, "WARZONE", "Drop in with your squad",
+     "Drop into Verdansk with your squad. Loot up, win your way back from the Gulag "
+     "and be the last squad standing.",
+     "social", "INVITE FRIENDS"),
+    (7, "PLUNDER", "Cash is king",
+     "Loot, earn and bank cash across Verdansk. The first team to reach the cash "
+     "target wins.",
+     "social", "SQUAD UP"),
+    (11, "SPECIAL OPS", "Team up against the enemy",
+     "Join up to three other players in co-op Special Ops. Work together, complete "
+     "the objectives and get your squad out alive.",
+     "social", "INVITE FRIENDS"),
+    (12, "BATTLE PASS", "Earn tiers as you play",
+     "Play matches to progress through the Battle Pass tiers and unlock weapon "
+     "blueprints, Operator skins, calling cards and more.",
+     "battlepass", "BATTLE PASS"),
+)
+
 
 def build():
     # Read from the target game's MarketingCommsManager request and crmutils.lua.
     # The empty metadata object is required by its native JSON substitution pass.
     context = "cod-iw8-bnet-pc"
     messages = []
-    for location, mode in ((1, "MULTIPLAYER"), (2, "MULTIPLAYER"),
-                           (6, "WARZONE"), (7, "WARZONE"),
-                           (11, "CO-OP"), (12, "CO-OP")):
-        content = dict(title="REPLAY DW", content_short=mode + " WITH FRIENDS",
-                       content_long="Add friends in Social, form a party and play together. "
-                                    "Replay store bundles are available for zero COD points.",
+    for location, title, short, long, action_location, action_title in MESSAGES:
+        content = dict(title=title, content_short=short, content_long=long,
                        image="mw_keyart_small", popup_image="mw_keyart", layout_type=0,
-                       action="goto_ingame", action_location="social", action_title="SOCIAL")
+                       action="goto_ingame", action_location=action_location,
+                       action_title=action_title)
         raw = json.dumps(content, separators=(",", ":")).encode()
         content["checksum"] = str(zlib.crc32(raw))
         raw = json.dumps(content, separators=(",", ":")).encode() + b"\0"
@@ -36,8 +63,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(build(), indent=2) + "\n", encoding="utf-8")
-    print("Built six target-mode CRM messages with native layout and shipped artwork")
+    args.output.write_text(json.dumps(build(), indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("Built six player-facing CRM messages with native layout and shipped artwork")
 
 
 if __name__ == "__main__":

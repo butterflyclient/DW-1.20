@@ -5,8 +5,8 @@
   "titles": [
     5800
   ],
-  "revision": "126225b659805868f2d83ead42edef327975f072480d47dbab7c4f7d3acfaeb7",
-  "generated_utc": "2026-10-28T00:16:58+00:00",
+  "revision": "8786bd17691047d18d0aece4692c9ff396d7471d7ab5c64c50c20eaffb587d40",
+  "generated_utc": "2026-10-28T12:28:38+00:00",
   "source": "primary-droplet",
   "install": "missing-or-unmodified",
   "files": {
@@ -3011,8 +3011,8 @@
       "bytes": 2267
     },
     "marketing/5800/cod-iw8-bnet-pc/catalog.json": {
-      "sha256": "647a784761a22407ecd04c378e12919c81c71e5636f70a86b5cdf54bb9b19944",
-      "bytes": 4572
+      "sha256": "ce0d70640264047a657120b0f724390b0705a2915aec67ccaedde587ed9804d0",
+      "bytes": 4607
     },
     "marketplace/5800/catalog.json": {
       "sha256": "412a2c76fc01149df6c2483b907ca4e96fa83bb2b09c449b507f1ee8f4a7edd3",

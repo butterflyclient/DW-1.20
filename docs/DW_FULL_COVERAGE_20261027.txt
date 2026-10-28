@@ -168,6 +168,29 @@ folder, the server writes playlists/<title>/packages.json from the actual
 installed maps (custom maps in mods/mw120r/maps, junctioned folders handled),
 so matchmaking only selects maps this PC has.
 
+Playlist menu (2026-10-28): matchmaking refuses a playlist with no eligible
+map (error 108, matchmaker-playlist-or-map-unavailable) and the native search
+then waits without a result. Replay's 13-map installation and the published
+policy.json have no Ground War, CDL or Special Ops map, so those playlists
+queued forever. At every start the backend derives the menu the client
+downloads (the publisher object playlists/<title>/provenance.json names) from
+catalog.json: per platform include list it keeps only playlists
+services::servablePlaylists can start, the same single-playlist selector a
+search uses, under policy.json and packages.json; a category left empty
+leaves the top-level list. Nothing else in the publication changes. The
+result is a zlib stream of stored blocks with its metadata checksum/version;
+when every playlist is servable the published object is served unchanged.
+Pack state records the derivation as for the patch manifests.
+Check: tools/test-playlist-menu.py.
+
+Pack bytes: manifests hash the exact published bytes (the droplet's files are
+CRLF). .gitattributes keeps content/** byte-exact, so a checkout or GitHub
+source archive matches its manifest; before 2026-10-28 git stored them as LF
+and a fresh checkout's server refused the pack at startup ("file is missing or
+corrupt"). Check: tools/test-content-pack.py (exports the index with git
+archive). Marketing: tools/build-replay-crm.py writes the six player-facing
+CRM messages (each mode's MOTD and one message, each with its own page).
+
 One command: Host-Local-Server.ps1 (or Run_Replay_DW_Local_Server.cmd) builds
 if needed, starts the server, creates or refreshes the local client when the
 production EXE updated or the server key changed (INI kept, old files backed

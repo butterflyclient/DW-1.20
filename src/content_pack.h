@@ -28,4 +28,9 @@ namespace content_pack
     // that published them; a client trusts only its own server's key. Re-sign
     // zero-entry manifests whose signature this server's key does not verify.
     void signPatchManifests(const std::filesystem::path &data, const Log &log);
+
+    // The playlist menu publication (the publisher object named by
+    // playlists/<title>/provenance.json) lists only playlists matchmaking can
+    // start under policy.json and the installed-map inventory.
+    void publishPlaylistMenus(const std::filesystem::path &data, const Log &log);
 } // namespace content_pack

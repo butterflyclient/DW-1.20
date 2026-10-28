@@ -2,6 +2,7 @@
 #include "content_pack.h"
 #include "crypto.h"
 #include "platform.h"
+#include "playlist_catalog.h"
 #include "wire.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
@@ -331,6 +332,98 @@ namespace content_pack
                 std::span(reinterpret_cast<const uint8_t *>(canonical.data()), canonical.size())));
             return body;
         }
+
+        // Replace a published object's content with bytes this server derived
+        // from it: its metadata follows (objectstore_services.cpp requires the
+        // MD5 checksum and length), and pack state remembers the pack bytes that
+        // were replaced so a newer pack revision still applies.
+        void replacePublisherContent(const std::filesystem::path &data,
+                                     const std::filesystem::path &contentPath,
+                                     const wire::Bytes &content)
+        {
+            write(contentPath, content);
+            const auto file = contentPath.filename().string();
+            const auto name = file.substr(0, file.size() - std::string_view(".content.bin").size());
+            const auto metadataPath = contentPath.parent_path() / (name + ".metadata.json");
+            if (const auto present = read(metadataPath, 16384))
+            {
+                auto metadata = Json::parse(present->begin(), present->end());
+                const auto md5 = crypto::md5(content);
+                static constexpr char alphabet[] =
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                std::string checksum;
+                for (size_t i = 0; i < md5.size(); i += 3)
+                {
+                    const uint32_t chunk = (md5[i] << 16) | ((i + 1 < md5.size() ? md5[i + 1] : 0) << 8) |
+                                           (i + 2 < md5.size() ? md5[i + 2] : 0);
+                    checksum.push_back(alphabet[(chunk >> 18) & 63]);
+                    checksum.push_back(alphabet[(chunk >> 12) & 63]);
+                    checksum.push_back(i + 1 < md5.size() ? alphabet[(chunk >> 6) & 63] : '=');
+                    checksum.push_back(i + 2 < md5.size() ? alphabet[chunk & 63] : '=');
+                }
+                metadata["contentLength"] = static_cast<uint64_t>(content.size());
+                metadata["checksum"] = checksum;
+                metadata["objectVersion"] = sha256(content).substr(0, 32);
+                metadata["modified"] = static_cast<int64_t>(std::time(nullptr));
+                writeJson(metadataPath, metadata);
+            }
+            const auto relativeContent = contentPath.lexically_relative(data).generic_string();
+            const auto relativeMetadata = metadataPath.lexically_relative(data).generic_string();
+            const auto states = data / "content-packs";
+            if (std::filesystem::is_directory(states))
+                for (const auto &stateFile : std::filesystem::directory_iterator(states))
+                {
+                    const auto stored = read(stateFile.path(), 4 * 1024 * 1024);
+                    auto state = Json::parse(stored->begin(), stored->end(), nullptr, false);
+                    if (!state.is_object() || !state.contains("installed"))
+                        continue;
+                    bool changed = false;
+                    for (const auto &[relative, path] : {std::pair{relativeContent, contentPath},
+                                                         std::pair{relativeMetadata, metadataPath}})
+                        if (state["installed"].contains(relative))
+                        {
+                            // Remember the pack bytes this derived file replaced.
+                            if (!state.contains("derived"))
+                                state["derived"] = Json::object();
+                            if (!state["derived"].contains(relative))
+                                state["derived"][relative] = state["installed"][relative];
+                            state["installed"][relative] = sha256(*read(path, 64 * 1024 * 1024));
+                            changed = true;
+                        }
+                    if (changed)
+                        writeJson(stateFile.path(), state);
+                }
+        }
+
+        // A zlib stream (RFC 1950) of stored deflate blocks (RFC 1951 3.2.4).
+        // Every inflater reads it; the backend has no compressor of its own.
+        wire::Bytes zlibStored(std::span<const uint8_t> data)
+        {
+            wire::Bytes out{0x78, 0x01};
+            size_t offset = 0;
+            do
+            {
+                const auto size = std::min<size_t>(data.size() - offset, 0xFFFF);
+                out.push_back(offset + size == data.size() ? 1 : 0);
+                for (const auto value : {size, size_t{0xFFFF} ^ size})
+                {
+                    out.push_back(static_cast<uint8_t>(value));
+                    out.push_back(static_cast<uint8_t>(value >> 8));
+                }
+                out.insert(out.end(), data.begin() + offset, data.begin() + offset + size);
+                offset += size;
+            } while (offset < data.size());
+            uint32_t low = 1, high = 0;
+            for (const auto value : data)
+            {
+                low = (low + value) % 65521;
+                high = (high + low) % 65521;
+            }
+            const uint32_t adler = (high << 16) | low;
+            for (int shift = 24; shift >= 0; shift -= 8)
+                out.push_back(static_cast<uint8_t>(adler >> shift));
+            return out;
+        }
     } // namespace
 
     void signPatchManifests(const std::filesystem::path &data, const Log &log)
@@ -373,61 +466,98 @@ namespace content_pack
             const auto fresh = platform::signDigest(digest, 8);
             manifest["signature"] = hex(fresh);
             const auto text = manifest.dump() + "\n";
-            const wire::Bytes content(text.begin(), text.end());
-            write(entry.path(), content);
+            replacePublisherContent(data, entry.path(), wire::Bytes(text.begin(), text.end()));
             const auto name = file.substr(0, file.size() - std::string_view(".content.bin").size());
-            const auto metadataPath = entry.path().parent_path() / (name + ".metadata.json");
-            const auto present = read(metadataPath, 16384);
-            if (present)
-            {
-                auto metadata = Json::parse(present->begin(), present->end());
-                const auto md5 = crypto::md5(content);
-                static constexpr char alphabet[] =
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-                std::string checksum;
-                for (size_t i = 0; i < md5.size(); i += 3)
-                {
-                    const uint32_t chunk = (md5[i] << 16) | ((i + 1 < md5.size() ? md5[i + 1] : 0) << 8) |
-                                           (i + 2 < md5.size() ? md5[i + 2] : 0);
-                    checksum.push_back(alphabet[(chunk >> 18) & 63]);
-                    checksum.push_back(alphabet[(chunk >> 12) & 63]);
-                    checksum.push_back(i + 1 < md5.size() ? alphabet[(chunk >> 6) & 63] : '=');
-                    checksum.push_back(i + 2 < md5.size() ? alphabet[chunk & 63] : '=');
-                }
-                metadata["contentLength"] = static_cast<uint64_t>(content.size());
-                metadata["checksum"] = checksum;
-                metadata["objectVersion"] = sha256(content).substr(0, 32);
-                metadata["modified"] = static_cast<int64_t>(std::time(nullptr));
-                writeJson(metadataPath, metadata);
-            }
-            // Pack state follows the re-signed bytes so a newer pack still applies.
-            const auto relativeContent = entry.path().lexically_relative(data).generic_string();
-            const auto relativeMetadata = metadataPath.lexically_relative(data).generic_string();
-            const auto states = data / "content-packs";
-            if (std::filesystem::is_directory(states))
-                for (const auto &stateFile : std::filesystem::directory_iterator(states))
-                {
-                    const auto stored = read(stateFile.path(), 4 * 1024 * 1024);
-                    auto state = Json::parse(stored->begin(), stored->end(), nullptr, false);
-                    if (!state.is_object() || !state.contains("installed"))
-                        continue;
-                    bool changed = false;
-                    for (const auto &[relative, path] : {std::pair{relativeContent, entry.path()},
-                                                         std::pair{relativeMetadata, metadataPath}})
-                        if (state["installed"].contains(relative))
-                        {
-                            // Remember the pack bytes this local signature replaced.
-                            if (!state.contains("derived"))
-                                state["derived"] = Json::object();
-                            if (!state["derived"].contains(relative))
-                                state["derived"][relative] = state["installed"][relative];
-                            state["installed"][relative] = sha256(*read(path, 65536));
-                            changed = true;
-                        }
-                    if (changed)
-                        writeJson(stateFile.path(), state);
-                }
             log("CONTENT re-signed patch manifest " + name + " with this server's platform key");
+        }
+    }
+
+    void publishPlaylistMenus(const std::filesystem::path &data, const Log &log)
+    {
+        using Menu = nlohmann::ordered_json; // the native parser reads the publication in order
+        const auto playlists = data / "playlists";
+        if (!std::filesystem::is_directory(playlists))
+            return;
+        for (const auto &entry : std::filesystem::directory_iterator(playlists))
+        {
+            const auto folder = entry.path().filename().string();
+            uint32_t title = 0;
+            const auto parsed = std::from_chars(folder.data(), folder.data() + folder.size(), title);
+            if (!entry.is_directory() || parsed.ec != std::errc{} ||
+                parsed.ptr != folder.data() + folder.size())
+                continue;
+            const auto catalogBytes = read(entry.path() / "catalog.json", 409600);
+            const auto provenanceBytes = read(entry.path() / "provenance.json", 65536);
+            if (!catalogBytes || !provenanceBytes)
+                continue;
+            // provenance.json binds the catalog to the publisher object it was
+            // decoded from: the menu the client downloads at sign-in.
+            const auto provenance = Json::parse(provenanceBytes->begin(), provenanceBytes->end());
+            if (provenance.at("catalog_sha256").get<std::string>() != sha256(*catalogBytes))
+            {
+                log("CONTENT playlist menu for title " + folder + " kept: catalog.json differs from its provenance");
+                continue;
+            }
+            auto source = provenance.at("compressed_source").get<std::string>();
+            source = source.substr(source.find_last_of("/\\") + 1) + ".content.bin";
+            std::optional<std::filesystem::path> object;
+            const auto objects = data / "objectstore" / "publisher" / folder;
+            if (std::filesystem::is_directory(objects))
+                for (const auto &file : std::filesystem::recursive_directory_iterator(objects))
+                    if (file.is_regular_file() && file.path().filename() == source)
+                        object = file.path();
+            if (!object)
+                continue;
+            // Matchmaking refuses a playlist with no eligible map (error 108) and
+            // the native search then waits without a result: Replay's 13-map
+            // installation has no Ground War map (owner 2026-10-28). The menu
+            // offers only playlists this server can start, per platform list;
+            // a category left empty leaves the top-level list too.
+            const auto servable = services::servablePlaylists(data, title);
+            auto menu = Menu::parse(catalogBytes->begin(), catalogBytes->end());
+            std::map<std::string, std::set<std::string>> emptied;
+            std::set<unsigned> hidden;
+            for (auto &category : menu.at("categories"))
+                for (auto &[key, value] : category.items())
+                {
+                    if (!key.ends_with("_include") || !value.is_array() || value.empty() ||
+                        !value.front().is_number_unsigned())
+                        continue;
+                    Menu kept = Menu::array();
+                    for (const auto &id : value)
+                        if (servable.contains(id.get<unsigned>()))
+                            kept.push_back(id);
+                        else
+                            hidden.insert(id.get<unsigned>());
+                    if (kept.empty())
+                        emptied[key].insert(category.at("category").get<std::string>());
+                    value = std::move(kept);
+                }
+            for (auto &category : menu["categories"])
+                for (auto &[key, value] : category.items())
+                    if (emptied.contains(key) && value.is_array())
+                    {
+                        Menu kept = Menu::array();
+                        for (const auto &letter : value)
+                            if (!letter.is_string() || !emptied[key].contains(letter.get<std::string>()))
+                                kept.push_back(letter);
+                        value = std::move(kept);
+                    }
+            const auto current = read(*object, 64 * 1024 * 1024);
+            if (hidden.empty() && current && sha256(*current) == provenance.at("compressed_sha256").get<std::string>())
+                continue; // the published object, every playlist servable
+            const auto text = hidden.empty() ? std::string(catalogBytes->begin(), catalogBytes->end())
+                                             : menu.dump();
+            const auto content =
+                zlibStored(std::span(reinterpret_cast<const uint8_t *>(text.data()), text.size()));
+            if (current && *current == content)
+                continue;
+            replacePublisherContent(data, *object, content);
+            std::string ids;
+            for (const auto id : hidden)
+                ids += " " + std::to_string(id);
+            log("CONTENT playlist menu title=" + folder + " hides " + std::to_string(hidden.size()) +
+                " playlists this server cannot start:" + (ids.empty() ? " none" : ids));
         }
     }
 
