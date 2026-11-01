@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
-project(iw8_demonware LANGUAGES CXX)
+project(iw8_demonware LANGUAGES C CXX)
+add_library(iw8-miniz STATIC third_party/miniz/miniz.c third_party/miniz/miniz_tdef.c)
+target_include_directories(iw8-miniz SYSTEM PUBLIC third_party/miniz)
+target_compile_definitions(iw8-miniz PUBLIC MINIZ_NO_ARCHIVE_APIS MINIZ_NO_INFLATE_APIS
+    MINIZ_NO_STDIO MINIZ_NO_TIME MINIZ_NO_ZLIB_COMPATIBLE_NAMES)
 add_executable(iw8-dw-server
     src/server.cpp
     src/tls_transport.cpp
@@ -50,8 +54,13 @@ add_executable(iw8-dw-server
     src/relay_services.cpp
     src/relay_provider.cpp
     src/content_pack.cpp
+    src/playlist_compression.cpp
 )
 target_compile_features(iw8-dw-server PRIVATE cxx_std_20)
+target_link_libraries(iw8-dw-server PRIVATE iw8-miniz)
+add_executable(iw8-content-codec-test tools/test-content-codec.cpp src/playlist_compression.cpp)
+target_compile_features(iw8-content-codec-test PRIVATE cxx_std_20)
+target_link_libraries(iw8-content-codec-test PRIVATE iw8-miniz)
 target_compile_definitions(iw8-dw-server PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0601)
 add_executable(iw8-session-lease-contract-test tools/test-session-lease.cpp
     src/platform.cpp src/platform_account_store.cpp src/platform_resources.cpp

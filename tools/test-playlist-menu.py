@@ -66,6 +66,9 @@ def served(data):
     # objectstore_services.cpp serves the object only with matching length and MD5.
     assert metadata["contentLength"] == len(content)
     assert metadata["checksum"] == base64.b64encode(hashlib.md5(content).digest()).decode()
+    # Replay downloads the object into a 0xa000-byte buffer (0x1412D1B16); a larger
+    # one never loads and the client stalls on "Fetching online profile".
+    assert len(content) <= 0xA000, len(content)
     return content, json.loads(zlib.decompress(content))
 
 

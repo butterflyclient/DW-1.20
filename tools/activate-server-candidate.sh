@@ -110,6 +110,7 @@ for attempt in range(50):
                 raw=content.read_bytes()
                 metadata=json.loads(content.with_name(name+'.metadata.json').read_bytes())
                 assert metadata['contentLength']==len(raw)
+                assert len(raw)<=0xa000  # Replay's native playlist download buffer
                 assert metadata['checksum']==base64.b64encode(hashlib.md5(raw).digest()).decode()
                 assert json.loads(zlib.decompress(raw))['system']['version']>0
                 menus+=1

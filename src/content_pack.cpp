@@ -3,6 +3,7 @@
 #include "crypto.h"
 #include "platform.h"
 #include "playlist_catalog.h"
+#include "playlist_compression.h"
 #include "wire.h"
 #include "../third_party/nlohmann/json.hpp"
 #include <algorithm>
@@ -395,35 +396,6 @@ namespace content_pack
                 }
         }
 
-        // A zlib stream (RFC 1950) of stored deflate blocks (RFC 1951 3.2.4).
-        // Every inflater reads it; the backend has no compressor of its own.
-        wire::Bytes zlibStored(std::span<const uint8_t> data)
-        {
-            wire::Bytes out{0x78, 0x01};
-            size_t offset = 0;
-            do
-            {
-                const auto size = std::min<size_t>(data.size() - offset, 0xFFFF);
-                out.push_back(offset + size == data.size() ? 1 : 0);
-                for (const auto value : {size, size_t{0xFFFF} ^ size})
-                {
-                    out.push_back(static_cast<uint8_t>(value));
-                    out.push_back(static_cast<uint8_t>(value >> 8));
-                }
-                out.insert(out.end(), data.begin() + offset, data.begin() + offset + size);
-                offset += size;
-            } while (offset < data.size());
-            uint32_t low = 1, high = 0;
-            for (const auto value : data)
-            {
-                low = (low + value) % 65521;
-                high = (high + low) % 65521;
-            }
-            const uint32_t adler = (high << 16) | low;
-            for (int shift = 24; shift >= 0; shift -= 8)
-                out.push_back(static_cast<uint8_t>(adler >> shift));
-            return out;
-        }
     } // namespace
 
     void signPatchManifests(const std::filesystem::path &data, const Log &log)
@@ -546,10 +518,23 @@ namespace content_pack
             const auto current = read(*object, 64 * 1024 * 1024);
             if (hidden.empty() && current && sha256(*current) == provenance.at("compressed_sha256").get<std::string>())
                 continue; // the published object, every playlist servable
-            const auto text = hidden.empty() ? std::string(catalogBytes->begin(), catalogBytes->end())
-                                             : menu.dump();
-            const auto content =
-                zlibStored(std::span(reinterpret_cast<const uint8_t *>(text.data()), text.size()));
+            const std::string catalogText(catalogBytes->begin(), catalogBytes->end());
+            const auto pack = [](const std::string &text)
+            { return compressPlaylist(std::span(reinterpret_cast<const uint8_t *>(text.data()), text.size())); };
+            // The native download buffer is 0xa000 bytes: a larger object never
+            // loads, the PLAYLISTS fence never passes and the client waits on
+            // "Fetching online profile". Serve the full catalog rather than that.
+            wire::Bytes content;
+            try
+            {
+                content = pack(hidden.empty() ? catalogText : menu.dump());
+            }
+            catch (const std::runtime_error &error)
+            {
+                log("CONTENT playlist menu title=" + folder + " serves every playlist: " + error.what());
+                hidden.clear();
+                content = pack(catalogText);
+            }
             if (current && *current == content)
                 continue;
             replacePublisherContent(data, *object, content);
